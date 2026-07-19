@@ -1,0 +1,52 @@
+{
+  "name": "gacha-task-manager",
+  "version": "0.1.0",
+  "description": "原神、崩坏：星穹铁道、绝区零和鸣潮的本地任务清单",
+  "main": "./out/main/index.js",
+  "author": "Gacha Task Manager contributors",
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "pnpm typecheck && electron-vite build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && vue-tsc --noEmit -p tsconfig.web.json",
+    "preview": "electron-vite preview",
+    "package:dir": "pnpm build && electron-builder --dir",
+    "package:portable": "pnpm build && electron-builder --win portable"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@vitejs/plugin-vue": "^6.0.8",
+    "electron": "^43.1.1",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "typescript": "~6.0.3",
+    "vite": "^7.3.6",
+    "vitest": "^4.1.10",
+    "vue": "^3.5.40",
+    "vue-tsc": "^3.3.7"
+  },
+  "build": {
+    "appId": "com.gachataskmanager.app",
+    "productName": "幻游清单",
+    "electronDist": "node_modules/electron/dist",
+    "npmRebuild": false,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ]
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}"
+    }
+  },
+  "packageManager": "pnpm@11.9.0"
+}

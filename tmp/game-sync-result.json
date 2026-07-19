@@ -1,0 +1,477 @@
+{
+  "generated_at": "2026-07-19T13:55:33.984228+00:00",
+  "accounts": [
+    {
+      "game": "genshin",
+      "uid": 100071776,
+      "nickname": "白雀3rL",
+      "level": 60,
+      "server": "cn_gf01",
+      "server_name": "天空岛",
+      "queries": {
+        "profile_and_exploration": {
+          "ok": false,
+          "error_type": "GeetestError",
+          "error": "[1034] Geetest triggered during the battle chronicle API request."
+        },
+        "spiral_abyss_current": {
+          "ok": false,
+          "error_type": "GeetestError",
+          "error": "[1034] Geetest triggered during the battle chronicle API request."
+        },
+        "imaginarium_theater_current": {
+          "ok": false,
+          "error_type": "Exception",
+          "error": "Character names not loaded for 'en-us'. Please run `await genshin.utility.update_characters_any()`."
+        },
+        "real_time_notes": {
+          "ok": false,
+          "error_type": "GeetestError",
+          "error": "[1034] Geetest triggered during the battle chronicle API request."
+        }
+      }
+    },
+    {
+      "game": "hkrpg",
+      "uid": 100005195,
+      "nickname": "白雀3rL",
+      "level": 70,
+      "server": "prod_gf_cn",
+      "server_name": "星穹列车",
+      "queries": {
+        "profile": {
+          "ok": false,
+          "error_type": "GeetestError",
+          "error": "[10035] Geetest triggered during the battle chronicle API request."
+        },
+        "memory_of_chaos": {
+          "ok": false,
+          "error_type": "GeetestError",
+          "error": "[10035] Geetest triggered during the battle chronicle API request."
+        },
+        "pure_fiction": {
+          "ok": false,
+          "error_type": "GeetestError",
+          "error": "[10035] Geetest triggered during the battle chronicle API request."
+        },
+        "apocalyptic_shadow": {
+          "ok": false,
+          "error_type": "GeetestError",
+          "error": "[10035] Geetest triggered during the battle chronicle API request."
+        },
+        "real_time_notes": {
+          "ok": false,
+          "error_type": "GeetestError",
+          "error": "[10035] Geetest triggered during the battle chronicle API request."
+        }
+      }
+    },
+    {
+      "game": "nap",
+      "uid": 10194867,
+      "nickname": "白雀3rL",
+      "level": 60,
+      "server": "prod_gf_cn",
+      "server_name": "新艾利都",
+      "queries": {
+        "profile": {
+          "ok": false,
+          "error_type": "GeetestError",
+          "error": "[10035] Geetest triggered during the battle chronicle API request."
+        },
+        "shiyu_defense": {
+          "ok": true,
+          "data": {
+            "schedule_id": 62052,
+            "begin_time": "2026-07-10T04:00:00+08:00",
+            "end_time": "2026-07-24T03:59:59+08:00",
+            "passed_fifth_floor": true,
+            "brief_info": {
+              "score": 111142,
+              "max_score": 150000,
+              "rank_percent": "20.56%",
+              "total_clear_time": null,
+              "rating": "S+",
+              "challenge_time": null
+            },
+            "fourth_frontier": {
+              "buff": {
+                "name": "极境彻风",
+                "description": "· 代理人的<color=#A6C5FD>风属性伤害</color>和<color=#98EFF0>冰属性伤害</color><color=#2BAD00>提升10%</color>。\\n· 命中处于<color=#FFFFFF>属性异常</color>状态中的敌人时，造成的伤害<color=#2BAD00>提升15%</color>，无视其<color=#2BAD00>10%</color>的全属性伤害抗性。"
+              },
+              "challenge_time": "2026-07-19T17:12:54",
+              "rating": "S",
+              "layers": [
+                {
+                  "id": 62052041,
+                  "clear_time": null,
+                  "characters": [
+                    {
+                      "id": 1091,
+                      "level": 60,
+                      "rarity": "S",
+                      "element": 202,
+                      "mindscape": 2
+                    },
+                    {
+                      "id": 1331,
+                      "level": 60,
+                      "rarity": "S",
+                      "element": 205,
+                      "mindscape": 0
+                    },
+                    {
+                      "id": 1411,
+                      "level": 60,
+                      "rarity": "S",
+                      "element": 200,
+                      "mindscape": 0
+                    }
+                  ],
+                  "bangboo": {
+                    "id": 54016,
+                    "rarity": "S",
+                    "level": 60
+                  }
+                },
+                {
+                  "id": 62052042,
+                  "clear_time": null,
+                  "characters": [
+                    {
+                      "id": 1431,
+                      "level": 60,
+                      "rarity": "S",
+                      "element": 200,
+                      "mindscape": 2
+                    },
+                    {
+                      "id": 1341,
+                      "level": 60,
+                      "rarity": "S",
+                      "element": 202,
+                      "mindscape": 0
+                    },
+                    {
+                      "id": 1491,
+                      "level": 60,
+                      "rarity": "S",
+                      "element": 200,
+                      "mindscape": 0
+                    }
+                  ],
+                  "bangboo": {
+                    "id": 54021,
+                    "rarity": "S",
+                    "level": 60
+                  }
+                }
+              ]
+            },
+            "fifth_frontier": {
+              "layers": [
+                {
+                  "id": 62052051,
+                  "rating": "S",
+                  "buff": {
+                    "name": "极境彻风",
+                    "description": "· 代理人的<color=#A6C5FD>风属性伤害</color>和<color=#98EFF0>冰属性伤害</color><color=#2BAD00>提升10%</color>。\\n· 命中处于<color=#FFFFFF>属性异常</color>状态中的敌人时，造成的伤害<color=#2BAD00>提升15%</color>，无视其<color=#2BAD00>10%</color>的全属性伤害抗性。"
+                  },
+                  "score": 30491,
+                  "max_score": 50000,
+                  "clear_time": null,
+                  "bangboo": {
+                    "id": 54017,
+                    "rarity": "S",
+                    "level": 60
+                  },
+                  "characters": [
+                    {
+                      "id": 1371,
+                      "level": 60,
+                      "rarity": "S",
+                      "element": 205,
+                      "mindscape": 2
+                    },
+                    {
+                      "id": 1421,
+                      "level": 60,
+                      "rarity": "A",
+                      "element": 200,
+                      "mindscape": 6
+                    },
+                    {
+                      "id": 1391,
+                      "level": 60,
+                      "rarity": "S",
+                      "element": 201,
+                      "mindscape": 0
+                    }
+                  ]
+                },
+                {
+                  "id": 62052052,
+                  "rating": "S",
+                  "buff": {
+                    "name": "终幕协奏",
+                    "description": "· 代理人的<color=#FFFFFF>[终结技]</color>、<color=#FFFFFF>[连携技]</color>造成的伤害提升40%。\\n· <color=#FFFFFF>[连携技]</color>命中敌人后，其失衡易伤倍率提升20%，失衡恢复速度降低15%，持续15秒，重复触发时刷新持续时间。"
+                  },
+                  "score": 31515,
+                  "max_score": 50000,
+                  "clear_time": null,
+                  "bangboo": {
+                    "id": 54016,
+                    "rarity": "S",
+                    "level": 60
+                  },
+                  "characters": [
+                    {
+                      "id": 1091,
+                      "level": 60,
+                      "rarity": "S",
+                      "element": 202,
+                      "mindscape": 2
+                    },
+                    {
+                      "id": 1331,
+                      "level": 60,
+                      "rarity": "S",
+                      "element": 205,
+                      "mindscape": 0
+                    },
+                    {
+                      "id": 1411,
+                      "level": 60,
+                      "rarity": "S",
+                      "element": 200,
+                      "mindscape": 0
+                    }
+                  ]
+                },
+                {
+                  "id": 62052053,
+                  "rating": "S",
+                  "buff": {
+                    "name": "曙色引光",
+                    "description": "· 代理人的攻击力提升30%，暴击伤害提升15%。\\n· 敌人的失衡易伤倍率提升20%。"
+                  },
+                  "score": 49136,
+                  "max_score": 50000,
+                  "clear_time": null,
+                  "bangboo": {
+                    "id": 54021,
+                    "rarity": "S",
+                    "level": 60
+                  },
+                  "characters": [
+                    {
+                      "id": 1431,
+                      "level": 60,
+                      "rarity": "S",
+                      "element": 200,
+                      "mindscape": 2
+                    },
+                    {
+                      "id": 1341,
+                      "level": 60,
+                      "rarity": "S",
+                      "element": 202,
+                      "mindscape": 0
+                    },
+                    {
+                      "id": 1491,
+                      "level": 60,
+                      "rarity": "S",
+                      "element": 200,
+                      "mindscape": 0
+                    }
+                  ]
+                }
+              ]
+            },
+            "player_nickname": "白雀3rL"
+          }
+        },
+        "deadly_assault": {
+          "ok": true,
+          "data": {
+            "id": 69041,
+            "start_time": "2026-07-17T04:00:00",
+            "end_time": "2026-07-29T03:59:59",
+            "challenges": [
+              {
+                "score": 32207,
+                "star": 3,
+                "total_star": 3,
+                "challenge_time": "2026-07-19T17:28:18",
+                "boss": {
+                  "name": "焚昼余火·法厄同",
+                  "background": "https://act-webstatic.mihoyo.com/game_record/zzzv2/boss_bg/boss_bg_4.png"
+                },
+                "buffs": [
+                  {
+                    "name": "凛息",
+                    "description": "· 代理人的<color=#A6C5FD>风属性伤害</color>、<color=#98EFF0>冰属性伤害</color><color=#2BAD00>提升20%</color>，异常精通<color=#2BAD00>提升20点</color>。\\n· 对敌人施加<color=#FFFFFF>属性异常</color>状态时，敌人的全伤害抗性<color=#2BAD00>降低10%</color>，且全队造成的属性异常伤害<color=#2BAD00>提升10%</color>，持续15秒，重复触发时刷新持续时间。"
+                  }
+                ],
+                "agents": [
+                  {
+                    "id": 1091,
+                    "level": 60,
+                    "element": 202,
+                    "specialty": 3,
+                    "rarity": "S",
+                    "mindscape": 2
+                  },
+                  {
+                    "id": 1331,
+                    "level": 60,
+                    "element": 205,
+                    "specialty": 3,
+                    "rarity": "S",
+                    "mindscape": 0
+                  },
+                  {
+                    "id": 1411,
+                    "level": 60,
+                    "element": 200,
+                    "specialty": 4,
+                    "rarity": "S",
+                    "mindscape": 0
+                  }
+                ],
+                "bangboo": {
+                  "id": 54016,
+                  "rarity": "S",
+                  "level": 60
+                }
+              },
+              {
+                "score": 40631,
+                "star": 3,
+                "total_star": 3,
+                "challenge_time": "2026-07-19T17:33:42",
+                "boss": {
+                  "name": "恶名·庞培",
+                  "background": "https://act-webstatic.mihoyo.com/game_record/zzzv2/boss_bg/boss_bg_4.png"
+                },
+                "buffs": [
+                  {
+                    "name": "溃亡",
+                    "description": "· 代理人造成的失衡值<color=#2BAD00>提升20%</color>，<color=#FFFFFF>[终结技]</color>/<color=#FFFFFF>[连携技]</color>无视敌人<color=#2BAD00>30%</color>的全属性伤害抗性。\\n· 发动<color=#FFFFFF>[连携技]</color>后，全队的攻击力<color=#2BAD00>提升10%</color>，暴击伤害<color=#2BAD00>提升15%</color>，持续20秒，最多可叠加3层，重复触发时刷新持续时间。"
+                  }
+                ],
+                "agents": [
+                  {
+                    "id": 1431,
+                    "level": 60,
+                    "element": 200,
+                    "specialty": 1,
+                    "rarity": "S",
+                    "mindscape": 2
+                  },
+                  {
+                    "id": 1341,
+                    "level": 60,
+                    "element": 202,
+                    "specialty": 5,
+                    "rarity": "S",
+                    "mindscape": 0
+                  },
+                  {
+                    "id": 1491,
+                    "level": 60,
+                    "element": 200,
+                    "specialty": 4,
+                    "rarity": "S",
+                    "mindscape": 0
+                  }
+                ],
+                "bangboo": {
+                  "id": 54021,
+                  "rarity": "S",
+                  "level": 60
+                }
+              },
+              {
+                "score": 24486,
+                "star": 3,
+                "total_star": 3,
+                "challenge_time": "2026-07-19T17:39:07",
+                "boss": {
+                  "name": "秽息妖鬼·名可名",
+                  "background": "https://act-webstatic.mihoyo.com/game_record/zzzv2/boss_bg/boss_bg_4.png"
+                },
+                "buffs": [
+                  {
+                    "name": "溃亡",
+                    "description": "· 代理人造成的失衡值<color=#2BAD00>提升20%</color>，<color=#FFFFFF>[终结技]</color>/<color=#FFFFFF>[连携技]</color>无视敌人<color=#2BAD00>30%</color>的全属性伤害抗性。\\n· 发动<color=#FFFFFF>[连携技]</color>后，全队的攻击力<color=#2BAD00>提升10%</color>，暴击伤害<color=#2BAD00>提升15%</color>，持续20秒，最多可叠加3层，重复触发时刷新持续时间。"
+                  }
+                ],
+                "agents": [
+                  {
+                    "id": 1371,
+                    "level": 60,
+                    "element": 205,
+                    "specialty": 6,
+                    "rarity": "S",
+                    "mindscape": 2
+                  },
+                  {
+                    "id": 1421,
+                    "level": 60,
+                    "element": 200,
+                    "specialty": 5,
+                    "rarity": "A",
+                    "mindscape": 6
+                  },
+                  {
+                    "id": 1391,
+                    "level": 60,
+                    "element": 201,
+                    "specialty": 2,
+                    "rarity": "S",
+                    "mindscape": 0
+                  }
+                ],
+                "bangboo": {
+                  "id": 54017,
+                  "rarity": "S",
+                  "level": 60
+                }
+              }
+            ],
+            "has_data": true,
+            "total_score": 97324,
+            "total_star": 9,
+            "rank_percent": "15.2%",
+            "nickname": "白雀3rL"
+          }
+        },
+        "annihilation_simulacrum": {
+          "ok": false,
+          "error_type": "TypeError",
+          "error": "'NoneType' object is not subscriptable"
+        },
+        "threshold_simulation": {
+          "ok": true,
+          "data": {
+            "id": 201,
+            "time_remaining_over_42_days": true,
+            "time_remaining_days": 0,
+            "has_data": false,
+            "ending_name": "",
+            "ending_background": "",
+            "total_score": 0,
+            "rank_percent": "0.0%"
+          }
+        },
+        "real_time_notes": {
+          "ok": false,
+          "error_type": "GeetestError",
+          "error": "[10035] Geetest triggered during the battle chronicle API request."
+        }
+      }
+    }
+  ]
+}
