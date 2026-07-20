@@ -37,6 +37,7 @@ pnpm package:portable
 
 命令格式和安全约束见 [本地命令接口](docs/local-command-api.md)。
 同步来源、公开排期文档与个人数据边界见 [同步适配器设计](docs/sync-adapters.md)。
+当前可执行的人工验收步骤见 [阶段验收清单](docs/stage-acceptance.md)。
 
 构建后的本地 MCP server 使用 stdio，不开放网络端口：
 
