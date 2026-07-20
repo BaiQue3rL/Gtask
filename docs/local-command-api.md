@@ -16,6 +16,8 @@ node out/main/local-mcp-server-cli.js
 - `archive_gacha_item`、`archive_completed_gacha_section`：软删除操作，均要求 `confirm: true`。
 - `write_gacha_checklists`：用于批量写入等高级命令的通用入口；同样不会绕过确认保护。
 
+服务还公开只读资源 `gacha://backups`，列出最近备份的文件名、类型、大小和更新时间。资源不包含凭据内容，也不提供删除或数据库恢复操作。
+
 MCP 采用本地 stdio，不监听网络端口。Windows GUI 可执行文件不直接承载 stdio；客户端应启动上述独立 Node 入口。
 CLI 与 MCP 在打开旧版磁盘数据库时会先创建迁移前一致性备份，与桌面端使用同一安全升级原则。
 

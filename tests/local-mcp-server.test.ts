@@ -1,26 +1,35 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { AppDatabase } from '../src/main/database'
 import { createLocalMcpServer } from '../src/main/local-mcp-server'
+import { createDailyBackup } from '../src/main/backup'
 
 let database: AppDatabase | null = null
 let server: McpServer | null = null
 let client: Client | null = null
+let temporaryDirectory: string | null = null
 
 afterEach(async () => {
   await client?.close()
   await server?.close()
   database?.close()
+  if (temporaryDirectory) rmSync(temporaryDirectory, { recursive: true, force: true })
   client = null
   server = null
   database = null
+  temporaryDirectory = null
 })
 
 async function connect(): Promise<Client> {
   database = new AppDatabase(':memory:')
-  server = createLocalMcpServer(database)
+  temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-mcp-resource-test-'))
+  await createDailyBackup(database, temporaryDirectory, new Date('2026-07-20T08:00:00+08:00'))
+  server = createLocalMcpServer(database, { backupDirectory: temporaryDirectory })
   client = new Client({ name: 'gacha-test-client', version: '1.0.0' })
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
   await Promise.all([server.connect(serverTransport), client.connect(clientTransport)])
@@ -55,6 +64,17 @@ describe('本地 MCP server', () => {
         { game: { id: 'zenless' } },
         { game: { id: 'wuthering-waves' } }
       ]
+    })
+
+    const resources = await connected.listResources()
+    expect(resources.resources).toEqual(
+      expect.arrayContaining([expect.objectContaining({ uri: 'gacha://backups' })])
+    )
+    const backupResource = await connected.readResource({ uri: 'gacha://backups' })
+    const backupContent = backupResource.contents[0]
+    if (!('text' in backupContent)) throw new Error('备份资源不是文本 JSON')
+    expect(JSON.parse(backupContent.text)).toMatchObject({
+      backups: [expect.objectContaining({ kind: 'daily' })]
     })
   })
 

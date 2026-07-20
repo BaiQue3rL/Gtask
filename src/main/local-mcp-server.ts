@@ -7,6 +7,7 @@ import {
   type GameId
 } from '../shared/contracts'
 import type { AppDatabase } from './database'
+import { listBackups } from './backup'
 import { LocalCommandService, type LocalCommandResult } from './local-command-service'
 
 const gameIdSchema = z.enum(SUPPORTED_GAME_IDS)
@@ -46,7 +47,14 @@ function toolError(error: unknown) {
   }
 }
 
-export function createLocalMcpServer(database: AppDatabase): McpServer {
+export interface LocalMcpServerOptions {
+  backupDirectory?: string
+}
+
+export function createLocalMcpServer(
+  database: AppDatabase,
+  options: LocalMcpServerOptions = {}
+): McpServer {
   const commands = new LocalCommandService(database)
   const server = new McpServer({ name: 'gacha-task-manager', version: '0.1.0' })
 
@@ -220,6 +228,27 @@ export function createLocalMcpServer(database: AppDatabase): McpServer {
       }
     }
   )
+
+  if (options.backupDirectory) {
+    server.registerResource(
+      'gacha-backups',
+      'gacha://backups',
+      {
+        title: '幻游清单本地备份',
+        description: '最近的每日、手动和数据库升级前备份元数据；不包含登录凭据。',
+        mimeType: 'application/json'
+      },
+      async () => ({
+        contents: [
+          {
+            uri: 'gacha://backups',
+            mimeType: 'application/json',
+            text: JSON.stringify({ backups: listBackups(options.backupDirectory!) }, null, 2)
+          }
+        ]
+      })
+    )
+  }
 
   return server
 }
