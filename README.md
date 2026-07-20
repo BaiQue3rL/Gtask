@@ -38,6 +38,12 @@ pnpm package:portable
 命令格式和安全约束见 [本地命令接口](docs/local-command-api.md)。
 同步来源、公开排期文档与个人数据边界见 [同步适配器设计](docs/sync-adapters.md)。
 
+构建后的本地 MCP server 使用 stdio，不开放网络端口：
+
+```powershell
+pnpm local:mcp
+```
+
 开发版首次启动后会在 Electron 的 `userData/data` 目录创建 `gacha-task-manager.sqlite`。
 
 ## 当前进度
@@ -49,7 +55,7 @@ pnpm package:portable
 - 主线/支线默认状态项，不记录具体剧情任务
 - 周常/挑战周期、实时倒计时、地图层级与探索百分比
 - 每游戏手动/自动同步设置和安全事务合并框架
-- 本地 AI 命令服务、外部写入自动刷新，以及每日/升级前/手动一致性备份
+- 本地 AI 命令服务、stdio MCP、外部写入自动刷新，以及每日/升级前/手动一致性备份
 - Windows DPAPI 凭据保险箱底座和一键清除入口
 - 主进程 IPC 参数校验、类型检查与自动化测试
 - 便携版构建配置

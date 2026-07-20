@@ -9,7 +9,8 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve('src/main/index.ts'),
-          'local-command-cli': resolve('src/main/local-command-cli.ts')
+          'local-command-cli': resolve('src/main/local-command-cli.ts'),
+          'local-mcp-server-cli': resolve('src/main/local-mcp-server-cli.ts')
         }
       }
     }

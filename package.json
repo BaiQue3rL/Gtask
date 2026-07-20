@@ -11,11 +11,15 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && vue-tsc --noEmit -p tsconfig.web.json",
     "local:command": "node out/main/local-command-cli.js",
+    "local:mcp": "node out/main/local-mcp-server-cli.js",
     "preview": "electron-vite preview",
     "package:dir": "pnpm build && electron-builder --dir",
     "package:portable": "pnpm build && electron-builder --win portable"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "zod": "4.0.0"
+  },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@vitejs/plugin-vue": "^6.0.8",

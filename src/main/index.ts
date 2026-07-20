@@ -65,6 +65,17 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
+  mainWindow.webContents.once('did-finish-load', () => {
+    mainWindow?.webContents.on('will-navigate', (event, url) => {
+      event.preventDefault()
+      try {
+        void shell.openExternal(parseExternalUrl(url))
+      } catch (error) {
+        console.warn('已阻止主窗口导航到不安全链接', error)
+      }
+    })
+  })
+
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
     void mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
   } else {
