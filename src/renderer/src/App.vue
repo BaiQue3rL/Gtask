@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import type {
+  AiScheduleAgentStatus,
   AppInfo,
   BackupSummary,
   ChecklistCategory,
@@ -74,6 +75,7 @@ const credentialStatuses = ref<CredentialStatus[]>([])
 const backups = ref<BackupSummary[]>([])
 const backingUp = ref(false)
 const restoringBackup = ref<string | null>(null)
+const aiScheduleAgent = ref<AiScheduleAgentStatus | null>(null)
 const editingItem = ref<ChecklistItem | null>(null)
 
 const form = reactive({
@@ -147,9 +149,10 @@ const syncStatusText = computed(() => {
 onMounted(async () => {
   window.addEventListener('keydown', handleGlobalKeydown)
   try {
-    ;[games.value, appInfo.value] = await Promise.all([
+    ;[games.value, appInfo.value, aiScheduleAgent.value] = await Promise.all([
       window.gacha.listGames(),
-      window.gacha.getAppInfo()
+      window.gacha.getAppInfo(),
+      window.gacha.getAiScheduleAgentStatus()
     ])
     await Promise.all([loadItems(), loadArchivedItems(), loadSyncSettings()])
   } catch (error) {
@@ -165,10 +168,11 @@ const removeSyncListener = window.gacha.onSyncCompleted((result) => {
   void Promise.all([loadItems(), loadSyncSettings()])
 })
 const removeChecklistListener = window.gacha.onChecklistChanged(() => {
-  void Promise.all([loadItems(), loadArchivedItems(), loadSyncSettings()])
+  void Promise.all([loadItems(), loadArchivedItems(), loadSyncSettings(), loadAiScheduleAgentStatus()])
 })
 const clockTimer = window.setInterval(() => {
   clockNow.value = Date.now()
+  void loadAiScheduleAgentStatus()
 }, 60_000)
 
 onUnmounted(() => {
@@ -214,6 +218,14 @@ async function loadSyncSettings(): Promise<void> {
     if (selectedGameId.value === gameId) syncSettings.value = loadedSettings
   } catch (error) {
     if (selectedGameId.value === gameId) showError(error)
+  }
+}
+
+async function loadAiScheduleAgentStatus(): Promise<void> {
+  try {
+    aiScheduleAgent.value = await window.gacha.getAiScheduleAgentStatus()
+  } catch (error) {
+    showError(error)
   }
 }
 
@@ -570,12 +582,13 @@ function showError(error: unknown): void {
             <button
               class="toolbar-button"
               type="button"
-              :disabled="syncing"
+                :disabled="syncing || !aiScheduleAgent?.connected"
+                :title="aiScheduleAgent?.connected ? `已连接 ${aiScheduleAgent.name}` : '请先连接具备联网搜索能力的 AI 排期 Agent'"
               aria-haspopup="menu"
               :aria-expanded="refreshMenuOpen"
               @click="refreshMenuOpen = !refreshMenuOpen"
             >
-              {{ syncing ? '同步中…' : '↻ 刷新清单' }} ▾
+                {{ syncing ? '同步中…' : aiScheduleAgent?.connected ? '↻ 刷新清单' : '↻ 未连接 AI' }} ▾
             </button>
             <div v-if="refreshMenuOpen" class="dropdown-menu" role="menu">
               <button role="menuitem" type="button" @click="runSync('public_schedule')">同步公开排期</button>

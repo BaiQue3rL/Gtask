@@ -7,6 +7,8 @@ import type {
   ChecklistCategory,
   ChecklistItem,
   ChecklistSource,
+  AiScheduleAgentStatus,
+  AiScheduleJob,
   CreateChecklistItemInput,
   GameId,
   GameSummary,
@@ -53,7 +55,10 @@ const DEFAULT_GAMES: GameSummary[] = [
   }
 ]
 
-export const CURRENT_SCHEMA_VERSION = 6
+export const CURRENT_SCHEMA_VERSION = 7
+
+const AI_AGENT_MAX_AGE_MS = 5 * 60 * 1000
+const AI_JOB_CLAIM_MAX_AGE_MS = 15 * 60 * 1000
 
 export class AppDatabase {
   private readonly database: DatabaseSync
@@ -185,6 +190,148 @@ export class AppDatabase {
         WHERE game_id = ?
       `)
       .run(status, lastSuccessAt, message, now, gameId)
+  }
+
+  registerAiScheduleAgent(
+    agentId: string,
+    name: string,
+    reference = new Date()
+  ): AiScheduleAgentStatus {
+    const now = reference.toISOString()
+    this.database.prepare(`
+      INSERT INTO ai_schedule_agents(id, name, last_seen_at, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        name = excluded.name,
+        last_seen_at = excluded.last_seen_at,
+        updated_at = excluded.updated_at
+    `).run(agentId, name, now, now, now)
+    return { connected: true, agentId, name, lastSeenAt: now }
+  }
+
+  getAiScheduleAgentStatus(reference = new Date()): AiScheduleAgentStatus {
+    const threshold = new Date(reference.getTime() - AI_AGENT_MAX_AGE_MS).toISOString()
+    const row = this.database.prepare(`
+      SELECT id AS agentId, name, last_seen_at AS lastSeenAt
+      FROM ai_schedule_agents
+      WHERE last_seen_at >= ?
+      ORDER BY last_seen_at DESC
+      LIMIT 1
+    `).get(threshold) as Omit<AiScheduleAgentStatus, 'connected'> | undefined
+    return row ? { connected: true, ...row } : {
+      connected: false,
+      agentId: null,
+      name: null,
+      lastSeenAt: null
+    }
+  }
+
+  createAiScheduleJob(gameId: GameId, scope: SyncScope, reference = new Date()): AiScheduleJob {
+    const agent = this.getAiScheduleAgentStatus(reference)
+    if (!agent.connected) throw new Error('尚未连接具备联网搜索能力的 AI 排期 Agent')
+    this.requeueStaleAiScheduleJobs(reference)
+    const active = this.database.prepare(`
+      SELECT id FROM ai_schedule_jobs
+      WHERE game_id = ? AND status IN ('pending', 'claimed')
+      ORDER BY requested_at ASC LIMIT 1
+    `).get(gameId) as { id: string } | undefined
+    if (active) return this.getAiScheduleJob(active.id)
+    const id = randomUUID()
+    const now = reference.toISOString()
+    this.database.prepare(`
+      INSERT INTO ai_schedule_jobs(id, game_id, scope, status, requested_at, updated_at)
+      VALUES (?, ?, ?, 'pending', ?, ?)
+    `).run(id, gameId, scope, now, now)
+    this.database.prepare(`
+      UPDATE sync_states
+      SET status = 'idle', last_scope = ?, last_attempt_at = ?,
+          message = '公开排期任务已提交给 AI，等待检索', updated_at = ?
+      WHERE game_id = ?
+    `).run(scope, now, now, gameId)
+    return this.getAiScheduleJob(id)
+  }
+
+  claimAiScheduleJob(agentId: string, reference = new Date()): AiScheduleJob | null {
+    return this.runTransaction(() => {
+      const agent = this.database.prepare('SELECT name FROM ai_schedule_agents WHERE id = ?').get(agentId)
+      if (!agent) throw new Error('AI 排期 Agent 尚未登记')
+      const now = reference.toISOString()
+      this.database.prepare(`UPDATE ai_schedule_agents SET last_seen_at = ?, updated_at = ? WHERE id = ?`)
+        .run(now, now, agentId)
+      this.requeueStaleAiScheduleJobs(reference)
+      const pending = this.database.prepare(`
+        SELECT id FROM ai_schedule_jobs WHERE status = 'pending' ORDER BY requested_at ASC LIMIT 1
+      `).get() as { id: string } | undefined
+      if (!pending) return null
+      this.database.prepare(`
+        UPDATE ai_schedule_jobs
+        SET status = 'claimed', agent_id = ?, claimed_at = ?, updated_at = ?
+        WHERE id = ? AND status = 'pending'
+      `).run(agentId, now, now, pending.id)
+      return this.getAiScheduleJob(pending.id)
+    })
+  }
+
+  applyAiScheduleJob(
+    jobId: string,
+    agentId: string,
+    items: NormalizedSyncItem[],
+    evidence: unknown,
+    reference = new Date()
+  ): { job: AiScheduleJob; merge: SyncMergeResult } {
+    const job = this.getAiScheduleJob(jobId)
+    if (job.status !== 'claimed' || job.agentId !== agentId) {
+      throw new Error('AI 排期任务未由当前 Agent 领取或已经结束')
+    }
+    const merge = this.mergeSyncedItems(job.gameId, 'public_schedule', items, reference.toISOString())
+    const now = reference.toISOString()
+    const message = `AI 排期同步完成：新增 ${merge.added}，更新 ${merge.updated}，保护 ${merge.preserved}`
+    this.database.prepare(`
+      UPDATE ai_schedule_jobs
+      SET status = 'completed', completed_at = ?, evidence_json = ?, message = ?, updated_at = ?
+      WHERE id = ? AND status = 'claimed' AND agent_id = ?
+    `).run(now, JSON.stringify(evidence), message, now, jobId, agentId)
+    this.recordSyncOutcome(job.gameId, 'success', message, true)
+    return { job: this.getAiScheduleJob(jobId), merge }
+  }
+
+  failAiScheduleJob(jobId: string, agentId: string, message: string, reference = new Date()): AiScheduleJob {
+    const now = reference.toISOString()
+    const result = this.database.prepare(`
+      UPDATE ai_schedule_jobs
+      SET status = 'failed', completed_at = ?, message = ?, updated_at = ?
+      WHERE id = ? AND status = 'claimed' AND agent_id = ?
+    `).run(now, message, now, jobId, agentId)
+    if (result.changes === 0) throw new Error('AI 排期任务未由当前 Agent 领取或已经结束')
+    const job = this.getAiScheduleJob(jobId)
+    this.recordSyncOutcome(job.gameId, 'error', message, false)
+    return job
+  }
+
+  private getAiScheduleJob(id: string): AiScheduleJob {
+    const row = this.database.prepare(`
+      SELECT j.id, j.game_id AS gameId, j.scope, j.status,
+        j.requested_at AS requestedAt, j.claimed_at AS claimedAt,
+        j.completed_at AS completedAt, j.agent_id AS agentId,
+        a.name AS agentName, j.message
+      FROM ai_schedule_jobs j
+      LEFT JOIN ai_schedule_agents a ON a.id = j.agent_id
+      WHERE j.id = ?
+    `).get(id) as AiScheduleJob | undefined
+    if (!row) throw new Error('AI 排期任务不存在')
+    return row
+  }
+
+  private requeueStaleAiScheduleJobs(reference: Date): number {
+    const threshold = new Date(reference.getTime() - AI_JOB_CLAIM_MAX_AGE_MS).toISOString()
+    const now = reference.toISOString()
+    const result = this.database.prepare(`
+      UPDATE ai_schedule_jobs
+      SET status = 'pending', agent_id = NULL, claimed_at = NULL,
+          message = 'Agent 超时，任务已重新排队', updated_at = ?
+      WHERE status = 'claimed' AND claimed_at < ?
+    `).run(now, threshold)
+    return Number(result.changes)
   }
 
   markStaleSyncStates(reference = new Date(), maximumAgeMs = 24 * 60 * 60 * 1000): number {
@@ -837,6 +984,41 @@ export class AppDatabase {
         BEGIN;
         ALTER TABLE checklist_items ADD COLUMN source_url TEXT;
         INSERT INTO schema_migrations(version) VALUES (6);
+        COMMIT;
+      `)
+    }
+
+    const migration7 = this.database
+      .prepare('SELECT version FROM schema_migrations WHERE version = 7')
+      .get()
+
+    if (!migration7) {
+      this.database.exec(`
+        BEGIN;
+        CREATE TABLE ai_schedule_agents (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          last_seen_at TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE TABLE ai_schedule_jobs (
+          id TEXT PRIMARY KEY,
+          game_id TEXT NOT NULL REFERENCES games(id) ON DELETE RESTRICT,
+          scope TEXT NOT NULL CHECK (scope IN ('public_schedule', 'public_and_personal')),
+          status TEXT NOT NULL CHECK (status IN ('pending', 'claimed', 'completed', 'failed')),
+          requested_at TEXT NOT NULL,
+          claimed_at TEXT,
+          completed_at TEXT,
+          agent_id TEXT REFERENCES ai_schedule_agents(id) ON DELETE SET NULL,
+          evidence_json TEXT,
+          message TEXT,
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX ai_schedule_jobs_pending ON ai_schedule_jobs(status, requested_at);
+        CREATE UNIQUE INDEX ai_schedule_jobs_active_game
+          ON ai_schedule_jobs(game_id) WHERE status IN ('pending', 'claimed');
+        INSERT INTO schema_migrations(version) VALUES (7);
         COMMIT;
       `)
     }

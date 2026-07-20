@@ -15,11 +15,26 @@ node out/main/local-mcp-server-cli.js
 - `create_gacha_item`、`update_gacha_item`、`restore_gacha_item`：带明确字段结构的常用写入操作。
 - `archive_gacha_item`、`archive_completed_gacha_section`：软删除操作，均要求 `confirm: true`。
 - `write_gacha_checklists`：用于批量写入等高级命令的通用入口；同样不会绕过确认保护。
+- `register_gacha_schedule_agent`：登记具备联网搜索能力的 AI Agent，并刷新五分钟有效的连接心跳。
+- `claim_gacha_schedule_job`：领取用户点击“刷新清单”后创建的公开排期任务。
+- `apply_gacha_public_schedule`：提交交叉验证后的结构化排期，并通过同步合并器写入。
+- `fail_gacha_schedule_job`：报告检索失败，保留已有清单和上次成功数据。
 
 服务还公开只读资源 `gacha://backups`，列出最近备份的文件名、类型、大小和更新时间。资源不包含凭据内容，也不提供删除或数据库恢复操作。
 
 MCP 采用本地 stdio，不监听网络端口。Windows GUI 可执行文件不直接承载 stdio；客户端应启动上述独立 Node 入口。
 CLI 与 MCP 在打开旧版磁盘数据库时会先创建迁移前一致性备份，与桌面端使用同一安全升级原则。
+
+## AI 公开排期任务协议
+
+公开排期按钮只有在最近五分钟内有 Agent 调用 `register_gacha_schedule_agent` 后才启用。Agent 需要持续运行并按以下顺序工作：
+
+1. 登记心跳并声明 `webSearch: true`。
+2. 轮询 `claim_gacha_schedule_job`；无任务时返回 `null`。
+3. 按任务中的游戏联网搜索并交叉验证来源。
+4. 调用 `apply_gacha_public_schedule` 提交 1～200 条排期及 1～20 条证据，或调用失败工具结束任务。
+
+专用提交工具只允许活动、周常和深渊/挑战排期字段，不接受完成状态、探索度、删除操作或凭据。每批先经过严格字段校验，再使用公开排期同步合并规则写入；重复 `remoteKey`、非法时间窗或未知字段会拒绝整批数据。
 
 不使用 MCP 时，也可以从标准输入传入单个 JSON 命令：
 

@@ -42,6 +42,28 @@ export interface BackupSummary {
   kind: 'daily' | 'pre_migration' | 'pre_restore' | 'manual'
 }
 
+export type AiScheduleJobStatus = 'pending' | 'claimed' | 'completed' | 'failed'
+
+export interface AiScheduleAgentStatus {
+  connected: boolean
+  agentId: string | null
+  name: string | null
+  lastSeenAt: string | null
+}
+
+export interface AiScheduleJob {
+  id: string
+  gameId: GameId
+  scope: SyncScope
+  status: AiScheduleJobStatus
+  requestedAt: string
+  claimedAt: string | null
+  completedAt: string | null
+  agentId: string | null
+  agentName: string | null
+  message: string | null
+}
+
 export interface GameSummary {
   id: GameId
   name: string
@@ -161,6 +183,7 @@ export interface GachaApi {
   listBackups: () => Promise<BackupSummary[]>
   createBackup: () => Promise<BackupSummary>
   restoreBackup: (fileName: string) => Promise<boolean>
+  getAiScheduleAgentStatus: () => Promise<AiScheduleAgentStatus>
   listGames: () => Promise<GameSummary[]>
   listChecklistItems: (gameId: GameId) => Promise<ChecklistItem[]>
   listArchivedChecklistItems: (gameId: GameId) => Promise<ChecklistItem[]>

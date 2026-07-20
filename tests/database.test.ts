@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
-import { AppDatabase } from '../src/main/database'
+import { AppDatabase, CURRENT_SCHEMA_VERSION } from '../src/main/database'
 
 let database: AppDatabase | null = null
 let temporaryDirectory: string | null = null
@@ -416,9 +416,11 @@ describe('AppDatabase', () => {
     database = null
 
     const newerDatabase = new DatabaseSync(databasePath)
-    newerDatabase.prepare('INSERT INTO schema_migrations(version) VALUES (7)').run()
+    newerDatabase.prepare('INSERT INTO schema_migrations(version) VALUES (?)').run(CURRENT_SCHEMA_VERSION + 1)
     newerDatabase.close()
 
-    expect(() => new AppDatabase(databasePath)).toThrow('期望 6，实际 7')
+    expect(() => new AppDatabase(databasePath)).toThrow(
+      `期望 ${CURRENT_SCHEMA_VERSION}，实际 ${CURRENT_SCHEMA_VERSION + 1}`
+    )
   })
 })

@@ -48,7 +48,11 @@ describe('本地 MCP server', () => {
       'update_gacha_item',
       'restore_gacha_item',
       'archive_gacha_item',
-      'archive_completed_gacha_section'
+      'archive_completed_gacha_section',
+      'register_gacha_schedule_agent',
+      'claim_gacha_schedule_job',
+      'apply_gacha_public_schedule',
+      'fail_gacha_schedule_job'
     ])
 
     const response = await connected.callTool({
@@ -103,5 +107,100 @@ describe('本地 MCP server', () => {
     expect(rejected.content).toEqual(
       expect.arrayContaining([expect.objectContaining({ text: expect.stringContaining('confirm: true') })])
     )
+  })
+
+  it('通过 Agent 心跳、任务领取和专用工具安全写入公开排期', async () => {
+    const connected = await connect()
+    expect(database!.getAiScheduleAgentStatus().connected).toBe(false)
+    expect(() => database!.createAiScheduleJob('genshin', 'public_schedule')).toThrow('尚未连接')
+
+    const registered = await connected.callTool({
+      name: 'register_gacha_schedule_agent',
+      arguments: { agentId: 'test-agent', name: '测试搜索 Agent', webSearch: true }
+    })
+    expect(registered.isError).not.toBe(true)
+    expect(database!.getAiScheduleAgentStatus()).toMatchObject({
+      connected: true,
+      agentId: 'test-agent'
+    })
+
+    const queued = database!.createAiScheduleJob('genshin', 'public_schedule')
+    expect(database!.createAiScheduleJob('genshin', 'public_schedule').id).toBe(queued.id)
+    const claimed = await connected.callTool({
+      name: 'claim_gacha_schedule_job',
+      arguments: { agentId: 'test-agent' }
+    })
+    expect(claimed.structuredContent).toMatchObject({
+      command: 'claim_schedule_job',
+      job: { id: queued.id, gameId: 'genshin', status: 'claimed' }
+    })
+
+    const rejectedCompletion = await connected.callTool({
+      name: 'apply_gacha_public_schedule',
+      arguments: {
+        agentId: 'test-agent',
+        jobId: queued.id,
+        retrievedAt: '2026-07-20T15:30:00.000Z',
+        items: [{
+          remoteKey: 'official:event:test',
+          category: 'limited_event',
+          title: '不能夹带完成状态',
+          sourceUrl: 'https://example.com/official-event',
+          confidence: 0.98,
+          completed: true
+        }],
+        evidence: [{
+          url: 'https://example.com/official-event',
+          platform: 'official-site',
+          publisher: '官方账号',
+          official: true
+        }]
+      }
+    })
+    expect(rejectedCompletion.isError).toBe(true)
+    expect(database!.listChecklistItems('genshin').some((item) => item.title === '不能夹带完成状态')).toBe(false)
+
+    const applied = await connected.callTool({
+      name: 'apply_gacha_public_schedule',
+      arguments: {
+        agentId: 'test-agent',
+        jobId: queued.id,
+        retrievedAt: '2026-07-20T15:30:00.000Z',
+        items: [{
+          remoteKey: 'official:event:test',
+          category: 'limited_event',
+          title: 'AI 交叉验证活动',
+          startsAt: '2026-07-21T02:00:00.000Z',
+          endsAt: '2026-08-01T19:59:00.000Z',
+          scheduleKind: 'fixed_window',
+          sourceUrl: 'https://example.com/official-event',
+          confidence: 0.98
+        }],
+        evidence: [{
+          url: 'https://example.com/official-event',
+          platform: 'official-site',
+          publisher: '官方账号',
+          official: true,
+          publishedAt: '2026-07-20T12:00:00.000Z'
+        }]
+      }
+    })
+    expect(applied.isError).not.toBe(true)
+    expect(applied.structuredContent).toMatchObject({
+      command: 'apply_public_schedule',
+      job: { status: 'completed' },
+      merge: { added: 1, updated: 0 }
+    })
+    expect(database!.listChecklistItems('genshin')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: 'AI 交叉验证活动',
+          source: 'public_schedule',
+          sourceUrl: 'https://example.com/official-event',
+          completed: false
+        })
+      ])
+    )
+    expect(database!.getSyncSettings('genshin')).toMatchObject({ status: 'success' })
   })
 })

@@ -12,6 +12,7 @@ import {
 import { CredentialVault } from './credential-vault'
 import { SyncOrchestrator } from './sync/orchestrator'
 import { restoreRelaunchOptions } from './relaunch'
+import type { GameId, SyncResult, SyncScope } from '../shared/contracts'
 import {
   parseChecklistSection,
   parseCredentialProvider,
@@ -40,6 +41,62 @@ let externalChangeTimer: ReturnType<typeof setInterval> | null = null
 let credentialVault: CredentialVault | null = null
 let appBackupDirectory: string | null = null
 let appDatabasePath: string | null = null
+
+function queueAiScheduleSync(gameId: GameId, scope: SyncScope): SyncResult {
+  if (!appDatabase) throw new Error('数据库尚未初始化')
+  const startedAt = new Date().toISOString()
+  try {
+    const job = appDatabase.createAiScheduleJob(gameId, scope)
+    const publicMessage = `已提交给 ${job.agentName ?? 'AI 排期 Agent'}，等待联网检索和交叉验证（任务 ${job.id.slice(0, 8)}）`
+    const sources: SyncResult['sources'] = [{
+      source: 'public_schedule',
+      status: 'skipped',
+      message: publicMessage,
+      added: 0,
+      updated: 0,
+      preserved: 0
+    }]
+    if (scope === 'public_and_personal') {
+      sources.push({
+        source: 'personal_data',
+        status: 'error',
+        message: `${gameId === 'wuthering-waves' ? '库街区' : '米游社'}个人数据适配器尚未接入`,
+        added: 0,
+        updated: 0,
+        preserved: 0
+      })
+    }
+    return {
+      gameId,
+      requestedScope: scope,
+      status: 'partial',
+      startedAt,
+      finishedAt: new Date().toISOString(),
+      sources,
+      message: sources.map((source) => source.message).join('；')
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '无法创建 AI 排期任务'
+    appDatabase.recordSyncAttempt(gameId, scope)
+    appDatabase.recordSyncOutcome(gameId, 'error', message, false)
+    return {
+      gameId,
+      requestedScope: scope,
+      status: 'error',
+      startedAt,
+      finishedAt: new Date().toISOString(),
+      sources: [{
+        source: 'public_schedule',
+        status: 'error',
+        message,
+        added: 0,
+        updated: 0,
+        preserved: 0
+      }],
+      message
+    }
+  }
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -165,6 +222,10 @@ function registerIpcHandlers(): void {
     }, 150)
     return true
   })
+  ipcMain.handle('ai-schedule:get-agent-status', () => {
+    if (!appDatabase) throw new Error('数据库尚未初始化')
+    return appDatabase.getAiScheduleAgentStatus()
+  })
 
   ipcMain.handle('games:list', () => appDatabase?.listGames() ?? [])
   ipcMain.handle('checklist:list', (_event, gameId: unknown) =>
@@ -212,8 +273,7 @@ function registerIpcHandlers(): void {
     })
   })
   ipcMain.handle('sync:run', async (_event, gameId: unknown, scope: unknown) => {
-    if (!syncOrchestrator) throw new Error('同步服务尚未初始化')
-    return syncOrchestrator.syncGame(parseGameId(gameId), parseSyncScope(scope))
+    return queueAiScheduleSync(parseGameId(gameId), parseSyncScope(scope))
   })
   ipcMain.handle('credentials:list-status', () => {
     if (!credentialVault) throw new Error('安全凭据存储尚未初始化')
@@ -274,9 +334,10 @@ if (!app.requestSingleInstanceLock()) {
     syncOrchestrator = new SyncOrchestrator(appDatabase)
     registerIpcHandlers()
     createWindow()
-    void syncOrchestrator.runStartupSync().then((results) => {
-      for (const result of results) mainWindow?.webContents.send('sync:completed', result)
-    })
+    for (const settings of appDatabase.listAutomaticSyncSettings()) {
+      const result = queueAiScheduleSync(settings.gameId as GameId, settings.autoScope)
+      mainWindow?.webContents.send('sync:completed', result)
+    }
     periodTimer = setInterval(() => {
       const changes =
         (appDatabase?.resetDueWeeklyItems() ?? 0) +

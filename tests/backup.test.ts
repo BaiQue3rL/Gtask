@@ -120,7 +120,12 @@ describe('createDailyBackup', () => {
     database = null
 
     const oldDatabase = new DatabaseSync(databasePath)
-    oldDatabase.exec('ALTER TABLE checklist_items DROP COLUMN source_url; DELETE FROM schema_migrations WHERE version = 6;')
+    oldDatabase.exec(`
+      DROP TABLE ai_schedule_jobs;
+      DROP TABLE ai_schedule_agents;
+      ALTER TABLE checklist_items DROP COLUMN source_url;
+      DELETE FROM schema_migrations WHERE version >= 6;
+    `)
     oldDatabase.close()
 
     database = await openDatabaseWithMigrationBackup(databasePath)
