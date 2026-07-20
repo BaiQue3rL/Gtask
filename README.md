@@ -36,6 +36,7 @@ pnpm package:portable
 ```
 
 命令格式和安全约束见 [本地命令接口](docs/local-command-api.md)。
+同步来源、公开排期文档与个人数据边界见 [同步适配器设计](docs/sync-adapters.md)。
 
 开发版首次启动后会在 Electron 的 `userData/data` 目录创建 `gacha-task-manager.sqlite`。
 
@@ -43,7 +44,7 @@ pnpm package:portable
 
 - Electron 主进程和安全预加载桥接
 - Vue 3 清单总览和事项编辑弹窗
-- SQLite v1～v5 迁移及四款游戏种子数据
+- SQLite v1～v6 迁移及四款游戏种子数据
 - 手动事项新增、编辑、完成状态切换、软删除、版块批量删除与回收站恢复
 - 主线/支线默认状态项，不记录具体剧情任务
 - 周常/挑战周期、实时倒计时、地图层级与探索百分比

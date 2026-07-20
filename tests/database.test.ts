@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AppDatabase } from '../src/main/database'
 
@@ -29,6 +30,13 @@ describe('AppDatabase', () => {
       const items = database.listChecklistItems(game.id)
       expect(items.map((item) => item.category)).toEqual(['main_quest', 'side_quest'])
     }
+    expect(() =>
+      database!.createChecklistItem({
+        gameId: 'genshin',
+        category: 'main_quest',
+        title: '第二条主线'
+      })
+    ).toThrow('不能重复新增')
   })
 
   it('新增、编辑、手动完成和软删除事项', () => {
@@ -252,6 +260,7 @@ describe('AppDatabase', () => {
         remoteKey: 'endgame:abyss:2026-07-b',
         category: 'endgame',
         title: '深境螺旋',
+        sourceUrl: 'https://example.com/genshin/abyss',
         startsAt: '2026-07-16T20:00:00.000Z',
         endsAt: '2026-08-01T19:59:59.999Z',
         modeKey: 'abyss'
@@ -279,6 +288,7 @@ describe('AppDatabase', () => {
       completed: true,
       progressPercent: 100,
       startsAt: '2026-07-16T20:00:00.000Z',
+      sourceUrl: 'https://example.com/genshin/abyss',
       modeKey: 'abyss'
     })
   })
@@ -347,5 +357,19 @@ describe('AppDatabase', () => {
       status: 'stale',
       lastSuccessAt: success.lastSuccessAt
     })
+  })
+
+  it('旧程序拒绝打开更高版本数据库，避免降级写入', () => {
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-newer-schema-test-'))
+    const databasePath = join(temporaryDirectory, 'test.sqlite')
+    database = new AppDatabase(databasePath)
+    database.close()
+    database = null
+
+    const newerDatabase = new DatabaseSync(databasePath)
+    newerDatabase.prepare('INSERT INTO schema_migrations(version) VALUES (7)').run()
+    newerDatabase.close()
+
+    expect(() => new AppDatabase(databasePath)).toThrow('期望 6，实际 7')
   })
 })

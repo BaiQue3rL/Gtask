@@ -132,7 +132,10 @@ describe('SyncOrchestrator', () => {
         expect.objectContaining({ source: 'personal_data', status: 'verification_required' })
       ])
     )
-    expect(database.getSyncSettings('genshin').status).toBe('verification_required')
+    expect(database.getSyncSettings('genshin')).toMatchObject({
+      status: 'verification_required'
+    })
+    expect(database.getSyncSettings('genshin').lastSuccessAt).not.toBeNull()
   })
 
   it('同一游戏的并发刷新复用正在执行的任务，避免重复请求和写入', async () => {

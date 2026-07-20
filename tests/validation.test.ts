@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   parseChecklistSection,
   parseCreateChecklistItem,
+  parseExternalUrl,
   parseGameId,
   parseSyncRunMode,
   parseSyncScope,
@@ -49,5 +50,31 @@ describe('清单 IPC 参数校验', () => {
     expect(parseSyncScope('public_and_personal')).toBe('public_and_personal')
     expect(() => parseSyncRunMode('startup')).toThrow('不支持的同步运行模式')
     expect(() => parseSyncScope('personal_only')).toThrow('不支持的同步范围')
+  })
+
+  it('拒绝非法时间和结束早于开始的事项', () => {
+    expect(() =>
+      parseCreateChecklistItem({
+        gameId: 'genshin',
+        category: 'limited_event',
+        title: '活动',
+        startsAt: 'not-a-date'
+      })
+    ).toThrow('不是有效时间')
+    expect(() =>
+      parseCreateChecklistItem({
+        gameId: 'genshin',
+        category: 'limited_event',
+        title: '活动',
+        startsAt: '2026-07-21T00:00:00.000Z',
+        endsAt: '2026-07-20T00:00:00.000Z'
+      })
+    ).toThrow('结束时间不能早于开始时间')
+  })
+
+  it('外部来源链接只允许 HTTP 和 HTTPS', () => {
+    expect(parseExternalUrl('https://example.com/schedule')).toBe('https://example.com/schedule')
+    expect(() => parseExternalUrl('file:///C:/secret.txt')).toThrow('HTTP/HTTPS')
+    expect(() => parseExternalUrl('javascript:alert(1)')).toThrow('HTTP/HTTPS')
   })
 })

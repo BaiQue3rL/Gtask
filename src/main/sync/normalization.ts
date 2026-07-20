@@ -25,6 +25,19 @@ function nullableDate(value: unknown, field: string): string | null | undefined 
   return normalized
 }
 
+function nullableHttpUrl(value: unknown): string | null | undefined {
+  const normalized = nullableString(value, '同步来源 URL', 500)
+  if (!normalized) return normalized
+  let url: URL
+  try {
+    url = new URL(normalized)
+  } catch {
+    throw new Error('同步来源 URL 格式不正确')
+  }
+  if (!['http:', 'https:'].includes(url.protocol)) throw new Error('同步来源 URL 仅支持 HTTP/HTTPS')
+  return url.toString()
+}
+
 export function normalizeSyncItem(value: unknown): NormalizedSyncItem {
   if (!isRecord(value)) throw new Error('同步事项格式不正确')
   if (
@@ -65,15 +78,22 @@ export function normalizeSyncItem(value: unknown): NormalizedSyncItem {
     throw new Error('同步周重置日必须在 1 到 7 之间')
   }
 
+  const startsAt = nullableDate(value.startsAt, '同步开始时间')
+  const endsAt = nullableDate(value.endsAt, '同步结束时间')
+  if (startsAt && endsAt && Date.parse(startsAt) > Date.parse(endsAt)) {
+    throw new Error('同步结束时间不能早于开始时间')
+  }
+
   return {
     remoteKey: requiredString(value.remoteKey, '远端事项标识', 200),
+    sourceUrl: nullableHttpUrl(value.sourceUrl),
     category: value.category as NormalizedSyncItem['category'],
     title: requiredString(value.title, '同步事项名称', 100),
     completed: value.completed as boolean | undefined,
     progressPercent: value.progressPercent as number | null | undefined,
     parentTitle: nullableString(value.parentTitle, '同步上级区域'),
-    startsAt: nullableDate(value.startsAt, '同步开始时间'),
-    endsAt: nullableDate(value.endsAt, '同步结束时间'),
+    startsAt,
+    endsAt,
     resetRule: nullableString(value.resetRule, '同步重置规则'),
     periodKey: nullableString(value.periodKey, '同步周期标识'),
     scheduleKind: value.scheduleKind as NormalizedSyncItem['scheduleKind'] | undefined,

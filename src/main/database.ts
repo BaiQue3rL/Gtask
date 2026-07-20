@@ -53,18 +53,25 @@ const DEFAULT_GAMES: GameSummary[] = [
   }
 ]
 
+export const CURRENT_SCHEMA_VERSION = 6
+
 export class AppDatabase {
   private readonly database: DatabaseSync
 
   constructor(databasePath: string) {
     mkdirSync(dirname(databasePath), { recursive: true })
     this.database = new DatabaseSync(databasePath)
-    this.database.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;')
-    this.migrate()
-    this.seedGames()
-    this.seedQuestChecklists()
-    this.resetDueWeeklyItems()
-    this.markStaleSyncStates()
+    try {
+      this.database.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;')
+      this.migrate()
+      this.seedGames()
+      this.seedQuestChecklists()
+      this.resetDueWeeklyItems()
+      this.markStaleSyncStates()
+    } catch (error) {
+      this.database.close()
+      throw error
+    }
   }
 
   listGames(): GameSummary[] {
@@ -90,6 +97,18 @@ export class AppDatabase {
     return Number(row.data_version)
   }
 
+  readConsistently<T>(operation: () => T): T {
+    this.database.exec('BEGIN')
+    try {
+      const result = operation()
+      this.database.exec('COMMIT')
+      return result
+    } catch (error) {
+      this.database.exec('ROLLBACK')
+      throw error
+    }
+  }
+
   getSyncSettings(gameId: string): SyncSettings {
     const row = this.database
       .prepare(`
@@ -98,6 +117,7 @@ export class AppDatabase {
           run_mode AS runMode,
           auto_scope AS autoScope,
           status,
+          last_scope AS lastScope,
           last_attempt_at AS lastAttemptAt,
           last_success_at AS lastSuccessAt,
           message
@@ -147,9 +167,14 @@ export class AppDatabase {
       .run(scope, now, now, gameId)
   }
 
-  recordSyncOutcome(gameId: string, status: SyncStatus, message: string): void {
+  recordSyncOutcome(
+    gameId: string,
+    status: SyncStatus,
+    message: string,
+    successfulDataReceived = status === 'success'
+  ): void {
     const now = new Date().toISOString()
-    const lastSuccessAt = status === 'success' ? now : null
+    const lastSuccessAt = successfulDataReceived ? now : null
     this.database
       .prepare(`
         UPDATE sync_states
@@ -199,6 +224,7 @@ export class AppDatabase {
           mode_key AS modeKey,
           source,
           remote_key AS remoteKey,
+          source_url AS sourceUrl,
           manual_completion_locked AS manualCompletionLocked,
           last_synced_at AS lastSyncedAt,
           completed_at AS completedAt,
@@ -217,6 +243,9 @@ export class AppDatabase {
             WHEN 'exploration' THEN 70
             ELSE 80
           END,
+          completed ASC,
+          CASE WHEN ends_at IS NULL THEN 1 ELSE 0 END,
+          ends_at ASC,
           created_at ASC
       `)
       .all(gameId) as unknown[]
@@ -245,6 +274,7 @@ export class AppDatabase {
           mode_key AS modeKey,
           source,
           remote_key AS remoteKey,
+          source_url AS sourceUrl,
           manual_completion_locked AS manualCompletionLocked,
           last_synced_at AS lastSyncedAt,
           completed_at AS completedAt,
@@ -260,6 +290,9 @@ export class AppDatabase {
   }
 
   createChecklistItem(input: CreateChecklistItemInput): ChecklistItem {
+    if (input.category === 'main_quest' || input.category === 'side_quest') {
+      throw new Error('主线任务和支线任务是每款游戏唯一的状态项，不能重复新增')
+    }
     const id = randomUUID()
     const now = new Date().toISOString()
     const scheduleKind = input.scheduleKind ?? this.defaultScheduleKind(input.category)
@@ -267,6 +300,9 @@ export class AppDatabase {
     const timeZone = scheduleKind === 'weekly' ? input.timeZone ?? 'Asia/Shanghai' : input.timeZone ?? null
     const weeklyPeriod =
       scheduleKind === 'weekly' ? getWeeklyPeriod(new Date(), resetWeekday ?? 1, timeZone ?? 'Asia/Shanghai') : null
+    const startsAt = input.startsAt ?? weeklyPeriod?.startsAt ?? null
+    const endsAt = input.endsAt ?? weeklyPeriod?.endsAt ?? null
+    this.assertTimeWindow(startsAt, endsAt)
 
     this.database
       .prepare(`
@@ -283,8 +319,8 @@ export class AppDatabase {
         input.title,
         input.progressPercent ?? null,
         input.parentTitle ?? null,
-        input.startsAt ?? weeklyPeriod?.startsAt ?? null,
-        input.endsAt ?? weeklyPeriod?.endsAt ?? null,
+        startsAt,
+        endsAt,
         input.resetRule ?? null,
         weeklyPeriod?.key ?? null,
         scheduleKind,
@@ -296,6 +332,10 @@ export class AppDatabase {
       )
 
     return this.getChecklistItem(id)
+  }
+
+  createChecklistItems(inputs: CreateChecklistItemInput[]): ChecklistItem[] {
+    return this.runTransaction(() => inputs.map((input) => this.createChecklistItem(input)))
   }
 
   updateChecklistItem(input: UpdateChecklistItemInput): ChecklistItem {
@@ -310,6 +350,12 @@ export class AppDatabase {
           ? current.completedAt ?? new Date().toISOString()
           : null
     const category = input.category ?? current.category
+    if (
+      (category === 'main_quest' || category === 'side_quest') &&
+      category !== current.category
+    ) {
+      throw new Error('不能把其他事项改为主线或支线状态项')
+    }
     const categoryChanged = category !== current.category
     const scheduleKind =
       input.scheduleKind === undefined
@@ -337,6 +383,10 @@ export class AppDatabase {
       scheduleKind === 'weekly'
         ? getWeeklyPeriod(new Date(), resetWeekday ?? 1, timeZone ?? 'Asia/Shanghai')
         : null
+    const startsAt =
+      input.startsAt === undefined ? weeklyPeriod?.startsAt ?? current.startsAt : input.startsAt
+    const endsAt = input.endsAt === undefined ? weeklyPeriod?.endsAt ?? current.endsAt : input.endsAt
+    this.assertTimeWindow(startsAt, endsAt)
 
     this.database
       .prepare(`
@@ -365,8 +415,8 @@ export class AppDatabase {
         completed ? 1 : 0,
         input.progressPercent === undefined ? current.progressPercent : input.progressPercent,
         input.parentTitle === undefined ? current.parentTitle : input.parentTitle,
-        input.startsAt === undefined ? weeklyPeriod?.startsAt ?? current.startsAt : input.startsAt,
-        input.endsAt === undefined ? weeklyPeriod?.endsAt ?? current.endsAt : input.endsAt,
+        startsAt,
+        endsAt,
         input.resetRule === undefined ? current.resetRule : input.resetRule,
         weeklyPeriod?.key ?? (categoryChanged ? null : current.periodKey),
         scheduleKind,
@@ -382,6 +432,10 @@ export class AppDatabase {
     return this.getChecklistItem(input.id)
   }
 
+  updateChecklistItems(inputs: UpdateChecklistItemInput[]): ChecklistItem[] {
+    return this.runTransaction(() => inputs.map((input) => this.updateChecklistItem(input)))
+  }
+
   archiveChecklistItem(id: string): void {
     const result = this.database
       .prepare(`
@@ -394,6 +448,13 @@ export class AppDatabase {
     if (result.changes === 0) throw new Error('清单事项不存在或已删除')
   }
 
+  archiveChecklistItems(ids: string[]): number {
+    return this.runTransaction(() => {
+      for (const id of ids) this.archiveChecklistItem(id)
+      return ids.length
+    })
+  }
+
   restoreChecklistItem(id: string): ChecklistItem {
     const result = this.database
       .prepare(`
@@ -404,6 +465,7 @@ export class AppDatabase {
       .run(new Date().toISOString(), id)
 
     if (result.changes === 0) throw new Error('回收站事项不存在或已恢复')
+    this.resetDueWeeklyItems()
     return this.getChecklistItem(id)
   }
 
@@ -438,6 +500,7 @@ export class AppDatabase {
       for (const item of items) {
         const remoteKey = item.remoteKey.trim()
         if (!remoteKey || remoteKey.length > 200) throw new Error('远端事项标识格式不正确')
+        this.assertTimeWindow(item.startsAt ?? null, item.endsAt ?? null)
         if (seenRemoteKeys.has(remoteKey)) throw new Error(`同步数据包含重复标识：${remoteKey}`)
         seenRemoteKeys.add(remoteKey)
 
@@ -469,8 +532,8 @@ export class AppDatabase {
                 id, game_id, category, title, completed, progress_percent, parent_title,
                 starts_at, ends_at, reset_rule, period_key, schedule_kind,
                 reset_weekday, timezone, mode_key, source, remote_key,
-                completed_at, last_synced_at, created_at, updated_at
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                source_url, completed_at, last_synced_at, created_at, updated_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `)
             .run(
               id,
@@ -490,6 +553,7 @@ export class AppDatabase {
               item.modeKey ?? null,
               source,
               remoteKey,
+              item.sourceUrl ?? null,
               remoteCompleted ? syncedAt : null,
               syncedAt,
               syncedAt,
@@ -523,6 +587,11 @@ export class AppDatabase {
           : acceptsRemoteCompletion
             ? null
             : currentCompletedAt
+        const startsAt =
+          preservePublicSchedule || item.startsAt === undefined ? current.startsAt : item.startsAt
+        const endsAt =
+          preservePublicSchedule || item.endsAt === undefined ? current.endsAt : item.endsAt
+        this.assertTimeWindow(startsAt, endsAt)
 
         this.database
           .prepare(`
@@ -540,6 +609,7 @@ export class AppDatabase {
               reset_weekday = ?,
               timezone = ?,
               mode_key = ?,
+              source_url = ?,
               manual_completion_locked = ?,
               completed_at = ?,
               last_synced_at = ?,
@@ -554,8 +624,8 @@ export class AppDatabase {
               ? current.progressPercent
               : item.progressPercent,
             item.parentTitle === undefined ? current.parentTitle : item.parentTitle,
-            preservePublicSchedule || item.startsAt === undefined ? current.startsAt : item.startsAt,
-            preservePublicSchedule || item.endsAt === undefined ? current.endsAt : item.endsAt,
+            startsAt,
+            endsAt,
             preservePublicSchedule || item.resetRule === undefined ? current.resetRule : item.resetRule,
             item.periodKey === undefined ? current.periodKey : item.periodKey,
             preservePublicSchedule || item.scheduleKind === undefined
@@ -566,6 +636,7 @@ export class AppDatabase {
               : item.resetWeekday,
             preservePublicSchedule || item.timeZone === undefined ? current.timeZone : item.timeZone,
             preservePublicSchedule || item.modeKey === undefined ? current.modeKey : item.modeKey,
+            preservePublicSchedule || item.sourceUrl === undefined ? current.sourceUrl : item.sourceUrl,
             manualCompletionLocked ? 1 : 0,
             completedAt,
             syncedAt,
@@ -750,6 +821,28 @@ export class AppDatabase {
         COMMIT;
       `)
     }
+
+    const migration6 = this.database
+      .prepare('SELECT version FROM schema_migrations WHERE version = 6')
+      .get()
+
+    if (!migration6) {
+      this.database.exec(`
+        BEGIN;
+        ALTER TABLE checklist_items ADD COLUMN source_url TEXT;
+        INSERT INTO schema_migrations(version) VALUES (6);
+        COMMIT;
+      `)
+    }
+
+    const versionRow = this.database
+      .prepare('SELECT MAX(version) AS version FROM schema_migrations')
+      .get() as { version: number | null }
+    if (Number(versionRow.version) !== CURRENT_SCHEMA_VERSION) {
+      throw new Error(
+        `数据库版本异常：期望 ${CURRENT_SCHEMA_VERSION}，实际 ${String(versionRow.version)}`
+      )
+    }
   }
 
   private seedGames(): void {
@@ -821,6 +914,7 @@ export class AppDatabase {
           mode_key AS modeKey,
           source,
           remote_key AS remoteKey,
+          source_url AS sourceUrl,
           manual_completion_locked AS manualCompletionLocked,
           last_synced_at AS lastSyncedAt,
           completed_at AS completedAt,
@@ -853,5 +947,25 @@ export class AppDatabase {
     if (category === 'limited_event') return 'fixed_window'
     if (category === 'endgame') return 'remote_schedule'
     return null
+  }
+
+  private assertTimeWindow(startsAt: string | null, endsAt: string | null): void {
+    if (startsAt && Number.isNaN(Date.parse(startsAt))) throw new Error('开始时间不是有效时间')
+    if (endsAt && Number.isNaN(Date.parse(endsAt))) throw new Error('结束时间不是有效时间')
+    if (startsAt && endsAt && Date.parse(startsAt) > Date.parse(endsAt)) {
+      throw new Error('结束时间不能早于开始时间')
+    }
+  }
+
+  private runTransaction<T>(operation: () => T): T {
+    this.database.exec('BEGIN IMMEDIATE')
+    try {
+      const result = operation()
+      this.database.exec('COMMIT')
+      return result
+    } catch (error) {
+      this.database.exec('ROLLBACK')
+      throw error
+    }
   }
 }

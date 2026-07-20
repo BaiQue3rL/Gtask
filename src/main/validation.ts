@@ -50,6 +50,18 @@ function parseNullableString(value: unknown, fieldName: string): string | null |
   return value
 }
 
+function parseNullableDate(value: unknown, fieldName: string): string | null | undefined {
+  const normalized = parseNullableString(value, fieldName)
+  if (normalized && Number.isNaN(Date.parse(normalized))) throw new Error(`${fieldName}不是有效时间`)
+  return normalized
+}
+
+function validateTimeWindow(startsAt: string | null | undefined, endsAt: string | null | undefined): void {
+  if (startsAt && endsAt && Date.parse(startsAt) > Date.parse(endsAt)) {
+    throw new Error('结束时间不能早于开始时间')
+  }
+}
+
 function parseProgress(value: unknown): number | null | undefined {
   if (value === undefined) return undefined
   if (value === null || value === '') return null
@@ -79,14 +91,17 @@ function parseResetWeekday(value: unknown): number | null | undefined {
 
 export function parseCreateChecklistItem(value: unknown): CreateChecklistItemInput {
   if (!isRecord(value)) throw new Error('新增事项参数格式不正确')
+  const startsAt = parseNullableDate(value.startsAt, '开始时间')
+  const endsAt = parseNullableDate(value.endsAt, '结束时间')
+  validateTimeWindow(startsAt, endsAt)
   return {
     gameId: parseGameId(value.gameId),
     category: parseChecklistCategory(value.category),
     title: parseTitle(value.title),
     progressPercent: parseProgress(value.progressPercent),
     parentTitle: parseNullableString(value.parentTitle, '上级区域'),
-    startsAt: parseNullableString(value.startsAt, '开始时间'),
-    endsAt: parseNullableString(value.endsAt, '结束时间'),
+    startsAt,
+    endsAt,
     resetRule: parseNullableString(value.resetRule, '重置规则'),
     scheduleKind: parseScheduleKind(value.scheduleKind),
     resetWeekday: parseResetWeekday(value.resetWeekday),
@@ -103,6 +118,9 @@ export function parseUpdateChecklistItem(value: unknown): UpdateChecklistItemInp
   if (value.completed !== undefined && typeof value.completed !== 'boolean') {
     throw new Error('完成状态格式不正确')
   }
+  const startsAt = parseNullableDate(value.startsAt, '开始时间')
+  const endsAt = parseNullableDate(value.endsAt, '结束时间')
+  validateTimeWindow(startsAt, endsAt)
 
   return {
     id: value.id,
@@ -111,8 +129,8 @@ export function parseUpdateChecklistItem(value: unknown): UpdateChecklistItemInp
     completed: value.completed,
     progressPercent: parseProgress(value.progressPercent),
     parentTitle: parseNullableString(value.parentTitle, '上级区域'),
-    startsAt: parseNullableString(value.startsAt, '开始时间'),
-    endsAt: parseNullableString(value.endsAt, '结束时间'),
+    startsAt,
+    endsAt,
     resetRule: parseNullableString(value.resetRule, '重置规则'),
     scheduleKind: parseScheduleKind(value.scheduleKind),
     resetWeekday: parseResetWeekday(value.resetWeekday),
@@ -155,4 +173,16 @@ export function parseCredentialProvider(value: unknown): CredentialProvider {
     throw new Error('不支持的凭据平台')
   }
   return value as CredentialProvider
+}
+
+export function parseExternalUrl(value: unknown): string {
+  if (typeof value !== 'string' || value.length > 500) throw new Error('外部链接格式不正确')
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    throw new Error('外部链接格式不正确')
+  }
+  if (!['http:', 'https:'].includes(url.protocol)) throw new Error('仅允许打开 HTTP/HTTPS 链接')
+  return url.toString()
 }

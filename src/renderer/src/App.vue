@@ -21,10 +21,11 @@ interface ChecklistPanel {
   section: ChecklistSection
   categories: ChecklistCategory[]
   defaultCategory: ChecklistCategory
+  allowCreate?: boolean
 }
 
 const panels: ChecklistPanel[] = [
-  { title: '任务', icon: '▣', section: 'tasks', categories: ['main_quest', 'side_quest'], defaultCategory: 'side_quest' },
+  { title: '任务', icon: '▣', section: 'tasks', categories: ['main_quest', 'side_quest'], defaultCategory: 'side_quest', allowCreate: false },
   { title: '活动', icon: '♧', section: 'events', categories: ['limited_event', 'permanent_event'], defaultCategory: 'limited_event' },
   { title: '周期事项', icon: '◴', section: 'cycles', categories: ['weekly', 'endgame'], defaultCategory: 'weekly' },
   { title: '地图探索', icon: '◇', section: 'exploration', categories: ['exploration'], defaultCategory: 'exploration' }
@@ -84,6 +85,18 @@ const form = reactive({
 })
 
 const selectedGame = computed(() => games.value.find((game) => game.id === selectedGameId.value))
+const editorCategories = computed(() => {
+  const questCategories: ChecklistCategory[] = ['main_quest', 'side_quest']
+  if (editingItem.value && questCategories.includes(editingItem.value.category)) {
+    return [[editingItem.value.category, categoryLabels[editingItem.value.category]]] as Array<[
+      ChecklistCategory,
+      string
+    ]>
+  }
+  return (Object.entries(categoryLabels) as Array<[ChecklistCategory, string]>).filter(
+    ([category]) => !questCategories.includes(category)
+  )
+})
 const personalPlatform = computed(() =>
   selectedGameId.value === 'wuthering-waves' ? '库街区' : '米游社'
 )
@@ -119,10 +132,16 @@ const syncStatusText = computed(() => {
   const successText = syncSettings.value.lastSuccessAt
     ? ` · 上次成功 ${formatLocalTime(syncSettings.value.lastSuccessAt)}`
     : ''
-  return `${statusLabels[syncSettings.value.status]}${successText}`
+  const scopeText = syncSettings.value.lastScope
+    ? syncSettings.value.lastScope === 'public_schedule'
+      ? '公开排期'
+      : `公开排期 + ${personalPlatform.value}`
+    : ''
+  return `${statusLabels[syncSettings.value.status]}${scopeText ? ` · ${scopeText}` : ''}${successText}`
 })
 
 onMounted(async () => {
+  window.addEventListener('keydown', handleGlobalKeydown)
   try {
     ;[games.value, appInfo.value] = await Promise.all([
       window.gacha.listGames(),
@@ -149,10 +168,19 @@ const clockTimer = window.setInterval(() => {
 }, 60_000)
 
 onUnmounted(() => {
+  window.removeEventListener('keydown', handleGlobalKeydown)
   removeSyncListener()
   removeChecklistListener()
   window.clearInterval(clockTimer)
 })
+
+function handleGlobalKeydown(event: KeyboardEvent): void {
+  if (event.key !== 'Escape') return
+  refreshMenuOpen.value = false
+  editorOpen.value = false
+  recycleBinOpen.value = false
+  settingsOpen.value = false
+}
 
 watch(selectedGameId, () => {
   syncNotice.value = null
@@ -218,6 +246,14 @@ async function clearCredential(provider: CredentialProvider): Promise<void> {
 async function openDataDirectory(): Promise<void> {
   try {
     await window.gacha.openDataDirectory()
+  } catch (error) {
+    showError(error)
+  }
+}
+
+async function openExternalSource(url: string): Promise<void> {
+  try {
+    await window.gacha.openExternalUrl(url)
   } catch (error) {
     showError(error)
   }
@@ -409,12 +445,23 @@ function toIsoOrNull(value: string): string | null {
   return value ? new Date(value).toISOString() : null
 }
 
-function countdown(value: string): string {
+function countdown(value: string, prefix = '剩余'): string {
   const diff = new Date(value).getTime() - clockNow.value
   if (diff <= 0) return '已到期'
   const days = Math.floor(diff / 86_400_000)
   const hours = Math.floor((diff % 86_400_000) / 3_600_000)
-  return days > 0 ? `剩余 ${days} 天 ${hours} 小时` : `剩余 ${hours} 小时`
+  const minutes = Math.max(0, Math.floor((diff % 3_600_000) / 60_000))
+  if (days > 0) return `${prefix} ${days} 天 ${hours} 小时`
+  if (hours > 0) return `${prefix} ${hours} 小时 ${minutes} 分钟`
+  return `${prefix} ${minutes} 分钟`
+}
+
+function isExpired(value: string): boolean {
+  return new Date(value).getTime() <= clockNow.value
+}
+
+function isUpcoming(value: string): boolean {
+  return new Date(value).getTime() > clockNow.value
 }
 
 function formatLocalTime(value: string): string {
@@ -441,7 +488,7 @@ function showError(error: unknown): void {
 </script>
 
 <template>
-  <main class="app-shell">
+  <main class="app-shell" @click="refreshMenuOpen = false">
     <aside class="sidebar">
       <div class="brand"><span class="brand-mark">✦</span>幻游清单</div>
       <button class="overview active" type="button"><span>▦</span>总览</button>
@@ -480,7 +527,7 @@ function showError(error: unknown): void {
           >
             ◇ 只看未完成
           </button>
-          <div class="dropdown">
+          <div class="dropdown" @click.stop>
             <button class="toolbar-button" type="button" :disabled="syncing" @click="refreshMenuOpen = !refreshMenuOpen">
               {{ syncing ? '同步中…' : '↻ 刷新清单' }} ▾
             </button>
@@ -502,8 +549,8 @@ function showError(error: unknown): void {
         </div>
       </header>
 
-      <p v-if="errorMessage" class="error-banner">{{ errorMessage }}</p>
-      <p v-if="syncNotice" class="sync-banner" :class="syncNotice.status">{{ syncNotice.message }}</p>
+      <p v-if="errorMessage" class="error-banner" role="alert">{{ errorMessage }}</p>
+      <p v-if="syncNotice" class="sync-banner" :class="syncNotice.status" aria-live="polite">{{ syncNotice.message }}</p>
 
       <section class="summary-grid">
         <article class="summary-card">
@@ -550,10 +597,15 @@ function showError(error: unknown): void {
                     <span v-if="item.parentTitle">{{ item.parentTitle }}</span>
                     <span v-if="item.progressPercent !== null">{{ item.progressPercent }}%</span>
                     <span v-if="item.modeKey">{{ item.modeKey }}</span>
-                    <span v-if="item.source !== 'manual' && item.lastSyncedAt" class="source-detail">
+                    <span
+                      v-if="item.source !== 'manual' && item.lastSyncedAt"
+                      class="source-detail"
+                      :title="item.sourceUrl ?? undefined"
+                    >
                       {{ item.source === 'public_schedule' ? '公开排期' : '个人数据' }} · {{ formatLocalTime(item.lastSyncedAt) }}
                     </span>
-                    <span v-if="item.endsAt" class="deadline">{{ countdown(item.endsAt) }}</span>
+                    <span v-if="item.startsAt && isUpcoming(item.startsAt)" class="deadline upcoming">{{ countdown(item.startsAt, '距离开始') }}</span>
+                    <span v-else-if="item.endsAt" class="deadline" :class="{ expired: isExpired(item.endsAt) }">{{ countdown(item.endsAt) }}</span>
                     <span v-else-if="item.resetRule">{{ item.resetRule }}</span>
                   </span>
                 </button>
@@ -561,7 +613,7 @@ function showError(error: unknown): void {
               </div>
               <p v-if="itemsFor(panel.categories).length === 0" class="empty-text">暂无事项</p>
             </div>
-            <button class="add-button" type="button" @click="openCreate(panel.defaultCategory)">＋ 新增{{ panel.title }}</button>
+            <button v-if="panel.allowCreate !== false" class="add-button" type="button" @click="openCreate(panel.defaultCategory)">＋ 新增{{ panel.title }}</button>
           </article>
         </section>
 
@@ -598,7 +650,7 @@ function showError(error: unknown): void {
     </section>
 
     <div v-if="editorOpen" class="modal-backdrop" @click.self="editorOpen = false">
-      <form class="editor-modal" @submit.prevent="saveItem">
+      <form class="editor-modal" role="dialog" aria-modal="true" aria-label="事项编辑器" @submit.prevent="saveItem">
         <div class="modal-header">
           <div><p class="eyebrow">{{ selectedGame?.name }}</p><h2>{{ editingItem ? '编辑事项' : '新增事项' }}</h2></div>
           <button class="close-button" type="button" @click="editorOpen = false">×</button>
@@ -606,8 +658,8 @@ function showError(error: unknown): void {
 
         <label>事项名称<input v-model="form.title" maxlength="100" autofocus placeholder="例如：刷角色突破素材" /></label>
         <label>分类
-          <select v-model="form.category">
-            <option v-for="(label, category) in categoryLabels" :key="category" :value="category">{{ label }}</option>
+          <select v-model="form.category" :disabled="editingItem ? ['main_quest', 'side_quest'].includes(editingItem.category) : false">
+            <option v-for="[category, label] in editorCategories" :key="category" :value="category">{{ label }}</option>
           </select>
         </label>
         <template v-if="form.category === 'exploration'">
@@ -631,6 +683,10 @@ function showError(error: unknown): void {
           <label>玩法标识<input v-model="form.modeKey" maxlength="200" placeholder="例如：深境螺旋 / 幻想真境剧诗" /></label>
           <label>周期说明<input v-model="form.resetRule" maxlength="200" placeholder="例如：每月 1 日、16 日刷新" /></label>
         </template>
+        <div v-if="editingItem?.sourceUrl" class="source-box">
+          <div><span>同步来源</span><small>{{ editingItem.sourceUrl }}</small></div>
+          <button class="secondary-button" type="button" @click="openExternalSource(editingItem.sourceUrl)">查看来源</button>
+        </div>
 
         <div class="modal-actions">
           <button v-if="editingItem" class="danger-button" type="button" @click="archiveItem(editingItem)">删除</button>
@@ -642,7 +698,7 @@ function showError(error: unknown): void {
     </div>
 
     <div v-if="recycleBinOpen" class="modal-backdrop" @click.self="recycleBinOpen = false">
-      <section class="editor-modal recycle-modal" aria-label="回收站">
+      <section class="editor-modal recycle-modal" role="dialog" aria-modal="true" aria-label="回收站">
         <div class="modal-header">
           <div><p class="eyebrow">{{ selectedGame?.name }}</p><h2>回收站</h2></div>
           <button class="close-button" type="button" @click="recycleBinOpen = false">×</button>
@@ -662,7 +718,7 @@ function showError(error: unknown): void {
     </div>
 
     <div v-if="settingsOpen" class="modal-backdrop" @click.self="settingsOpen = false">
-      <section class="editor-modal recycle-modal" aria-label="设置">
+      <section class="editor-modal recycle-modal" role="dialog" aria-modal="true" aria-label="设置">
         <div class="modal-header">
           <div><p class="eyebrow">本机设置</p><h2>设置</h2></div>
           <button class="close-button" type="button" @click="settingsOpen = false">×</button>

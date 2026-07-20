@@ -73,7 +73,7 @@ export class SyncOrchestrator {
         : status === 'partial'
           ? 'stale'
           : 'error'
-    this.database.recordSyncOutcome(gameId, databaseStatus, message)
+    this.database.recordSyncOutcome(gameId, databaseStatus, message, successCount > 0)
 
     return {
       gameId,
@@ -119,7 +119,17 @@ export class SyncOrchestrator {
         checklistSource,
         normalizeSyncItems(result.items)
       )
-      return { source, status: 'success', message: result.message, ...merge }
+      const changes = merge.added + merge.updated
+      const changeMessage = changes > 0
+        ? `新增 ${merge.added}，更新 ${merge.updated}`
+        : '无清单变更'
+      const preservedMessage = merge.preserved > 0 ? `，保护 ${merge.preserved}` : ''
+      return {
+        source,
+        status: 'success',
+        message: `${result.message}（${changeMessage}${preservedMessage}）`,
+        ...merge
+      }
     } catch (error) {
       const verificationRequired = error instanceof SyncVerificationRequiredError
       return {

@@ -103,6 +103,8 @@ h2 { margin: 0; font-size: 19px; }
 .item-details { display: flex; align-items: center; gap: 10px; color: #86a0c1; font-size: 12px; }
 .item-details b { padding: 3px 7px; border: 1px solid #345e8c; border-radius: 4px; color: #8db8ed; font-weight: 400; }
 .item-details .deadline { color: #f0b63a; }
+.item-details .deadline.upcoming { color: #78aae8; }
+.item-details .deadline.expired { color: #ef7e73; }
 .item-details .source-detail { color: #7089a8; }
 .completed .item-title { color: #70d9aa; }
 .more-button { border: 0; color: #9eb1ca; background: transparent; font-size: 23px; cursor: pointer; }
@@ -148,6 +150,11 @@ h2 { margin: 0; font-size: 19px; }
 .data-location { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; padding: 10px 12px; border: 1px solid #2b4665; border-radius: 8px; background: rgba(13, 38, 68, 0.55); }
 .data-location span { overflow: hidden; color: #8097b4; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .data-location button { flex: 0 0 auto; padding: 7px 12px; border-radius: 6px; cursor: pointer; }
+.source-box { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding: 10px 12px; border: 1px solid #2b4665; border-radius: 8px; background: rgba(13, 38, 68, 0.55); }
+.source-box div { display: grid; min-width: 0; gap: 4px; }
+.source-box span { color: #aebdd0; font-size: 12px; }
+.source-box small { overflow: hidden; color: #7089a8; text-overflow: ellipsis; white-space: nowrap; }
+.source-box button { flex: 0 0 auto; padding: 7px 12px; border-radius: 6px; cursor: pointer; }
 .settings-note { margin: 15px 0 0; padding-top: 13px; border-top: 1px solid #2a4362; color: #68819f; font-size: 11px; line-height: 1.6; }
 
 @media (max-width: 1200px) {

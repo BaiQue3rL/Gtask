@@ -1,12 +1,13 @@
 import { join } from 'node:path'
-import { app, BrowserWindow, ipcMain, safeStorage, shell } from 'electron'
-import { AppDatabase } from './database'
-import { createDailyBackup } from './backup'
+import { app, BrowserWindow, dialog, ipcMain, safeStorage, shell } from 'electron'
+import { AppDatabase, CURRENT_SCHEMA_VERSION } from './database'
+import { createDailyBackup, createPreMigrationBackup } from './backup'
 import { CredentialVault } from './credential-vault'
 import { SyncOrchestrator } from './sync/orchestrator'
 import {
   parseChecklistSection,
   parseCredentialProvider,
+  parseExternalUrl,
   parseCreateChecklistItem,
   parseGameId,
   parseItemId,
@@ -69,6 +70,9 @@ function registerIpcHandlers(): void {
   ipcMain.handle('app:open-data-directory', async () => {
     const message = await shell.openPath(app.getPath('userData'))
     if (message) throw new Error(message)
+  })
+  ipcMain.handle('app:open-external-url', async (_event, value: unknown) => {
+    await shell.openExternal(parseExternalUrl(value))
   })
 
   ipcMain.handle('games:list', () => appDatabase?.listGames() ?? [])
@@ -140,16 +144,39 @@ if (!app.requestSingleInstanceLock()) {
     mainWindow.focus()
   })
 
-  app.whenReady().then(() => {
-    appDatabase = new AppDatabase(join(app.getPath('userData'), 'data', 'gacha-task-manager.sqlite'))
+  app.whenReady().then(async () => {
+    const databasePath = join(app.getPath('userData'), 'data', 'gacha-task-manager.sqlite')
+    const backupDirectory = join(app.getPath('userData'), 'backups')
+    try {
+      await createPreMigrationBackup(databasePath, backupDirectory, CURRENT_SCHEMA_VERSION)
+    } catch (error) {
+      dialog.showErrorBox(
+        '无法安全升级数据库',
+        error instanceof Error ? error.message : '创建迁移前备份失败'
+      )
+      app.quit()
+      return
+    }
+    try {
+      appDatabase = new AppDatabase(databasePath)
+    } catch (error) {
+      dialog.showErrorBox(
+        '无法打开本地数据库',
+        error instanceof Error ? error.message : '数据库初始化失败'
+      )
+      app.quit()
+      return
+    }
     credentialVault = new CredentialVault(join(app.getPath('userData'), 'credentials'), {
       isAvailable: () => safeStorage.isEncryptionAvailable(),
       protect: (plainText) => safeStorage.encryptString(plainText),
       unprotect: (encrypted) => safeStorage.decryptString(encrypted)
     })
-    void createDailyBackup(appDatabase, join(app.getPath('userData'), 'backups')).catch((error) => {
+    try {
+      await createDailyBackup(appDatabase, backupDirectory)
+    } catch (error) {
       console.error('创建每日数据库备份失败', error)
-    })
+    }
     syncOrchestrator = new SyncOrchestrator(appDatabase)
     registerIpcHandlers()
     createWindow()

@@ -16,8 +16,15 @@ function defaultDatabasePath(): string {
 
 function readRequest(): unknown {
   const inline = argumentValue('--request')
-  const content = inline ?? readFileSync(0, 'utf8').trim()
-  if (!content) throw new Error('请通过标准输入或 --request 传入 JSON 命令')
+  const base64 = argumentValue('--request-base64')
+  const requestFile = argumentValue('--request-file')
+  const content = inline
+    ?? (base64 ? Buffer.from(base64, 'base64').toString('utf8') : undefined)
+    ?? (requestFile ? readFileSync(requestFile, 'utf8') : undefined)
+    ?? readFileSync(0, 'utf8').trim()
+  if (!content) {
+    throw new Error('请通过标准输入、--request、--request-base64 或 --request-file 传入 JSON 命令')
+  }
   return JSON.parse(content) as unknown
 }
 

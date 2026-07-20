@@ -7,6 +7,7 @@ import type {
 
 export interface NormalizedSyncItem {
   remoteKey: string
+  sourceUrl?: string | null
   category: ChecklistCategory
   title: string
   completed?: boolean

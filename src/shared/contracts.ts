@@ -67,6 +67,7 @@ export interface ChecklistItem {
   modeKey: string | null
   source: ChecklistSource
   remoteKey: string | null
+  sourceUrl: string | null
   manualCompletionLocked: boolean
   lastSyncedAt: string | null
   completedAt: string | null
@@ -115,6 +116,7 @@ export interface SyncSettings {
   runMode: SyncRunMode
   autoScope: SyncScope
   status: SyncStatus
+  lastScope: SyncScope | null
   lastAttemptAt: string | null
   lastSuccessAt: string | null
   message: string | null
@@ -148,6 +150,7 @@ export interface SyncResult {
 export interface GachaApi {
   getAppInfo: () => Promise<AppInfo>
   openDataDirectory: () => Promise<void>
+  openExternalUrl: (url: string) => Promise<void>
   listGames: () => Promise<GameSummary[]>
   listChecklistItems: (gameId: GameId) => Promise<ChecklistItem[]>
   listArchivedChecklistItems: (gameId: GameId) => Promise<ChecklistItem[]>

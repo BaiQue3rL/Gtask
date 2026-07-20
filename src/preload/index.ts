@@ -4,6 +4,7 @@ import type { GachaApi } from '../shared/contracts'
 const gachaApi: GachaApi = {
   getAppInfo: () => ipcRenderer.invoke('app:get-info'),
   openDataDirectory: () => ipcRenderer.invoke('app:open-data-directory'),
+  openExternalUrl: (url) => ipcRenderer.invoke('app:open-external-url', url),
   listGames: () => ipcRenderer.invoke('games:list'),
   listChecklistItems: (gameId) => ipcRenderer.invoke('checklist:list', gameId),
   listArchivedChecklistItems: (gameId) => ipcRenderer.invoke('checklist:list-archived', gameId),

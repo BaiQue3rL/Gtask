@@ -14,10 +14,32 @@
 '{"command":"list_games"}' | node out/main/local-command-cli.js --database ':memory:'
 ```
 
+Windows PowerShell 5.1 向原生进程传递管道文本时可能损坏中文。含中文的命令推荐使用 UTF-8 Base64：
+
+```powershell
+$json = '{"command":"create_item","item":{"gameId":"genshin","category":"custom","title":"刷角色突破素材"}}'
+$encoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($json))
+node out/main/local-command-cli.js --request-base64 $encoded
+```
+
+也可把 JSON 保存为 UTF-8 文件后使用 `--request-file <路径>`。PowerShell 7 的 UTF-8 管道可继续使用标准输入。
+
 ## 读取命令
+
+调用方可先读取支持范围、命令列表和破坏性命令：
+
+```json
+{"command":"describe_commands"}
+```
 
 ```json
 {"command":"list_games"}
+```
+
+一次读取四款游戏的活动清单、周期、探索、自定义事项和同步状态：
+
+```json
+{"command":"get_all_snapshots","includeArchived":false}
 ```
 
 ```json
@@ -47,6 +69,8 @@
 }
 ```
 
+批量新增和批量更新分别使用 `create_items`、`update_items`，把单项命令的 `item` 改为 `items` 数组。每批限制 1～100 项；整批先校验并在一个事务中写入，任一项失败则全部回滚。
+
 ```json
 {
   "command": "update_item",
@@ -69,6 +93,10 @@
 
 ```json
 {"command":"archive_item","id":"事项 ID","confirm":true}
+```
+
+```json
+{"command":"archive_items","ids":["事项 ID 1","事项 ID 2"],"confirm":true}
 ```
 
 ```json

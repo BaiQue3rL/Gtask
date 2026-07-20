@@ -8,6 +8,7 @@ describe('normalizeSyncItem', () => {
         remoteKey: ' event:summer ',
         category: 'limited_event',
         title: ' 夏日活动 ',
+        sourceUrl: 'https://example.com/schedule',
         startsAt: '2026-07-20T00:00:00.000Z',
         progressPercent: 50
       })
@@ -15,6 +16,7 @@ describe('normalizeSyncItem', () => {
       remoteKey: 'event:summer',
       category: 'limited_event',
       title: '夏日活动',
+      sourceUrl: 'https://example.com/schedule',
       progressPercent: 50
     })
   })
@@ -27,6 +29,9 @@ describe('normalizeSyncItem', () => {
     )
     expect(() => normalizeSyncItem({ ...base, title: '活动', progressPercent: 101 })).toThrow(
       '0 到 100'
+    )
+    expect(() => normalizeSyncItem({ ...base, title: '活动', sourceUrl: 'file:///secret' })).toThrow(
+      'HTTP/HTTPS'
     )
   })
 })
