@@ -113,6 +113,22 @@ function registerIpcHandlers(): void {
       throw new Error('备份服务尚未初始化')
     }
     if (typeof fileName !== 'string') throw new Error('备份文件名格式不正确')
+    const candidate = listBackups(appBackupDirectory).find((backup) => backup.fileName === fileName)
+    if (!candidate) throw new Error('找不到指定的备份文件')
+    const confirmationOptions = {
+      type: 'warning',
+      title: '恢复本地备份',
+      message: `确定恢复备份“${candidate.fileName}”吗？`,
+      detail: '当前数据库会先自动生成一份“恢复前”安全备份，随后应用将重新启动。',
+      buttons: ['取消', '恢复并重启'],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true
+    } satisfies Electron.MessageBoxOptions
+    const confirmation = mainWindow
+      ? await dialog.showMessageBox(mainWindow, confirmationOptions)
+      : await dialog.showMessageBox(confirmationOptions)
+    if (confirmation.response !== 1) return false
     try {
       await restoreBackup(appDatabase, appDatabasePath, appBackupDirectory, fileName)
     } catch (error) {
@@ -135,6 +151,7 @@ function registerIpcHandlers(): void {
       app.relaunch()
       app.exit(0)
     }, 150)
+    return true
   })
 
   ipcMain.handle('games:list', () => appDatabase?.listGames() ?? [])

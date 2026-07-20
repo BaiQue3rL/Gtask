@@ -254,13 +254,10 @@ async function createBackup(): Promise<void> {
 
 async function restoreBackup(backup: BackupSummary): Promise<void> {
   if (restoringBackup.value) return
-  const confirmed = window.confirm(
-    `确定恢复备份“${backup.fileName}”吗？\n\n当前数据库会先自动生成一份“恢复前”安全备份，随后应用将重新启动。`
-  )
-  if (!confirmed) return
   restoringBackup.value = backup.fileName
   try {
-    await window.gacha.restoreBackup(backup.fileName)
+    const restarting = await window.gacha.restoreBackup(backup.fileName)
+    if (!restarting) restoringBackup.value = null
   } catch (error) {
     restoringBackup.value = null
     showError(error)
@@ -799,7 +796,7 @@ function showError(error: unknown): void {
         </div>
         <p class="recycle-hint">数据库位于 data 子目录；每日一致性备份位于 backups 子目录。</p>
         <div class="backup-list">
-          <div v-for="backup in backups.slice(0, 4)" :key="backup.fileName" class="backup-row">
+          <div v-for="backup in backups" :key="backup.fileName" class="backup-row">
             <div><strong>{{ backup.fileName }}</strong><span>{{ formatLocalTime(backup.updatedAt) }}</span></div>
             <small>{{ backup.kind === 'daily' ? '每日' : backup.kind === 'manual' ? '手动' : backup.kind === 'pre_restore' ? '恢复前' : '升级前' }} · {{ formatFileSize(backup.sizeBytes) }}</small>
             <button

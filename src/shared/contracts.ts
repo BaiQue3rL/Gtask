@@ -160,7 +160,7 @@ export interface GachaApi {
   openExternalUrl: (url: string) => Promise<void>
   listBackups: () => Promise<BackupSummary[]>
   createBackup: () => Promise<BackupSummary>
-  restoreBackup: (fileName: string) => Promise<void>
+  restoreBackup: (fileName: string) => Promise<boolean>
   listGames: () => Promise<GameSummary[]>
   listChecklistItems: (gameId: GameId) => Promise<ChecklistItem[]>
   listArchivedChecklistItems: (gameId: GameId) => Promise<ChecklistItem[]>
