@@ -800,7 +800,7 @@ function showError(error: unknown): void {
           <span>{{ appInfo?.dataPath }}</span>
           <button class="secondary-button" type="button" @click="openDataDirectory">打开目录</button>
         </div>
-        <p class="recycle-hint">数据库位于 data 子目录；每日一致性备份位于 backups 子目录。</p>
+        <p class="recycle-hint">数据库位于 data 子目录；backups 子目录保留最近 30 份每日备份，手动与安全备份不自动清理。</p>
         <div class="backup-list">
           <div v-for="backup in backups" :key="backup.fileName" class="backup-row">
             <div><strong>{{ backup.fileName }}</strong><span>{{ formatLocalTime(backup.updatedAt) }}</span></div>
