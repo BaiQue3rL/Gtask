@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { AppDatabase } from './database'
+import type { AppDatabase } from './database'
+import { openDatabaseWithMigrationBackup } from './database-bootstrap'
 import { LocalCommandService } from './local-command-service'
 
 function argumentValue(name: string): string | undefined {
@@ -28,15 +29,22 @@ function readRequest(): unknown {
   return JSON.parse(content) as unknown
 }
 
-const database = new AppDatabase(argumentValue('--database') ?? defaultDatabasePath())
-try {
-  const result = new LocalCommandService(database).execute(readRequest())
-  process.stdout.write(`${JSON.stringify({ ok: true, result }, null, 2)}\n`)
-} catch (error) {
+async function main(): Promise<void> {
+  let database: AppDatabase | null = null
+  try {
+    database = await openDatabaseWithMigrationBackup(
+      argumentValue('--database') ?? defaultDatabasePath()
+    )
+    const result = new LocalCommandService(database).execute(readRequest())
+    process.stdout.write(`${JSON.stringify({ ok: true, result }, null, 2)}\n`)
+  } finally {
+    database?.close()
+  }
+}
+
+void main().catch((error: unknown) => {
   process.stderr.write(
     `${JSON.stringify({ ok: false, error: error instanceof Error ? error.message : '未知错误' })}\n`
   )
   process.exitCode = 1
-} finally {
-  database.close()
-}
+})

@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
-import { AppDatabase } from './database'
+import { openDatabaseWithMigrationBackup } from './database-bootstrap'
 import { createLocalMcpServer } from './local-mcp-server'
 
 function argumentValue(name: string): string | undefined {
@@ -15,7 +15,9 @@ function defaultDatabasePath(): string {
 }
 
 export async function startLocalMcpServerProcess(): Promise<void> {
-  const database = new AppDatabase(argumentValue('--database') ?? defaultDatabasePath())
+  const database = await openDatabaseWithMigrationBackup(
+    argumentValue('--database') ?? defaultDatabasePath()
+  )
   const server = createLocalMcpServer(database)
   let closed = false
 

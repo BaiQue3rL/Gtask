@@ -9,6 +9,8 @@ import {
   listBackups
 } from '../src/main/backup'
 import { AppDatabase, CURRENT_SCHEMA_VERSION } from '../src/main/database'
+import { openDatabaseWithMigrationBackup } from '../src/main/database-bootstrap'
+import { DatabaseSync } from 'node:sqlite'
 
 let database: AppDatabase | null = null
 let temporaryDirectory: string | null = null
@@ -75,5 +77,23 @@ describe('createDailyBackup', () => {
 
     expect(listBackups(backupDirectory).map((backup) => backup.kind)).toEqual(['manual', 'daily'])
     expect(listBackups(backupDirectory)[0].sizeBytes).toBeGreaterThan(0)
+  })
+
+  it('CLI/MCP 安全打开旧数据库时同样先创建迁移前备份', async () => {
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-command-bootstrap-test-'))
+    const dataDirectory = join(temporaryDirectory, 'data')
+    const databasePath = join(dataDirectory, 'source.sqlite')
+    const backupDirectory = join(temporaryDirectory, 'backups')
+    database = new AppDatabase(databasePath)
+    database.close()
+    database = null
+
+    const oldDatabase = new DatabaseSync(databasePath)
+    oldDatabase.exec('ALTER TABLE checklist_items DROP COLUMN source_url; DELETE FROM schema_migrations WHERE version = 6;')
+    oldDatabase.close()
+
+    database = await openDatabaseWithMigrationBackup(databasePath)
+    expect(listBackups(backupDirectory).map((backup) => backup.kind)).toContain('pre_migration')
+    expect(database.listGames()).toHaveLength(4)
   })
 })

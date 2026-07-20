@@ -17,6 +17,7 @@ node out/main/local-mcp-server-cli.js
 - `write_gacha_checklists`：用于批量写入等高级命令的通用入口；同样不会绕过确认保护。
 
 MCP 采用本地 stdio，不监听网络端口。Windows GUI 可执行文件不直接承载 stdio；客户端应启动上述独立 Node 入口。
+CLI 与 MCP 在打开旧版磁盘数据库时会先创建迁移前一致性备份，与桌面端使用同一安全升级原则。
 
 不使用 MCP 时，也可以从标准输入传入单个 JSON 命令：
 
