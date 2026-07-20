@@ -41,13 +41,26 @@ button { font: inherit; }
 .game-button:hover, .game-button.selected { background: rgba(40, 89, 153, 0.25); }
 .game-button.selected { border-color: #355f93; }
 .game-dot { width: 14px; height: 14px; border: 2px solid var(--game-accent); border-radius: 50%; box-shadow: 0 0 10px var(--game-accent); }
-.sidebar-footer { margin-top: auto; padding: 18px 12px 4px; border-top: 1px solid #263c5b; color: #b8c6db; }
+.sidebar-footer { display: grid; gap: 8px; margin-top: auto; padding: 14px 5px 0; border-top: 1px solid #263c5b; color: #b8c6db; }
+.sidebar-footer button { display: flex; justify-content: space-between; padding: 8px 7px; border: 0; border-radius: 6px; color: #b8c6db; background: transparent; text-align: left; cursor: pointer; }
+.sidebar-footer button:hover { color: white; background: rgba(40, 89, 153, 0.25); }
+.sidebar-footer button span { color: #6f8eb5; }
 
 .workspace { overflow: auto; padding: 24px 28px 18px; }
 .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
-.topbar-actions { display: flex; align-items: center; gap: 9px; }
+.topbar-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 9px; max-width: 760px; }
 .toolbar-button { padding: 9px 13px; border: 1px solid #315276; border-radius: 8px; color: #b1c3da; background: rgba(8, 24, 47, 0.8); cursor: pointer; }
 .toolbar-button:hover, .toolbar-button.active { border-color: #5a8dca; color: #e5f0ff; background: #123360; }
+.toolbar-button:disabled { cursor: wait; opacity: 0.55; }
+.toolbar-select { padding: 9px 32px 9px 13px; border: 1px solid #315a87; border-radius: 999px; color: #b9d2f2; background: #0a1b34; cursor: pointer; }
+.sync-status { flex-basis: 100%; color: #7189a7; font-size: 11px; text-align: right; }
+.sync-status.success { color: #6fc79e; }
+.sync-status.error { color: #e2867d; }
+.sync-status.stale, .sync-status.verification_required { color: #d6ad55; }
+.dropdown { position: relative; }
+.dropdown-menu { position: absolute; z-index: 8; top: calc(100% + 7px); right: 0; display: grid; width: 245px; padding: 6px; border: 1px solid #365b86; border-radius: 9px; background: #0a1c36; box-shadow: 0 14px 36px rgba(0, 0, 0, 0.4); }
+.dropdown-menu button { padding: 10px 11px; border: 0; border-radius: 6px; color: #c8d7eb; background: transparent; text-align: left; cursor: pointer; }
+.dropdown-menu button:hover { color: white; background: #15365f; }
 .eyebrow { margin: 0 0 4px; color: #6e91c2; font-size: 12px; letter-spacing: 0.15em; }
 h1 { margin: 0; font-size: 27px; }
 h2 { margin: 0; font-size: 19px; }
@@ -74,8 +87,12 @@ h2 { margin: 0; font-size: 19px; }
 .empty-card { min-height: 180px; padding: 18px; }
 .empty-card p, .custom-list p { color: #7187a4; font-size: 14px; }
 .checklist-card { min-height: 240px; padding: 18px 14px 12px; }
-.checklist-card h2, .custom-list h2 { padding: 0 4px 12px; }
+.section-header { display: flex; align-items: center; justify-content: space-between; padding: 0 4px 12px; }
+.checklist-card h2, .custom-list h2 { padding: 0; }
 .checklist-card h2 span { margin-right: 10px; color: #78a8ee; }
+.clear-completed-button { padding: 5px 9px; border: 1px solid #5c454b; border-radius: 6px; color: #d88c89; background: transparent; font-size: 12px; cursor: pointer; }
+.clear-completed-button:hover:not(:disabled) { border-color: #9a5c5a; color: #ffaaa2; background: rgba(125, 50, 47, 0.16); }
+.clear-completed-button:disabled { cursor: not-allowed; opacity: 0.3; }
 .item-list { display: grid; gap: 7px; }
 .checklist-row { display: grid; grid-template-columns: 30px minmax(0, 1fr) 28px; align-items: center; min-height: 50px; padding: 5px 7px; border: 1px solid #29425f; border-radius: 8px; background: rgba(21, 43, 72, 0.62); }
 .checklist-row.completed { border-color: #2d665a; background: rgba(24, 81, 67, 0.42); }
@@ -86,6 +103,7 @@ h2 { margin: 0; font-size: 19px; }
 .item-details { display: flex; align-items: center; gap: 10px; color: #86a0c1; font-size: 12px; }
 .item-details b { padding: 3px 7px; border: 1px solid #345e8c; border-radius: 4px; color: #8db8ed; font-weight: 400; }
 .item-details .deadline { color: #f0b63a; }
+.item-details .source-detail { color: #7089a8; }
 .completed .item-title { color: #70d9aa; }
 .more-button { border: 0; color: #9eb1ca; background: transparent; font-size: 23px; cursor: pointer; }
 .add-button { width: 100%; margin-top: 10px; padding: 8px; border: 1px solid #416ea6; border-radius: 6px; color: #72a3e4; background: transparent; cursor: pointer; }
@@ -96,6 +114,10 @@ h2 { margin: 0; font-size: 19px; }
 .centered { display: grid; min-height: 220px; place-items: center; color: #90a5c0; }
 .error { color: #ff8372; }
 .error-banner { margin: 0 0 14px; padding: 10px 14px; border: 1px solid #7e403f; border-radius: 8px; color: #ff9d92; background: rgba(110, 38, 38, 0.35); }
+.sync-banner { margin: 0 0 14px; padding: 10px 14px; border: 1px solid #3c5e82; border-radius: 8px; color: #b8cde7; background: rgba(29, 67, 105, 0.3); }
+.sync-banner.success { border-color: #34705d; color: #83dcb2; background: rgba(30, 99, 74, 0.3); }
+.sync-banner.error { border-color: #7e403f; color: #ff9d92; background: rgba(110, 38, 38, 0.35); }
+.sync-banner.partial { border-color: #80652d; color: #ecc66a; background: rgba(109, 80, 20, 0.28); }
 .dev-footer { padding: 14px 4px 0; color: #526c8d; font-size: 11px; }
 
 .modal-backdrop { position: fixed; z-index: 10; inset: 0; display: grid; place-items: center; padding: 30px; background: rgba(1, 7, 18, 0.72); backdrop-filter: blur(8px); }
@@ -103,6 +125,7 @@ h2 { margin: 0; font-size: 19px; }
 .modal-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; }
 .close-button { border: 0; color: #91a7c1; background: transparent; font-size: 28px; cursor: pointer; }
 .editor-modal label { display: grid; gap: 7px; margin-top: 14px; color: #aebdd0; font-size: 13px; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .editor-modal input, .editor-modal select { width: 100%; padding: 10px 12px; border: 1px solid #345270; border-radius: 7px; outline: none; color: #edf5ff; background: #09192e; }
 .editor-modal input:focus, .editor-modal select:focus { border-color: #5d91d3; }
 .modal-actions { display: grid; grid-template-columns: auto 1fr auto auto; gap: 9px; margin-top: 24px; }
@@ -111,6 +134,21 @@ h2 { margin: 0; font-size: 19px; }
 .secondary-button { border: 1px solid #3d5878; color: #b3c2d5; background: transparent; }
 .primary-button { border: 1px solid #5b91d5; color: white; background: #245eaa; }
 .primary-button:disabled { cursor: not-allowed; opacity: 0.45; }
+.recycle-modal { width: min(620px, 100%); }
+.recycle-hint { margin: -7px 0 15px; color: #7189a7; font-size: 12px; }
+.recycle-list { display: grid; gap: 8px; max-height: 460px; overflow: auto; }
+.recycle-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 11px 12px; border: 1px solid #2b4665; border-radius: 8px; background: rgba(13, 38, 68, 0.55); }
+.recycle-row div { display: grid; gap: 5px; min-width: 0; }
+.recycle-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recycle-row span { color: #728aa7; font-size: 11px; }
+.recycle-row button { padding: 7px 13px; border-radius: 6px; cursor: pointer; }
+.recycle-row button:disabled { cursor: not-allowed; opacity: 0.35; }
+.settings-heading { margin: 0 0 8px; color: #dce9f8; font-size: 15px; }
+.settings-heading.data-heading { margin-top: 20px; }
+.data-location { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; padding: 10px 12px; border: 1px solid #2b4665; border-radius: 8px; background: rgba(13, 38, 68, 0.55); }
+.data-location span { overflow: hidden; color: #8097b4; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.data-location button { flex: 0 0 auto; padding: 7px 12px; border-radius: 6px; cursor: pointer; }
+.settings-note { margin: 15px 0 0; padding-top: 13px; border-top: 1px solid #2a4362; color: #68819f; font-size: 11px; line-height: 1.6; }
 
 @media (max-width: 1200px) {
   .app-shell { grid-template-columns: 220px minmax(0, 1fr); }

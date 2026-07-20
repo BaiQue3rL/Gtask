@@ -1,13 +1,22 @@
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { DatabaseSync } from 'node:sqlite'
+import { backup, DatabaseSync } from 'node:sqlite'
+import { getWeeklyPeriod } from './periods'
 import type {
+  ChecklistCategory,
   ChecklistItem,
+  ChecklistSource,
   CreateChecklistItemInput,
+  GameId,
   GameSummary,
+  SyncScope,
+  SyncSettings,
+  SyncStatus,
+  UpdateSyncSettingsInput,
   UpdateChecklistItemInput
 } from '../shared/contracts'
+import type { NormalizedSyncItem, SyncMergeResult } from './sync/types'
 
 const DEFAULT_GAMES: GameSummary[] = [
   {
@@ -54,6 +63,8 @@ export class AppDatabase {
     this.migrate()
     this.seedGames()
     this.seedQuestChecklists()
+    this.resetDueWeeklyItems()
+    this.markStaleSyncStates()
   }
 
   listGames(): GameSummary[] {
@@ -74,6 +85,99 @@ export class AppDatabase {
     return rows.map((row) => ({ ...row, enabled: Boolean(row.enabled) }))
   }
 
+  getDataVersion(): number {
+    const row = this.database.prepare('PRAGMA data_version').get() as { data_version: number }
+    return Number(row.data_version)
+  }
+
+  getSyncSettings(gameId: string): SyncSettings {
+    const row = this.database
+      .prepare(`
+        SELECT
+          game_id AS gameId,
+          run_mode AS runMode,
+          auto_scope AS autoScope,
+          status,
+          last_attempt_at AS lastAttemptAt,
+          last_success_at AS lastSuccessAt,
+          message
+        FROM sync_states
+        WHERE game_id = ?
+      `)
+      .get(gameId)
+
+    if (!row) throw new Error('游戏同步设置不存在')
+    return row as unknown as SyncSettings
+  }
+
+  updateSyncSettings(input: UpdateSyncSettingsInput): SyncSettings {
+    const result = this.database
+      .prepare(`
+        UPDATE sync_states
+        SET run_mode = ?, auto_scope = ?, updated_at = ?
+        WHERE game_id = ?
+      `)
+      .run(input.runMode, input.autoScope, new Date().toISOString(), input.gameId)
+
+    if (result.changes === 0) throw new Error('游戏同步设置不存在')
+    return this.getSyncSettings(input.gameId)
+  }
+
+  listAutomaticSyncSettings(): SyncSettings[] {
+    const gameIds = this.database
+      .prepare(`
+        SELECT game_id AS gameId
+        FROM sync_states
+        WHERE run_mode = 'automatic'
+        ORDER BY game_id
+      `)
+      .all() as Array<{ gameId: string }>
+
+    return gameIds.map((row) => this.getSyncSettings(row.gameId))
+  }
+
+  recordSyncAttempt(gameId: string, scope: SyncScope): void {
+    const now = new Date().toISOString()
+    this.database
+      .prepare(`
+        UPDATE sync_states
+        SET status = 'idle', last_scope = ?, last_attempt_at = ?, message = NULL, updated_at = ?
+        WHERE game_id = ?
+      `)
+      .run(scope, now, now, gameId)
+  }
+
+  recordSyncOutcome(gameId: string, status: SyncStatus, message: string): void {
+    const now = new Date().toISOString()
+    const lastSuccessAt = status === 'success' ? now : null
+    this.database
+      .prepare(`
+        UPDATE sync_states
+        SET status = ?,
+            last_success_at = COALESCE(?, last_success_at),
+            message = ?,
+            updated_at = ?
+        WHERE game_id = ?
+      `)
+      .run(status, lastSuccessAt, message, now, gameId)
+  }
+
+  markStaleSyncStates(reference = new Date(), maximumAgeMs = 24 * 60 * 60 * 1000): number {
+    const threshold = new Date(reference.getTime() - maximumAgeMs).toISOString()
+    const result = this.database
+      .prepare(`
+        UPDATE sync_states
+        SET status = 'stale',
+            message = COALESCE(message, '上次成功数据已超过 24 小时'),
+            updated_at = ?
+        WHERE status = 'success'
+          AND last_success_at IS NOT NULL
+          AND last_success_at < ?
+      `)
+      .run(reference.toISOString(), threshold)
+    return Number(result.changes)
+  }
+
   listChecklistItems(gameId: string): ChecklistItem[] {
     const rows = this.database
       .prepare(`
@@ -84,12 +188,19 @@ export class AppDatabase {
           title,
           completed,
           progress_percent AS progressPercent,
+          parent_title AS parentTitle,
           starts_at AS startsAt,
           ends_at AS endsAt,
           reset_rule AS resetRule,
           period_key AS periodKey,
+          schedule_kind AS scheduleKind,
+          reset_weekday AS resetWeekday,
+          timezone AS timeZone,
+          mode_key AS modeKey,
           source,
+          remote_key AS remoteKey,
           manual_completion_locked AS manualCompletionLocked,
+          last_synced_at AS lastSyncedAt,
           completed_at AS completedAt,
           created_at AS createdAt,
           updated_at AS updatedAt
@@ -113,16 +224,57 @@ export class AppDatabase {
     return rows.map((row) => this.mapChecklistItem(row))
   }
 
+  listArchivedChecklistItems(gameId: string): ChecklistItem[] {
+    const rows = this.database
+      .prepare(`
+        SELECT
+          id,
+          game_id AS gameId,
+          category,
+          title,
+          completed,
+          progress_percent AS progressPercent,
+          parent_title AS parentTitle,
+          starts_at AS startsAt,
+          ends_at AS endsAt,
+          reset_rule AS resetRule,
+          period_key AS periodKey,
+          schedule_kind AS scheduleKind,
+          reset_weekday AS resetWeekday,
+          timezone AS timeZone,
+          mode_key AS modeKey,
+          source,
+          remote_key AS remoteKey,
+          manual_completion_locked AS manualCompletionLocked,
+          last_synced_at AS lastSyncedAt,
+          completed_at AS completedAt,
+          created_at AS createdAt,
+          updated_at AS updatedAt
+        FROM checklist_items
+        WHERE game_id = ? AND archived = 1
+        ORDER BY updated_at DESC
+      `)
+      .all(gameId) as unknown[]
+
+    return rows.map((row) => this.mapChecklistItem(row))
+  }
+
   createChecklistItem(input: CreateChecklistItemInput): ChecklistItem {
     const id = randomUUID()
     const now = new Date().toISOString()
+    const scheduleKind = input.scheduleKind ?? this.defaultScheduleKind(input.category)
+    const resetWeekday = scheduleKind === 'weekly' ? input.resetWeekday ?? 1 : input.resetWeekday ?? null
+    const timeZone = scheduleKind === 'weekly' ? input.timeZone ?? 'Asia/Shanghai' : input.timeZone ?? null
+    const weeklyPeriod =
+      scheduleKind === 'weekly' ? getWeeklyPeriod(new Date(), resetWeekday ?? 1, timeZone ?? 'Asia/Shanghai') : null
 
     this.database
       .prepare(`
         INSERT INTO checklist_items(
-          id, game_id, category, title, progress_percent, starts_at, ends_at,
-          reset_rule, source, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?)
+          id, game_id, category, title, progress_percent, parent_title, starts_at, ends_at,
+          reset_rule, period_key, schedule_kind, reset_weekday, timezone, mode_key,
+          source, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?)
       `)
       .run(
         id,
@@ -130,9 +282,15 @@ export class AppDatabase {
         input.category,
         input.title,
         input.progressPercent ?? null,
-        input.startsAt ?? null,
-        input.endsAt ?? null,
+        input.parentTitle ?? null,
+        input.startsAt ?? weeklyPeriod?.startsAt ?? null,
+        input.endsAt ?? weeklyPeriod?.endsAt ?? null,
         input.resetRule ?? null,
+        weeklyPeriod?.key ?? null,
+        scheduleKind,
+        resetWeekday,
+        timeZone,
+        input.modeKey ?? null,
         now,
         now
       )
@@ -151,6 +309,34 @@ export class AppDatabase {
         : input.completed
           ? current.completedAt ?? new Date().toISOString()
           : null
+    const category = input.category ?? current.category
+    const categoryChanged = category !== current.category
+    const scheduleKind =
+      input.scheduleKind === undefined
+        ? categoryChanged
+          ? this.defaultScheduleKind(category)
+          : current.scheduleKind
+        : input.scheduleKind
+    const resetWeekday =
+      input.resetWeekday === undefined
+        ? scheduleKind === 'weekly'
+          ? current.resetWeekday ?? 1
+          : categoryChanged
+            ? null
+            : current.resetWeekday
+        : input.resetWeekday
+    const timeZone =
+      input.timeZone === undefined
+        ? scheduleKind === 'weekly'
+          ? current.timeZone ?? 'Asia/Shanghai'
+          : categoryChanged
+            ? null
+            : current.timeZone
+        : input.timeZone
+    const weeklyPeriod =
+      scheduleKind === 'weekly'
+        ? getWeeklyPeriod(new Date(), resetWeekday ?? 1, timeZone ?? 'Asia/Shanghai')
+        : null
 
     this.database
       .prepare(`
@@ -159,22 +345,34 @@ export class AppDatabase {
           title = ?,
           completed = ?,
           progress_percent = ?,
+          parent_title = ?,
           starts_at = ?,
           ends_at = ?,
           reset_rule = ?,
+          period_key = ?,
+          schedule_kind = ?,
+          reset_weekday = ?,
+          timezone = ?,
+          mode_key = ?,
           manual_completion_locked = ?,
           completed_at = ?,
           updated_at = ?
         WHERE id = ? AND archived = 0
       `)
       .run(
-        input.category ?? current.category,
+        category,
         input.title ?? current.title,
         completed ? 1 : 0,
         input.progressPercent === undefined ? current.progressPercent : input.progressPercent,
-        input.startsAt === undefined ? current.startsAt : input.startsAt,
-        input.endsAt === undefined ? current.endsAt : input.endsAt,
+        input.parentTitle === undefined ? current.parentTitle : input.parentTitle,
+        input.startsAt === undefined ? weeklyPeriod?.startsAt ?? current.startsAt : input.startsAt,
+        input.endsAt === undefined ? weeklyPeriod?.endsAt ?? current.endsAt : input.endsAt,
         input.resetRule === undefined ? current.resetRule : input.resetRule,
+        weeklyPeriod?.key ?? (categoryChanged ? null : current.periodKey),
+        scheduleKind,
+        resetWeekday,
+        timeZone,
+        input.modeKey === undefined ? (categoryChanged ? null : current.modeKey) : input.modeKey,
         manualCompletionLocked ? 1 : 0,
         completedAt,
         new Date().toISOString(),
@@ -196,8 +394,234 @@ export class AppDatabase {
     if (result.changes === 0) throw new Error('清单事项不存在或已删除')
   }
 
+  restoreChecklistItem(id: string): ChecklistItem {
+    const result = this.database
+      .prepare(`
+        UPDATE checklist_items
+        SET archived = 0, updated_at = ?
+        WHERE id = ? AND archived = 1
+      `)
+      .run(new Date().toISOString(), id)
+
+    if (result.changes === 0) throw new Error('回收站事项不存在或已恢复')
+    return this.getChecklistItem(id)
+  }
+
+  archiveCompletedSection(gameId: string, categories: ChecklistCategory[]): number {
+    if (categories.length === 0) return 0
+    const placeholders = categories.map(() => '?').join(', ')
+    const result = this.database
+      .prepare(`
+        UPDATE checklist_items
+        SET archived = 1, updated_at = ?
+        WHERE game_id = ?
+          AND category IN (${placeholders})
+          AND completed = 1
+          AND archived = 0
+      `)
+      .run(new Date().toISOString(), gameId, ...categories)
+
+    return Number(result.changes)
+  }
+
+  mergeSyncedItems(
+    gameId: GameId,
+    source: Exclude<ChecklistSource, 'manual'>,
+    items: NormalizedSyncItem[],
+    syncedAt = new Date().toISOString()
+  ): SyncMergeResult {
+    const result: SyncMergeResult = { added: 0, updated: 0, preserved: 0 }
+    const seenRemoteKeys = new Set<string>()
+
+    this.database.exec('BEGIN IMMEDIATE')
+    try {
+      for (const item of items) {
+        const remoteKey = item.remoteKey.trim()
+        if (!remoteKey || remoteKey.length > 200) throw new Error('远端事项标识格式不正确')
+        if (seenRemoteKeys.has(remoteKey)) throw new Error(`同步数据包含重复标识：${remoteKey}`)
+        seenRemoteKeys.add(remoteKey)
+
+        const identity = this.database
+          .prepare(`
+            SELECT id, archived, source
+            FROM checklist_items
+            WHERE game_id = ?
+              AND remote_key = ?
+              AND source <> 'manual'
+            ORDER BY CASE WHEN source = ? THEN 0 ELSE 1 END
+            LIMIT 1
+          `)
+          .get(gameId, remoteKey, source) as
+          | { id: string; archived: number; source: ChecklistSource }
+          | undefined
+
+        if (identity?.archived) {
+          result.preserved += 1
+          continue
+        }
+
+        if (!identity) {
+          const id = randomUUID()
+          const remoteCompleted = source === 'personal_sync' && item.completed === true
+          this.database
+            .prepare(`
+              INSERT INTO checklist_items(
+                id, game_id, category, title, completed, progress_percent, parent_title,
+                starts_at, ends_at, reset_rule, period_key, schedule_kind,
+                reset_weekday, timezone, mode_key, source, remote_key,
+                completed_at, last_synced_at, created_at, updated_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `)
+            .run(
+              id,
+              gameId,
+              item.category,
+              item.title,
+              remoteCompleted ? 1 : 0,
+              source === 'personal_sync' ? item.progressPercent ?? null : null,
+              item.parentTitle ?? null,
+              item.startsAt ?? null,
+              item.endsAt ?? null,
+              item.resetRule ?? null,
+              item.periodKey ?? null,
+              item.scheduleKind ?? this.defaultScheduleKind(item.category),
+              item.resetWeekday ?? null,
+              item.timeZone ?? null,
+              item.modeKey ?? null,
+              source,
+              remoteKey,
+              remoteCompleted ? syncedAt : null,
+              syncedAt,
+              syncedAt,
+              syncedAt
+            )
+          result.added += 1
+          continue
+        }
+
+        const current = this.getChecklistItem(identity.id)
+        const preservePublicSchedule =
+          source === 'personal_sync' && current.source === 'public_schedule'
+        const periodChanged =
+          item.periodKey !== undefined &&
+          item.periodKey !== null &&
+          current.periodKey !== null &&
+          item.periodKey !== current.periodKey
+        const currentCompleted = periodChanged ? false : current.completed
+        const currentCompletedAt = periodChanged ? null : current.completedAt
+        const manualCompletionLocked = periodChanged ? false : current.manualCompletionLocked
+        const acceptsRemoteCompletion = source === 'personal_sync' && item.completed !== undefined
+        const completionProtected =
+          acceptsRemoteCompletion && item.completed === false && manualCompletionLocked
+        const completed = completionProtected
+          ? currentCompleted
+          : acceptsRemoteCompletion
+            ? item.completed!
+            : currentCompleted
+        const completedAt = completed
+          ? currentCompletedAt ?? syncedAt
+          : acceptsRemoteCompletion
+            ? null
+            : currentCompletedAt
+
+        this.database
+          .prepare(`
+            UPDATE checklist_items SET
+              category = ?,
+              title = ?,
+              completed = ?,
+              progress_percent = ?,
+              parent_title = ?,
+              starts_at = ?,
+              ends_at = ?,
+              reset_rule = ?,
+              period_key = ?,
+              schedule_kind = ?,
+              reset_weekday = ?,
+              timezone = ?,
+              mode_key = ?,
+              manual_completion_locked = ?,
+              completed_at = ?,
+              last_synced_at = ?,
+              updated_at = ?
+            WHERE id = ? AND archived = 0
+          `)
+          .run(
+            preservePublicSchedule ? current.category : item.category,
+            preservePublicSchedule ? current.title : item.title,
+            completed ? 1 : 0,
+            source === 'public_schedule' || item.progressPercent === undefined
+              ? current.progressPercent
+              : item.progressPercent,
+            item.parentTitle === undefined ? current.parentTitle : item.parentTitle,
+            preservePublicSchedule || item.startsAt === undefined ? current.startsAt : item.startsAt,
+            preservePublicSchedule || item.endsAt === undefined ? current.endsAt : item.endsAt,
+            preservePublicSchedule || item.resetRule === undefined ? current.resetRule : item.resetRule,
+            item.periodKey === undefined ? current.periodKey : item.periodKey,
+            preservePublicSchedule || item.scheduleKind === undefined
+              ? current.scheduleKind
+              : item.scheduleKind,
+            preservePublicSchedule || item.resetWeekday === undefined
+              ? current.resetWeekday
+              : item.resetWeekday,
+            preservePublicSchedule || item.timeZone === undefined ? current.timeZone : item.timeZone,
+            preservePublicSchedule || item.modeKey === undefined ? current.modeKey : item.modeKey,
+            manualCompletionLocked ? 1 : 0,
+            completedAt,
+            syncedAt,
+            syncedAt,
+            current.id
+          )
+        result.updated += 1
+        if (completionProtected) result.preserved += 1
+      }
+      this.database.exec('COMMIT')
+      return result
+    } catch (error) {
+      this.database.exec('ROLLBACK')
+      throw error
+    }
+  }
+
+  resetDueWeeklyItems(reference = new Date()): number {
+    let changes = 0
+    for (let resetWeekday = 1; resetWeekday <= 7; resetWeekday += 1) {
+      const period = getWeeklyPeriod(reference, resetWeekday, 'Asia/Shanghai')
+      const result = this.database
+        .prepare(`
+          UPDATE checklist_items
+          SET completed = 0,
+              completed_at = NULL,
+              manual_completion_locked = 0,
+              period_key = ?,
+              starts_at = ?,
+              ends_at = ?,
+              updated_at = ?
+          WHERE schedule_kind = 'weekly'
+            AND reset_weekday = ?
+            AND timezone = 'Asia/Shanghai'
+            AND archived = 0
+            AND (period_key IS NULL OR period_key <> ?)
+        `)
+        .run(
+          period.key,
+          period.startsAt,
+          period.endsAt,
+          new Date().toISOString(),
+          resetWeekday,
+          period.key
+        )
+      changes += Number(result.changes)
+    }
+    return changes
+  }
+
   close(): void {
     this.database.close()
+  }
+
+  async backupTo(destinationPath: string): Promise<number> {
+    return backup(this.database, destinationPath)
   }
 
   private migrate(): void {
@@ -270,6 +694,62 @@ export class AppDatabase {
         COMMIT;
       `)
     }
+
+    const migration3 = this.database
+      .prepare('SELECT version FROM schema_migrations WHERE version = 3')
+      .get()
+
+    if (!migration3) {
+      this.database.exec(`
+        BEGIN;
+        ALTER TABLE sync_states ADD COLUMN run_mode TEXT NOT NULL DEFAULT 'manual'
+          CHECK (run_mode IN ('manual', 'automatic'));
+        ALTER TABLE sync_states ADD COLUMN auto_scope TEXT NOT NULL DEFAULT 'public_schedule'
+          CHECK (auto_scope IN ('public_schedule', 'public_and_personal'));
+        ALTER TABLE sync_states ADD COLUMN last_scope TEXT
+          CHECK (last_scope IS NULL OR last_scope IN ('public_schedule', 'public_and_personal'));
+        INSERT INTO schema_migrations(version) VALUES (3);
+        COMMIT;
+      `)
+    }
+
+    const migration4 = this.database
+      .prepare('SELECT version FROM schema_migrations WHERE version = 4')
+      .get()
+
+    if (!migration4) {
+      this.database.exec(`
+        BEGIN;
+        ALTER TABLE checklist_items ADD COLUMN schedule_kind TEXT
+          CHECK (schedule_kind IS NULL OR schedule_kind IN ('weekly', 'fixed_window', 'remote_schedule'));
+        ALTER TABLE checklist_items ADD COLUMN reset_weekday INTEGER
+          CHECK (reset_weekday IS NULL OR (reset_weekday >= 1 AND reset_weekday <= 7));
+        ALTER TABLE checklist_items ADD COLUMN timezone TEXT;
+        ALTER TABLE checklist_items ADD COLUMN mode_key TEXT;
+        UPDATE checklist_items
+          SET schedule_kind = 'weekly', reset_weekday = 1, timezone = 'Asia/Shanghai'
+          WHERE category = 'weekly';
+        UPDATE checklist_items SET schedule_kind = 'fixed_window'
+          WHERE category = 'limited_event';
+        UPDATE checklist_items SET schedule_kind = 'remote_schedule'
+          WHERE category = 'endgame';
+        INSERT INTO schema_migrations(version) VALUES (4);
+        COMMIT;
+      `)
+    }
+
+    const migration5 = this.database
+      .prepare('SELECT version FROM schema_migrations WHERE version = 5')
+      .get()
+
+    if (!migration5) {
+      this.database.exec(`
+        BEGIN;
+        ALTER TABLE checklist_items ADD COLUMN parent_title TEXT;
+        INSERT INTO schema_migrations(version) VALUES (5);
+        COMMIT;
+      `)
+    }
   }
 
   private seedGames(): void {
@@ -282,6 +762,10 @@ export class AppDatabase {
         accent = excluded.accent,
         sort_order = excluded.sort_order,
         updated_at = CURRENT_TIMESTAMP
+      WHERE games.name <> excluded.name
+         OR games.short_name <> excluded.short_name
+         OR games.accent <> excluded.accent
+         OR games.sort_order <> excluded.sort_order
     `)
 
     const insertSyncState = this.database.prepare(`
@@ -326,12 +810,19 @@ export class AppDatabase {
           title,
           completed,
           progress_percent AS progressPercent,
+          parent_title AS parentTitle,
           starts_at AS startsAt,
           ends_at AS endsAt,
           reset_rule AS resetRule,
           period_key AS periodKey,
+          schedule_kind AS scheduleKind,
+          reset_weekday AS resetWeekday,
+          timezone AS timeZone,
+          mode_key AS modeKey,
           source,
+          remote_key AS remoteKey,
           manual_completion_locked AS manualCompletionLocked,
+          last_synced_at AS lastSyncedAt,
           completed_at AS completedAt,
           created_at AS createdAt,
           updated_at AS updatedAt
@@ -355,5 +846,12 @@ export class AppDatabase {
       completed: Boolean(item.completed),
       manualCompletionLocked: Boolean(item.manualCompletionLocked)
     }
+  }
+
+  private defaultScheduleKind(category: ChecklistCategory): ChecklistItem['scheduleKind'] {
+    if (category === 'weekly') return 'weekly'
+    if (category === 'limited_event') return 'fixed_window'
+    if (category === 'endgame') return 'remote_schedule'
+    return null
   }
 }

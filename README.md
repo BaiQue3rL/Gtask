@@ -28,15 +28,27 @@ pnpm build
 pnpm package:portable
 ```
 
+构建后可通过标准输入调用本地 JSON 命令接口：
+
+```powershell
+'{"command":"get_game_snapshot","gameId":"genshin","completed":false}' |
+  node out/main/local-command-cli.js
+```
+
+命令格式和安全约束见 [本地命令接口](docs/local-command-api.md)。
+
 开发版首次启动后会在 Electron 的 `userData/data` 目录创建 `gacha-task-manager.sqlite`。
 
 ## 当前进度
 
 - Electron 主进程和安全预加载桥接
 - Vue 3 清单总览和事项编辑弹窗
-- SQLite 初始表结构、版本迁移及四款游戏种子数据
-- 手动事项新增、编辑、完成状态切换和软删除
+- SQLite v1～v5 迁移及四款游戏种子数据
+- 手动事项新增、编辑、完成状态切换、软删除、版块批量删除与回收站恢复
 - 主线/支线默认状态项，不记录具体剧情任务
-- 手动完成锁和本周完成时间记录
-- 主进程 IPC 参数校验与数据库自动化测试
+- 周常/挑战周期、实时倒计时、地图层级与探索百分比
+- 每游戏手动/自动同步设置和安全事务合并框架
+- 本地 AI 命令服务、外部写入自动刷新和每日一致性备份
+- Windows DPAPI 凭据保险箱底座和一键清除入口
+- 主进程 IPC 参数校验、类型检查与自动化测试
 - 便携版构建配置

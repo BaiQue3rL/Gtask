@@ -16,6 +16,25 @@ export const CHECKLIST_CATEGORIES = [
 export type ChecklistCategory = (typeof CHECKLIST_CATEGORIES)[number]
 export type ChecklistSource = 'manual' | 'public_schedule' | 'personal_sync'
 
+export const CHECKLIST_SECTIONS = ['tasks', 'events', 'cycles', 'exploration', 'custom'] as const
+export type ChecklistSection = (typeof CHECKLIST_SECTIONS)[number]
+
+export const SYNC_RUN_MODES = ['manual', 'automatic'] as const
+export type SyncRunMode = (typeof SYNC_RUN_MODES)[number]
+export const SYNC_SCOPES = ['public_schedule', 'public_and_personal'] as const
+export type SyncScope = (typeof SYNC_SCOPES)[number]
+export type SyncStatus = 'idle' | 'success' | 'error' | 'stale' | 'verification_required'
+export const SCHEDULE_KINDS = ['weekly', 'fixed_window', 'remote_schedule'] as const
+export type ScheduleKind = (typeof SCHEDULE_KINDS)[number]
+export const CREDENTIAL_PROVIDERS = ['miyoushe', 'kuro-community'] as const
+export type CredentialProvider = (typeof CREDENTIAL_PROVIDERS)[number]
+
+export interface CredentialStatus {
+  provider: CredentialProvider
+  stored: boolean
+  updatedAt: string | null
+}
+
 export interface GameSummary {
   id: GameId
   name: string
@@ -37,12 +56,19 @@ export interface ChecklistItem {
   title: string
   completed: boolean
   progressPercent: number | null
+  parentTitle: string | null
   startsAt: string | null
   endsAt: string | null
   resetRule: string | null
   periodKey: string | null
+  scheduleKind: ScheduleKind | null
+  resetWeekday: number | null
+  timeZone: string | null
+  modeKey: string | null
   source: ChecklistSource
+  remoteKey: string | null
   manualCompletionLocked: boolean
+  lastSyncedAt: string | null
   completedAt: string | null
   createdAt: string
   updatedAt: string
@@ -53,9 +79,14 @@ export interface CreateChecklistItemInput {
   category: ChecklistCategory
   title: string
   progressPercent?: number | null
+  parentTitle?: string | null
   startsAt?: string | null
   endsAt?: string | null
   resetRule?: string | null
+  scheduleKind?: ScheduleKind | null
+  resetWeekday?: number | null
+  timeZone?: string | null
+  modeKey?: string | null
 }
 
 export interface UpdateChecklistItemInput {
@@ -64,16 +95,72 @@ export interface UpdateChecklistItemInput {
   title?: string
   completed?: boolean
   progressPercent?: number | null
+  parentTitle?: string | null
   startsAt?: string | null
   endsAt?: string | null
   resetRule?: string | null
+  scheduleKind?: ScheduleKind | null
+  resetWeekday?: number | null
+  timeZone?: string | null
+  modeKey?: string | null
+}
+
+export interface ArchiveCompletedSectionInput {
+  gameId: GameId
+  section: ChecklistSection
+}
+
+export interface SyncSettings {
+  gameId: GameId
+  runMode: SyncRunMode
+  autoScope: SyncScope
+  status: SyncStatus
+  lastAttemptAt: string | null
+  lastSuccessAt: string | null
+  message: string | null
+}
+
+export interface UpdateSyncSettingsInput {
+  gameId: GameId
+  runMode: SyncRunMode
+  autoScope: SyncScope
+}
+
+export interface SyncSourceResult {
+  source: 'public_schedule' | 'personal_data'
+  status: 'success' | 'error' | 'skipped' | 'verification_required'
+  message: string
+  added: number
+  updated: number
+  preserved: number
+}
+
+export interface SyncResult {
+  gameId: GameId
+  requestedScope: SyncScope
+  status: 'success' | 'partial' | 'error'
+  startedAt: string
+  finishedAt: string
+  sources: SyncSourceResult[]
+  message: string
 }
 
 export interface GachaApi {
   getAppInfo: () => Promise<AppInfo>
+  openDataDirectory: () => Promise<void>
   listGames: () => Promise<GameSummary[]>
   listChecklistItems: (gameId: GameId) => Promise<ChecklistItem[]>
+  listArchivedChecklistItems: (gameId: GameId) => Promise<ChecklistItem[]>
   createChecklistItem: (input: CreateChecklistItemInput) => Promise<ChecklistItem>
   updateChecklistItem: (input: UpdateChecklistItemInput) => Promise<ChecklistItem>
   archiveChecklistItem: (id: string) => Promise<void>
+  restoreChecklistItem: (id: string) => Promise<ChecklistItem>
+  archiveCompletedSection: (input: ArchiveCompletedSectionInput) => Promise<number>
+  getSyncSettings: (gameId: GameId) => Promise<SyncSettings>
+  updateSyncSettings: (input: UpdateSyncSettingsInput) => Promise<SyncSettings>
+  syncGame: (gameId: GameId, scope: SyncScope) => Promise<SyncResult>
+  listCredentialStatuses: () => Promise<CredentialStatus[]>
+  clearCredential: (provider: CredentialProvider) => Promise<boolean>
+  onSyncCompleted: (callback: (result: SyncResult) => void) => () => void
+  onChecklistChanged: (callback: () => void) => () => void
 }

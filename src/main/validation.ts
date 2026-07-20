@@ -1,9 +1,19 @@
 import {
   CHECKLIST_CATEGORIES,
+  CHECKLIST_SECTIONS,
+  CREDENTIAL_PROVIDERS,
+  SCHEDULE_KINDS,
+  SYNC_RUN_MODES,
+  SYNC_SCOPES,
   SUPPORTED_GAME_IDS,
   type ChecklistCategory,
+  type ChecklistSection,
+  type CredentialProvider,
   type CreateChecklistItemInput,
   type GameId,
+  type ScheduleKind,
+  type SyncRunMode,
+  type SyncScope,
   type UpdateChecklistItemInput
 } from '../shared/contracts'
 
@@ -18,7 +28,7 @@ export function parseGameId(value: unknown): GameId {
   return value as GameId
 }
 
-function parseCategory(value: unknown): ChecklistCategory {
+export function parseChecklistCategory(value: unknown): ChecklistCategory {
   if (typeof value !== 'string' || !CHECKLIST_CATEGORIES.includes(value as ChecklistCategory)) {
     throw new Error('不支持的事项分类')
   }
@@ -49,16 +59,39 @@ function parseProgress(value: unknown): number | null | undefined {
   return value
 }
 
+function parseScheduleKind(value: unknown): ScheduleKind | null | undefined {
+  if (value === undefined) return undefined
+  if (value === null || value === '') return null
+  if (typeof value !== 'string' || !SCHEDULE_KINDS.includes(value as ScheduleKind)) {
+    throw new Error('周期类型格式不正确')
+  }
+  return value as ScheduleKind
+}
+
+function parseResetWeekday(value: unknown): number | null | undefined {
+  if (value === undefined) return undefined
+  if (value === null || value === '') return null
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 7) {
+    throw new Error('周重置日必须在 1 到 7 之间')
+  }
+  return value
+}
+
 export function parseCreateChecklistItem(value: unknown): CreateChecklistItemInput {
   if (!isRecord(value)) throw new Error('新增事项参数格式不正确')
   return {
     gameId: parseGameId(value.gameId),
-    category: parseCategory(value.category),
+    category: parseChecklistCategory(value.category),
     title: parseTitle(value.title),
     progressPercent: parseProgress(value.progressPercent),
+    parentTitle: parseNullableString(value.parentTitle, '上级区域'),
     startsAt: parseNullableString(value.startsAt, '开始时间'),
     endsAt: parseNullableString(value.endsAt, '结束时间'),
-    resetRule: parseNullableString(value.resetRule, '重置规则')
+    resetRule: parseNullableString(value.resetRule, '重置规则'),
+    scheduleKind: parseScheduleKind(value.scheduleKind),
+    resetWeekday: parseResetWeekday(value.resetWeekday),
+    timeZone: parseNullableString(value.timeZone, '时区'),
+    modeKey: parseNullableString(value.modeKey, '模式标识')
   }
 }
 
@@ -73,17 +106,53 @@ export function parseUpdateChecklistItem(value: unknown): UpdateChecklistItemInp
 
   return {
     id: value.id,
-    category: value.category === undefined ? undefined : parseCategory(value.category),
+    category: value.category === undefined ? undefined : parseChecklistCategory(value.category),
     title: value.title === undefined ? undefined : parseTitle(value.title),
     completed: value.completed,
     progressPercent: parseProgress(value.progressPercent),
+    parentTitle: parseNullableString(value.parentTitle, '上级区域'),
     startsAt: parseNullableString(value.startsAt, '开始时间'),
     endsAt: parseNullableString(value.endsAt, '结束时间'),
-    resetRule: parseNullableString(value.resetRule, '重置规则')
+    resetRule: parseNullableString(value.resetRule, '重置规则'),
+    scheduleKind: parseScheduleKind(value.scheduleKind),
+    resetWeekday: parseResetWeekday(value.resetWeekday),
+    timeZone: parseNullableString(value.timeZone, '时区'),
+    modeKey: parseNullableString(value.modeKey, '模式标识')
   }
 }
 
 export function parseItemId(value: unknown): string {
   if (typeof value !== 'string' || !value || value.length > 100) throw new Error('事项 ID 格式不正确')
   return value
+}
+
+export function parseChecklistSection(value: unknown): ChecklistSection {
+  if (typeof value !== 'string' || !CHECKLIST_SECTIONS.includes(value as ChecklistSection)) {
+    throw new Error('不支持的清单版块')
+  }
+  return value as ChecklistSection
+}
+
+export function parseSyncRunMode(value: unknown): SyncRunMode {
+  if (typeof value !== 'string' || !SYNC_RUN_MODES.includes(value as SyncRunMode)) {
+    throw new Error('不支持的同步运行模式')
+  }
+  return value as SyncRunMode
+}
+
+export function parseSyncScope(value: unknown): SyncScope {
+  if (typeof value !== 'string' || !SYNC_SCOPES.includes(value as SyncScope)) {
+    throw new Error('不支持的同步范围')
+  }
+  return value as SyncScope
+}
+
+export function parseCredentialProvider(value: unknown): CredentialProvider {
+  if (
+    typeof value !== 'string' ||
+    !CREDENTIAL_PROVIDERS.includes(value as CredentialProvider)
+  ) {
+    throw new Error('不支持的凭据平台')
+  }
+  return value as CredentialProvider
 }

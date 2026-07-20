@@ -1,25 +1,33 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import type {
   AppInfo,
   ChecklistCategory,
   ChecklistItem,
+  ChecklistSection,
+  CreateChecklistItemInput,
+  CredentialProvider,
+  CredentialStatus,
   GameId,
-  GameSummary
+  GameSummary,
+  SyncResult,
+  SyncScope,
+  SyncSettings
 } from '../../shared/contracts'
 
 interface ChecklistPanel {
   title: string
   icon: string
+  section: ChecklistSection
   categories: ChecklistCategory[]
   defaultCategory: ChecklistCategory
 }
 
 const panels: ChecklistPanel[] = [
-  { title: '任务', icon: '▣', categories: ['main_quest', 'side_quest'], defaultCategory: 'side_quest' },
-  { title: '活动', icon: '♧', categories: ['limited_event', 'permanent_event'], defaultCategory: 'limited_event' },
-  { title: '周期事项', icon: '◴', categories: ['weekly', 'endgame'], defaultCategory: 'weekly' },
-  { title: '地图探索', icon: '◇', categories: ['exploration'], defaultCategory: 'exploration' }
+  { title: '任务', icon: '▣', section: 'tasks', categories: ['main_quest', 'side_quest'], defaultCategory: 'side_quest' },
+  { title: '活动', icon: '♧', section: 'events', categories: ['limited_event', 'permanent_event'], defaultCategory: 'limited_event' },
+  { title: '周期事项', icon: '◴', section: 'cycles', categories: ['weekly', 'endgame'], defaultCategory: 'weekly' },
+  { title: '地图探索', icon: '◇', section: 'exploration', categories: ['exploration'], defaultCategory: 'exploration' }
 ]
 
 const categoryLabels: Record<ChecklistCategory, string> = {
@@ -33,26 +41,58 @@ const categoryLabels: Record<ChecklistCategory, string> = {
   custom: '自定义事项'
 }
 
+const weekdayLabels: Record<number, string> = {
+  1: '周一',
+  2: '周二',
+  3: '周三',
+  4: '周四',
+  5: '周五',
+  6: '周六',
+  7: '周日'
+}
+
 const games = ref<GameSummary[]>([])
 const items = ref<ChecklistItem[]>([])
+const archivedItems = ref<ChecklistItem[]>([])
 const appInfo = ref<AppInfo | null>(null)
 const loading = ref(true)
 const saving = ref(false)
 const errorMessage = ref('')
 const selectedGameId = ref<GameId>('genshin')
 const showIncompleteOnly = ref(false)
+const refreshMenuOpen = ref(false)
+const syncing = ref(false)
+const syncSettings = ref<SyncSettings | null>(null)
+const syncNotice = ref<{ status: SyncResult['status']; message: string } | null>(null)
+const clockNow = ref(Date.now())
 const editorOpen = ref(false)
+const recycleBinOpen = ref(false)
+const settingsOpen = ref(false)
+const credentialStatuses = ref<CredentialStatus[]>([])
 const editingItem = ref<ChecklistItem | null>(null)
 
 const form = reactive({
   category: 'custom' as ChecklistCategory,
   title: '',
   progressPercent: null as number | null,
+  parentTitle: '',
+  startsAt: '',
   endsAt: '',
-  resetRule: ''
+  resetRule: '',
+  resetWeekday: 1,
+  modeKey: ''
 })
 
 const selectedGame = computed(() => games.value.find((game) => game.id === selectedGameId.value))
+const personalPlatform = computed(() =>
+  selectedGameId.value === 'wuthering-waves' ? '库街区' : '米游社'
+)
+const syncModeValue = computed(() => {
+  if (!syncSettings.value || syncSettings.value.runMode === 'manual') return 'manual'
+  return syncSettings.value.autoScope === 'public_schedule'
+    ? 'automatic_public'
+    : 'automatic_personal'
+})
 const incompleteCount = computed(() => items.value.filter((item) => !item.completed).length)
 const completedCount = computed(() => {
   const weekStart = startOfCurrentWeek()
@@ -67,6 +107,20 @@ const expiringCount = computed(() => {
     return end >= now && end <= threshold
   }).length
 })
+const syncStatusText = computed(() => {
+  if (!syncSettings.value) return '同步状态读取中'
+  const statusLabels: Record<SyncSettings['status'], string> = {
+    idle: '尚未同步',
+    success: '同步成功',
+    error: '同步失败',
+    stale: '部分同步，数据可能过期',
+    verification_required: '需要登录或验证'
+  }
+  const successText = syncSettings.value.lastSuccessAt
+    ? ` · 上次成功 ${formatLocalTime(syncSettings.value.lastSuccessAt)}`
+    : ''
+  return `${statusLabels[syncSettings.value.status]}${successText}`
+})
 
 onMounted(async () => {
   try {
@@ -74,7 +128,7 @@ onMounted(async () => {
       window.gacha.listGames(),
       window.gacha.getAppInfo()
     ])
-    await loadItems()
+    await Promise.all([loadItems(), loadArchivedItems(), loadSyncSettings()])
   } catch (error) {
     showError(error)
   } finally {
@@ -82,17 +136,128 @@ onMounted(async () => {
   }
 })
 
-watch(selectedGameId, () => void loadItems())
+const removeSyncListener = window.gacha.onSyncCompleted((result) => {
+  if (result.gameId !== selectedGameId.value) return
+  syncNotice.value = { status: result.status, message: result.message }
+  void Promise.all([loadItems(), loadSyncSettings()])
+})
+const removeChecklistListener = window.gacha.onChecklistChanged(() => {
+  void Promise.all([loadItems(), loadArchivedItems(), loadSyncSettings()])
+})
+const clockTimer = window.setInterval(() => {
+  clockNow.value = Date.now()
+}, 60_000)
+
+onUnmounted(() => {
+  removeSyncListener()
+  removeChecklistListener()
+  window.clearInterval(clockTimer)
+})
+
+watch(selectedGameId, () => {
+  syncNotice.value = null
+  refreshMenuOpen.value = false
+  recycleBinOpen.value = false
+  void Promise.all([loadItems(), loadArchivedItems(), loadSyncSettings()])
+})
 
 async function loadItems(): Promise<void> {
+  const gameId = selectedGameId.value
   loading.value = true
   errorMessage.value = ''
   try {
-    items.value = await window.gacha.listChecklistItems(selectedGameId.value)
+    const loadedItems = await window.gacha.listChecklistItems(gameId)
+    if (selectedGameId.value === gameId) items.value = loadedItems
+  } catch (error) {
+    if (selectedGameId.value === gameId) showError(error)
+  } finally {
+    if (selectedGameId.value === gameId) loading.value = false
+  }
+}
+
+async function loadSyncSettings(): Promise<void> {
+  const gameId = selectedGameId.value
+  try {
+    const loadedSettings = await window.gacha.getSyncSettings(gameId)
+    if (selectedGameId.value === gameId) syncSettings.value = loadedSettings
+  } catch (error) {
+    if (selectedGameId.value === gameId) showError(error)
+  }
+}
+
+async function loadArchivedItems(): Promise<void> {
+  const gameId = selectedGameId.value
+  try {
+    const loadedItems = await window.gacha.listArchivedChecklistItems(gameId)
+    if (selectedGameId.value === gameId) archivedItems.value = loadedItems
+  } catch (error) {
+    if (selectedGameId.value === gameId) showError(error)
+  }
+}
+
+async function openSettings(): Promise<void> {
+  settingsOpen.value = true
+  try {
+    credentialStatuses.value = await window.gacha.listCredentialStatuses()
   } catch (error) {
     showError(error)
+  }
+}
+
+async function clearCredential(provider: CredentialProvider): Promise<void> {
+  const platform = provider === 'miyoushe' ? '米游社' : '库街区'
+  if (!window.confirm(`确定清除本机保存的${platform}登录凭据吗？`)) return
+  try {
+    await window.gacha.clearCredential(provider)
+    credentialStatuses.value = await window.gacha.listCredentialStatuses()
+  } catch (error) {
+    showError(error)
+  }
+}
+
+async function openDataDirectory(): Promise<void> {
+  try {
+    await window.gacha.openDataDirectory()
+  } catch (error) {
+    showError(error)
+  }
+}
+
+async function updateSyncMode(event: Event): Promise<void> {
+  const gameId = selectedGameId.value
+  const value = (event.target as HTMLSelectElement).value
+  const runMode = value === 'manual' ? 'manual' : 'automatic'
+  const autoScope = value === 'automatic_personal' ? 'public_and_personal' : 'public_schedule'
+  try {
+    const updatedSettings = await window.gacha.updateSyncSettings({
+      gameId,
+      runMode,
+      autoScope
+    })
+    if (selectedGameId.value === gameId) syncSettings.value = updatedSettings
+  } catch (error) {
+    if (selectedGameId.value === gameId) {
+      showError(error)
+      await loadSyncSettings()
+    }
+  }
+}
+
+async function runSync(scope: SyncScope): Promise<void> {
+  const gameId = selectedGameId.value
+  refreshMenuOpen.value = false
+  syncing.value = true
+  syncNotice.value = null
+  try {
+    const result = await window.gacha.syncGame(gameId, scope)
+    if (selectedGameId.value === gameId) {
+      syncNotice.value = { status: result.status, message: result.message }
+      await Promise.all([loadItems(), loadSyncSettings()])
+    }
+  } catch (error) {
+    if (selectedGameId.value === gameId) showError(error)
   } finally {
-    loading.value = false
+    syncing.value = false
   }
 }
 
@@ -107,8 +272,12 @@ function openCreate(category: ChecklistCategory): void {
   form.category = category
   form.title = ''
   form.progressPercent = null
+  form.parentTitle = ''
+  form.startsAt = ''
   form.endsAt = ''
   form.resetRule = category === 'weekly' ? '每周一重置' : ''
+  form.resetWeekday = 1
+  form.modeKey = ''
   editorOpen.value = true
 }
 
@@ -117,8 +286,12 @@ function openEdit(item: ChecklistItem): void {
   form.category = item.category
   form.title = item.title
   form.progressPercent = item.progressPercent
+  form.parentTitle = item.parentTitle ?? ''
+  form.startsAt = toLocalDateTime(item.startsAt)
   form.endsAt = toLocalDateTime(item.endsAt)
   form.resetRule = item.resetRule ?? ''
+  form.resetWeekday = item.resetWeekday ?? 1
+  form.modeKey = item.modeKey ?? ''
   editorOpen.value = true
 }
 
@@ -127,12 +300,30 @@ async function saveItem(): Promise<void> {
   saving.value = true
   errorMessage.value = ''
   try {
-    const common = {
+    const isTimed = ['limited_event', 'endgame'].includes(form.category)
+    const isWeekly = form.category === 'weekly'
+    const common: Omit<CreateChecklistItemInput, 'gameId'> = {
       category: form.category,
       title: form.title,
       progressPercent: form.category === 'exploration' ? normalizeProgress(form.progressPercent) : null,
-      endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : null,
-      resetRule: form.resetRule.trim() || null
+      parentTitle: form.category === 'exploration' ? form.parentTitle.trim() || null : null,
+      startsAt: isWeekly ? undefined : isTimed ? toIsoOrNull(form.startsAt) : null,
+      endsAt: isWeekly ? undefined : isTimed ? toIsoOrNull(form.endsAt) : null,
+      resetRule: isWeekly
+        ? `每${weekdayLabels[form.resetWeekday]}重置`
+        : form.category === 'endgame'
+          ? form.resetRule.trim() || null
+          : null,
+      scheduleKind: isWeekly
+        ? 'weekly'
+        : form.category === 'limited_event'
+          ? 'fixed_window'
+          : form.category === 'endgame'
+            ? 'remote_schedule'
+            : null,
+      resetWeekday: isWeekly ? form.resetWeekday : null,
+      timeZone: isWeekly ? 'Asia/Shanghai' : null,
+      modeKey: form.category === 'endgame' ? form.modeKey.trim() || null : null
     }
     const saved = editingItem.value
       ? await window.gacha.updateChecklistItem({ id: editingItem.value.id, ...common })
@@ -164,14 +355,46 @@ async function archiveItem(item: ChecklistItem): Promise<void> {
   try {
     await window.gacha.archiveChecklistItem(item.id)
     items.value = items.value.filter((candidate) => candidate.id !== item.id)
+    archivedItems.value.unshift(item)
     editorOpen.value = false
   } catch (error) {
     showError(error)
   }
 }
 
-function normalizeProgress(value: number | null): number | null {
-  if (value === null || value === undefined || value === ('' as unknown)) return null
+async function archiveCompletedSection(
+  section: ChecklistSection,
+  categories: ChecklistCategory[],
+  sectionTitle: string
+): Promise<void> {
+  const completedItems = items.value.filter(
+    (item) => categories.includes(item.category) && item.completed
+  )
+  if (completedItems.length === 0) return
+  if (!window.confirm(`确定删除“${sectionTitle}”中的 ${completedItems.length} 个已完成事项吗？`)) return
+
+  try {
+    await window.gacha.archiveCompletedSection({ gameId: selectedGameId.value, section })
+    const archivedIds = new Set(completedItems.map((item) => item.id))
+    items.value = items.value.filter((item) => !archivedIds.has(item.id))
+    archivedItems.value = [...completedItems, ...archivedItems.value]
+  } catch (error) {
+    showError(error)
+  }
+}
+
+async function restoreItem(item: ChecklistItem): Promise<void> {
+  try {
+    const restored = await window.gacha.restoreChecklistItem(item.id)
+    archivedItems.value = archivedItems.value.filter((candidate) => candidate.id !== item.id)
+    items.value.push(restored)
+  } catch (error) {
+    showError(error)
+  }
+}
+
+function normalizeProgress(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null
   return Math.min(100, Math.max(0, Number(value)))
 }
 
@@ -182,12 +405,26 @@ function toLocalDateTime(value: string | null): string {
   return new Date(date.getTime() - offset).toISOString().slice(0, 16)
 }
 
+function toIsoOrNull(value: string): string | null {
+  return value ? new Date(value).toISOString() : null
+}
+
 function countdown(value: string): string {
-  const diff = new Date(value).getTime() - Date.now()
+  const diff = new Date(value).getTime() - clockNow.value
   if (diff <= 0) return '已到期'
   const days = Math.floor(diff / 86_400_000)
   const hours = Math.floor((diff % 86_400_000) / 3_600_000)
   return days > 0 ? `剩余 ${days} 天 ${hours} 小时` : `剩余 ${hours} 小时`
+}
+
+function formatLocalTime(value: string): string {
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(new Date(value))
 }
 
 function startOfCurrentWeek(): Date {
@@ -222,7 +459,10 @@ function showError(error: unknown): void {
           {{ game.name }}
         </button>
       </nav>
-      <div class="sidebar-footer">⚙ 设置</div>
+      <div class="sidebar-footer">
+        <button type="button" @click="recycleBinOpen = true">♲ 回收站 <span>{{ archivedItems.length }}</span></button>
+        <button type="button" @click="openSettings">⚙ 设置</button>
+      </div>
     </aside>
 
     <section class="workspace">
@@ -240,12 +480,30 @@ function showError(error: unknown): void {
           >
             ◇ 只看未完成
           </button>
-          <button class="toolbar-button" type="button" @click="loadItems">↻ 刷新清单</button>
-          <span class="status-pill"><i></i>纯手动模式</span>
+          <div class="dropdown">
+            <button class="toolbar-button" type="button" :disabled="syncing" @click="refreshMenuOpen = !refreshMenuOpen">
+              {{ syncing ? '同步中…' : '↻ 刷新清单' }} ▾
+            </button>
+            <div v-if="refreshMenuOpen" class="dropdown-menu">
+              <button type="button" @click="runSync('public_schedule')">同步公开排期</button>
+              <button type="button" @click="runSync('public_and_personal')">同步公开排期 + {{ personalPlatform }}</button>
+            </div>
+          </div>
+          <select class="toolbar-select" :value="syncModeValue" aria-label="同步模式" @change="updateSyncMode">
+            <option value="manual">手动模式</option>
+            <option value="automatic_public">自动模式 · 公开排期</option>
+            <option value="automatic_personal">自动模式 · 公开排期 + {{ personalPlatform }}</option>
+          </select>
+          <span
+            class="sync-status"
+            :class="syncSettings?.status"
+            :title="syncSettings?.message ?? syncStatusText"
+          >{{ syncStatusText }}</span>
         </div>
       </header>
 
       <p v-if="errorMessage" class="error-banner">{{ errorMessage }}</p>
+      <p v-if="syncNotice" class="sync-banner" :class="syncNotice.status">{{ syncNotice.message }}</p>
 
       <section class="summary-grid">
         <article class="summary-card">
@@ -266,7 +524,15 @@ function showError(error: unknown): void {
       <template v-else>
         <section class="content-grid">
           <article v-for="panel in panels" :key="panel.title" class="panel checklist-card">
-            <h2><span>{{ panel.icon }}</span>{{ panel.title }}</h2>
+            <div class="section-header">
+              <h2><span>{{ panel.icon }}</span>{{ panel.title }}</h2>
+              <button
+                class="clear-completed-button"
+                type="button"
+                :disabled="!items.some((item) => panel.categories.includes(item.category) && item.completed)"
+                @click="archiveCompletedSection(panel.section, panel.categories, panel.title)"
+              >删除已完成</button>
+            </div>
             <div class="item-list">
               <div
                 v-for="item in itemsFor(panel.categories)"
@@ -281,7 +547,12 @@ function showError(error: unknown): void {
                   <span class="item-title">{{ item.title }}</span>
                   <span class="item-details">
                     <b>{{ categoryLabels[item.category] }}</b>
+                    <span v-if="item.parentTitle">{{ item.parentTitle }}</span>
                     <span v-if="item.progressPercent !== null">{{ item.progressPercent }}%</span>
+                    <span v-if="item.modeKey">{{ item.modeKey }}</span>
+                    <span v-if="item.source !== 'manual' && item.lastSyncedAt" class="source-detail">
+                      {{ item.source === 'public_schedule' ? '公开排期' : '个人数据' }} · {{ formatLocalTime(item.lastSyncedAt) }}
+                    </span>
                     <span v-if="item.endsAt" class="deadline">{{ countdown(item.endsAt) }}</span>
                     <span v-else-if="item.resetRule">{{ item.resetRule }}</span>
                   </span>
@@ -295,7 +566,15 @@ function showError(error: unknown): void {
         </section>
 
         <section class="panel custom-list">
-          <h2>自定义清单</h2>
+          <div class="section-header">
+            <h2>自定义清单</h2>
+            <button
+              class="clear-completed-button"
+              type="button"
+              :disabled="!items.some((item) => item.category === 'custom' && item.completed)"
+              @click="archiveCompletedSection('custom', ['custom'], '自定义清单')"
+            >删除已完成</button>
+          </div>
           <div class="custom-grid">
             <div
               v-for="item in itemsFor(['custom'])"
@@ -331,9 +610,27 @@ function showError(error: unknown): void {
             <option v-for="(label, category) in categoryLabels" :key="category" :value="category">{{ label }}</option>
           </select>
         </label>
-        <label v-if="form.category === 'exploration'">探索进度（%）<input v-model.number="form.progressPercent" type="number" min="0" max="100" /></label>
-        <label v-if="['limited_event', 'endgame'].includes(form.category)">结束时间<input v-model="form.endsAt" type="datetime-local" /></label>
-        <label v-if="['weekly', 'endgame'].includes(form.category)">重置规则<input v-model="form.resetRule" placeholder="例如：每周一重置" /></label>
+        <template v-if="form.category === 'exploration'">
+          <div class="form-grid">
+            <label>上级区域（可选）<input v-model="form.parentTitle" maxlength="200" placeholder="例如：枫丹" /></label>
+            <label>探索进度（%）<input v-model.number="form.progressPercent" type="number" min="0" max="100" /></label>
+          </div>
+        </template>
+        <template v-if="['limited_event', 'endgame'].includes(form.category)">
+          <div class="form-grid">
+            <label>开始时间<input v-model="form.startsAt" type="datetime-local" /></label>
+            <label>结束时间<input v-model="form.endsAt" type="datetime-local" /></label>
+          </div>
+        </template>
+        <label v-if="form.category === 'weekly'">每周重置日
+          <select v-model.number="form.resetWeekday">
+            <option v-for="(label, value) in weekdayLabels" :key="value" :value="Number(value)">{{ label }}</option>
+          </select>
+        </label>
+        <template v-if="form.category === 'endgame'">
+          <label>玩法标识<input v-model="form.modeKey" maxlength="200" placeholder="例如：深境螺旋 / 幻想真境剧诗" /></label>
+          <label>周期说明<input v-model="form.resetRule" maxlength="200" placeholder="例如：每月 1 日、16 日刷新" /></label>
+        </template>
 
         <div class="modal-actions">
           <button v-if="editingItem" class="danger-button" type="button" @click="archiveItem(editingItem)">删除</button>
@@ -342,6 +639,58 @@ function showError(error: unknown): void {
           <button class="primary-button" type="submit" :disabled="saving || !form.title.trim()">{{ saving ? '保存中…' : '保存' }}</button>
         </div>
       </form>
+    </div>
+
+    <div v-if="recycleBinOpen" class="modal-backdrop" @click.self="recycleBinOpen = false">
+      <section class="editor-modal recycle-modal" aria-label="回收站">
+        <div class="modal-header">
+          <div><p class="eyebrow">{{ selectedGame?.name }}</p><h2>回收站</h2></div>
+          <button class="close-button" type="button" @click="recycleBinOpen = false">×</button>
+        </div>
+        <p class="recycle-hint">已删除事项保留在本机；远端同步不会自动恢复它们。</p>
+        <div class="recycle-list">
+          <div v-for="item in archivedItems" :key="item.id" class="recycle-row">
+            <div>
+              <strong>{{ item.title }}</strong>
+              <span>{{ categoryLabels[item.category] }} · {{ item.source === 'manual' ? '手动' : '同步' }}</span>
+            </div>
+            <button class="secondary-button" type="button" @click="restoreItem(item)">恢复</button>
+          </div>
+          <p v-if="archivedItems.length === 0" class="empty-text">回收站为空</p>
+        </div>
+      </section>
+    </div>
+
+    <div v-if="settingsOpen" class="modal-backdrop" @click.self="settingsOpen = false">
+      <section class="editor-modal recycle-modal" aria-label="设置">
+        <div class="modal-header">
+          <div><p class="eyebrow">本机设置</p><h2>设置</h2></div>
+          <button class="close-button" type="button" @click="settingsOpen = false">×</button>
+        </div>
+        <h3 class="settings-heading">登录凭据</h3>
+        <p class="recycle-hint">登录完全可选。凭据仅通过 Windows 安全存储加密后保存在本机，不读取浏览器 Cookie。</p>
+        <div class="recycle-list">
+          <div v-for="status in credentialStatuses" :key="status.provider" class="recycle-row">
+            <div>
+              <strong>{{ status.provider === 'miyoushe' ? '米游社' : '库街区' }}</strong>
+              <span>{{ status.stored ? `已安全保存 · ${formatLocalTime(status.updatedAt!)}` : '未登录' }}</span>
+            </div>
+            <button
+              class="danger-button"
+              type="button"
+              :disabled="!status.stored"
+              @click="clearCredential(status.provider)"
+            >清除凭据</button>
+          </div>
+        </div>
+        <h3 class="settings-heading data-heading">本地数据</h3>
+        <div class="data-location">
+          <span>{{ appInfo?.dataPath }}</span>
+          <button class="secondary-button" type="button" @click="openDataDirectory">打开目录</button>
+        </div>
+        <p class="recycle-hint">数据库位于 data 子目录；每日一致性备份位于 backups 子目录。</p>
+        <p class="settings-note">登录入口将在个人数据适配器接入时启用；当前手动清单与公开排期模式不依赖登录。</p>
+      </section>
     </div>
   </main>
 </template>

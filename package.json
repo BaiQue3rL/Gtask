@@ -10,6 +10,7 @@
     "build": "pnpm typecheck && electron-vite build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && vue-tsc --noEmit -p tsconfig.web.json",
+    "local:command": "node out/main/local-command-cli.js",
     "preview": "electron-vite preview",
     "package:dir": "pnpm build && electron-builder --dir",
     "package:portable": "pnpm build && electron-builder --win portable"

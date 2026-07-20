@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  parseChecklistSection,
   parseCreateChecklistItem,
   parseGameId,
+  parseSyncRunMode,
+  parseSyncScope,
   parseUpdateChecklistItem
 } from '../src/main/validation'
 
@@ -34,5 +37,17 @@ describe('清单 IPC 参数校验', () => {
     expect(() => parseUpdateChecklistItem({ id: 'test-id', completed: 'yes' })).toThrow(
       '完成状态格式不正确'
     )
+  })
+
+  it('只接受已定义的清单版块', () => {
+    expect(parseChecklistSection('cycles')).toBe('cycles')
+    expect(() => parseChecklistSection('all')).toThrow('不支持的清单版块')
+  })
+
+  it('校验同步模式和同步范围', () => {
+    expect(parseSyncRunMode('automatic')).toBe('automatic')
+    expect(parseSyncScope('public_and_personal')).toBe('public_and_personal')
+    expect(() => parseSyncRunMode('startup')).toThrow('不支持的同步运行模式')
+    expect(() => parseSyncScope('personal_only')).toThrow('不支持的同步范围')
   })
 })
