@@ -293,6 +293,55 @@ describe('AppDatabase', () => {
     })
   })
 
+  it('个人数据先到达时，后续公开排期仍取得元数据优先级', () => {
+    database = new AppDatabase(':memory:')
+    const remoteKey = 'endgame:shiyu-defense'
+    database.mergeSyncedItems('zenless', 'personal_sync', [
+      {
+        remoteKey,
+        category: 'endgame',
+        title: '个人接口内部名称',
+        completed: true,
+        progressPercent: 80,
+        startsAt: '2026-07-01T00:00:00.000Z'
+      }
+    ])
+    database.mergeSyncedItems('zenless', 'public_schedule', [
+      {
+        remoteKey,
+        category: 'endgame',
+        title: '式舆防卫战',
+        sourceUrl: 'https://example.com/zenless/shiyu',
+        startsAt: '2026-07-16T20:00:00.000Z',
+        endsAt: '2026-08-01T19:59:59.999Z'
+      }
+    ])
+    database.mergeSyncedItems('zenless', 'personal_sync', [
+      {
+        remoteKey,
+        category: 'endgame',
+        title: '又一次个人接口名称',
+        completed: false,
+        progressPercent: 90,
+        startsAt: '2026-07-02T00:00:00.000Z'
+      }
+    ])
+
+    const matches = database
+      .listChecklistItems('zenless')
+      .filter((item) => item.remoteKey === remoteKey)
+    expect(matches).toHaveLength(1)
+    expect(matches[0]).toMatchObject({
+      source: 'public_schedule',
+      title: '式舆防卫战',
+      completed: false,
+      progressPercent: 90,
+      startsAt: '2026-07-16T20:00:00.000Z',
+      endsAt: '2026-08-01T19:59:59.999Z',
+      sourceUrl: 'https://example.com/zenless/shiyu'
+    })
+  })
+
   it('挑战玩法进入新周期时清除上一周期完成状态和手动完成锁', () => {
     database = new AppDatabase(':memory:')
     database.mergeSyncedItems('zenless', 'public_schedule', [

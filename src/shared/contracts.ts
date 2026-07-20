@@ -35,6 +35,13 @@ export interface CredentialStatus {
   updatedAt: string | null
 }
 
+export interface BackupSummary {
+  fileName: string
+  sizeBytes: number
+  updatedAt: string
+  kind: 'daily' | 'pre_migration' | 'manual'
+}
+
 export interface GameSummary {
   id: GameId
   name: string
@@ -151,6 +158,8 @@ export interface GachaApi {
   getAppInfo: () => Promise<AppInfo>
   openDataDirectory: () => Promise<void>
   openExternalUrl: (url: string) => Promise<void>
+  listBackups: () => Promise<BackupSummary[]>
+  createBackup: () => Promise<BackupSummary>
   listGames: () => Promise<GameSummary[]>
   listChecklistItems: (gameId: GameId) => Promise<ChecklistItem[]>
   listArchivedChecklistItems: (gameId: GameId) => Promise<ChecklistItem[]>

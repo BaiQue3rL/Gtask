@@ -136,7 +136,7 @@ h2 { margin: 0; font-size: 19px; }
 .secondary-button { border: 1px solid #3d5878; color: #b3c2d5; background: transparent; }
 .primary-button { border: 1px solid #5b91d5; color: white; background: #245eaa; }
 .primary-button:disabled { cursor: not-allowed; opacity: 0.45; }
-.recycle-modal { width: min(620px, 100%); }
+.recycle-modal { width: min(620px, 100%); max-height: calc(100vh - 60px); overflow-y: auto; }
 .recycle-hint { margin: -7px 0 15px; color: #7189a7; font-size: 12px; }
 .recycle-list { display: grid; gap: 8px; max-height: 460px; overflow: auto; }
 .recycle-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 11px 12px; border: 1px solid #2b4665; border-radius: 8px; background: rgba(13, 38, 68, 0.55); }
@@ -147,9 +147,17 @@ h2 { margin: 0; font-size: 19px; }
 .recycle-row button:disabled { cursor: not-allowed; opacity: 0.35; }
 .settings-heading { margin: 0 0 8px; color: #dce9f8; font-size: 15px; }
 .settings-heading.data-heading { margin-top: 20px; }
+.settings-title-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.settings-title-row button { padding: 6px 11px; border-radius: 6px; cursor: pointer; }
 .data-location { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; padding: 10px 12px; border: 1px solid #2b4665; border-radius: 8px; background: rgba(13, 38, 68, 0.55); }
 .data-location span { overflow: hidden; color: #8097b4; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .data-location button { flex: 0 0 auto; padding: 7px 12px; border-radius: 6px; cursor: pointer; }
+.backup-list { display: grid; gap: 6px; margin-top: 10px; }
+.backup-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 8px 10px; border: 1px solid #273f5c; border-radius: 7px; background: rgba(10, 31, 57, 0.46); }
+.backup-row div { display: grid; min-width: 0; gap: 3px; }
+.backup-row strong { overflow: hidden; color: #aebfd4; font-size: 11px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.backup-row span, .backup-row small { color: #657e9c; font-size: 10px; }
+.backup-row small { flex: 0 0 auto; }
 .source-box { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding: 10px 12px; border: 1px solid #2b4665; border-radius: 8px; background: rgba(13, 38, 68, 0.55); }
 .source-box div { display: grid; min-width: 0; gap: 4px; }
 .source-box span { color: #aebdd0; font-size: 12px; }

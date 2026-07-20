@@ -1,7 +1,8 @@
-import { existsSync, mkdirSync, renameSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { backup, DatabaseSync } from 'node:sqlite'
 import type { AppDatabase } from './database'
+import type { BackupSummary } from '../shared/contracts'
 
 function localDateKey(reference: Date): string {
   const year = reference.getFullYear()
@@ -71,4 +72,48 @@ export async function createPreMigrationBackup(
   } finally {
     source.close()
   }
+}
+
+export async function createManualBackup(
+  database: AppDatabase,
+  backupDirectory: string,
+  reference = new Date()
+): Promise<string> {
+  const resolvedDirectory = resolve(backupDirectory)
+  mkdirSync(resolvedDirectory, { recursive: true })
+  const destination = join(
+    resolvedDirectory,
+    `gacha-task-manager-manual-${timestampKey(reference)}-${String(reference.getMilliseconds()).padStart(3, '0')}.sqlite`
+  )
+  const temporaryDestination = `${destination}.tmp`
+  try {
+    await database.backupTo(temporaryDestination)
+    renameSync(temporaryDestination, destination)
+    return destination
+  } catch (error) {
+    if (existsSync(temporaryDestination)) rmSync(temporaryDestination)
+    throw error
+  }
+}
+
+export function listBackups(backupDirectory: string): BackupSummary[] {
+  const resolvedDirectory = resolve(backupDirectory)
+  if (!existsSync(resolvedDirectory)) return []
+  return readdirSync(resolvedDirectory, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.sqlite'))
+    .map((entry): BackupSummary => {
+      const stats = statSync(join(resolvedDirectory, entry.name))
+      const kind: BackupSummary['kind'] = entry.name.includes('-before-v')
+        ? 'pre_migration'
+        : entry.name.includes('-manual-')
+          ? 'manual'
+          : 'daily'
+      return {
+        fileName: entry.name,
+        sizeBytes: stats.size,
+        updatedAt: stats.mtime.toISOString(),
+        kind
+      }
+    })
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
 }

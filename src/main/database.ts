@@ -566,6 +566,10 @@ export class AppDatabase {
         const current = this.getChecklistItem(identity.id)
         const preservePublicSchedule =
           source === 'personal_sync' && current.source === 'public_schedule'
+        const resolvedSource =
+          source === 'public_schedule' || current.source === 'public_schedule'
+            ? 'public_schedule'
+            : 'personal_sync'
         const periodChanged =
           item.periodKey !== undefined &&
           item.periodKey !== null &&
@@ -609,6 +613,7 @@ export class AppDatabase {
               reset_weekday = ?,
               timezone = ?,
               mode_key = ?,
+              source = ?,
               source_url = ?,
               manual_completion_locked = ?,
               completed_at = ?,
@@ -636,6 +641,7 @@ export class AppDatabase {
               : item.resetWeekday,
             preservePublicSchedule || item.timeZone === undefined ? current.timeZone : item.timeZone,
             preservePublicSchedule || item.modeKey === undefined ? current.modeKey : item.modeKey,
+            resolvedSource,
             preservePublicSchedule || item.sourceUrl === undefined ? current.sourceUrl : item.sourceUrl,
             manualCompletionLocked ? 1 : 0,
             completedAt,

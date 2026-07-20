@@ -1,7 +1,12 @@
 import { join } from 'node:path'
 import { app, BrowserWindow, dialog, ipcMain, safeStorage, shell } from 'electron'
 import { AppDatabase, CURRENT_SCHEMA_VERSION } from './database'
-import { createDailyBackup, createPreMigrationBackup } from './backup'
+import {
+  createDailyBackup,
+  createManualBackup,
+  createPreMigrationBackup,
+  listBackups
+} from './backup'
 import { CredentialVault } from './credential-vault'
 import { SyncOrchestrator } from './sync/orchestrator'
 import {
@@ -30,6 +35,7 @@ let syncOrchestrator: SyncOrchestrator | null = null
 let periodTimer: ReturnType<typeof setInterval> | null = null
 let externalChangeTimer: ReturnType<typeof setInterval> | null = null
 let credentialVault: CredentialVault | null = null
+let appBackupDirectory: string | null = null
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -51,7 +57,11 @@ function createWindow(): void {
   mainWindow.on('ready-to-show', () => mainWindow?.show())
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url)
+    try {
+      void shell.openExternal(parseExternalUrl(url))
+    } catch (error) {
+      console.warn('已阻止不安全的外部链接', error)
+    }
     return { action: 'deny' }
   })
 
@@ -73,6 +83,17 @@ function registerIpcHandlers(): void {
   })
   ipcMain.handle('app:open-external-url', async (_event, value: unknown) => {
     await shell.openExternal(parseExternalUrl(value))
+  })
+  ipcMain.handle('backups:list', () => {
+    if (!appBackupDirectory) throw new Error('备份目录尚未初始化')
+    return listBackups(appBackupDirectory)
+  })
+  ipcMain.handle('backups:create', async () => {
+    if (!appDatabase || !appBackupDirectory) throw new Error('备份服务尚未初始化')
+    const path = await createManualBackup(appDatabase, appBackupDirectory)
+    const backup = listBackups(appBackupDirectory).find((candidate) => path.endsWith(candidate.fileName))
+    if (!backup) throw new Error('备份已创建但无法读取备份信息')
+    return backup
   })
 
   ipcMain.handle('games:list', () => appDatabase?.listGames() ?? [])
@@ -147,6 +168,7 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(async () => {
     const databasePath = join(app.getPath('userData'), 'data', 'gacha-task-manager.sqlite')
     const backupDirectory = join(app.getPath('userData'), 'backups')
+    appBackupDirectory = backupDirectory
     try {
       await createPreMigrationBackup(databasePath, backupDirectory, CURRENT_SCHEMA_VERSION)
     } catch (error) {
@@ -216,4 +238,5 @@ app.on('before-quit', () => {
   appDatabase = null
   syncOrchestrator = null
   credentialVault = null
+  appBackupDirectory = null
 })

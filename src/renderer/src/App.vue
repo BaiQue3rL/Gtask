@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import type {
   AppInfo,
+  BackupSummary,
   ChecklistCategory,
   ChecklistItem,
   ChecklistSection,
@@ -70,6 +71,8 @@ const editorOpen = ref(false)
 const recycleBinOpen = ref(false)
 const settingsOpen = ref(false)
 const credentialStatuses = ref<CredentialStatus[]>([])
+const backups = ref<BackupSummary[]>([])
+const backingUp = ref(false)
 const editingItem = ref<ChecklistItem | null>(null)
 
 const form = reactive({
@@ -226,9 +229,25 @@ async function loadArchivedItems(): Promise<void> {
 async function openSettings(): Promise<void> {
   settingsOpen.value = true
   try {
-    credentialStatuses.value = await window.gacha.listCredentialStatuses()
+    ;[credentialStatuses.value, backups.value] = await Promise.all([
+      window.gacha.listCredentialStatuses(),
+      window.gacha.listBackups()
+    ])
   } catch (error) {
     showError(error)
+  }
+}
+
+async function createBackup(): Promise<void> {
+  if (backingUp.value) return
+  backingUp.value = true
+  try {
+    await window.gacha.createBackup()
+    backups.value = await window.gacha.listBackups()
+  } catch (error) {
+    showError(error)
+  } finally {
+    backingUp.value = false
   }
 }
 
@@ -472,6 +491,11 @@ function formatLocalTime(value: string): string {
     minute: '2-digit',
     hour12: false
   }).format(new Date(value))
+}
+
+function formatFileSize(value: number): string {
+  if (value < 1024) return `${value} B`
+  return `${(value / 1024).toFixed(value < 10 * 1024 ? 1 : 0)} KB`
 }
 
 function startOfCurrentWeek(): Date {
@@ -739,12 +763,24 @@ function showError(error: unknown): void {
             >清除凭据</button>
           </div>
         </div>
-        <h3 class="settings-heading data-heading">本地数据</h3>
+        <div class="settings-title-row">
+          <h3 class="settings-heading data-heading">本地数据与备份</h3>
+          <button class="secondary-button" type="button" :disabled="backingUp" @click="createBackup">
+            {{ backingUp ? '备份中…' : '立即备份' }}
+          </button>
+        </div>
         <div class="data-location">
           <span>{{ appInfo?.dataPath }}</span>
           <button class="secondary-button" type="button" @click="openDataDirectory">打开目录</button>
         </div>
         <p class="recycle-hint">数据库位于 data 子目录；每日一致性备份位于 backups 子目录。</p>
+        <div class="backup-list">
+          <div v-for="backup in backups.slice(0, 4)" :key="backup.fileName" class="backup-row">
+            <div><strong>{{ backup.fileName }}</strong><span>{{ formatLocalTime(backup.updatedAt) }}</span></div>
+            <small>{{ backup.kind === 'daily' ? '每日' : backup.kind === 'manual' ? '手动' : '升级前' }} · {{ formatFileSize(backup.sizeBytes) }}</small>
+          </div>
+          <p v-if="backups.length === 0" class="empty-text">尚无备份</p>
+        </div>
         <p class="settings-note">登录入口将在个人数据适配器接入时启用；当前手动清单与公开排期模式不依赖登录。</p>
       </section>
     </div>
