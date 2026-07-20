@@ -10,6 +10,7 @@ import {
 } from './backup'
 import { CredentialVault } from './credential-vault'
 import { SyncOrchestrator } from './sync/orchestrator'
+import { restoreRelaunchOptions } from './relaunch'
 import {
   parseChecklistSection,
   parseCredentialProvider,
@@ -148,8 +149,18 @@ function registerIpcHandlers(): void {
     if (externalChangeTimer) clearInterval(externalChangeTimer)
     externalChangeTimer = null
     setTimeout(() => {
-      app.relaunch()
-      app.exit(0)
+      try {
+        const relaunchOptions = restoreRelaunchOptions(process.env, process.argv)
+        if (relaunchOptions) app.relaunch(relaunchOptions)
+        else app.relaunch()
+      } catch (error) {
+        dialog.showErrorBox(
+          '数据已恢复，请手动重新打开应用',
+          error instanceof Error ? error.message : '无法自动重新启动应用'
+        )
+      } finally {
+        app.exit(0)
+      }
     }, 150)
     return true
   })
