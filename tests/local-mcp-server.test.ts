@@ -160,6 +160,30 @@ describe('本地 MCP server', () => {
     expect(rejectedCompletion.isError).toBe(true)
     expect(database!.listChecklistItems('genshin').some((item) => item.title === '不能夹带完成状态')).toBe(false)
 
+    const rejectedPermanentEvent = await connected.callTool({
+      name: 'apply_gacha_public_schedule',
+      arguments: {
+        agentId: 'test-agent',
+        jobId: queued.id,
+        retrievedAt: '2026-07-20T15:30:00.000Z',
+        items: [{
+          remoteKey: 'official:event:permanent',
+          category: 'permanent_event',
+          title: '常驻活动只能由用户维护',
+          sourceUrl: 'https://example.com/official-event',
+          confidence: 0.98
+        }],
+        evidence: [{
+          url: 'https://example.com/official-event',
+          platform: 'official-site',
+          publisher: '官方账号',
+          official: true
+        }]
+      }
+    })
+    expect(rejectedPermanentEvent.isError).toBe(true)
+    expect(database!.listChecklistItems('genshin').some((item) => item.title === '常驻活动只能由用户维护')).toBe(false)
+
     const applied = await connected.callTool({
       name: 'apply_gacha_public_schedule',
       arguments: {

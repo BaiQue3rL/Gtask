@@ -16,6 +16,7 @@ import type {
   SyncScope,
   SyncSettings
 } from '../../shared/contracts'
+import { readHiddenGameIds, writeHiddenGameIds } from './game-visibility'
 
 interface ChecklistPanel {
   title: string
@@ -55,6 +56,7 @@ const weekdayLabels: Record<number, string> = {
 }
 
 const games = ref<GameSummary[]>([])
+const hiddenGameIds = ref<GameId[]>(readHiddenGameIds(window.localStorage))
 const items = ref<ChecklistItem[]>([])
 const archivedItems = ref<ChecklistItem[]>([])
 const appInfo = ref<AppInfo | null>(null)
@@ -91,6 +93,7 @@ const form = reactive({
 })
 
 const selectedGame = computed(() => games.value.find((game) => game.id === selectedGameId.value))
+const visibleGames = computed(() => games.value.filter((game) => !hiddenGameIds.value.includes(game.id)))
 const editorCategories = computed(() => {
   const questCategories: ChecklistCategory[] = ['main_quest', 'side_quest']
   if (editingItem.value && questCategories.includes(editingItem.value.category)) {
@@ -154,6 +157,9 @@ onMounted(async () => {
       window.gacha.getAppInfo(),
       window.gacha.getAiScheduleAgentStatus()
     ])
+    if (hiddenGameIds.value.includes(selectedGameId.value)) {
+      selectedGameId.value = visibleGames.value[0]?.id ?? 'genshin'
+    }
     await Promise.all([loadItems(), loadArchivedItems(), loadSyncSettings()])
   } catch (error) {
     showError(error)
@@ -169,6 +175,18 @@ const removeSyncListener = window.gacha.onSyncCompleted((result) => {
 })
 const removeChecklistListener = window.gacha.onChecklistChanged(() => {
   void Promise.all([loadItems(), loadArchivedItems(), loadSyncSettings(), loadAiScheduleAgentStatus()])
+    .then(() => {
+      const settings = syncSettings.value
+      if (!settings?.message || settings.status === 'idle') return
+      syncNotice.value = {
+        status: settings.status === 'success'
+          ? 'success'
+          : settings.status === 'error'
+            ? 'error'
+            : 'partial',
+        message: settings.message
+      }
+    })
 })
 const clockTimer = window.setInterval(() => {
   clockNow.value = Date.now()
@@ -246,6 +264,31 @@ async function openSettings(): Promise<void> {
       window.gacha.listCredentialStatuses(),
       window.gacha.listBackups()
     ])
+  } catch (error) {
+    showError(error)
+  }
+}
+
+function isGameVisible(gameId: GameId): boolean {
+  return !hiddenGameIds.value.includes(gameId)
+}
+
+function toggleGameVisibility(gameId: GameId): void {
+  const currentlyVisible = isGameVisible(gameId)
+  if (currentlyVisible && visibleGames.value.length === 1) {
+    errorMessage.value = '至少需要保留一款游戏显示'
+    return
+  }
+
+  const nextHidden = currentlyVisible
+    ? [...hiddenGameIds.value, gameId]
+    : hiddenGameIds.value.filter((id) => id !== gameId)
+
+  try {
+    hiddenGameIds.value = writeHiddenGameIds(window.localStorage, nextHidden)
+    if (hiddenGameIds.value.includes(selectedGameId.value)) {
+      selectedGameId.value = visibleGames.value[0]?.id ?? 'genshin'
+    }
   } catch (error) {
     showError(error)
   }
@@ -544,7 +587,7 @@ function showError(error: unknown): void {
       <p class="section-label">我的游戏</p>
       <nav class="game-list" aria-label="支持的游戏">
         <button
-          v-for="game in games"
+          v-for="game in visibleGames"
           :key="game.id"
           class="game-button"
           :class="{ selected: selectedGameId === game.id }"
@@ -786,6 +829,20 @@ function showError(error: unknown): void {
         <div class="modal-header">
           <div><p class="eyebrow">本机设置</p><h2>设置</h2></div>
           <button class="close-button" type="button" aria-label="关闭设置" @click="settingsOpen = false">×</button>
+        </div>
+        <h3 class="settings-heading">我的游戏</h3>
+        <p class="recycle-hint">隐藏不玩的游戏只会移除左侧入口，不会删除任何清单或同步数据。</p>
+        <div class="game-visibility-list">
+          <label v-for="game in games" :key="game.id" class="game-visibility-row">
+            <span><i class="game-dot" :style="{ '--game-accent': game.accent }"></i>{{ game.name }}</span>
+            <input
+              type="checkbox"
+              :checked="isGameVisible(game.id)"
+              :disabled="isGameVisible(game.id) && visibleGames.length === 1"
+              :aria-label="`显示 ${game.name}`"
+              @change="toggleGameVisibility(game.id)"
+            >
+          </label>
         </div>
         <h3 class="settings-heading">登录凭据</h3>
         <p class="recycle-hint">登录完全可选。凭据仅通过 Windows 安全存储加密后保存在本机，不读取浏览器 Cookie。</p>

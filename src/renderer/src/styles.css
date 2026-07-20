@@ -147,6 +147,12 @@ h2 { margin: 0; font-size: 19px; }
 .recycle-row button { padding: 7px 13px; border-radius: 6px; cursor: pointer; }
 .recycle-row button:disabled { cursor: not-allowed; opacity: 0.35; }
 .settings-heading { margin: 0 0 8px; color: #dce9f8; font-size: 15px; }
+.game-visibility-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 20px; }
+.game-visibility-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid #2b4665; border-radius: 8px; color: #b9c9dc; background: rgba(13, 38, 68, 0.55); cursor: pointer; }
+.game-visibility-row span { display: flex; align-items: center; gap: 9px; font-size: 12px; }
+.game-visibility-row .game-dot { display: inline-block; flex: 0 0 auto; }
+.game-visibility-row input { width: 16px; height: 16px; accent-color: #5d91d3; cursor: pointer; }
+.game-visibility-row input:disabled { cursor: not-allowed; opacity: 0.45; }
 .settings-heading.data-heading { margin-top: 20px; }
 .settings-title-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .settings-title-row button { padding: 6px 11px; border-radius: 6px; cursor: pointer; }

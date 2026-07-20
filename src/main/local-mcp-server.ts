@@ -18,7 +18,7 @@ const scheduleKindSchema = z.enum(['weekly', 'fixed_window', 'remote_schedule'])
 const nullableTextSchema = z.string().max(200).nullable().optional()
 const nullableDateSchema = z.string().nullable().optional()
 const nullableProgressSchema = z.number().min(0).max(100).nullable().optional()
-const publicScheduleCategorySchema = z.enum(['limited_event', 'permanent_event', 'weekly', 'endgame'])
+const publicScheduleCategorySchema = z.enum(['limited_event', 'weekly', 'endgame'])
 const isoDateSchema = z.string().max(50).refine((value) => !Number.isNaN(Date.parse(value)), '必须是有效时间')
 const httpUrlSchema = z.string().max(500).url().refine((value) => {
   const protocol = new URL(value).protocol
