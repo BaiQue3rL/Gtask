@@ -85,4 +85,20 @@ describe('公开排期文档', () => {
     )
     await expect(future.sync('genshin')).rejects.toThrow('来自未来')
   })
+
+  it('拒绝异常庞大的公开排期事项集合', () => {
+    expect(() =>
+      parsePublicScheduleDocument(
+        {
+          ...document,
+          items: Array.from({ length: 501 }, (_, index) => ({
+            remoteKey: `event:${index}`,
+            category: 'limited_event',
+            title: `活动 ${index}`
+          }))
+        },
+        'genshin'
+      )
+    ).toThrow('不能超过 500 条')
+  })
 })

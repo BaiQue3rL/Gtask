@@ -18,6 +18,7 @@ export interface PublicScheduleDocumentAdapterOptions {
 
 const DEFAULT_MAXIMUM_AGE_MS = 24 * 60 * 60 * 1000
 const DEFAULT_MAXIMUM_FUTURE_SKEW_MS = 5 * 60 * 1000
+const MAXIMUM_DOCUMENT_ITEMS = 500
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -35,6 +36,9 @@ export function parsePublicScheduleDocument(
     throw new Error('公开排期抓取时间格式不正确')
   }
   if (!Array.isArray(value.items)) throw new Error('公开排期事项列表格式不正确')
+  if (value.items.length > MAXIMUM_DOCUMENT_ITEMS) {
+    throw new Error(`公开排期事项不能超过 ${MAXIMUM_DOCUMENT_ITEMS} 条`)
+  }
 
   const items: NormalizedSyncItem[] = value.items.map((candidate): NormalizedSyncItem => {
     if (!isRecord(candidate)) throw new Error('公开排期事项格式不正确')
