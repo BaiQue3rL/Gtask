@@ -537,6 +537,7 @@ function showError(error: unknown): void {
           class="game-button"
           :class="{ selected: selectedGameId === game.id }"
           type="button"
+          :aria-current="selectedGameId === game.id ? 'page' : undefined"
           @click="selectedGameId = game.id"
         >
           <span class="game-dot" :style="{ '--game-accent': game.accent }"></span>
@@ -679,11 +680,16 @@ function showError(error: unknown): void {
               class="checklist-row"
               :class="{ completed: item.completed }"
             >
-              <button class="check-button" type="button" @click="toggleCompleted(item)">{{ item.completed ? '✓' : '' }}</button>
+              <button
+                class="check-button"
+                type="button"
+                :aria-label="item.completed ? '标为未完成' : '标为完成'"
+                @click="toggleCompleted(item)"
+              >{{ item.completed ? '✓' : '' }}</button>
               <button class="item-main" type="button" @click="openEdit(item)">
                 <span class="item-title">{{ item.title }}</span>
               </button>
-              <button class="more-button" type="button" @click="openEdit(item)">⋮</button>
+              <button class="more-button" type="button" aria-label="编辑" @click="openEdit(item)">⋮</button>
             </div>
           </div>
           <p v-if="itemsFor(['custom']).length === 0" class="empty-text">暂无自定义事项</p>
