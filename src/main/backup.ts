@@ -9,7 +9,7 @@ import {
 } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { backup, DatabaseSync } from 'node:sqlite'
-import type { AppDatabase } from './database'
+import { CURRENT_SCHEMA_VERSION, type AppDatabase } from './database'
 import type { BackupSummary } from '../shared/contracts'
 
 function localDateKey(reference: Date): string {
@@ -40,6 +40,16 @@ function verifyRestorableDatabase(databasePath: string): void {
     const tableNames = new Set(rows.map((row) => row.name))
     if (requiredTables.some((table) => !tableNames.has(table))) {
       throw new Error('所选文件不是可恢复的幻游清单数据库')
+    }
+    const versionRow = candidate
+      .prepare('SELECT MAX(version) AS version FROM schema_migrations')
+      .get() as { version: number | null }
+    const version = Number(versionRow.version)
+    if (!Number.isInteger(version) || version < 1) {
+      throw new Error('所选备份缺少有效的数据库版本')
+    }
+    if (version > CURRENT_SCHEMA_VERSION) {
+      throw new Error(`所选备份来自更高版本（v${version}），当前应用无法恢复`)
     }
   } finally {
     candidate.close()

@@ -137,4 +137,21 @@ describe('createDailyBackup', () => {
     ).rejects.toThrow('备份文件名不合法')
     expect(database.listGames()).toHaveLength(4)
   })
+
+  it('替换当前数据库前拒绝来自未来版本的备份', async () => {
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-restore-version-test-'))
+    const databasePath = join(temporaryDirectory, 'source.sqlite')
+    const backupDirectory = join(temporaryDirectory, 'backups')
+    database = new AppDatabase(databasePath)
+    const backupPath = await createManualBackup(database, backupDirectory)
+    const future = new DatabaseSync(backupPath)
+    future.prepare('INSERT INTO schema_migrations(version) VALUES (?)').run(CURRENT_SCHEMA_VERSION + 1)
+    future.close()
+
+    await expect(
+      restoreBackup(database, databasePath, backupDirectory, basename(backupPath))
+    ).rejects.toThrow('来自更高版本')
+    expect(database.listGames()).toHaveLength(4)
+    expect(listBackups(backupDirectory).map((backup) => backup.kind)).not.toContain('pre_restore')
+  })
 })
