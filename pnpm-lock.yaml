@@ -7,14 +7,10 @@ settings:
 importers:
 
   .:
-    dependencies:
+    devDependencies:
       '@modelcontextprotocol/sdk':
         specifier: 1.29.0
         version: 1.29.0(zod@4.0.0)
-      zod:
-        specifier: 4.0.0
-        version: 4.0.0
-    devDependencies:
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.3
@@ -45,6 +41,9 @@ importers:
       vue-tsc:
         specifier: ^3.3.7
         version: 3.3.7(typescript@6.0.3)
+      zod:
+        specifier: 4.0.0
+        version: 4.0.0
 
 packages:
 

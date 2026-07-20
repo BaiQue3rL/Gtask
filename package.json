@@ -10,17 +10,15 @@
     "build": "pnpm typecheck && electron-vite build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && vue-tsc --noEmit -p tsconfig.web.json",
+    "licenses:generate": "node scripts/generate-third-party-notices.mjs",
     "local:command": "node out/main/local-command-cli.js",
     "local:mcp": "node out/main/local-mcp-server-cli.js",
     "preview": "electron-vite preview",
-    "package:dir": "pnpm build && electron-builder --dir",
-    "package:portable": "pnpm build && electron-builder --win portable"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "1.29.0",
-    "zod": "4.0.0"
+    "package:dir": "pnpm build && pnpm licenses:generate && electron-builder --dir",
+    "package:portable": "pnpm build && pnpm licenses:generate && electron-builder --win portable"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
     "@types/node": "^24.0.0",
     "@vitejs/plugin-vue": "^6.0.8",
     "electron": "^43.1.1",
@@ -30,7 +28,8 @@
     "vite": "^7.3.6",
     "vitest": "^4.1.10",
     "vue": "^3.5.40",
-    "vue-tsc": "^3.3.7"
+    "vue-tsc": "^3.3.7",
+    "zod": "4.0.0"
   },
   "build": {
     "appId": "com.gachataskmanager.app",
@@ -42,7 +41,9 @@
     },
     "files": [
       "out/**/*",
-      "package.json"
+      "package.json",
+      "LICENSE",
+      "THIRD_PARTY_NOTICES.txt"
     ],
     "win": {
       "target": [
