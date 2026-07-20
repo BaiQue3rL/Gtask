@@ -46,6 +46,7 @@
       "THIRD_PARTY_NOTICES.txt"
     ],
     "win": {
+      "icon": "build/icon.svg",
       "target": [
         "portable"
       ]
