@@ -6,6 +6,7 @@ import {
   createManualBackup,
   createPreMigrationBackup,
   listBackups,
+  pruneDailyBackups,
   restoreBackup
 } from './backup'
 import { CredentialVault } from './credential-vault'
@@ -266,8 +267,9 @@ if (!app.requestSingleInstanceLock()) {
     })
     try {
       await createDailyBackup(appDatabase, backupDirectory)
+      pruneDailyBackups(backupDirectory)
     } catch (error) {
-      console.error('创建每日数据库备份失败', error)
+      console.error('创建或整理每日数据库备份失败', error)
     }
     syncOrchestrator = new SyncOrchestrator(appDatabase)
     registerIpcHandlers()

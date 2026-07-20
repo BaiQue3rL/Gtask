@@ -12,6 +12,10 @@ import { backup, DatabaseSync } from 'node:sqlite'
 import { CURRENT_SCHEMA_VERSION, type AppDatabase } from './database'
 import type { BackupSummary } from '../shared/contracts'
 
+export const DEFAULT_DAILY_BACKUP_RETENTION = 30
+
+const DAILY_BACKUP_FILE_NAME = /^gacha-task-manager-(\d{4}-\d{2}-\d{2})\.sqlite$/
+
 function localDateKey(reference: Date): string {
   const year = reference.getFullYear()
   const month = String(reference.getMonth() + 1).padStart(2, '0')
@@ -89,6 +93,29 @@ export async function createDailyBackup(
     if (existsSync(temporaryDestination)) rmSync(temporaryDestination)
     throw error
   }
+}
+
+/**
+ * Keeps automatic daily snapshots bounded without touching user-created or safety backups.
+ */
+export function pruneDailyBackups(
+  backupDirectory: string,
+  retention = DEFAULT_DAILY_BACKUP_RETENTION
+): string[] {
+  if (!Number.isInteger(retention) || retention < 1) {
+    throw new Error('每日备份保留数量必须是大于零的整数')
+  }
+
+  const resolvedDirectory = resolve(backupDirectory)
+  if (!existsSync(resolvedDirectory)) return []
+  const expired = readdirSync(resolvedDirectory, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && DAILY_BACKUP_FILE_NAME.test(entry.name))
+    .map((entry) => entry.name)
+    .sort((left, right) => right.localeCompare(left))
+    .slice(retention)
+
+  for (const fileName of expired) rmSync(join(resolvedDirectory, fileName), { force: true })
+  return expired
 }
 
 function timestampKey(reference: Date): string {
@@ -263,9 +290,9 @@ export function listBackups(backupDirectory: string): BackupSummary[] {
         ? 'pre_migration'
         : entry.name.includes('-before-restore-')
           ? 'pre_restore'
-        : entry.name.includes('-manual-')
-          ? 'manual'
-          : 'daily'
+          : entry.name.includes('-manual-')
+            ? 'manual'
+            : 'daily'
       return {
         fileName: entry.name,
         sizeBytes: stats.size,

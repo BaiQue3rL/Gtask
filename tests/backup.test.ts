@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -7,6 +7,7 @@ import {
   createManualBackup,
   createPreMigrationBackup,
   listBackups,
+  pruneDailyBackups,
   restoreBackup
 } from '../src/main/backup'
 import { AppDatabase, CURRENT_SCHEMA_VERSION } from '../src/main/database'
@@ -78,6 +79,35 @@ describe('createDailyBackup', () => {
 
     expect(listBackups(backupDirectory).map((backup) => backup.kind)).toEqual(['manual', 'daily'])
     expect(listBackups(backupDirectory)[0].sizeBytes).toBeGreaterThan(0)
+  })
+
+  it('只清理超出保留数量的每日备份，不删除手动或安全备份', () => {
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-backup-retention-test-'))
+    const backupDirectory = join(temporaryDirectory, 'backups')
+    mkdirSync(backupDirectory)
+
+    for (const day of ['17', '18', '19', '20']) {
+      writeFileSync(join(backupDirectory, `gacha-task-manager-2026-07-${day}.sqlite`), day)
+    }
+    const protectedNames = [
+      'gacha-task-manager-manual-20260720-090000-000.sqlite',
+      'gacha-task-manager-before-restore-20260720-091000-000.sqlite',
+      'gacha-task-manager-before-v7-20260720-092000.sqlite'
+    ]
+    for (const fileName of protectedNames) writeFileSync(join(backupDirectory, fileName), fileName)
+
+    expect(pruneDailyBackups(backupDirectory, 2)).toEqual([
+      'gacha-task-manager-2026-07-18.sqlite',
+      'gacha-task-manager-2026-07-17.sqlite'
+    ])
+    expect(listBackups(backupDirectory).map((backup) => backup.fileName)).toEqual(
+      expect.arrayContaining([
+        'gacha-task-manager-2026-07-20.sqlite',
+        'gacha-task-manager-2026-07-19.sqlite',
+        ...protectedNames
+      ])
+    )
+    expect(() => pruneDailyBackups(backupDirectory, 0)).toThrow('大于零的整数')
   })
 
   it('CLI/MCP 安全打开旧数据库时同样先创建迁移前备份', async () => {
