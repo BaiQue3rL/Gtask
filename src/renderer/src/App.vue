@@ -73,6 +73,7 @@ const settingsOpen = ref(false)
 const credentialStatuses = ref<CredentialStatus[]>([])
 const backups = ref<BackupSummary[]>([])
 const backingUp = ref(false)
+const restoringBackup = ref<string | null>(null)
 const editingItem = ref<ChecklistItem | null>(null)
 
 const form = reactive({
@@ -248,6 +249,21 @@ async function createBackup(): Promise<void> {
     showError(error)
   } finally {
     backingUp.value = false
+  }
+}
+
+async function restoreBackup(backup: BackupSummary): Promise<void> {
+  if (restoringBackup.value) return
+  const confirmed = window.confirm(
+    `确定恢复备份“${backup.fileName}”吗？\n\n当前数据库会先自动生成一份“恢复前”安全备份，随后应用将重新启动。`
+  )
+  if (!confirmed) return
+  restoringBackup.value = backup.fileName
+  try {
+    await window.gacha.restoreBackup(backup.fileName)
+  } catch (error) {
+    restoringBackup.value = null
+    showError(error)
   }
 }
 
@@ -785,7 +801,14 @@ function showError(error: unknown): void {
         <div class="backup-list">
           <div v-for="backup in backups.slice(0, 4)" :key="backup.fileName" class="backup-row">
             <div><strong>{{ backup.fileName }}</strong><span>{{ formatLocalTime(backup.updatedAt) }}</span></div>
-            <small>{{ backup.kind === 'daily' ? '每日' : backup.kind === 'manual' ? '手动' : '升级前' }} · {{ formatFileSize(backup.sizeBytes) }}</small>
+            <small>{{ backup.kind === 'daily' ? '每日' : backup.kind === 'manual' ? '手动' : backup.kind === 'pre_restore' ? '恢复前' : '升级前' }} · {{ formatFileSize(backup.sizeBytes) }}</small>
+            <button
+              class="secondary-button"
+              type="button"
+              :disabled="Boolean(restoringBackup)"
+              :aria-label="`恢复备份 ${backup.fileName}`"
+              @click="restoreBackup(backup)"
+            >{{ restoringBackup === backup.fileName ? '恢复中…' : '恢复' }}</button>
           </div>
           <p v-if="backups.length === 0" class="empty-text">尚无备份</p>
         </div>

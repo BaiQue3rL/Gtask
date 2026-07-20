@@ -7,6 +7,7 @@ const gachaApi: GachaApi = {
   openExternalUrl: (url) => ipcRenderer.invoke('app:open-external-url', url),
   listBackups: () => ipcRenderer.invoke('backups:list'),
   createBackup: () => ipcRenderer.invoke('backups:create'),
+  restoreBackup: (fileName) => ipcRenderer.invoke('backups:restore', fileName),
   listGames: () => ipcRenderer.invoke('games:list'),
   listChecklistItems: (gameId) => ipcRenderer.invoke('checklist:list', gameId),
   listArchivedChecklistItems: (gameId) => ipcRenderer.invoke('checklist:list-archived', gameId),

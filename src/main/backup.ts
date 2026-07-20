@@ -1,5 +1,13 @@
-import { existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  statSync
+} from 'node:fs'
+import { basename, dirname, join, resolve } from 'node:path'
 import { backup, DatabaseSync } from 'node:sqlite'
 import type { AppDatabase } from './database'
 import type { BackupSummary } from '../shared/contracts'
@@ -18,6 +26,23 @@ function verifyBackupIntegrity(databasePath: string): void {
     if (Object.values(row)[0] !== 'ok') throw new Error('SQLite 备份完整性检查失败')
   } finally {
     backupDatabase.close()
+  }
+}
+
+function verifyRestorableDatabase(databasePath: string): void {
+  verifyBackupIntegrity(databasePath)
+  const candidate = new DatabaseSync(databasePath, { readOnly: true })
+  try {
+    const requiredTables = ['schema_migrations', 'games', 'checklist_items', 'sync_states']
+    const rows = candidate
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+      .all() as Array<{ name: string }>
+    const tableNames = new Set(rows.map((row) => row.name))
+    if (requiredTables.some((table) => !tableNames.has(table))) {
+      throw new Error('所选文件不是可恢复的幻游清单数据库')
+    }
+  } finally {
+    candidate.close()
   }
 }
 
@@ -117,6 +142,88 @@ export async function createManualBackup(
   }
 }
 
+async function createPreRestoreBackup(
+  database: AppDatabase,
+  backupDirectory: string,
+  reference = new Date()
+): Promise<string> {
+  const resolvedDirectory = resolve(backupDirectory)
+  mkdirSync(resolvedDirectory, { recursive: true })
+  const destination = join(
+    resolvedDirectory,
+    `gacha-task-manager-before-restore-${timestampKey(reference)}-${String(reference.getMilliseconds()).padStart(3, '0')}.sqlite`
+  )
+  const temporaryDestination = `${destination}.tmp`
+  try {
+    await database.backupTo(temporaryDestination)
+    verifyBackupIntegrity(temporaryDestination)
+    renameSync(temporaryDestination, destination)
+    return destination
+  } catch (error) {
+    if (existsSync(temporaryDestination)) rmSync(temporaryDestination)
+    throw error
+  }
+}
+
+/**
+ * Replaces the live database with a known backup. A safety copy is always written first.
+ * On success the supplied AppDatabase has been closed and must not be used again.
+ */
+export async function restoreBackup(
+  database: AppDatabase,
+  databasePath: string,
+  backupDirectory: string,
+  fileName: string,
+  reference = new Date()
+): Promise<string> {
+  const resolvedDirectory = resolve(backupDirectory)
+  if (typeof fileName !== 'string' || basename(fileName) !== fileName || !fileName.endsWith('.sqlite')) {
+    throw new Error('备份文件名不合法')
+  }
+  const sourcePath = resolve(resolvedDirectory, fileName)
+  if (dirname(sourcePath) !== resolvedDirectory || !existsSync(sourcePath)) {
+    throw new Error('找不到指定的备份文件')
+  }
+  verifyRestorableDatabase(sourcePath)
+
+  const resolvedDatabasePath = resolve(databasePath)
+  const temporaryDatabasePath = `${resolvedDatabasePath}.restore.tmp`
+  const rollbackDatabasePath = `${resolvedDatabasePath}.restore.rollback`
+  rmSync(temporaryDatabasePath, { force: true })
+  rmSync(rollbackDatabasePath, { force: true })
+  copyFileSync(sourcePath, temporaryDatabasePath)
+
+  try {
+    verifyRestorableDatabase(temporaryDatabasePath)
+  } catch (error) {
+    rmSync(temporaryDatabasePath, { force: true })
+    throw error
+  }
+
+  const safetyBackupPath = await createPreRestoreBackup(database, resolvedDirectory, reference)
+  database.close()
+
+  let originalMoved = false
+  try {
+    if (existsSync(resolvedDatabasePath)) {
+      renameSync(resolvedDatabasePath, rollbackDatabasePath)
+      originalMoved = true
+    }
+    rmSync(`${resolvedDatabasePath}-wal`, { force: true })
+    rmSync(`${resolvedDatabasePath}-shm`, { force: true })
+    renameSync(temporaryDatabasePath, resolvedDatabasePath)
+    rmSync(rollbackDatabasePath, { force: true })
+    return safetyBackupPath
+  } catch (error) {
+    rmSync(temporaryDatabasePath, { force: true })
+    if (originalMoved && existsSync(rollbackDatabasePath)) {
+      rmSync(resolvedDatabasePath, { force: true })
+      renameSync(rollbackDatabasePath, resolvedDatabasePath)
+    }
+    throw error
+  }
+}
+
 export function listBackups(backupDirectory: string): BackupSummary[] {
   const resolvedDirectory = resolve(backupDirectory)
   if (!existsSync(resolvedDirectory)) return []
@@ -126,6 +233,8 @@ export function listBackups(backupDirectory: string): BackupSummary[] {
       const stats = statSync(join(resolvedDirectory, entry.name))
       const kind: BackupSummary['kind'] = entry.name.includes('-before-v')
         ? 'pre_migration'
+        : entry.name.includes('-before-restore-')
+          ? 'pre_restore'
         : entry.name.includes('-manual-')
           ? 'manual'
           : 'daily'

@@ -39,7 +39,7 @@ export interface BackupSummary {
   fileName: string
   sizeBytes: number
   updatedAt: string
-  kind: 'daily' | 'pre_migration' | 'manual'
+  kind: 'daily' | 'pre_migration' | 'pre_restore' | 'manual'
 }
 
 export interface GameSummary {
@@ -160,6 +160,7 @@ export interface GachaApi {
   openExternalUrl: (url: string) => Promise<void>
   listBackups: () => Promise<BackupSummary[]>
   createBackup: () => Promise<BackupSummary>
+  restoreBackup: (fileName: string) => Promise<void>
   listGames: () => Promise<GameSummary[]>
   listChecklistItems: (gameId: GameId) => Promise<ChecklistItem[]>
   listArchivedChecklistItems: (gameId: GameId) => Promise<ChecklistItem[]>

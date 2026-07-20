@@ -5,7 +5,8 @@ import {
   createDailyBackup,
   createManualBackup,
   createPreMigrationBackup,
-  listBackups
+  listBackups,
+  restoreBackup
 } from './backup'
 import { CredentialVault } from './credential-vault'
 import { SyncOrchestrator } from './sync/orchestrator'
@@ -36,6 +37,7 @@ let periodTimer: ReturnType<typeof setInterval> | null = null
 let externalChangeTimer: ReturnType<typeof setInterval> | null = null
 let credentialVault: CredentialVault | null = null
 let appBackupDirectory: string | null = null
+let appDatabasePath: string | null = null
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -105,6 +107,34 @@ function registerIpcHandlers(): void {
     const backup = listBackups(appBackupDirectory).find((candidate) => path.endsWith(candidate.fileName))
     if (!backup) throw new Error('备份已创建但无法读取备份信息')
     return backup
+  })
+  ipcMain.handle('backups:restore', async (_event, fileName: unknown) => {
+    if (!appDatabase || !appDatabasePath || !appBackupDirectory) {
+      throw new Error('备份服务尚未初始化')
+    }
+    if (typeof fileName !== 'string') throw new Error('备份文件名格式不正确')
+    try {
+      await restoreBackup(appDatabase, appDatabasePath, appBackupDirectory, fileName)
+    } catch (error) {
+      try {
+        appDatabase.close()
+      } catch {
+        // The restore helper may already have closed this handle.
+      }
+      appDatabase = new AppDatabase(appDatabasePath)
+      syncOrchestrator = new SyncOrchestrator(appDatabase)
+      throw error
+    }
+    appDatabase = null
+    syncOrchestrator = null
+    if (periodTimer) clearInterval(periodTimer)
+    periodTimer = null
+    if (externalChangeTimer) clearInterval(externalChangeTimer)
+    externalChangeTimer = null
+    setTimeout(() => {
+      app.relaunch()
+      app.exit(0)
+    }, 150)
   })
 
   ipcMain.handle('games:list', () => appDatabase?.listGames() ?? [])
@@ -180,6 +210,7 @@ if (!app.requestSingleInstanceLock()) {
     const databasePath = join(app.getPath('userData'), 'data', 'gacha-task-manager.sqlite')
     const backupDirectory = join(app.getPath('userData'), 'backups')
     appBackupDirectory = backupDirectory
+    appDatabasePath = databasePath
     try {
       await createPreMigrationBackup(databasePath, backupDirectory, CURRENT_SCHEMA_VERSION)
     } catch (error) {
@@ -250,4 +281,5 @@ app.on('before-quit', () => {
   syncOrchestrator = null
   credentialVault = null
   appBackupDirectory = null
+  appDatabasePath = null
 })

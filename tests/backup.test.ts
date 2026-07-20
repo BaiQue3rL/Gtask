@@ -1,12 +1,13 @@
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   createDailyBackup,
   createManualBackup,
   createPreMigrationBackup,
-  listBackups
+  listBackups,
+  restoreBackup
 } from '../src/main/backup'
 import { AppDatabase, CURRENT_SCHEMA_VERSION } from '../src/main/database'
 import { openDatabaseWithMigrationBackup } from '../src/main/database-bootstrap'
@@ -94,6 +95,46 @@ describe('createDailyBackup', () => {
 
     database = await openDatabaseWithMigrationBackup(databasePath)
     expect(listBackups(backupDirectory).map((backup) => backup.kind)).toContain('pre_migration')
+    expect(database.listGames()).toHaveLength(4)
+  })
+
+  it('恢复已知备份前保留当前数据库的安全副本', async () => {
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-restore-backup-test-'))
+    const databasePath = join(temporaryDirectory, 'source.sqlite')
+    const backupDirectory = join(temporaryDirectory, 'backups')
+    database = new AppDatabase(databasePath)
+    database.createChecklistItem({ gameId: 'genshin', category: 'custom', title: '备份时存在' })
+    const backupPath = await createManualBackup(
+      database,
+      backupDirectory,
+      new Date('2026-07-20T10:20:00+08:00')
+    )
+    database.createChecklistItem({ gameId: 'genshin', category: 'custom', title: '备份后新增' })
+
+    await restoreBackup(
+      database,
+      databasePath,
+      backupDirectory,
+      basename(backupPath),
+      new Date('2026-07-20T10:30:00+08:00')
+    )
+    database = new AppDatabase(databasePath)
+
+    const titles = database.listChecklistItems('genshin').map((item) => item.title)
+    expect(titles).toContain('备份时存在')
+    expect(titles).not.toContain('备份后新增')
+    expect(listBackups(backupDirectory).map((backup) => backup.kind)).toContain('pre_restore')
+  })
+
+  it('拒绝恢复备份目录之外的路径', async () => {
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-restore-path-test-'))
+    const databasePath = join(temporaryDirectory, 'source.sqlite')
+    const backupDirectory = join(temporaryDirectory, 'backups')
+    database = new AppDatabase(databasePath)
+
+    await expect(
+      restoreBackup(database, databasePath, backupDirectory, '..\\source.sqlite')
+    ).rejects.toThrow('备份文件名不合法')
     expect(database.listGames()).toHaveLength(4)
   })
 })
