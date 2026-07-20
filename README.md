@@ -26,6 +26,7 @@ pnpm dev
 pnpm typecheck
 pnpm build
 pnpm package:portable
+pnpm release:verify
 ```
 
 构建后可通过标准输入调用本地 JSON 命令接口：
