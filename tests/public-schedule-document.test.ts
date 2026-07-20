@@ -63,9 +63,26 @@ describe('公开排期文档', () => {
   })
 
   it('适配器加载文档并返回协调器可直接合并的事项', async () => {
-    const adapter = new PublicScheduleDocumentAdapter(async () => document)
+    const adapter = new PublicScheduleDocumentAdapter(async () => document, {
+      now: () => new Date('2026-07-20T02:00:00.000Z')
+    })
     const output = await adapter.sync('genshin')
     expect(output.items).toHaveLength(2)
     expect(output.message).toContain('2026-07-20T01:00:00.000Z')
+  })
+
+  it('拒绝过期文档和明显来自未来的抓取时间', async () => {
+    const now = () => new Date('2026-07-20T02:00:00.000Z')
+    const stale = new PublicScheduleDocumentAdapter(
+      async () => ({ ...document, fetchedAt: '2026-07-18T01:00:00.000Z' }),
+      { now }
+    )
+    await expect(stale.sync('genshin')).rejects.toThrow('已过期')
+
+    const future = new PublicScheduleDocumentAdapter(
+      async () => ({ ...document, fetchedAt: '2026-07-20T03:00:00.000Z' }),
+      { now }
+    )
+    await expect(future.sync('genshin')).rejects.toThrow('来自未来')
   })
 })

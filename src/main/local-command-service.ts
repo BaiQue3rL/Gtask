@@ -66,6 +66,12 @@ function requireConfirmation(value: unknown): void {
   if (value !== true) throw new Error('删除命令必须显式传入 confirm: true')
 }
 
+function optionalBoolean(value: unknown, fieldName: string): boolean | undefined {
+  if (value === undefined) return undefined
+  if (typeof value !== 'boolean') throw new Error(`${fieldName}格式不正确`)
+  return value
+}
+
 export class LocalCommandService {
   constructor(private readonly database: AppDatabase) {}
 
@@ -102,38 +108,40 @@ export class LocalCommandService {
       case 'list_games':
         return { command: 'list_games', games: this.database.listGames() }
       case 'get_all_snapshots':
-        return this.database.readConsistently(() => ({
-          command: 'get_all_snapshots' as const,
-          snapshots: this.database.listGames().map((game) => ({
-            game,
-            items: this.database.listChecklistItems(game.id),
-            archivedItems: input.includeArchived === true
-              ? this.database.listArchivedChecklistItems(game.id)
-              : [],
-            syncSettings: this.database.getSyncSettings(game.id)
-          }))
-        }))
+        return this.database.readConsistently(() => {
+          const includeArchived = optionalBoolean(input.includeArchived, '回收站筛选') ?? false
+          return {
+            command: 'get_all_snapshots' as const,
+            snapshots: this.database.listGames().map((game) => ({
+              game,
+              items: this.database.listChecklistItems(game.id),
+              archivedItems: includeArchived
+                ? this.database.listArchivedChecklistItems(game.id)
+                : [],
+              syncSettings: this.database.getSyncSettings(game.id)
+            }))
+          }
+        })
       case 'get_game_snapshot': {
         const gameId = parseGameId(input.gameId)
         const category = input.category === undefined
           ? undefined
           : parseChecklistCategory(input.category)
-        if (input.completed !== undefined && typeof input.completed !== 'boolean') {
-          throw new Error('完成状态筛选格式不正确')
-        }
+        const completed = optionalBoolean(input.completed, '完成状态筛选')
+        const includeArchived = optionalBoolean(input.includeArchived, '回收站筛选') ?? false
         return this.database.readConsistently(() => {
           const game = this.database.listGames().find((candidate) => candidate.id === gameId)
           if (!game) throw new Error('游戏不存在')
           let items = this.database.listChecklistItems(gameId)
           if (category !== undefined) items = items.filter((item) => item.category === category)
-          if (input.completed !== undefined) {
-            items = items.filter((item) => item.completed === input.completed)
+          if (completed !== undefined) {
+            items = items.filter((item) => item.completed === completed)
           }
           return {
             command: 'get_game_snapshot' as const,
             game,
             items,
-            archivedItems: input.includeArchived === true
+            archivedItems: includeArchived
               ? this.database.listArchivedChecklistItems(gameId)
               : [],
             syncSettings: this.database.getSyncSettings(gameId)

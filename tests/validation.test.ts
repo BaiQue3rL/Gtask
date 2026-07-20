@@ -72,6 +72,17 @@ describe('清单 IPC 参数校验', () => {
     ).toThrow('结束时间不能早于开始时间')
   })
 
+  it('把 IPC 和 AI 输入的时间统一为 ISO 8601', () => {
+    expect(
+      parseCreateChecklistItem({
+        gameId: 'genshin',
+        category: 'limited_event',
+        title: '活动',
+        startsAt: '2026-07-20T08:00:00+08:00'
+      }).startsAt
+    ).toBe('2026-07-20T00:00:00.000Z')
+  })
+
   it('外部来源链接只允许 HTTP 和 HTTPS', () => {
     expect(parseExternalUrl('https://example.com/schedule')).toBe('https://example.com/schedule')
     expect(() => parseExternalUrl('file:///C:/secret.txt')).toThrow('HTTP/HTTPS')

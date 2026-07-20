@@ -547,17 +547,25 @@ function showError(error: unknown): void {
             class="toolbar-button"
             :class="{ active: showIncompleteOnly }"
             type="button"
+            :aria-pressed="showIncompleteOnly"
             @click="showIncompleteOnly = !showIncompleteOnly"
           >
             ◇ 只看未完成
           </button>
           <div class="dropdown" @click.stop>
-            <button class="toolbar-button" type="button" :disabled="syncing" @click="refreshMenuOpen = !refreshMenuOpen">
+            <button
+              class="toolbar-button"
+              type="button"
+              :disabled="syncing"
+              aria-haspopup="menu"
+              :aria-expanded="refreshMenuOpen"
+              @click="refreshMenuOpen = !refreshMenuOpen"
+            >
               {{ syncing ? '同步中…' : '↻ 刷新清单' }} ▾
             </button>
-            <div v-if="refreshMenuOpen" class="dropdown-menu">
-              <button type="button" @click="runSync('public_schedule')">同步公开排期</button>
-              <button type="button" @click="runSync('public_and_personal')">同步公开排期 + {{ personalPlatform }}</button>
+            <div v-if="refreshMenuOpen" class="dropdown-menu" role="menu">
+              <button role="menuitem" type="button" @click="runSync('public_schedule')">同步公开排期</button>
+              <button role="menuitem" type="button" @click="runSync('public_and_personal')">同步公开排期 + {{ personalPlatform }}</button>
             </div>
           </div>
           <select class="toolbar-select" :value="syncModeValue" aria-label="同步模式" @change="updateSyncMode">
@@ -591,7 +599,7 @@ function showError(error: unknown): void {
         </article>
       </section>
 
-      <section v-if="loading" class="panel centered">正在读取本地清单…</section>
+      <section v-if="loading" class="panel centered" role="status" aria-live="polite">正在读取本地清单…</section>
       <template v-else>
         <section class="content-grid">
           <article v-for="panel in panels" :key="panel.title" class="panel checklist-card">
@@ -677,7 +685,7 @@ function showError(error: unknown): void {
       <form class="editor-modal" role="dialog" aria-modal="true" aria-label="事项编辑器" @submit.prevent="saveItem">
         <div class="modal-header">
           <div><p class="eyebrow">{{ selectedGame?.name }}</p><h2>{{ editingItem ? '编辑事项' : '新增事项' }}</h2></div>
-          <button class="close-button" type="button" @click="editorOpen = false">×</button>
+          <button class="close-button" type="button" aria-label="关闭事项编辑器" @click="editorOpen = false">×</button>
         </div>
 
         <label>事项名称<input v-model="form.title" maxlength="100" autofocus placeholder="例如：刷角色突破素材" /></label>
@@ -725,7 +733,7 @@ function showError(error: unknown): void {
       <section class="editor-modal recycle-modal" role="dialog" aria-modal="true" aria-label="回收站">
         <div class="modal-header">
           <div><p class="eyebrow">{{ selectedGame?.name }}</p><h2>回收站</h2></div>
-          <button class="close-button" type="button" @click="recycleBinOpen = false">×</button>
+          <button class="close-button" type="button" aria-label="关闭回收站" @click="recycleBinOpen = false">×</button>
         </div>
         <p class="recycle-hint">已删除事项保留在本机；远端同步不会自动恢复它们。</p>
         <div class="recycle-list">
@@ -745,7 +753,7 @@ function showError(error: unknown): void {
       <section class="editor-modal recycle-modal" role="dialog" aria-modal="true" aria-label="设置">
         <div class="modal-header">
           <div><p class="eyebrow">本机设置</p><h2>设置</h2></div>
-          <button class="close-button" type="button" @click="settingsOpen = false">×</button>
+          <button class="close-button" type="button" aria-label="关闭设置" @click="settingsOpen = false">×</button>
         </div>
         <h3 class="settings-heading">登录凭据</h3>
         <p class="recycle-hint">登录完全可选。凭据仅通过 Windows 安全存储加密后保存在本机，不读取浏览器 Cookie。</p>

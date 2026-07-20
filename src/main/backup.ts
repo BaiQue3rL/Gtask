@@ -11,6 +11,16 @@ function localDateKey(reference: Date): string {
   return `${year}-${month}-${day}`
 }
 
+function verifyBackupIntegrity(databasePath: string): void {
+  const backupDatabase = new DatabaseSync(databasePath)
+  try {
+    const row = backupDatabase.prepare('PRAGMA quick_check').get() as Record<string, unknown>
+    if (Object.values(row)[0] !== 'ok') throw new Error('SQLite 备份完整性检查失败')
+  } finally {
+    backupDatabase.close()
+  }
+}
+
 export async function createDailyBackup(
   database: AppDatabase,
   backupDirectory: string,
@@ -25,6 +35,7 @@ export async function createDailyBackup(
   if (existsSync(temporaryDestination)) rmSync(temporaryDestination)
   try {
     await database.backupTo(temporaryDestination)
+    verifyBackupIntegrity(temporaryDestination)
     renameSync(temporaryDestination, destination)
     return destination
   } catch (error) {
@@ -67,8 +78,17 @@ export async function createPreMigrationBackup(
       resolvedDirectory,
       `gacha-task-manager-before-v${targetVersion}-${timestampKey(reference)}.sqlite`
     )
-    await backup(source, destination)
-    return destination
+    const temporaryDestination = `${destination}.tmp`
+    if (existsSync(temporaryDestination)) rmSync(temporaryDestination)
+    try {
+      await backup(source, temporaryDestination)
+      verifyBackupIntegrity(temporaryDestination)
+      renameSync(temporaryDestination, destination)
+      return destination
+    } catch (error) {
+      if (existsSync(temporaryDestination)) rmSync(temporaryDestination)
+      throw error
+    }
   } finally {
     source.close()
   }
@@ -88,6 +108,7 @@ export async function createManualBackup(
   const temporaryDestination = `${destination}.tmp`
   try {
     await database.backupTo(temporaryDestination)
+    verifyBackupIntegrity(temporaryDestination)
     renameSync(temporaryDestination, destination)
     return destination
   } catch (error) {

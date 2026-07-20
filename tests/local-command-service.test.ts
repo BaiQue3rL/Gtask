@@ -160,4 +160,18 @@ describe('LocalCommandService', () => {
     ).toThrow('不存在')
     expect(database.listChecklistItems('genshin').some((item) => item.id === created.item.id)).toBe(true)
   })
+
+  it('拒绝静默忽略错误的读取筛选和过长事项 ID', () => {
+    database = new AppDatabase(':memory:')
+    const service = new LocalCommandService(database)
+    expect(() =>
+      service.execute({ command: 'get_all_snapshots', includeArchived: 'yes' })
+    ).toThrow('回收站筛选格式不正确')
+    expect(() =>
+      service.execute({
+        command: 'update_item',
+        item: { id: 'x'.repeat(101), completed: true }
+      })
+    ).toThrow('事项 ID 格式不正确')
+  })
 })

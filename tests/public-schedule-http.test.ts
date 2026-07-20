@@ -25,7 +25,7 @@ describe('公开排期 HTTP loader', () => {
     await expect(load('genshin')).resolves.toEqual({ schemaVersion: 1 })
     expect(fetcher).toHaveBeenCalledWith(
       new URL('https://schedule.example.com/genshin.json'),
-      expect.objectContaining({ method: 'GET', redirect: 'follow' })
+      expect.objectContaining({ method: 'GET', redirect: 'manual' })
     )
   })
 
@@ -46,9 +46,49 @@ describe('公开排期 HTTP loader', () => {
     const redirected = createPublicScheduleHttpLoader({
       urls: { genshin: 'https://schedule.example.com/genshin.json' },
       allowedHosts: ['schedule.example.com'],
-      fetcher: async () => jsonResponse({}, { url: 'https://redirected.example/payload.json' })
+      fetcher: async () =>
+        jsonResponse({}, {
+          ok: false,
+          status: 302,
+          headers: new Headers({ location: 'https://redirected.example/payload.json' })
+        })
     })
     await expect(redirected('genshin')).rejects.toThrow('不在白名单')
+  })
+
+  it('允许白名单内的有限相对跳转并拒绝跳转循环', async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        jsonResponse({}, {
+          ok: false,
+          status: 302,
+          headers: new Headers({ location: '/current/genshin.json' })
+        })
+      )
+      .mockResolvedValueOnce(jsonResponse({ schemaVersion: 1 }))
+    const load = createPublicScheduleHttpLoader({
+      urls: { genshin: 'https://schedule.example.com/genshin.json' },
+      allowedHosts: ['schedule.example.com'],
+      fetcher
+    })
+    await expect(load('genshin')).resolves.toEqual({ schemaVersion: 1 })
+    expect(fetcher.mock.calls[1][0]).toEqual(
+      new URL('https://schedule.example.com/current/genshin.json')
+    )
+
+    const looping = createPublicScheduleHttpLoader({
+      urls: { genshin: 'https://schedule.example.com/a.json' },
+      allowedHosts: ['schedule.example.com'],
+      maximumRedirects: 1,
+      fetcher: async () =>
+        jsonResponse({}, {
+          ok: false,
+          status: 302,
+          headers: new Headers({ location: '/again.json' })
+        })
+    })
+    await expect(looping('genshin')).rejects.toThrow('跳转次数过多')
   })
 
   it('拒绝错误内容类型、超大响应和超时请求', async () => {
@@ -67,6 +107,17 @@ describe('公开排期 HTTP loader', () => {
       fetcher: async () => jsonResponse({ payload: 'too large' })
     })
     await expect(oversized('genshin')).rejects.toThrow('超过大小限制')
+
+    const streamedOversized = createPublicScheduleHttpLoader({
+      urls: { genshin: 'https://schedule.example.com/genshin.json' },
+      allowedHosts: ['schedule.example.com'],
+      maximumBytes: 10,
+      fetcher: async () =>
+        new Response(JSON.stringify({ payload: 'streamed and too large' }), {
+          headers: { 'content-type': 'application/json' }
+        })
+    })
+    await expect(streamedOversized('genshin')).rejects.toThrow('超过大小限制')
 
     const timedOut = createPublicScheduleHttpLoader({
       urls: { genshin: 'https://schedule.example.com/genshin.json' },

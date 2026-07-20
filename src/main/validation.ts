@@ -52,8 +52,10 @@ function parseNullableString(value: unknown, fieldName: string): string | null |
 
 function parseNullableDate(value: unknown, fieldName: string): string | null | undefined {
   const normalized = parseNullableString(value, fieldName)
-  if (normalized && Number.isNaN(Date.parse(normalized))) throw new Error(`${fieldName}不是有效时间`)
-  return normalized
+  if (!normalized) return normalized
+  const timestamp = Date.parse(normalized)
+  if (Number.isNaN(timestamp)) throw new Error(`${fieldName}不是有效时间`)
+  return new Date(timestamp).toISOString()
 }
 
 function validateTimeWindow(startsAt: string | null | undefined, endsAt: string | null | undefined): void {
@@ -123,7 +125,7 @@ export function parseUpdateChecklistItem(value: unknown): UpdateChecklistItemInp
   validateTimeWindow(startsAt, endsAt)
 
   return {
-    id: value.id,
+    id: parseItemId(value.id),
     category: value.category === undefined ? undefined : parseChecklistCategory(value.category),
     title: value.title === undefined ? undefined : parseTitle(value.title),
     completed: value.completed,

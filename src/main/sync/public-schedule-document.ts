@@ -10,6 +10,15 @@ export interface ParsedPublicScheduleDocument {
   items: NormalizedSyncItem[]
 }
 
+export interface PublicScheduleDocumentAdapterOptions {
+  now?: () => Date
+  maximumAgeMs?: number
+  maximumFutureSkewMs?: number
+}
+
+const DEFAULT_MAXIMUM_AGE_MS = 24 * 60 * 60 * 1000
+const DEFAULT_MAXIMUM_FUTURE_SKEW_MS = 5 * 60 * 1000
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -53,10 +62,30 @@ export function parsePublicScheduleDocument(
 }
 
 export class PublicScheduleDocumentAdapter implements SyncAdapter {
-  constructor(private readonly loadDocument: (gameId: GameId) => Promise<unknown>) {}
+  private readonly now: () => Date
+  private readonly maximumAgeMs: number
+  private readonly maximumFutureSkewMs: number
+
+  constructor(
+    private readonly loadDocument: (gameId: GameId) => Promise<unknown>,
+    options: PublicScheduleDocumentAdapterOptions = {}
+  ) {
+    this.now = options.now ?? (() => new Date())
+    this.maximumAgeMs = options.maximumAgeMs ?? DEFAULT_MAXIMUM_AGE_MS
+    this.maximumFutureSkewMs = options.maximumFutureSkewMs ?? DEFAULT_MAXIMUM_FUTURE_SKEW_MS
+    if (!Number.isFinite(this.maximumAgeMs) || this.maximumAgeMs <= 0) {
+      throw new Error('公开排期文档有效期配置不正确')
+    }
+    if (!Number.isFinite(this.maximumFutureSkewMs) || this.maximumFutureSkewMs < 0) {
+      throw new Error('公开排期未来时间容差配置不正确')
+    }
+  }
 
   async sync(gameId: GameId): Promise<SyncAdapterOutput> {
     const document = parsePublicScheduleDocument(await this.loadDocument(gameId), gameId)
+    const ageMs = this.now().getTime() - Date.parse(document.fetchedAt)
+    if (ageMs > this.maximumAgeMs) throw new Error('公开排期文档已过期')
+    if (ageMs < -this.maximumFutureSkewMs) throw new Error('公开排期抓取时间异常地来自未来')
     return {
       items: document.items,
       message: `公开排期已同步，来源抓取于 ${document.fetchedAt}`

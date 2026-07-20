@@ -21,8 +21,10 @@ function nullableString(value: unknown, field: string, maxLength = 200): string 
 
 function nullableDate(value: unknown, field: string): string | null | undefined {
   const normalized = nullableString(value, field)
-  if (normalized && Number.isNaN(Date.parse(normalized))) throw new Error(`${field}不是有效时间`)
-  return normalized
+  if (!normalized) return normalized
+  const timestamp = Date.parse(normalized)
+  if (Number.isNaN(timestamp)) throw new Error(`${field}不是有效时间`)
+  return new Date(timestamp).toISOString()
 }
 
 function nullableHttpUrl(value: unknown): string | null | undefined {

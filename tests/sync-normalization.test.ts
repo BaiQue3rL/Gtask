@@ -34,4 +34,15 @@ describe('normalizeSyncItem', () => {
       'HTTP/HTTPS'
     )
   })
+
+  it('把可解析时间统一为 ISO 8601 后再写入数据库', () => {
+    expect(
+      normalizeSyncItem({
+        remoteKey: 'event:date-normalization',
+        category: 'limited_event',
+        title: '时间归一化',
+        startsAt: '2026-07-20T08:00:00+08:00'
+      }).startsAt
+    ).toBe('2026-07-20T00:00:00.000Z')
+  })
 })
