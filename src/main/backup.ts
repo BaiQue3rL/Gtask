@@ -20,17 +20,27 @@ function localDateKey(reference: Date): string {
 }
 
 function verifyBackupIntegrity(databasePath: string): void {
-  const backupDatabase = new DatabaseSync(databasePath)
+  const walPath = `${databasePath}-wal`
+  const shmPath = `${databasePath}-shm`
+  const walExisted = existsSync(walPath)
+  const shmExisted = existsSync(shmPath)
+  const backupDatabase = new DatabaseSync(databasePath, { readOnly: true })
   try {
     const row = backupDatabase.prepare('PRAGMA quick_check').get() as Record<string, unknown>
     if (Object.values(row)[0] !== 'ok') throw new Error('SQLite 备份完整性检查失败')
   } finally {
     backupDatabase.close()
+    if (!walExisted) rmSync(walPath, { force: true })
+    if (!shmExisted) rmSync(shmPath, { force: true })
   }
 }
 
 function verifyRestorableDatabase(databasePath: string): void {
   verifyBackupIntegrity(databasePath)
+  const walPath = `${databasePath}-wal`
+  const shmPath = `${databasePath}-shm`
+  const walExisted = existsSync(walPath)
+  const shmExisted = existsSync(shmPath)
   const candidate = new DatabaseSync(databasePath, { readOnly: true })
   try {
     const requiredTables = ['schema_migrations', 'games', 'checklist_items', 'sync_states']
@@ -53,6 +63,8 @@ function verifyRestorableDatabase(databasePath: string): void {
     }
   } finally {
     candidate.close()
+    if (!walExisted) rmSync(walPath, { force: true })
+    if (!shmExisted) rmSync(shmPath, { force: true })
   }
 }
 
@@ -200,6 +212,8 @@ export async function restoreBackup(
   const temporaryDatabasePath = `${resolvedDatabasePath}.restore.tmp`
   const rollbackDatabasePath = `${resolvedDatabasePath}.restore.rollback`
   rmSync(temporaryDatabasePath, { force: true })
+  rmSync(`${temporaryDatabasePath}-wal`, { force: true })
+  rmSync(`${temporaryDatabasePath}-shm`, { force: true })
   rmSync(rollbackDatabasePath, { force: true })
   copyFileSync(sourcePath, temporaryDatabasePath)
 
@@ -207,6 +221,8 @@ export async function restoreBackup(
     verifyRestorableDatabase(temporaryDatabasePath)
   } catch (error) {
     rmSync(temporaryDatabasePath, { force: true })
+    rmSync(`${temporaryDatabasePath}-wal`, { force: true })
+    rmSync(`${temporaryDatabasePath}-shm`, { force: true })
     throw error
   }
 
@@ -226,6 +242,8 @@ export async function restoreBackup(
     return safetyBackupPath
   } catch (error) {
     rmSync(temporaryDatabasePath, { force: true })
+    rmSync(`${temporaryDatabasePath}-wal`, { force: true })
+    rmSync(`${temporaryDatabasePath}-shm`, { force: true })
     if (originalMoved && existsSync(rollbackDatabasePath)) {
       rmSync(resolvedDatabasePath, { force: true })
       renameSync(rollbackDatabasePath, resolvedDatabasePath)

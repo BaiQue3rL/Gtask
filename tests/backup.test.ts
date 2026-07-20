@@ -124,6 +124,10 @@ describe('createDailyBackup', () => {
     expect(titles).toContain('备份时存在')
     expect(titles).not.toContain('备份后新增')
     expect(listBackups(backupDirectory).map((backup) => backup.kind)).toContain('pre_restore')
+    expect(existsSync(`${backupPath}-wal`)).toBe(false)
+    expect(existsSync(`${backupPath}-shm`)).toBe(false)
+    expect(existsSync(`${databasePath}.restore.tmp-wal`)).toBe(false)
+    expect(existsSync(`${databasePath}.restore.tmp-shm`)).toBe(false)
   })
 
   it('拒绝恢复备份目录之外的路径', async () => {
