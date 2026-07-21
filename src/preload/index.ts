@@ -21,6 +21,8 @@ const gachaApi: GachaApi = {
   updateSyncSettings: (input) => ipcRenderer.invoke('sync:update-settings', input),
   syncGame: (gameId, scope) => ipcRenderer.invoke('sync:run', gameId, scope),
   listCredentialStatuses: () => ipcRenderer.invoke('credentials:list-status'),
+  saveDeepSeekApiKey: (apiKey) => ipcRenderer.invoke('ai-provider:save-deepseek-key', apiKey),
+  testDeepSeekConnection: () => ipcRenderer.invoke('ai-provider:test-deepseek'),
   clearCredential: (provider) => ipcRenderer.invoke('credentials:clear', provider),
   onSyncCompleted: (callback) => {
     const listener = (_event: Electron.IpcRendererEvent, result: Parameters<typeof callback>[0]): void => callback(result)

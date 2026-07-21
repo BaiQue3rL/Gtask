@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { app, BrowserWindow, dialog, ipcMain, safeStorage, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, net, safeStorage, shell } from 'electron'
 import { AppDatabase, CURRENT_SCHEMA_VERSION } from './database'
 import {
   createDailyBackup,
@@ -10,6 +10,8 @@ import {
   restoreBackup
 } from './backup'
 import { CredentialVault } from './credential-vault'
+import { testDeepSeekApiKey } from './ai/deepseek-client'
+import { createElectronNetFetcher } from './sync/electron-net-fetcher'
 import { SyncOrchestrator } from './sync/orchestrator'
 import { restoreRelaunchOptions } from './relaunch'
 import type { GameId, SyncResult, SyncScope } from '../shared/contracts'
@@ -277,7 +279,24 @@ function registerIpcHandlers(): void {
   })
   ipcMain.handle('credentials:list-status', () => {
     if (!credentialVault) throw new Error('安全凭据存储尚未初始化')
-    return [credentialVault.status('miyoushe'), credentialVault.status('kuro-community')]
+    return [
+      credentialVault.status('miyoushe'),
+      credentialVault.status('kuro-community'),
+      credentialVault.status('deepseek')
+    ]
+  })
+  ipcMain.handle('ai-provider:save-deepseek-key', (_event, value: unknown) => {
+    if (!credentialVault) throw new Error('安全凭据存储尚未初始化')
+    if (typeof value !== 'string' || value.trim().length < 20 || value.trim().length > 500) {
+      throw new Error('DeepSeek API 密钥格式不正确')
+    }
+    return credentialVault.store('deepseek', { kind: 'api_key', value: value.trim() })
+  })
+  ipcMain.handle('ai-provider:test-deepseek', async () => {
+    if (!credentialVault) throw new Error('安全凭据存储尚未初始化')
+    const credential = credentialVault.read('deepseek')
+    if (!credential || credential.kind !== 'api_key') throw new Error('尚未保存 DeepSeek API 密钥')
+    return testDeepSeekApiKey(credential.value, createElectronNetFetcher(net.fetch))
   })
   ipcMain.handle('credentials:clear', (_event, provider: unknown) => {
     if (!credentialVault) throw new Error('安全凭据存储尚未初始化')

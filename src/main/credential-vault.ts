@@ -7,7 +7,7 @@ import {
 } from '../shared/contracts'
 
 export interface CredentialPayload {
-  kind: 'cookie' | 'token' | 'session'
+  kind: 'cookie' | 'token' | 'session' | 'api_key'
   value: string
   accountLabel?: string
 }
@@ -61,7 +61,7 @@ export class CredentialVault {
       parsed === null ||
       !('kind' in parsed) ||
       !('value' in parsed) ||
-      !['cookie', 'token', 'session'].includes(String(parsed.kind)) ||
+      !['cookie', 'token', 'session', 'api_key'].includes(String(parsed.kind)) ||
       typeof parsed.value !== 'string'
     ) {
       throw new Error('已保存凭据格式损坏')

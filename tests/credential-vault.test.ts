@@ -41,6 +41,12 @@ describe('CredentialVault', () => {
     expect(vault.read('miyoushe')).toEqual({ kind: 'session', value: 'replacement-secret' })
     expect(vault.clear('miyoushe')).toBe(true)
     expect(vault.read('miyoushe')).toBeNull()
+
+    vault.store('deepseek', { kind: 'api_key', value: 'sk-local-test-secret' })
+    expect(vault.read('deepseek')).toEqual({ kind: 'api_key', value: 'sk-local-test-secret' })
+    expect(readFileSync(join(temporaryDirectory, 'deepseek.bin'), 'utf8')).not.toContain(
+      'sk-local-test-secret'
+    )
   })
 
   it('系统安全存储不可用时拒绝落盘', () => {

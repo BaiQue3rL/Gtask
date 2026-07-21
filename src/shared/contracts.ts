@@ -26,13 +26,21 @@ export type SyncScope = (typeof SYNC_SCOPES)[number]
 export type SyncStatus = 'idle' | 'success' | 'error' | 'stale' | 'verification_required'
 export const SCHEDULE_KINDS = ['weekly', 'fixed_window', 'remote_schedule'] as const
 export type ScheduleKind = (typeof SCHEDULE_KINDS)[number]
-export const CREDENTIAL_PROVIDERS = ['miyoushe', 'kuro-community'] as const
+export const CREDENTIAL_PROVIDERS = ['miyoushe', 'kuro-community', 'deepseek'] as const
 export type CredentialProvider = (typeof CREDENTIAL_PROVIDERS)[number]
 
 export interface CredentialStatus {
   provider: CredentialProvider
   stored: boolean
   updatedAt: string | null
+}
+
+export interface AiProviderConnectionResult {
+  connected: boolean
+  provider: 'deepseek'
+  model: string
+  message: string
+  testedAt: string
 }
 
 export interface BackupSummary {
@@ -196,6 +204,8 @@ export interface GachaApi {
   updateSyncSettings: (input: UpdateSyncSettingsInput) => Promise<SyncSettings>
   syncGame: (gameId: GameId, scope: SyncScope) => Promise<SyncResult>
   listCredentialStatuses: () => Promise<CredentialStatus[]>
+  saveDeepSeekApiKey: (apiKey: string) => Promise<CredentialStatus>
+  testDeepSeekConnection: () => Promise<AiProviderConnectionResult>
   clearCredential: (provider: CredentialProvider) => Promise<boolean>
   onSyncCompleted: (callback: (result: SyncResult) => void) => () => void
   onChecklistChanged: (callback: () => void) => () => void

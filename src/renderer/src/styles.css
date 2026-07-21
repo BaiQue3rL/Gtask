@@ -153,6 +153,17 @@ h2 { margin: 0; font-size: 19px; }
 .game-visibility-row .game-dot { display: inline-block; flex: 0 0 auto; }
 .game-visibility-row input { width: 16px; height: 16px; accent-color: #5d91d3; cursor: pointer; }
 .game-visibility-row input:disabled { cursor: not-allowed; opacity: 0.45; }
+.ai-provider-box { display: grid; gap: 10px; margin-bottom: 20px; padding: 12px; border: 1px solid #2b4665; border-radius: 8px; background: rgba(13, 38, 68, 0.55); }
+.ai-provider-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ai-provider-heading div { display: grid; gap: 4px; }
+.ai-provider-heading strong { color: #dce9f8; font-size: 13px; }
+.ai-provider-heading span { color: #728aa7; font-size: 11px; }
+.ai-provider-heading button, .secret-input-row button { flex: 0 0 auto; padding: 7px 11px; border-radius: 6px; cursor: pointer; }
+.ai-provider-heading button:disabled, .secret-input-row button:disabled { cursor: not-allowed; opacity: 0.4; }
+.secret-input-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; }
+.secret-input-row input { min-width: 0; }
+.connection-note { margin: 0; font-size: 11px; }
+.connection-note.success { color: #73d7a4; }
 .settings-heading.data-heading { margin-top: 20px; }
 .settings-title-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .settings-title-row button { padding: 6px 11px; border-radius: 6px; cursor: pointer; }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import type {
+  AiProviderConnectionResult,
   AiScheduleAgentStatus,
   AppInfo,
   BackupSummary,
@@ -74,6 +75,10 @@ const editorOpen = ref(false)
 const recycleBinOpen = ref(false)
 const settingsOpen = ref(false)
 const credentialStatuses = ref<CredentialStatus[]>([])
+const deepSeekApiKey = ref('')
+const savingDeepSeekKey = ref(false)
+const testingDeepSeek = ref(false)
+const deepSeekNotice = ref<AiProviderConnectionResult | null>(null)
 const backups = ref<BackupSummary[]>([])
 const backingUp = ref(false)
 const restoringBackup = ref<string | null>(null)
@@ -94,6 +99,12 @@ const form = reactive({
 
 const selectedGame = computed(() => games.value.find((game) => game.id === selectedGameId.value))
 const visibleGames = computed(() => games.value.filter((game) => !hiddenGameIds.value.includes(game.id)))
+const gameCredentialStatuses = computed(() =>
+  credentialStatuses.value.filter((status) => status.provider !== 'deepseek')
+)
+const deepSeekStatus = computed(() =>
+  credentialStatuses.value.find((status) => status.provider === 'deepseek') ?? null
+)
 const editorCategories = computed(() => {
   const questCategories: ChecklistCategory[] = ['main_quest', 'side_quest']
   if (editingItem.value && questCategories.includes(editingItem.value.category)) {
@@ -320,13 +331,51 @@ async function restoreBackup(backup: BackupSummary): Promise<void> {
 }
 
 async function clearCredential(provider: CredentialProvider): Promise<void> {
-  const platform = provider === 'miyoushe' ? '米游社' : '库街区'
+  const platform = provider === 'miyoushe'
+    ? '米游社'
+    : provider === 'kuro-community'
+      ? '库街区'
+      : 'DeepSeek API'
   if (!window.confirm(`确定清除本机保存的${platform}登录凭据吗？`)) return
   try {
     await window.gacha.clearCredential(provider)
     credentialStatuses.value = await window.gacha.listCredentialStatuses()
+    if (provider === 'deepseek') deepSeekNotice.value = null
   } catch (error) {
     showError(error)
+  }
+}
+
+async function saveDeepSeekApiKey(): Promise<void> {
+  if (savingDeepSeekKey.value) return
+  const apiKey = deepSeekApiKey.value.trim()
+  if (!apiKey) {
+    errorMessage.value = '请输入 DeepSeek API 密钥'
+    return
+  }
+  savingDeepSeekKey.value = true
+  deepSeekNotice.value = null
+  try {
+    await window.gacha.saveDeepSeekApiKey(apiKey)
+    deepSeekApiKey.value = ''
+    credentialStatuses.value = await window.gacha.listCredentialStatuses()
+  } catch (error) {
+    showError(error)
+  } finally {
+    savingDeepSeekKey.value = false
+  }
+}
+
+async function testDeepSeekConnection(): Promise<void> {
+  if (testingDeepSeek.value) return
+  testingDeepSeek.value = true
+  deepSeekNotice.value = null
+  try {
+    deepSeekNotice.value = await window.gacha.testDeepSeekConnection()
+  } catch (error) {
+    showError(error)
+  } finally {
+    testingDeepSeek.value = false
   }
 }
 
@@ -844,10 +893,45 @@ function showError(error: unknown): void {
             >
           </label>
         </div>
-        <h3 class="settings-heading">登录凭据</h3>
+        <h3 class="settings-heading">AI 服务</h3>
+        <p class="recycle-hint">DeepSeek 仅作为可选的结构化整理器，不代替 Codex/Web 联网检索。密钥由 Windows 安全存储加密保存。</p>
+        <div class="ai-provider-box">
+          <div class="ai-provider-heading">
+            <div>
+              <strong>DeepSeek API</strong>
+              <span>{{ deepSeekStatus?.stored ? `已安全保存 · ${formatLocalTime(deepSeekStatus.updatedAt!)}` : '未配置' }}</span>
+            </div>
+            <button
+              class="danger-button"
+              type="button"
+              :disabled="!deepSeekStatus?.stored"
+              @click="clearCredential('deepseek')"
+            >清除密钥</button>
+          </div>
+          <div class="secret-input-row">
+            <input
+              v-model="deepSeekApiKey"
+              type="password"
+              autocomplete="off"
+              placeholder="sk-..."
+              aria-label="DeepSeek API 密钥"
+            >
+            <button class="secondary-button" type="button" :disabled="savingDeepSeekKey" @click="saveDeepSeekApiKey">
+              {{ savingDeepSeekKey ? '保存中…' : '加密保存' }}
+            </button>
+            <button
+              class="secondary-button"
+              type="button"
+              :disabled="!deepSeekStatus?.stored || testingDeepSeek"
+              @click="testDeepSeekConnection"
+            >{{ testingDeepSeek ? '测试中…' : '测试连接' }}</button>
+          </div>
+          <p v-if="deepSeekNotice" class="connection-note success">{{ deepSeekNotice.message }}</p>
+        </div>
+        <h3 class="settings-heading data-heading">登录凭据</h3>
         <p class="recycle-hint">登录完全可选。凭据仅通过 Windows 安全存储加密后保存在本机，不读取浏览器 Cookie。</p>
         <div class="recycle-list">
-          <div v-for="status in credentialStatuses" :key="status.provider" class="recycle-row">
+          <div v-for="status in gameCredentialStatuses" :key="status.provider" class="recycle-row">
             <div>
               <strong>{{ status.provider === 'miyoushe' ? '米游社' : '库街区' }}</strong>
               <span>{{ status.stored ? `已安全保存 · ${formatLocalTime(status.updatedAt!)}` : '未登录' }}</span>
