@@ -9,8 +9,7 @@ export interface CredentialReader {
 
 const PROVIDER_LABELS: Record<CredentialProvider, string> = {
   miyoushe: '米游社',
-  'kuro-community': '库街区',
-  deepseek: 'DeepSeek'
+  'kuro-community': '库街区'
 }
 
 export class CredentialBackedAdapter implements SyncAdapter {

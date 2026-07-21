@@ -1,8 +1,12 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { CredentialVault, type CredentialProtector } from '../src/main/credential-vault'
+import {
+  CredentialVault,
+  removeRetiredDeepSeekCredential,
+  type CredentialProtector
+} from '../src/main/credential-vault'
 
 let temporaryDirectory: string | null = null
 
@@ -41,12 +45,16 @@ describe('CredentialVault', () => {
     expect(vault.read('miyoushe')).toEqual({ kind: 'session', value: 'replacement-secret' })
     expect(vault.clear('miyoushe')).toBe(true)
     expect(vault.read('miyoushe')).toBeNull()
+  })
 
-    vault.store('deepseek', { kind: 'api_key', value: 'sk-local-test-secret' })
-    expect(vault.read('deepseek')).toEqual({ kind: 'api_key', value: 'sk-local-test-secret' })
-    expect(readFileSync(join(temporaryDirectory, 'deepseek.bin'), 'utf8')).not.toContain(
-      'sk-local-test-secret'
-    )
+  it('升级时清除已经退役的 DeepSeek 密钥文件', () => {
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-retired-credential-test-'))
+    const path = join(temporaryDirectory, 'deepseek.bin')
+    writeFileSync(path, 'encrypted-legacy-key')
+
+    expect(removeRetiredDeepSeekCredential(temporaryDirectory)).toBe(true)
+    expect(existsSync(path)).toBe(false)
+    expect(removeRetiredDeepSeekCredential(temporaryDirectory)).toBe(false)
   })
 
   it('系统安全存储不可用时拒绝落盘', () => {

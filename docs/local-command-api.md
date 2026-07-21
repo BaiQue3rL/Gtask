@@ -49,10 +49,6 @@ CLI 与 MCP 在打开旧版磁盘数据库时会先创建迁移前一致性备�
 
 Codex 对写入型 MCP 工具保留用户批准边界。正式插件不使用全局免审批参数。
 
-## DeepSeek 可选整理器
-
-设置页可加密保存 DeepSeek API 密钥并进行结构化 JSON 连接测试。当前固定使用 `deepseek-v4-flash` 并显式设置 `thinking.type=disabled`；它只负责整理已获取的来源，不被视为联网搜索器。
-
 不使用 MCP 时，也可以从标准输入传入单个 JSON 命令：
 
 ```powershell

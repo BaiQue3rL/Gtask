@@ -9,9 +9,9 @@ import {
   pruneDailyBackups,
   restoreBackup
 } from './backup'
-import { CredentialVault } from './credential-vault'
-import { testDeepSeekApiKey } from './ai/deepseek-client'
+import { CredentialVault, removeRetiredDeepSeekCredential } from './credential-vault'
 import { detectCodexPlugin } from './ai/codex-plugin'
+import { MiyousheQrLoginService } from './auth/miyoushe-qr-login'
 import { createElectronNetFetcher } from './sync/electron-net-fetcher'
 import { SyncOrchestrator } from './sync/orchestrator'
 import { restoreRelaunchOptions } from './relaunch'
@@ -42,6 +42,7 @@ let syncOrchestrator: SyncOrchestrator | null = null
 let periodTimer: ReturnType<typeof setInterval> | null = null
 let externalChangeTimer: ReturnType<typeof setInterval> | null = null
 let credentialVault: CredentialVault | null = null
+let miyousheQrLogin: MiyousheQrLoginService | null = null
 let appBackupDirectory: string | null = null
 let appDatabasePath: string | null = null
 
@@ -294,22 +295,29 @@ function registerIpcHandlers(): void {
     if (!credentialVault) throw new Error('安全凭据存储尚未初始化')
     return [
       credentialVault.status('miyoushe'),
-      credentialVault.status('kuro-community'),
-      credentialVault.status('deepseek')
+      credentialVault.status('kuro-community')
     ]
   })
-  ipcMain.handle('ai-provider:save-deepseek-key', (_event, value: unknown) => {
-    if (!credentialVault) throw new Error('安全凭据存储尚未初始化')
-    if (typeof value !== 'string' || value.trim().length < 20 || value.trim().length > 500) {
-      throw new Error('DeepSeek API 密钥格式不正确')
-    }
-    return credentialVault.store('deepseek', { kind: 'api_key', value: value.trim() })
+  ipcMain.handle('miyoushe-login:start', async () => {
+    if (!miyousheQrLogin) throw new Error('米游社登录服务尚未初始化')
+    return miyousheQrLogin.start()
   })
-  ipcMain.handle('ai-provider:test-deepseek', async () => {
-    if (!credentialVault) throw new Error('安全凭据存储尚未初始化')
-    const credential = credentialVault.read('deepseek')
-    if (!credential || credential.kind !== 'api_key') throw new Error('尚未保存 DeepSeek API 密钥')
-    return testDeepSeekApiKey(credential.value, createElectronNetFetcher(net.fetch))
+  ipcMain.handle('miyoushe-login:poll', async (_event, value: unknown) => {
+    if (!miyousheQrLogin || !credentialVault) throw new Error('米游社登录服务尚未初始化')
+    const sessionId = parseQrLoginSessionId(value)
+    const result = await miyousheQrLogin.poll(sessionId)
+    if (result.credential) {
+      credentialVault.store('miyoushe', {
+        kind: 'cookie',
+        value: result.credential.cookie,
+        accountLabel: result.credential.accountLabel
+      })
+    }
+    return result.state
+  })
+  ipcMain.handle('miyoushe-login:cancel', (_event, value: unknown) => {
+    if (!miyousheQrLogin) throw new Error('米游社登录服务尚未初始化')
+    return miyousheQrLogin.cancel(parseQrLoginSessionId(value))
   })
   ipcMain.handle('credentials:clear', (_event, provider: unknown) => {
     if (!credentialVault) throw new Error('安全凭据存储尚未初始化')
@@ -352,11 +360,14 @@ if (!app.requestSingleInstanceLock()) {
       app.quit()
       return
     }
-    credentialVault = new CredentialVault(join(app.getPath('userData'), 'credentials'), {
+    const credentialDirectory = join(app.getPath('userData'), 'credentials')
+    removeRetiredDeepSeekCredential(credentialDirectory)
+    credentialVault = new CredentialVault(credentialDirectory, {
       isAvailable: () => safeStorage.isEncryptionAvailable(),
       protect: (plainText) => safeStorage.encryptString(plainText),
       unprotect: (encrypted) => safeStorage.decryptString(encrypted)
     })
+    miyousheQrLogin = new MiyousheQrLoginService(createElectronNetFetcher(net.fetch))
     try {
       await createDailyBackup(appDatabase, backupDirectory)
       pruneDailyBackups(backupDirectory)
@@ -403,6 +414,14 @@ app.on('before-quit', () => {
   appDatabase = null
   syncOrchestrator = null
   credentialVault = null
+  miyousheQrLogin = null
   appBackupDirectory = null
   appDatabasePath = null
 })
+
+function parseQrLoginSessionId(value: unknown): string {
+  if (typeof value !== 'string' || !/^[0-9a-f-]{36}$/i.test(value)) {
+    throw new Error('二维码登录会话标识格式不正确')
+  }
+  return value
+}

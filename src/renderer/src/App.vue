@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import type {
-  AiProviderConnectionResult,
   AiScheduleAgentStatus,
   AppInfo,
   BackupSummary,
@@ -13,6 +12,7 @@ import type {
   CredentialStatus,
   GameId,
   GameSummary,
+  MiyousheQrLoginState,
   SyncResult,
   SyncScope,
   SyncSettings
@@ -74,16 +74,17 @@ const clockNow = ref(Date.now())
 const editorOpen = ref(false)
 const recycleBinOpen = ref(false)
 const settingsOpen = ref(false)
+const miyousheLoginOpen = ref(false)
+const miyousheLoginState = ref<MiyousheQrLoginState | null>(null)
+const startingMiyousheLogin = ref(false)
+const pollingMiyousheLogin = ref(false)
 const credentialStatuses = ref<CredentialStatus[]>([])
-const deepSeekApiKey = ref('')
-const savingDeepSeekKey = ref(false)
-const testingDeepSeek = ref(false)
-const deepSeekNotice = ref<AiProviderConnectionResult | null>(null)
 const backups = ref<BackupSummary[]>([])
 const backingUp = ref(false)
 const restoringBackup = ref<string | null>(null)
 const aiScheduleAgent = ref<AiScheduleAgentStatus | null>(null)
 const editingItem = ref<ChecklistItem | null>(null)
+let miyousheLoginTimer: number | null = null
 
 const form = reactive({
   category: 'custom' as ChecklistCategory,
@@ -99,12 +100,7 @@ const form = reactive({
 
 const selectedGame = computed(() => games.value.find((game) => game.id === selectedGameId.value))
 const visibleGames = computed(() => games.value.filter((game) => !hiddenGameIds.value.includes(game.id)))
-const gameCredentialStatuses = computed(() =>
-  credentialStatuses.value.filter((status) => status.provider !== 'deepseek')
-)
-const deepSeekStatus = computed(() =>
-  credentialStatuses.value.find((status) => status.provider === 'deepseek') ?? null
-)
+const gameCredentialStatuses = computed(() => credentialStatuses.value)
 const aiScheduleAvailable = computed(() =>
   Boolean(aiScheduleAgent.value?.connected || aiScheduleAgent.value?.codexPluginInstalled)
 )
@@ -212,10 +208,15 @@ onUnmounted(() => {
   removeSyncListener()
   removeChecklistListener()
   window.clearInterval(clockTimer)
+  stopMiyousheLoginPolling()
 })
 
 function handleGlobalKeydown(event: KeyboardEvent): void {
   if (event.key !== 'Escape') return
+  if (miyousheLoginOpen.value) {
+    void closeMiyousheLogin()
+    return
+  }
   refreshMenuOpen.value = false
   editorOpen.value = false
   recycleBinOpen.value = false
@@ -334,52 +335,71 @@ async function restoreBackup(backup: BackupSummary): Promise<void> {
 }
 
 async function clearCredential(provider: CredentialProvider): Promise<void> {
-  const platform = provider === 'miyoushe'
-    ? '米游社'
-    : provider === 'kuro-community'
-      ? '库街区'
-      : 'DeepSeek API'
+  const platform = provider === 'miyoushe' ? '米游社' : '库街区'
   if (!window.confirm(`确定清除本机保存的${platform}登录凭据吗？`)) return
   try {
     await window.gacha.clearCredential(provider)
     credentialStatuses.value = await window.gacha.listCredentialStatuses()
-    if (provider === 'deepseek') deepSeekNotice.value = null
   } catch (error) {
     showError(error)
   }
 }
 
-async function saveDeepSeekApiKey(): Promise<void> {
-  if (savingDeepSeekKey.value) return
-  const apiKey = deepSeekApiKey.value.trim()
-  if (!apiKey) {
-    errorMessage.value = '请输入 DeepSeek API 密钥'
-    return
-  }
-  savingDeepSeekKey.value = true
-  deepSeekNotice.value = null
+async function startMiyousheLogin(): Promise<void> {
+  if (startingMiyousheLogin.value) return
+  startingMiyousheLogin.value = true
+  stopMiyousheLoginPolling()
   try {
-    await window.gacha.saveDeepSeekApiKey(apiKey)
-    deepSeekApiKey.value = ''
-    credentialStatuses.value = await window.gacha.listCredentialStatuses()
+    miyousheLoginState.value = await window.gacha.startMiyousheQrLogin()
+    miyousheLoginOpen.value = true
+    miyousheLoginTimer = window.setInterval(() => void pollMiyousheLogin(), 1_000)
   } catch (error) {
     showError(error)
   } finally {
-    savingDeepSeekKey.value = false
+    startingMiyousheLogin.value = false
   }
 }
 
-async function testDeepSeekConnection(): Promise<void> {
-  if (testingDeepSeek.value) return
-  testingDeepSeek.value = true
-  deepSeekNotice.value = null
+async function pollMiyousheLogin(): Promise<void> {
+  const state = miyousheLoginState.value
+  if (!state || pollingMiyousheLogin.value || ['confirmed', 'expired'].includes(state.status)) return
+  pollingMiyousheLogin.value = true
   try {
-    deepSeekNotice.value = await window.gacha.testDeepSeekConnection()
+    const nextState = await window.gacha.pollMiyousheQrLogin(state.sessionId)
+    if (miyousheLoginState.value?.sessionId !== state.sessionId) return
+    miyousheLoginState.value = nextState
+    if (nextState.status === 'confirmed') {
+      stopMiyousheLoginPolling()
+      credentialStatuses.value = await window.gacha.listCredentialStatuses()
+    } else if (nextState.status === 'expired') {
+      stopMiyousheLoginPolling()
+    }
   } catch (error) {
+    stopMiyousheLoginPolling()
     showError(error)
   } finally {
-    testingDeepSeek.value = false
+    pollingMiyousheLogin.value = false
   }
+}
+
+async function closeMiyousheLogin(): Promise<void> {
+  const sessionId = miyousheLoginState.value?.sessionId
+  const finished = ['confirmed', 'expired'].includes(miyousheLoginState.value?.status ?? '')
+  stopMiyousheLoginPolling()
+  miyousheLoginOpen.value = false
+  miyousheLoginState.value = null
+  if (sessionId && !finished) {
+    try {
+      await window.gacha.cancelMiyousheQrLogin(sessionId)
+    } catch {
+      // Closing the UI remains safe even if the in-memory session already expired.
+    }
+  }
+}
+
+function stopMiyousheLoginPolling(): void {
+  if (miyousheLoginTimer !== null) window.clearInterval(miyousheLoginTimer)
+  miyousheLoginTimer = null
 }
 
 async function openDataDirectory(): Promise<void> {
@@ -914,7 +934,7 @@ function showError(error: unknown): void {
             >
           </label>
         </div>
-        <h3 class="settings-heading">AI 服务</h3>
+        <h3 class="settings-heading">公开排期 AI</h3>
         <div class="ai-provider-box codex-provider-box">
           <div class="ai-provider-heading">
             <div>
@@ -933,40 +953,7 @@ function showError(error: unknown): void {
             >打开 Codex</button>
           </div>
         </div>
-        <p class="recycle-hint">DeepSeek 仅作为可选的结构化整理器，不代替 Codex/Web 联网检索。密钥由 Windows 安全存储加密保存。</p>
-        <div class="ai-provider-box">
-          <div class="ai-provider-heading">
-            <div>
-              <strong>DeepSeek API</strong>
-              <span>{{ deepSeekStatus?.stored ? `已安全保存 · ${formatLocalTime(deepSeekStatus.updatedAt!)}` : '未配置' }}</span>
-            </div>
-            <button
-              class="danger-button"
-              type="button"
-              :disabled="!deepSeekStatus?.stored"
-              @click="clearCredential('deepseek')"
-            >清除密钥</button>
-          </div>
-          <div class="secret-input-row">
-            <input
-              v-model="deepSeekApiKey"
-              type="password"
-              autocomplete="off"
-              placeholder="sk-..."
-              aria-label="DeepSeek API 密钥"
-            >
-            <button class="secondary-button" type="button" :disabled="savingDeepSeekKey" @click="saveDeepSeekApiKey">
-              {{ savingDeepSeekKey ? '保存中…' : '加密保存' }}
-            </button>
-            <button
-              class="secondary-button"
-              type="button"
-              :disabled="!deepSeekStatus?.stored || testingDeepSeek"
-              @click="testDeepSeekConnection"
-            >{{ testingDeepSeek ? '测试中…' : '测试连接' }}</button>
-          </div>
-          <p v-if="deepSeekNotice" class="connection-note success">{{ deepSeekNotice.message }}</p>
-        </div>
+        <p class="recycle-hint">公开排期统一由 Codex/MCP 联网检索、交叉验证并结构化回写，不再要求配置额外 AI API。</p>
         <h3 class="settings-heading data-heading">登录凭据</h3>
         <p class="recycle-hint">登录完全可选。凭据仅通过 Windows 安全存储加密后保存在本机，不读取浏览器 Cookie。</p>
         <div class="recycle-list">
@@ -975,12 +962,22 @@ function showError(error: unknown): void {
               <strong>{{ status.provider === 'miyoushe' ? '米游社' : '库街区' }}</strong>
               <span>{{ status.stored ? `已安全保存 · ${formatLocalTime(status.updatedAt!)}` : '未登录' }}</span>
             </div>
-            <button
-              class="danger-button"
-              type="button"
-              :disabled="!status.stored"
-              @click="clearCredential(status.provider)"
-            >清除凭据</button>
+            <div class="credential-actions">
+              <button
+                v-if="status.provider === 'miyoushe'"
+                class="secondary-button"
+                type="button"
+                :disabled="startingMiyousheLogin"
+                @click="startMiyousheLogin"
+              >{{ startingMiyousheLogin ? '获取中…' : status.stored ? '重新登录' : '扫码登录' }}</button>
+              <button v-else class="secondary-button" type="button" disabled>登录开发中</button>
+              <button
+                class="danger-button"
+                type="button"
+                :disabled="!status.stored"
+                @click="clearCredential(status.provider)"
+              >清除凭据</button>
+            </div>
           </div>
         </div>
         <div class="settings-title-row">
@@ -1008,7 +1005,43 @@ function showError(error: unknown): void {
           </div>
           <p v-if="backups.length === 0" class="empty-text">尚无备份</p>
         </div>
-        <p class="settings-note">登录入口将在个人数据适配器接入时启用；当前手动清单与公开排期模式不依赖登录。</p>
+        <p class="settings-note">米游社二维码登录已启用；库街区登录与风控验证窗口继续开发中。手动清单与公开排期模式始终不依赖登录。</p>
+      </section>
+    </div>
+    <div v-if="miyousheLoginOpen" class="modal-backdrop login-backdrop" @click.self="closeMiyousheLogin">
+      <section class="editor-modal login-modal" role="dialog" aria-modal="true" aria-label="米游社扫码登录">
+        <div class="modal-header">
+          <div><h2>米游社扫码登录</h2><p>凭据只会经 Windows DPAPI 加密保存在本机</p></div>
+          <button class="close-button" type="button" aria-label="关闭米游社登录" @click="closeMiyousheLogin">×</button>
+        </div>
+        <div v-if="miyousheLoginState" class="qr-login-content">
+          <img
+            v-if="miyousheLoginState.qrCodeDataUrl"
+            :src="miyousheLoginState.qrCodeDataUrl"
+            alt="米游社登录二维码"
+            width="280"
+            height="280"
+          >
+          <div v-else class="qr-login-result" :class="miyousheLoginState.status">
+            {{ miyousheLoginState.status === 'confirmed' ? '✓' : '!' }}
+          </div>
+          <strong>{{ miyousheLoginState.message }}</strong>
+          <p v-if="miyousheLoginState.status === 'waiting_confirmation'">请回到米游社 App 完成授权，窗口会自动更新。</p>
+          <p v-else-if="miyousheLoginState.status === 'confirmed'">现在可以使用“公开排期 + 米游社”同步个人数据。</p>
+          <p v-else-if="miyousheLoginState.status === 'expired'">出于安全考虑，二维码不会自动长期续期。</p>
+          <p v-else>二维码有效期约 5 分钟，应用不会读取浏览器 Cookie。</p>
+        </div>
+        <div class="login-actions">
+          <button
+            v-if="miyousheLoginState?.status === 'expired'"
+            class="primary-button"
+            type="button"
+            @click="startMiyousheLogin"
+          >重新获取二维码</button>
+          <button class="secondary-button" type="button" @click="closeMiyousheLogin">
+            {{ miyousheLoginState?.status === 'confirmed' ? '完成' : '取消' }}
+          </button>
+        </div>
       </section>
     </div>
   </main>

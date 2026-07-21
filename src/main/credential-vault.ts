@@ -7,7 +7,7 @@ import {
 } from '../shared/contracts'
 
 export interface CredentialPayload {
-  kind: 'cookie' | 'token' | 'session' | 'api_key'
+  kind: 'cookie' | 'token' | 'session'
   value: string
   accountLabel?: string
 }
@@ -61,7 +61,7 @@ export class CredentialVault {
       parsed === null ||
       !('kind' in parsed) ||
       !('value' in parsed) ||
-      !['cookie', 'token', 'session', 'api_key'].includes(String(parsed.kind)) ||
+      !['cookie', 'token', 'session'].includes(String(parsed.kind)) ||
       typeof parsed.value !== 'string'
     ) {
       throw new Error('已保存凭据格式损坏')
@@ -80,4 +80,11 @@ export class CredentialVault {
     if (!CREDENTIAL_PROVIDERS.includes(provider)) throw new Error('不支持的凭据平台')
     return join(this.directory, `${provider}.bin`)
   }
+}
+
+export function removeRetiredDeepSeekCredential(directory: string): boolean {
+  const path = join(resolve(directory), 'deepseek.bin')
+  if (!existsSync(path)) return false
+  rmSync(path)
+  return true
 }
