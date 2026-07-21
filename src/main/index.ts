@@ -11,6 +11,7 @@ import {
 } from './backup'
 import { CredentialVault } from './credential-vault'
 import { testDeepSeekApiKey } from './ai/deepseek-client'
+import { detectCodexPlugin } from './ai/codex-plugin'
 import { createElectronNetFetcher } from './sync/electron-net-fetcher'
 import { SyncOrchestrator } from './sync/orchestrator'
 import { restoreRelaunchOptions } from './relaunch'
@@ -48,8 +49,12 @@ function queueAiScheduleSync(gameId: GameId, scope: SyncScope): SyncResult {
   if (!appDatabase) throw new Error('数据库尚未初始化')
   const startedAt = new Date().toISOString()
   try {
-    const job = appDatabase.createAiScheduleJob(gameId, scope)
-    const publicMessage = `已提交给 ${job.agentName ?? 'AI 排期 Agent'}，等待联网检索和交叉验证（任务 ${job.id.slice(0, 8)}）`
+    const plugin = detectCodexPlugin()
+    const agent = appDatabase.getAiScheduleAgentStatus()
+    const job = appDatabase.createAiScheduleJob(gameId, scope, new Date(), plugin.installed)
+    const publicMessage = agent.connected
+      ? `已提交给 ${agent.name ?? 'AI 排期 Agent'}，等待联网检索和交叉验证（任务 ${job.id.slice(0, 8)}）`
+      : `已排队（任务 ${job.id.slice(0, 8)}）；请在 Codex 打开“幻游清单”插件并运行 $sync-gacha-schedules`
     const sources: SyncResult['sources'] = [{
       source: 'public_schedule',
       status: 'skipped',
@@ -226,7 +231,15 @@ function registerIpcHandlers(): void {
   })
   ipcMain.handle('ai-schedule:get-agent-status', () => {
     if (!appDatabase) throw new Error('数据库尚未初始化')
-    return appDatabase.getAiScheduleAgentStatus()
+    return {
+      ...appDatabase.getAiScheduleAgentStatus(),
+      codexPluginInstalled: detectCodexPlugin().installed
+    }
+  })
+  ipcMain.handle('codex-plugin:open', async () => {
+    const plugin = detectCodexPlugin()
+    if (!plugin.installed) throw new Error('尚未安装或启用“幻游清单”Codex 插件')
+    await shell.openExternal(plugin.deeplink)
   })
 
   ipcMain.handle('games:list', () => appDatabase?.listGames() ?? [])

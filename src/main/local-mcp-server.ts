@@ -19,6 +19,10 @@ const nullableTextSchema = z.string().max(200).nullable().optional()
 const nullableDateSchema = z.string().nullable().optional()
 const nullableProgressSchema = z.number().min(0).max(100).nullable().optional()
 const publicScheduleCategorySchema = z.enum(['limited_event', 'weekly', 'endgame'])
+const chineseScheduleTitleSchema = z.string().min(1).max(100).regex(
+  /\p{Script=Han}/u,
+  '公开排期名称必须包含经中文来源核对的中文正式名称'
+)
 const isoDateSchema = z.string().max(50).refine((value) => !Number.isNaN(Date.parse(value)), '必须是有效时间')
 const httpUrlSchema = z.string().max(500).url().refine((value) => {
   const protocol = new URL(value).protocol
@@ -281,7 +285,7 @@ export function createLocalMcpServer(
     'apply_gacha_public_schedule',
     {
       title: '提交已验证的公开排期',
-      description: '把联网检索并交叉验证后的公开排期提交给已领取任务。不能提交完成状态、探索度或删除操作。',
+      description: '把联网检索并交叉验证后的公开排期提交给已领取任务。每个名称必须来自中文来源并包含中文，不能提交完成状态、探索度或删除操作。',
       inputSchema: {
         agentId: z.string().min(1).max(100),
         jobId: z.string().uuid(),
@@ -289,7 +293,8 @@ export function createLocalMcpServer(
         items: z.array(z.object({
           remoteKey: z.string().min(1).max(200),
           category: publicScheduleCategorySchema,
-          title: z.string().min(1).max(100),
+          title: chineseScheduleTitleSchema,
+          titleSourceUrl: httpUrlSchema,
           startsAt: isoDateSchema.nullable().optional(),
           endsAt: isoDateSchema.nullable().optional(),
           resetRule: z.string().max(200).nullable().optional(),
@@ -306,6 +311,7 @@ export function createLocalMcpServer(
           platform: z.string().min(1).max(100),
           publisher: z.string().min(1).max(100),
           official: z.boolean(),
+          language: z.enum(['zh-CN', 'other']),
           publishedAt: isoDateSchema.nullable().optional(),
           note: z.string().max(500).optional()
         }).strict()).min(1).max(20)
@@ -314,12 +320,28 @@ export function createLocalMcpServer(
     },
     async ({ agentId, jobId, retrievedAt, items, evidence }) => {
       try {
-        const normalizedItems: NormalizedSyncItem[] = items.map(({ confidence: _confidence, ...item }) => item)
+        const chineseEvidenceUrls = new Set(
+          evidence.filter((entry) => entry.language === 'zh-CN').map((entry) => entry.url)
+        )
+        for (const item of items) {
+          if (!chineseEvidenceUrls.has(item.titleSourceUrl)) {
+            throw new Error(`“${item.title}”缺少对应的中文名称来源证据`)
+          }
+        }
+        const normalizedItems: NormalizedSyncItem[] = items.map(({
+          confidence: _confidence,
+          titleSourceUrl: _titleSourceUrl,
+          ...item
+        }) => item)
+        const normalizedEvidence = evidence.map(({ language, ...entry }) => ({
+          ...entry,
+          note: [entry.note, `页面语言：${language}`].filter(Boolean).join('；')
+        }))
         const result = database.applyAiScheduleJob(
           jobId,
           agentId,
           normalizedItems,
-          { retrievedAt, evidence }
+          { retrievedAt, evidence: normalizedEvidence }
         )
         return toolResult({ command: 'apply_public_schedule', ...result })
       } catch (error) {

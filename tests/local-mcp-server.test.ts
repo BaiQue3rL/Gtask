@@ -145,6 +145,7 @@ describe('本地 MCP server', () => {
           remoteKey: 'official:event:test',
           category: 'limited_event',
           title: '不能夹带完成状态',
+          titleSourceUrl: 'https://example.com/official-event-cn',
           sourceUrl: 'https://example.com/official-event',
           confidence: 0.98,
           completed: true
@@ -153,7 +154,8 @@ describe('本地 MCP server', () => {
           url: 'https://example.com/official-event',
           platform: 'official-site',
           publisher: '官方账号',
-          official: true
+          official: true,
+          language: 'zh-CN'
         }]
       }
     })
@@ -170,6 +172,7 @@ describe('本地 MCP server', () => {
           remoteKey: 'official:event:permanent',
           category: 'permanent_event',
           title: '常驻活动只能由用户维护',
+          titleSourceUrl: 'https://example.com/official-event-cn',
           sourceUrl: 'https://example.com/official-event',
           confidence: 0.98
         }],
@@ -177,12 +180,38 @@ describe('本地 MCP server', () => {
           url: 'https://example.com/official-event',
           platform: 'official-site',
           publisher: '官方账号',
-          official: true
+          official: true,
+          language: 'zh-CN'
         }]
       }
     })
     expect(rejectedPermanentEvent.isError).toBe(true)
     expect(database!.listChecklistItems('genshin').some((item) => item.title === '常驻活动只能由用户维护')).toBe(false)
+
+    const rejectedEnglishTitle = await connected.callTool({
+      name: 'apply_gacha_public_schedule',
+      arguments: {
+        agentId: 'test-agent',
+        jobId: queued.id,
+        retrievedAt: '2026-07-20T15:30:00.000Z',
+        items: [{
+          remoteKey: 'official:event:english',
+          category: 'limited_event',
+          title: 'English Event Name',
+          titleSourceUrl: 'https://example.com/official-event-cn',
+          sourceUrl: 'https://example.com/official-event',
+          confidence: 0.98
+        }],
+        evidence: [{
+          url: 'https://example.com/official-event-cn',
+          platform: 'official-site',
+          publisher: '官方账号',
+          official: true,
+          language: 'zh-CN'
+        }]
+      }
+    })
+    expect(rejectedEnglishTitle.isError).toBe(true)
 
     const applied = await connected.callTool({
       name: 'apply_gacha_public_schedule',
@@ -194,6 +223,7 @@ describe('本地 MCP server', () => {
           remoteKey: 'official:event:test',
           category: 'limited_event',
           title: 'AI 交叉验证活动',
+          titleSourceUrl: 'https://example.com/official-event-cn',
           startsAt: '2026-07-21T02:00:00.000Z',
           endsAt: '2026-08-01T19:59:00.000Z',
           scheduleKind: 'fixed_window',
@@ -201,10 +231,11 @@ describe('本地 MCP server', () => {
           confidence: 0.98
         }],
         evidence: [{
-          url: 'https://example.com/official-event',
+          url: 'https://example.com/official-event-cn',
           platform: 'official-site',
           publisher: '官方账号',
           official: true,
+          language: 'zh-CN',
           publishedAt: '2026-07-20T12:00:00.000Z'
         }]
       }

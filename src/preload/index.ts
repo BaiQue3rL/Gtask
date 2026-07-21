@@ -9,6 +9,7 @@ const gachaApi: GachaApi = {
   createBackup: () => ipcRenderer.invoke('backups:create'),
   restoreBackup: (fileName) => ipcRenderer.invoke('backups:restore', fileName),
   getAiScheduleAgentStatus: () => ipcRenderer.invoke('ai-schedule:get-agent-status'),
+  openCodexPlugin: () => ipcRenderer.invoke('codex-plugin:open'),
   listGames: () => ipcRenderer.invoke('games:list'),
   listChecklistItems: (gameId) => ipcRenderer.invoke('checklist:list', gameId),
   listArchivedChecklistItems: (gameId) => ipcRenderer.invoke('checklist:list-archived', gameId),

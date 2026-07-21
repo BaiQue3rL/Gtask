@@ -105,6 +105,9 @@ const gameCredentialStatuses = computed(() =>
 const deepSeekStatus = computed(() =>
   credentialStatuses.value.find((status) => status.provider === 'deepseek') ?? null
 )
+const aiScheduleAvailable = computed(() =>
+  Boolean(aiScheduleAgent.value?.connected || aiScheduleAgent.value?.codexPluginInstalled)
+)
 const editorCategories = computed(() => {
   const questCategories: ChecklistCategory[] = ['main_quest', 'side_quest']
   if (editingItem.value && questCategories.includes(editingItem.value.category)) {
@@ -395,6 +398,14 @@ async function openExternalSource(url: string): Promise<void> {
   }
 }
 
+async function openCodexPlugin(): Promise<void> {
+  try {
+    await window.gacha.openCodexPlugin()
+  } catch (error) {
+    showError(error)
+  }
+}
+
 async function updateSyncMode(event: Event): Promise<void> {
   const gameId = selectedGameId.value
   const value = (event.target as HTMLSelectElement).value
@@ -674,13 +685,17 @@ function showError(error: unknown): void {
             <button
               class="toolbar-button"
               type="button"
-                :disabled="syncing || !aiScheduleAgent?.connected"
-                :title="aiScheduleAgent?.connected ? `已连接 ${aiScheduleAgent.name}` : '请先连接具备联网搜索能力的 AI 排期 Agent'"
+                :disabled="syncing || !aiScheduleAvailable"
+                :title="aiScheduleAgent?.connected
+                  ? `已连接 ${aiScheduleAgent.name}`
+                  : aiScheduleAgent?.codexPluginInstalled
+                    ? '已安装 Codex 插件；刷新后请在 Codex 处理排期任务'
+                    : '请先连接具备联网搜索能力的 AI 排期 Agent'"
               aria-haspopup="menu"
               :aria-expanded="refreshMenuOpen"
               @click="refreshMenuOpen = !refreshMenuOpen"
             >
-                {{ syncing ? '同步中…' : aiScheduleAgent?.connected ? '↻ 刷新清单' : '↻ 未连接 AI' }} ▾
+                {{ syncing ? '同步中…' : aiScheduleAvailable ? '↻ 刷新清单' : '↻ 未连接 AI' }} ▾
             </button>
             <div v-if="refreshMenuOpen" class="dropdown-menu" role="menu">
               <button role="menuitem" type="button" @click="runSync('public_schedule')">同步公开排期</button>
@@ -701,7 +716,14 @@ function showError(error: unknown): void {
       </header>
 
       <p v-if="errorMessage" class="error-banner" role="alert">{{ errorMessage }}</p>
-      <p v-if="syncNotice" class="sync-banner" :class="syncNotice.status" aria-live="polite">{{ syncNotice.message }}</p>
+      <div v-if="syncNotice" class="sync-banner" :class="syncNotice.status" aria-live="polite">
+        <span>{{ syncNotice.message }}</span>
+        <button
+          v-if="aiScheduleAgent?.codexPluginInstalled && !aiScheduleAgent?.connected && syncNotice.status === 'partial'"
+          type="button"
+          @click="openCodexPlugin"
+        >打开 Codex 处理</button>
+      </div>
 
       <section class="summary-grid">
         <article class="summary-card">
@@ -741,24 +763,23 @@ function showError(error: unknown): void {
                 <button class="check-button" type="button" :aria-label="item.completed ? '标为未完成' : '标为完成'" @click="toggleCompleted(item)">
                   {{ item.completed ? '✓' : '' }}
                 </button>
-                <button class="item-main" type="button" @click="openEdit(item)">
+                <button class="item-main" type="button" :title="item.title" @click="openEdit(item)">
                   <span class="item-title">{{ item.title }}</span>
                   <span class="item-details">
                     <b>{{ categoryLabels[item.category] }}</b>
                     <span v-if="item.parentTitle">{{ item.parentTitle }}</span>
                     <span v-if="item.progressPercent !== null">{{ item.progressPercent }}%</span>
-                    <span v-if="item.modeKey">{{ item.modeKey }}</span>
+                    <span v-if="item.resetRule" class="reset-detail">{{ item.resetRule }}</span>
                     <span
                       v-if="item.source !== 'manual' && item.lastSyncedAt"
                       class="source-detail"
-                      :title="item.sourceUrl ?? undefined"
+                      :title="`${item.source === 'public_schedule' ? '公开排期' : '个人数据'} · 同步于 ${formatLocalTime(item.lastSyncedAt)}${item.sourceUrl ? ` · ${item.sourceUrl}` : ''}`"
                     >
-                      {{ item.source === 'public_schedule' ? '公开排期' : '个人数据' }} · {{ formatLocalTime(item.lastSyncedAt) }}
+                      {{ item.source === 'public_schedule' ? '公开排期' : '个人数据' }}
                     </span>
-                    <span v-if="item.startsAt && isUpcoming(item.startsAt)" class="deadline upcoming">{{ countdown(item.startsAt, '距离开始') }}</span>
-                    <span v-else-if="item.endsAt" class="deadline" :class="{ expired: isExpired(item.endsAt) }">{{ countdown(item.endsAt) }}</span>
-                    <span v-else-if="item.resetRule">{{ item.resetRule }}</span>
                   </span>
+                  <span v-if="item.startsAt && isUpcoming(item.startsAt)" class="item-timing deadline upcoming">{{ countdown(item.startsAt, '距离开始') }}</span>
+                  <span v-else-if="item.endsAt" class="item-timing deadline" :class="{ expired: isExpired(item.endsAt) }">{{ countdown(item.endsAt) }}</span>
                 </button>
                 <button class="more-button" type="button" aria-label="编辑" @click="openEdit(item)">⋮</button>
               </div>
@@ -894,6 +915,24 @@ function showError(error: unknown): void {
           </label>
         </div>
         <h3 class="settings-heading">AI 服务</h3>
+        <div class="ai-provider-box codex-provider-box">
+          <div class="ai-provider-heading">
+            <div>
+              <strong>Codex 排期插件</strong>
+              <span>{{ aiScheduleAgent?.connected
+                ? `Agent 已连接 · ${aiScheduleAgent.name}`
+                : aiScheduleAgent?.codexPluginInstalled
+                  ? '已安装 · 可先排队再由 Codex 领取'
+                  : '未安装或未启用' }}</span>
+            </div>
+            <button
+              class="secondary-button"
+              type="button"
+              :disabled="!aiScheduleAgent?.codexPluginInstalled"
+              @click="openCodexPlugin"
+            >打开 Codex</button>
+          </div>
+        </div>
         <p class="recycle-hint">DeepSeek 仅作为可选的结构化整理器，不代替 Codex/Web 联网检索。密钥由 Windows 安全存储加密保存。</p>
         <div class="ai-provider-box">
           <div class="ai-provider-heading">

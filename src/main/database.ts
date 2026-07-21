@@ -206,7 +206,7 @@ export class AppDatabase {
         last_seen_at = excluded.last_seen_at,
         updated_at = excluded.updated_at
     `).run(agentId, name, now, now, now)
-    return { connected: true, agentId, name, lastSeenAt: now }
+    return { connected: true, codexPluginInstalled: false, agentId, name, lastSeenAt: now }
   }
 
   getAiScheduleAgentStatus(reference = new Date()): AiScheduleAgentStatus {
@@ -217,18 +217,26 @@ export class AppDatabase {
       WHERE last_seen_at >= ?
       ORDER BY last_seen_at DESC
       LIMIT 1
-    `).get(threshold) as Omit<AiScheduleAgentStatus, 'connected'> | undefined
-    return row ? { connected: true, ...row } : {
+    `).get(threshold) as Omit<AiScheduleAgentStatus, 'connected' | 'codexPluginInstalled'> | undefined
+    return row ? { connected: true, codexPluginInstalled: false, ...row } : {
       connected: false,
+      codexPluginInstalled: false,
       agentId: null,
       name: null,
       lastSeenAt: null
     }
   }
 
-  createAiScheduleJob(gameId: GameId, scope: SyncScope, reference = new Date()): AiScheduleJob {
+  createAiScheduleJob(
+    gameId: GameId,
+    scope: SyncScope,
+    reference = new Date(),
+    allowWithoutAgent = false
+  ): AiScheduleJob {
     const agent = this.getAiScheduleAgentStatus(reference)
-    if (!agent.connected) throw new Error('尚未连接具备联网搜索能力的 AI 排期 Agent')
+    if (!agent.connected && !allowWithoutAgent) {
+      throw new Error('尚未连接具备联网搜索能力的 AI 排期 Agent')
+    }
     this.requeueStaleAiScheduleJobs(reference)
     const active = this.database.prepare(`
       SELECT id FROM ai_schedule_jobs

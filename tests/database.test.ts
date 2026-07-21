@@ -395,6 +395,26 @@ describe('AppDatabase', () => {
     }
   })
 
+  it('已安装 Codex 插件时可在没有活动心跳的情况下先排队', () => {
+    database = new AppDatabase(':memory:')
+
+    expect(() => database!.createAiScheduleJob('genshin', 'public_schedule')).toThrow('尚未连接')
+    const queued = database.createAiScheduleJob(
+      'genshin',
+      'public_schedule',
+      new Date('2026-07-21T14:45:00.000Z'),
+      true
+    )
+
+    expect(queued).toMatchObject({
+      gameId: 'genshin',
+      scope: 'public_schedule',
+      status: 'pending',
+      agentId: null,
+      agentName: null
+    })
+  })
+
   it('成功同步超过时限后只标记过期并保留最后成功时间', () => {
     database = new AppDatabase(':memory:')
     database.recordSyncOutcome('genshin', 'success', '同步成功')

@@ -62,6 +62,17 @@ describe('公开排期文档', () => {
     ).toThrow('只允许限时活动和周期挑战')
   })
 
+  it('拒绝没有经中文来源核对的纯英文名称', () => {
+    expect(() => parsePublicScheduleDocument({
+      ...document,
+      items: [{
+        remoteKey: 'event:english-only',
+        category: 'limited_event',
+        title: 'English Event Name'
+      }]
+    }, 'genshin')).toThrow('中文正式名称')
+  })
+
   it('适配器加载文档并返回协调器可直接合并的事项', async () => {
     const adapter = new PublicScheduleDocumentAdapter(async () => document, {
       now: () => new Date('2026-07-20T02:00:00.000Z')

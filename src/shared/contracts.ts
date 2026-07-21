@@ -54,6 +54,7 @@ export type AiScheduleJobStatus = 'pending' | 'claimed' | 'completed' | 'failed'
 
 export interface AiScheduleAgentStatus {
   connected: boolean
+  codexPluginInstalled: boolean
   agentId: string | null
   name: string | null
   lastSeenAt: string | null
@@ -192,6 +193,7 @@ export interface GachaApi {
   createBackup: () => Promise<BackupSummary>
   restoreBackup: (fileName: string) => Promise<boolean>
   getAiScheduleAgentStatus: () => Promise<AiScheduleAgentStatus>
+  openCodexPlugin: () => Promise<void>
   listGames: () => Promise<GameSummary[]>
   listChecklistItems: (gameId: GameId) => Promise<ChecklistItem[]>
   listArchivedChecklistItems: (gameId: GameId) => Promise<ChecklistItem[]>

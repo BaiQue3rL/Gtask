@@ -48,6 +48,9 @@ export function parsePublicScheduleDocument(
       completed: undefined,
       progressPercent: undefined
     })
+    if (!/\p{Script=Han}/u.test(normalized.title)) {
+      throw new Error('公开排期名称必须使用经中文来源核对的中文正式名称')
+    }
     if (!['limited_event', 'endgame'].includes(normalized.category)) {
       throw new Error('公开排期只允许限时活动和周期挑战')
     }
