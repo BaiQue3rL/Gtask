@@ -1,6 +1,6 @@
 {
   "name": "gacha-task-manager",
-  "version": "0.1.0+app.20260722214500",
+  "version": "0.1.0+app.20260722220000",
   "description": "Connect Codex to the local Gacha Task Manager and safely synchronize verified schedules and map catalogs.",
   "author": {
     "name": "Gacha Task Manager contributors"

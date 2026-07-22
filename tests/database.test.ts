@@ -584,7 +584,13 @@ describe('AppDatabase', () => {
   it('公开排期回写后保留同轮个人数据需要验证的状态', () => {
     database = new AppDatabase(':memory:')
     database.registerAiScheduleAgent('agent-personal-state', '测试 Agent')
-    const queued = database.createAiScheduleJob('zenless', 'public_and_personal')
+    const queued = database.createAiScheduleJob(
+      'zenless',
+      'public_and_personal',
+      new Date(),
+      false,
+      'events'
+    )
     const claimed = database.claimAiScheduleJob('agent-personal-state')!
     expect(claimed.id).toBe(queued.id)
     database.recordSyncOutcome(
@@ -697,6 +703,28 @@ describe('AppDatabase', () => {
       title: '周常',
       category: 'weekly'
     })
+  })
+
+  it('四款游戏的周期同步都拒绝遗漏主要挑战玩法', () => {
+    database = new AppDatabase(':memory:')
+    database.registerAiScheduleAgent('agent-cycle-completeness', '周期完整性测试 Agent')
+    const cases = [
+      ['genshin', '深境螺旋、幻想真境剧诗、幽境危战'],
+      ['star-rail', '混沌回忆、虚构叙事、末日幻影、异相仲裁'],
+      ['zenless', '式舆防卫战、危局强袭战'],
+      ['wuthering-waves', '逆境深塔、冥歌海墟']
+    ] as const
+
+    for (const [gameId, missingTitles] of cases) {
+      const queued = database.createAiScheduleJob(gameId, 'public_schedule', new Date(), false, 'cycles')
+      database.claimAiScheduleJob('agent-cycle-completeness')
+      expect(() => database!.applyAiScheduleJob(
+        queued.id,
+        'agent-cycle-completeness',
+        [],
+        []
+      )).toThrow(`周期同步缺少：${missingTitles}`)
+    }
   })
 
   it('公开地图目录新增为零进度，个人数据只补充对应探索度', () => {

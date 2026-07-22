@@ -60,6 +60,27 @@ export const CURRENT_SCHEMA_VERSION = 10
 
 const AI_AGENT_MAX_AGE_MS = 5 * 60 * 1000
 const AI_JOB_CLAIM_MAX_AGE_MS = 15 * 60 * 1000
+const REQUIRED_ENDGAME_MODES: Record<GameId, ReadonlyArray<readonly [string, string]>> = {
+  genshin: [
+    ['spiral-abyss', '深境螺旋'],
+    ['imaginarium-theater', '幻想真境剧诗'],
+    ['stygian-onslaught', '幽境危战']
+  ],
+  'star-rail': [
+    ['memory-of-chaos', '混沌回忆'],
+    ['pure-fiction', '虚构叙事'],
+    ['apocalyptic-shadow', '末日幻影'],
+    ['anomaly-arbitration', '异相仲裁']
+  ],
+  zenless: [
+    ['shiyu-defense', '式舆防卫战'],
+    ['deadly-assault', '危局强袭战']
+  ],
+  'wuthering-waves': [
+    ['tower-of-adversity', '逆境深塔'],
+    ['whimpering-wastes', '冥歌海墟']
+  ]
+}
 
 export class AppDatabase {
   private readonly database: DatabaseSync
@@ -323,20 +344,16 @@ export class AppDatabase {
       if (invalid) throw new Error(`当前任务只允许回写“${job.target}”版块数据`)
     }
     const includesCycles = job.target === 'all' || job.target === 'cycles'
-    if (includesCycles && job.gameId === 'genshin') {
-      const requiredModes = new Map([
-        ['spiral-abyss', '深境螺旋'],
-        ['imaginarium-theater', '幻想真境剧诗'],
-        ['stygian-onslaught', '幽境危战']
-      ])
+    if (includesCycles) {
+      const requiredModes = REQUIRED_ENDGAME_MODES[job.gameId]
       const submittedModes = new Set(items
         .filter((item) => item.category === 'endgame')
         .map((item) => item.modeKey))
-      const missing = [...requiredModes]
+      const missing = requiredModes
         .filter(([modeKey]) => !submittedModes.has(modeKey))
         .map(([, title]) => title)
       if (missing.length > 0) {
-        throw new Error(`原神周期同步缺少：${missing.join('、')}；已保留原清单，请重新核验`)
+        throw new Error(`${job.gameId} 周期同步缺少：${missing.join('、')}；已保留原清单，请重新核验`)
       }
     }
     const mergedItems = includesCycles && !items.some((item) => item.category === 'weekly')

@@ -24,7 +24,7 @@ Use the `gacha_task_manager` MCP tools. Do not run shell commands or edit the SQ
 - For `exploration`, submit the released region catalog only. Use a stable `modeKey` and `parentTitle` when known. Do not submit progress or completion; new regions start at 0% and personal data fills progress later.
 - Public map refreshes are append/update only. Missing regions must never be deleted or archived.
 - Never submit a `recurrenceRule` for `endgame`. Only weeklies reset locally. Each new endgame period is a separate checklist record so completed historical periods remain completed.
-- A Genshin `cycles` or `all` submission must include 深境螺旋 (`spiral-abyss`), 幻想真境剧诗 (`imaginarium-theater`), and 幽境危战 (`stygian-onslaught`) as three separate modes. The app supplies the fixed Monday weekly item.
+- A `cycles` or `all` submission must include every major mode for that game: Genshin—深境螺旋 (`spiral-abyss`), 幻想真境剧诗 (`imaginarium-theater`), 幽境危战 (`stygian-onslaught`); Star Rail—混沌回忆 (`memory-of-chaos`), 虚构叙事 (`pure-fiction`), 末日幻影 (`apocalyptic-shadow`), 异相仲裁 (`anomaly-arbitration`); Zenless Zone Zero—式舆防卫战 (`shiyu-defense`), 危局强袭战 (`deadly-assault`); Wuthering Waves—逆境深塔 (`tower-of-adversity`), 冥歌海墟 (`whimpering-wastes`). The app supplies the fixed Monday weekly item.
 - For `endgame`, use a stable `modeKey` for the mode and a period-specific `periodKey` plus `remoteKey` for the current window. For other categories, keep `remoteKey` stable across refreshes.
 - Every `title` must be an official Simplified Chinese name confirmed by a Chinese source. Pure English titles and AI-authored translations are forbidden.
 - Set `titleSourceUrl` to the matching Chinese page and include it in `evidence` with `language: zh-CN`.
