@@ -196,6 +196,17 @@ export class AppDatabase {
       .run(scope, now, now, gameId)
   }
 
+  recordPersonalSyncAttempt(gameId: string): void {
+    const now = new Date().toISOString()
+    this.database
+      .prepare(`
+        UPDATE sync_states
+        SET status = 'idle', last_scope = NULL, last_attempt_at = ?, message = NULL, updated_at = ?
+        WHERE game_id = ?
+      `)
+      .run(now, now, gameId)
+  }
+
   recordSyncOutcome(
     gameId: string,
     status: SyncStatus,
@@ -261,7 +272,7 @@ export class AppDatabase {
   ): AiScheduleJob {
     const agent = this.getAiScheduleAgentStatus(reference)
     if (!agent.connected && !allowWithoutAgent) {
-      throw new Error('尚未连接具备联网搜索能力的 AI 排期 Agent')
+      throw new Error('尚未连接具备联网搜索能力的 AI 资料 Agent')
     }
     this.requeueStaleAiScheduleJobs(reference)
     const active = this.database.prepare(`
@@ -294,7 +305,7 @@ export class AppDatabase {
     this.database.prepare(`
       UPDATE sync_states
       SET status = 'idle', last_scope = ?, last_attempt_at = ?,
-          message = '公开排期任务已提交给 AI，等待检索', updated_at = ?
+          message = '公开资料任务已提交给 AI，等待检索', updated_at = ?
       WHERE game_id = ?
     `).run(scope, now, now, gameId)
     return this.getAiScheduleJob(id)
@@ -303,7 +314,7 @@ export class AppDatabase {
   claimAiScheduleJob(agentId: string, reference = new Date()): AiScheduleJob | null {
     return this.runTransaction(() => {
       const agent = this.database.prepare('SELECT name FROM ai_schedule_agents WHERE id = ?').get(agentId)
-      if (!agent) throw new Error('AI 排期 Agent 尚未登记')
+      if (!agent) throw new Error('AI 资料 Agent 尚未登记')
       const now = reference.toISOString()
       this.database.prepare(`UPDATE ai_schedule_agents SET last_seen_at = ?, updated_at = ? WHERE id = ?`)
         .run(now, now, agentId)
@@ -330,7 +341,7 @@ export class AppDatabase {
   ): { job: AiScheduleJob; merge: SyncMergeResult } {
     const job = this.getAiScheduleJob(jobId)
     if (job.status !== 'claimed' || job.agentId !== agentId) {
-      throw new Error('AI 排期任务未由当前 Agent 领取或已经结束')
+      throw new Error('AI 资料任务未由当前 Agent 领取或已经结束')
     }
     const targetCategories: Partial<Record<SyncTarget, ChecklistCategory[]>> = {
       events: ['limited_event'],
@@ -365,7 +376,7 @@ export class AppDatabase {
       : items
     const merge = this.mergeSyncedItems(job.gameId, 'public_schedule', mergedItems, reference.toISOString())
     const now = reference.toISOString()
-    const message = `AI 排期同步完成：新增 ${merge.added}，更新 ${merge.updated}，保护 ${merge.preserved}`
+    const message = `AI 资料同步完成：新增 ${merge.added}，更新 ${merge.updated}，保护 ${merge.preserved}`
     this.database.prepare(`
       UPDATE ai_schedule_jobs
       SET status = 'completed', completed_at = ?, evidence_json = ?, message = ?, updated_at = ?
@@ -393,7 +404,7 @@ export class AppDatabase {
       SET status = 'failed', completed_at = ?, message = ?, updated_at = ?
       WHERE id = ? AND status = 'claimed' AND agent_id = ?
     `).run(now, message, now, jobId, agentId)
-    if (result.changes === 0) throw new Error('AI 排期任务未由当前 Agent 领取或已经结束')
+    if (result.changes === 0) throw new Error('AI 资料任务未由当前 Agent 领取或已经结束')
     const job = this.getAiScheduleJob(jobId)
     this.recordSyncOutcome(job.gameId, 'error', message, false)
     return job
@@ -410,7 +421,7 @@ export class AppDatabase {
       LEFT JOIN ai_schedule_agents a ON a.id = j.agent_id
       WHERE j.id = ?
     `).get(id) as AiScheduleJob | undefined
-    if (!row) throw new Error('AI 排期任务不存在')
+    if (!row) throw new Error('AI 资料任务不存在')
     return row
   }
 

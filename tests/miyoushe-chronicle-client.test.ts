@@ -139,10 +139,15 @@ describe('MiyousheZenlessClient', () => {
         { retcode: 1034, message: 'Verification required', data: null },
         { 'x-rpc-aigis': aigis }
       ))
-      .mockResolvedValueOnce(response({ retcode: 0, data: {
-        hadal_ver: 'v2',
-        hadal_info_v2: { zone_id: 62052, pass_fifth_floor: false }
-      } }))
+      .mockResolvedValueOnce(response(
+        { retcode: 0, data: {
+          hadal_ver: 'v2',
+          hadal_info_v2: { zone_id: 62052, pass_fifth_floor: false }
+        } },
+        // The service may echo the challenge header even though retcode and
+        // data show that verification succeeded.
+        { 'x-rpc-aigis': aigis }
+      ))
     const solver = vi.fn(async () => ({
       geetest_challenge: 'verified-challenge',
       geetest_validate: 'verified-validate',

@@ -24,6 +24,7 @@ const gachaApi: GachaApi = {
   getSyncSettings: (gameId) => ipcRenderer.invoke('sync:get-settings', gameId),
   updateSyncSettings: (input) => ipcRenderer.invoke('sync:update-settings', input),
   syncGame: (gameId, scope, target = 'all') => ipcRenderer.invoke('sync:run', gameId, scope, target),
+  syncPersonalData: (gameId, target = 'all') => ipcRenderer.invoke('sync:run-personal', gameId, target),
   listCredentialStatuses: () => ipcRenderer.invoke('credentials:list-status'),
   startMiyousheQrLogin: () => ipcRenderer.invoke('miyoushe-login:start'),
   pollMiyousheQrLogin: (sessionId) => ipcRenderer.invoke('miyoushe-login:poll', sessionId),

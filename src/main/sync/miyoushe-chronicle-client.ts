@@ -137,7 +137,10 @@ class MiyousheChronicleClient {
       if (!response.ok) throw new Error(`米游社个人数据请求失败（HTTP ${response.status}）`)
       const envelope = await response.json() as MiyousheEnvelope
       const retcode = envelope.retcode ?? 0
-      if (GEETEST_RETCODES.has(retcode) || response.headers.has('x-rpc-aigis')) {
+      // Battle Chronicle responses can keep echoing x-rpc-aigis after a valid
+      // verification. Only the documented risk retcodes mean the request was
+      // rejected; treating the header alone as failure discards successful data.
+      if (GEETEST_RETCODES.has(retcode)) {
         if (!verification && this.solveGeetest) {
           const challenge = parseAigisChallenge(response.headers.get('x-rpc-aigis'))
             ?? await this.createGeetestChallenge()

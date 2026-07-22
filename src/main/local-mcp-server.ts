@@ -26,7 +26,7 @@ const recurrenceRuleSchema = z.string().max(200).refine(
 const publicScheduleCategorySchema = z.enum(['limited_event', 'weekly', 'endgame', 'exploration'])
 const chineseScheduleTitleSchema = z.string().min(1).max(100).regex(
   /\p{Script=Han}/u,
-  '公开排期名称必须包含经中文来源核对的中文正式名称'
+  '公开资料名称必须包含经中文来源核对的中文正式名称'
 )
 const isoDateSchema = z.string().max(50)
   .regex(/T.*(?:Z|[+-]\d{2}:\d{2})$/i, '时间必须包含 Z 或明确的 UTC 偏移量')
@@ -252,7 +252,7 @@ export function createLocalMcpServer(
   server.registerTool(
     'register_gacha_schedule_agent',
     {
-      title: '登记公开排期 AI Agent',
+      title: '登记公开资料 AI Agent',
       description: '登记或刷新具备联网搜索能力的 AI Agent 心跳；Agent 应至少每五分钟调用一次。',
       inputSchema: {
         agentId: z.string().min(1).max(100),
@@ -276,7 +276,7 @@ export function createLocalMcpServer(
   server.registerTool(
     'claim_gacha_schedule_job',
     {
-      title: '领取公开排期检索任务',
+      title: '领取公开资料检索任务',
       description: '领取用户从“刷新清单”发起的最早一条待处理任务，同时刷新 Agent 心跳。无任务时返回 null。',
       inputSchema: { agentId: z.string().min(1).max(100) },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true }
@@ -293,7 +293,7 @@ export function createLocalMcpServer(
   server.registerTool(
     'apply_gacha_public_schedule',
     {
-      title: '提交已验证的公开排期',
+      title: '提交已验证的公开资料',
       description: '把联网检索并交叉验证后的活动、周期排期或地图区域目录提交给已领取任务。每个名称必须来自中文来源并包含中文，不能提交个人探索度、完成状态或删除操作。',
       inputSchema: {
         agentId: z.string().min(1).max(100),
@@ -364,7 +364,7 @@ export function createLocalMcpServer(
   server.registerTool(
     'fail_gacha_schedule_job',
     {
-      title: '报告公开排期检索失败',
+      title: '报告公开资料检索失败',
       description: '在搜索、交叉验证或结构化失败时结束已领取任务，不修改现有清单。',
       inputSchema: {
         agentId: z.string().min(1).max(100),

@@ -68,6 +68,7 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .dropdown-menu { position: absolute; z-index: 8; top: calc(100% + 7px); right: 0; display: grid; width: 245px; padding: 6px; border: 1px solid #365b86; border-radius: 9px; background: #0a1c36; box-shadow: 0 14px 36px rgba(0, 0, 0, 0.4); }
 .dropdown-menu button { padding: 10px 11px; border: 0; border-radius: 6px; color: #c8d7eb; background: transparent; text-align: left; cursor: pointer; }
 .dropdown-menu button:hover { color: white; background: #15365f; }
+.dropdown-menu button:disabled { cursor: not-allowed; opacity: 0.4; color: #71859d; background: transparent; }
 .eyebrow { margin: 0 0 4px; color: #6e91c2; font-size: 12px; letter-spacing: 0.15em; }
 h1 { margin: 0; font-size: 27px; }
 h2 { margin: 0; font-size: 19px; }
@@ -152,6 +153,9 @@ h2 { margin: 0; font-size: 19px; }
 .danger-button { border: 1px solid #874945; color: #ff9388; background: transparent; }
 .danger-button.compact { padding: 7px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; }
 .image-import-modal { width: min(820px, 100%); max-height: calc(100vh - 50px); overflow-y: auto; }
+.local-import-target-modal { width: min(440px, 100%); }
+.local-import-targets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.local-import-targets button { padding: 12px 10px; border-radius: 7px; cursor: pointer; }
 .image-import-hint { margin: -6px 0 14px; color: #8198b5; font-size: 12px; line-height: 1.6; }
 .image-import-timezone { display: grid; grid-template-columns: minmax(0, 1fr) 180px; gap: 16px; align-items: end; margin-bottom: 14px; }
 .image-import-timezone .image-import-hint { margin: 0; }

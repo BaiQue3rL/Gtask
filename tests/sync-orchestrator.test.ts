@@ -70,7 +70,7 @@ describe('SyncOrchestrator', () => {
 
     expect(result.status).toBe('error')
     expect(result.sources).toHaveLength(2)
-    expect(result.message).toContain('公开排期适配器尚未接入')
+    expect(result.message).toContain('公开资料适配器尚未接入')
     expect(result.message).toContain('库街区个人数据适配器尚未接入')
     expect(database.getSyncSettings('wuthering-waves').status).toBe('error')
   })
@@ -219,5 +219,37 @@ describe('SyncOrchestrator', () => {
     expect(database.listChecklistItems('zenless')).toEqual(expect.arrayContaining([
       expect.objectContaining({ title: '式舆防卫战', completed: true, source: 'personal_sync' })
     ]))
+  })
+
+  it('同步进度只运行个人适配器并记录独立结果', async () => {
+    database = new AppDatabase(':memory:')
+    const publicSync = vi.fn(async () => ({ items: [], message: '不应运行' }))
+    const personalSync = vi.fn(async () => ({
+      items: [{
+        remoteKey: 'map:fontaine',
+        category: 'exploration' as const,
+        title: '枫丹',
+        progressPercent: 72
+      }],
+      message: '个人进度已同步'
+    }))
+    const orchestrator = new SyncOrchestrator(database, {
+      publicSchedule: { genshin: { sync: publicSync } },
+      personalData: { genshin: { sync: personalSync } }
+    })
+
+    const result = await orchestrator.syncPersonalOnly('genshin', 'exploration')
+
+    expect(publicSync).not.toHaveBeenCalled()
+    expect(personalSync).toHaveBeenCalledWith('genshin', 'exploration')
+    expect(result).toMatchObject({
+      requestedScope: 'personal_data',
+      requestedTarget: 'exploration',
+      status: 'success'
+    })
+    expect(database.getSyncSettings('genshin')).toMatchObject({
+      status: 'success',
+      lastScope: null
+    })
   })
 })

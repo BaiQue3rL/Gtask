@@ -16,7 +16,7 @@ node out/main/local-mcp-server-cli.js
 - `archive_gacha_item`、`archive_completed_gacha_section`：软删除操作，均要求 `confirm: true`。
 - `write_gacha_checklists`：用于批量写入等高级命令的通用入口；同样不会绕过确认保护。
 - `register_gacha_schedule_agent`：登记具备联网搜索能力的 AI Agent，并刷新五分钟有效的连接心跳。
-- `claim_gacha_schedule_job`：领取用户点击“刷新清单”后创建的公开排期任务。
+- `claim_gacha_schedule_job`：领取用户点击“同步清单”后创建的公开资料任务。
 - `apply_gacha_public_schedule`：提交交叉验证后的结构化排期，并通过同步合并器写入。
 - `fail_gacha_schedule_job`：报告检索失败，保留已有清单和上次成功数据。
 
@@ -25,9 +25,9 @@ node out/main/local-mcp-server-cli.js
 MCP 采用本地 stdio，不监听网络端口。Windows GUI 可执行文件不直接承载 stdio；客户端应启动上述独立 Node 入口。
 CLI 与 MCP 在打开旧版磁盘数据库时会先创建迁移前一致性备份，与桌面端使用同一安全升级原则。
 
-## AI 公开排期任务协议
+## AI 公开资料任务协议
 
-公开排期按钮在以下任一条件满足时启用：最近五分钟内有 Agent 调用 `register_gacha_schedule_agent`，或本机已经安装并启用 `gacha-task-manager@personal` Codex 插件。后一种方式允许先创建待领取任务，界面随后提供“打开 Codex 处理”入口；用户在 Codex 运行 `$sync-gacha-schedules` 即可领取。Agent 按以下顺序工作：
+“同步清单”在以下任一条件满足时启用：最近五分钟内有 Agent 调用 `register_gacha_schedule_agent`，或本机已经安装并启用 `gacha-task-manager@personal` Codex 插件。后一种方式允许先创建待领取任务，界面随后提供“打开 Codex 处理”入口；用户在 Codex 运行 `$sync-gacha-schedules` 即可领取。Agent 按以下顺序工作：
 
 1. 登记心跳并声明 `webSearch: true`。
 2. 轮询 `claim_gacha_schedule_job`；无任务时返回 `null`。
@@ -40,7 +40,7 @@ CLI 与 MCP 在打开旧版磁盘数据库时会先创建迁移前一致性备�
 
 2026-07-21 已在本机安装个人插件 `gacha-task-manager@personal`，插件内含 `sync-gacha-schedules` 技能和同名 MCP 配置。一次真实流程已完成：
 
-1. 桌面端点击“同步公开排期”创建任务。
+1. 桌面端点击“同步清单”创建公开资料任务。
 2. Codex 登记 Agent 并领取同一任务。
 3. Codex 联网检索官方 HoYoLAB 和交叉验证来源。
 4. 专用 MCP 工具向原神清单新增 4 条排期，桌面端约 2 秒后自动显示成功。

@@ -49,7 +49,7 @@ export class SyncOrchestrator {
         gameId,
         'public_schedule',
         this.adapters.publicSchedule[gameId],
-        '公开排期适配器尚未接入',
+        '公开资料适配器尚未接入',
         target
       )
     )
@@ -99,6 +99,34 @@ export class SyncOrchestrator {
       results.push(await this.syncGame(settings.gameId, settings.autoScope))
     }
     return results
+  }
+
+  async syncPersonalOnly(gameId: GameId, target: SyncTarget = 'all'): Promise<SyncResult> {
+    const startedAt = new Date().toISOString()
+    this.database.recordPersonalSyncAttempt(gameId)
+    const personal = await this.syncPersonalData(gameId, target)
+    const status: SyncResult['status'] = personal.status === 'success' ? 'success' : 'error'
+    const databaseStatus: SyncStatus = personal.status === 'verification_required'
+      ? 'verification_required'
+      : personal.status === 'success'
+        ? 'success'
+        : 'error'
+    this.database.recordSyncOutcome(
+      gameId,
+      databaseStatus,
+      personal.message,
+      personal.status === 'success'
+    )
+    return {
+      gameId,
+      requestedScope: 'personal_data',
+      requestedTarget: target,
+      status,
+      startedAt,
+      finishedAt: new Date().toISOString(),
+      sources: [personal],
+      message: personal.message
+    }
   }
 
   syncPersonalData(gameId: GameId, target: SyncTarget = 'all'): Promise<SyncSourceResult> {

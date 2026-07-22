@@ -27,6 +27,7 @@ import { restoreRelaunchOptions } from './relaunch'
 import { recognizeScheduleImage } from './schedule-image-import'
 import { parseScheduleImageText } from './schedule-image-parser'
 import { normalizeSyncItems } from './sync/normalization'
+import { getBundledExplorationCatalog } from './sync/bundled-exploration-catalog'
 import type { GameId, SyncResult, SyncScope, SyncTarget } from '../shared/contracts'
 import {
   parseChecklistSection,
@@ -67,30 +68,38 @@ async function queueAiScheduleSync(
   if (!appDatabase) throw new Error('数据库尚未初始化')
   const startedAt = new Date().toISOString()
   const sources: SyncResult['sources'] = []
+  const bundledCatalogMerge = target === 'all' || target === 'exploration'
+    ? appDatabase.mergeSyncedItems(
+        gameId,
+        'public_schedule',
+        normalizeSyncItems(getBundledExplorationCatalog(gameId))
+      )
+    : null
   try {
     const plugin = detectCodexPlugin()
     const agent = appDatabase.getAiScheduleAgentStatus()
     const job = appDatabase.createAiScheduleJob(gameId, scope, new Date(), plugin.installed, target)
     const publicMessage = agent.connected
-      ? `已提交给 ${agent.name ?? 'AI 排期 Agent'}，等待联网检索和交叉验证（任务 ${job.id.slice(0, 8)}）`
+      ? `已提交给 ${agent.name ?? 'AI 资料 Agent'}，等待联网检索和交叉验证（任务 ${job.id.slice(0, 8)}）`
       : `已排队（任务 ${job.id.slice(0, 8)}）；请在 Codex 打开“幻游清单”插件并运行 $sync-gacha-schedules`
+    const catalogMessage = bundledCatalogMerge
+      ? `基础地图目录已同步（新增 ${bundledCatalogMerge.added}，更新 ${bundledCatalogMerge.updated}）；`
+      : ''
     sources.push({
       source: 'public_schedule',
       status: 'skipped',
-      message: publicMessage,
-      added: 0,
-      updated: 0,
-      preserved: 0
+      message: `${catalogMessage}${publicMessage}`,
+      ...(bundledCatalogMerge ?? { added: 0, updated: 0, preserved: 0 })
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : '无法创建 AI 排期任务'
+    const message = error instanceof Error ? error.message : '无法创建 AI 资料任务'
     sources.push({
       source: 'public_schedule',
-      status: 'error',
-      message,
-      added: 0,
-      updated: 0,
-      preserved: 0
+      status: bundledCatalogMerge ? 'success' : 'error',
+      message: bundledCatalogMerge
+        ? `基础地图目录已同步（新增 ${bundledCatalogMerge.added}，更新 ${bundledCatalogMerge.updated}）；AI 增量校正未能排队：${message}`
+        : message,
+      ...(bundledCatalogMerge ?? { added: 0, updated: 0, preserved: 0 })
     })
   }
 
@@ -127,11 +136,17 @@ async function queueAiScheduleSync(
   const hasPersonalSuccess = sources.some(
     (source) => source.source === 'personal_data' && source.status === 'success'
   )
+  const publicStatus = sources[0]?.status
+  const finalStatus: SyncResult['status'] = publicStatus === 'error' && !hasPersonalSuccess
+    ? 'error'
+    : sources.every((source) => source.status === 'success')
+      ? 'success'
+      : 'partial'
   return {
     gameId,
     requestedScope: scope,
     requestedTarget: target,
-    status: sources[0]?.status === 'error' && !hasPersonalSuccess ? 'error' : 'partial',
+    status: finalStatus,
     startedAt,
     finishedAt: new Date().toISOString(),
     sources,
@@ -267,9 +282,9 @@ function registerIpcHandlers(): void {
     const target = parseSyncTarget(targetValue)
     if (target === 'all' || target === 'tasks') throw new Error('该版块不支持图片导入')
     const selection = await dialog.showOpenDialog(mainWindow!, {
-      title: '选择官方排期图片',
+      title: '选择官方资料图片',
       properties: ['openFile'],
-      filters: [{ name: '排期图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp'] }]
+      filters: [{ name: '资料图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp'] }]
     })
     const imagePath = selection.filePaths[0]
     if (selection.canceled || !imagePath) return null
@@ -439,6 +454,13 @@ function registerIpcHandlers(): void {
     return await queueAiScheduleSync(
       parseGameId(gameId),
       parseSyncScope(scope),
+      parseSyncTarget(target)
+    )
+  })
+  ipcMain.handle('sync:run-personal', async (_event, gameId: unknown, target: unknown = 'all') => {
+    if (!syncOrchestrator) throw new Error('个人数据同步服务尚未初始化')
+    return await syncOrchestrator.syncPersonalOnly(
+      parseGameId(gameId),
       parseSyncTarget(target)
     )
   })

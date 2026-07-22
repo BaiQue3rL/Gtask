@@ -142,6 +142,7 @@ const backingUp = ref(false)
 const restoringBackup = ref<string | null>(null)
 const recognizingImage = ref(false)
 const applyingImageImport = ref(false)
+const localImportTargetOpen = ref(false)
 const imageImportDraft = ref<ScheduleImageDraft | null>(null)
 const imageImportTarget = ref<Exclude<SyncTarget, 'all' | 'tasks'>>('events')
 const imageSourceOffsetMinutes = ref(8 * 60)
@@ -238,11 +239,17 @@ const syncStatusText = computed(() => {
     : ''
   const scopeText = syncSettings.value.lastScope
     ? syncSettings.value.lastScope === 'public_schedule'
-      ? '公开排期'
-      : `公开排期 + ${personalPlatform.value}`
+      ? '同步清单'
+      : '清单和进度'
     : ''
   return `${statusLabels[syncSettings.value.status]}${scopeText ? ` · ${scopeText}` : ''}${successText}`
 })
+
+function displaySyncMessage(message: string): string {
+  return message
+    .replaceAll('公开排期', '公开资料')
+    .replaceAll('AI 排期', 'AI 资料')
+}
 
 onMounted(async () => {
   window.addEventListener('keydown', handleGlobalKeydown)
@@ -265,7 +272,7 @@ onMounted(async () => {
 
 const removeSyncListener = window.gacha.onSyncCompleted((result) => {
   if (result.gameId !== selectedGameId.value) return
-  syncNotice.value = { status: result.status, message: result.message }
+  syncNotice.value = { status: result.status, message: displaySyncMessage(result.message) }
   void Promise.all([loadItems(), loadSyncSettings()])
 })
 const removeChecklistListener = window.gacha.onChecklistChanged(() => {
@@ -279,7 +286,7 @@ const removeChecklistListener = window.gacha.onChecklistChanged(() => {
           : settings.status === 'error'
             ? 'error'
             : 'partial',
-        message: settings.message
+        message: displaySyncMessage(settings.message)
       }
     })
 })
@@ -300,6 +307,10 @@ function handleGlobalKeydown(event: KeyboardEvent): void {
   if (event.key !== 'Escape') return
   if (imageImportDraft.value) {
     imageImportDraft.value = null
+    return
+  }
+  if (localImportTargetOpen.value) {
+    localImportTargetOpen.value = false
     return
   }
   if (miyousheLoginOpen.value) {
@@ -546,7 +557,7 @@ async function runSync(scope: SyncScope, target: SyncTarget = 'all'): Promise<vo
   try {
     const result = await window.gacha.syncGame(gameId, scope, target)
     if (selectedGameId.value === gameId) {
-      syncNotice.value = { status: result.status, message: result.message }
+      syncNotice.value = { status: result.status, message: displaySyncMessage(result.message) }
       await Promise.all([loadItems(), loadSyncSettings()])
     }
   } catch (error) {
@@ -556,10 +567,36 @@ async function runSync(scope: SyncScope, target: SyncTarget = 'all'): Promise<vo
   }
 }
 
+async function runPersonalSync(target: SyncTarget = 'all'): Promise<void> {
+  const gameId = selectedGameId.value
+  refreshMenuOpen.value = false
+  sectionSyncMenuOpen.value = null
+  syncing.value = true
+  syncNotice.value = null
+  try {
+    const result = await window.gacha.syncPersonalData(gameId, target)
+    if (selectedGameId.value === gameId) {
+      syncNotice.value = { status: result.status, message: displaySyncMessage(result.message) }
+      await Promise.all([loadItems(), loadSyncSettings()])
+    }
+  } catch (error) {
+    if (selectedGameId.value === gameId) showError(error)
+  } finally {
+    syncing.value = false
+  }
+}
+
+function openLocalImportTargetPicker(): void {
+  refreshMenuOpen.value = false
+  sectionSyncMenuOpen.value = null
+  localImportTargetOpen.value = true
+}
+
 async function openScheduleImageImport(
   target: Exclude<SyncTarget, 'all' | 'tasks'>
 ): Promise<void> {
   if (recognizingImage.value) return
+  localImportTargetOpen.value = false
   sectionSyncMenuOpen.value = null
   recognizingImage.value = true
   try {
@@ -903,12 +940,12 @@ function showError(error: unknown): void {
             <button
               class="toolbar-button"
               type="button"
-                :disabled="syncing || !aiScheduleAvailable"
+                :disabled="syncing"
                 :title="aiScheduleAgent?.connected
                   ? `已连接 ${aiScheduleAgent.name}`
                   : aiScheduleAgent?.codexPluginInstalled
-                    ? '已安装 Codex 插件；刷新后请在 Codex 处理排期任务'
-                    : '请先连接具备联网搜索能力的 AI 排期 Agent'"
+                    ? '已安装 Codex 插件；同步清单后请在 Codex 处理资料任务'
+                    : '同步清单需要 AI；同步进度和同步本地仍可使用'"
               aria-haspopup="menu"
               :aria-expanded="refreshMenuOpen"
               @click="refreshMenuOpen = !refreshMenuOpen"
@@ -916,19 +953,20 @@ function showError(error: unknown): void {
                 {{ syncing ? '同步中…' : aiScheduleAvailable ? '↻ 刷新清单' : '↻ 未连接 AI' }} ▾
             </button>
             <div v-if="refreshMenuOpen" class="dropdown-menu" role="menu">
-              <button role="menuitem" type="button" @click="runSync('public_schedule')">同步公开排期</button>
-              <button role="menuitem" type="button" @click="runSync('public_and_personal')">同步公开排期 + {{ personalPlatform }}</button>
+              <button role="menuitem" type="button" :disabled="!aiScheduleAvailable" @click="runSync('public_schedule')">同步清单</button>
+              <button role="menuitem" type="button" @click="runPersonalSync()">同步进度</button>
+              <button role="menuitem" type="button" @click="openLocalImportTargetPicker">同步本地</button>
             </div>
           </div>
           <select class="toolbar-select" :value="syncModeValue" aria-label="同步模式" @change="updateSyncMode">
             <option value="manual">手动模式</option>
-            <option value="automatic_public">自动模式 · 公开排期</option>
-            <option value="automatic_personal">自动模式 · 公开排期 + {{ personalPlatform }}</option>
+            <option value="automatic_public">自动模式 · 同步清单</option>
+            <option value="automatic_personal">自动模式 · 清单和进度</option>
           </select>
           <span
             class="sync-status"
             :class="syncSettings?.status"
-            :title="syncSettings?.message ?? syncStatusText"
+            :title="syncSettings?.message ? displaySyncMessage(syncSettings.message) : syncStatusText"
           >{{ syncStatusText }}</span>
         </div>
       </header>
@@ -979,15 +1017,15 @@ function showError(error: unknown): void {
                     <button
                       class="section-sync-button"
                       type="button"
-                      :disabled="syncing || !aiScheduleAvailable"
+                      :disabled="syncing"
                       aria-haspopup="menu"
                       :aria-expanded="sectionSyncMenuOpen === panel.section"
                       @click="sectionSyncMenuOpen = sectionSyncMenuOpen === panel.section ? null : panel.section"
                     >↻ 同步 ▾</button>
                     <div v-if="sectionSyncMenuOpen === panel.section" class="dropdown-menu section-sync-menu" role="menu">
-                      <button role="menuitem" type="button" @click="runSync('public_schedule', panel.syncTarget)">仅同步{{ panel.title }}公开资料</button>
-                      <button role="menuitem" type="button" @click="runSync('public_and_personal', panel.syncTarget)">同步公开资料 + {{ personalPlatform }}</button>
-                      <button role="menuitem" type="button" @click="openScheduleImageImport(panel.syncTarget)">从官方图片离线导入</button>
+                      <button role="menuitem" type="button" :disabled="!aiScheduleAvailable" @click="runSync('public_schedule', panel.syncTarget)">同步清单</button>
+                      <button role="menuitem" type="button" @click="runPersonalSync(panel.syncTarget)">同步进度</button>
+                      <button role="menuitem" type="button" @click="openScheduleImageImport(panel.syncTarget)">同步本地</button>
                     </div>
                   </div>
                   <button
@@ -1019,9 +1057,9 @@ function showError(error: unknown): void {
                       <span
                         v-if="item.source !== 'manual' && item.lastSyncedAt"
                         class="source-detail"
-                        :title="`${item.source === 'public_schedule' ? '公开排期' : '个人数据'} · 同步于 ${formatLocalTime(item.lastSyncedAt)}${item.sourceUrl ? ` · ${item.sourceUrl}` : ''}`"
+                        :title="`${item.source === 'public_schedule' ? '公开资料' : '个人数据'} · 同步于 ${formatLocalTime(item.lastSyncedAt)}${item.sourceUrl ? ` · ${item.sourceUrl}` : ''}`"
                       >
-                        {{ item.source === 'public_schedule' ? '公开排期' : '个人数据' }}
+                        {{ item.source === 'public_schedule' ? '公开资料' : '个人数据' }}
                       </span>
                     </span>
                     <span v-if="item.startsAt && isUpcoming(item.startsAt)" class="item-timing deadline upcoming">{{ countdown(item.startsAt, '距离开始') }}</span>
@@ -1119,8 +1157,23 @@ function showError(error: unknown): void {
       </form>
     </div>
 
+    <div v-if="localImportTargetOpen" class="modal-backdrop" @click.self="localImportTargetOpen = false">
+      <section class="editor-modal local-import-target-modal" role="dialog" aria-modal="true" aria-label="选择本地同步版块">
+        <div class="modal-header">
+          <div><p class="eyebrow">同步本地</p><h2>选择图片对应的版块</h2></div>
+          <button class="close-button" type="button" aria-label="关闭本地同步" @click="localImportTargetOpen = false">×</button>
+        </div>
+        <p class="recycle-hint">图片仅在本机识别，确认结果后才会写入当前游戏。</p>
+        <div class="local-import-targets">
+          <button class="secondary-button" type="button" @click="openScheduleImageImport('events')">活动</button>
+          <button class="secondary-button" type="button" @click="openScheduleImageImport('cycles')">周期事项</button>
+          <button class="secondary-button" type="button" @click="openScheduleImageImport('exploration')">地图探索</button>
+        </div>
+      </section>
+    </div>
+
     <div v-if="imageImportDraft" class="modal-backdrop" @click.self="imageImportDraft = null">
-      <section class="editor-modal image-import-modal" role="dialog" aria-modal="true" aria-label="官方排期图片导入预览">
+      <section class="editor-modal image-import-modal" role="dialog" aria-modal="true" aria-label="公开资料图片导入预览">
         <div class="modal-header">
           <div>
             <p class="eyebrow">本地离线 OCR · {{ imageImportDraft.fileName }}</p>
@@ -1217,11 +1270,11 @@ function showError(error: unknown): void {
             >
           </label>
         </div>
-        <h3 class="settings-heading">公开排期 AI</h3>
+        <h3 class="settings-heading">公开资料 AI</h3>
         <div class="ai-provider-box codex-provider-box">
           <div class="ai-provider-heading">
             <div>
-              <strong>Codex 排期插件</strong>
+              <strong>Codex 资料同步插件</strong>
               <span>{{ aiScheduleAgent?.connected
                 ? `Agent 已连接 · ${aiScheduleAgent.name}`
                 : aiScheduleAgent?.codexPluginInstalled
@@ -1235,7 +1288,7 @@ function showError(error: unknown): void {
             >{{ aiScheduleAgent?.codexPluginInstalled ? '打开 Codex' : '安装 / 启用' }}</button>
           </div>
         </div>
-        <p class="recycle-hint">公开排期统一由 Codex/MCP 联网检索、交叉验证并结构化回写。首次点击“安装 / 启用”会打开本机插件页，由 Codex 完成安装；应用不会直接修改 Codex 缓存。</p>
+        <p class="recycle-hint">公开资料统一由 Codex/MCP 联网检索、交叉验证并结构化回写。首次点击“安装 / 启用”会打开本机插件页，由 Codex 完成安装；应用不会直接修改 Codex 缓存。</p>
         <h3 class="settings-heading data-heading">登录凭据</h3>
         <p class="recycle-hint">登录完全可选。凭据仅通过 Windows 安全存储加密后保存在本机，不读取浏览器 Cookie。</p>
         <div class="recycle-list">
@@ -1287,7 +1340,7 @@ function showError(error: unknown): void {
           </div>
           <p v-if="backups.length === 0" class="empty-text">尚无备份</p>
         </div>
-        <p class="settings-note">米游社二维码登录已启用；库街区登录与风控验证窗口继续开发中。手动清单与公开排期模式始终不依赖登录。</p>
+        <p class="settings-note">米游社二维码登录已启用；库街区登录与风控验证窗口继续开发中。手动清单与公开资料同步始终不依赖登录。</p>
       </section>
     </div>
     <div v-if="miyousheLoginOpen" class="modal-backdrop login-backdrop" @click.self="closeMiyousheLogin">
@@ -1309,7 +1362,7 @@ function showError(error: unknown): void {
           </div>
           <strong>{{ miyousheLoginState.message }}</strong>
           <p v-if="miyousheLoginState.status === 'waiting_confirmation'">请回到米游社 App 完成授权，窗口会自动更新。</p>
-          <p v-else-if="miyousheLoginState.status === 'confirmed'">现在可以使用“公开排期 + 米游社”同步个人数据。</p>
+          <p v-else-if="miyousheLoginState.status === 'confirmed'">现在可以使用“同步进度”读取米游社个人数据。</p>
           <p v-else-if="miyousheLoginState.status === 'expired'">出于安全考虑，二维码不会自动长期续期。</p>
           <p v-else>二维码有效期约 5 分钟，应用不会读取浏览器 Cookie。</p>
         </div>
