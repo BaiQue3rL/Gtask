@@ -16,8 +16,11 @@ function requiredIdentifier(value: unknown, field: string): string {
   return String(value)
 }
 
-function chinaDateTime(value: unknown, field: string): string {
-  if (typeof value !== 'string' || !value.trim()) throw new Error(`绝区零个人数据缺少 ${field}`)
+function optionalChinaDateTime(value: unknown, field: string): string | undefined {
+  if (value === undefined || value === null || value === '') return undefined
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error(`绝区零个人数据的 ${field} 不是有效时间`)
+  }
   const trimmed = value.trim()
   const hasTimeZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(trimmed)
   const parsed = new Date(hasTimeZone ? trimmed : `${trimmed}+08:00`)
@@ -47,8 +50,8 @@ export function parseZenlessShiyuDefense(value: unknown): NormalizedSyncItem {
     title: '式舆防卫战',
     completed: data.passed_fifth_floor === true,
     progressPercent: score !== null && maximumScore !== null ? percentage(score, maximumScore) : null,
-    startsAt: chinaDateTime(data.begin_time, '式舆防卫战开始时间'),
-    endsAt: chinaDateTime(data.end_time, '式舆防卫战结束时间'),
+    startsAt: optionalChinaDateTime(data.begin_time, '式舆防卫战开始时间'),
+    endsAt: optionalChinaDateTime(data.end_time, '式舆防卫战结束时间'),
     periodKey: `zenless:shiyu-defense:${scheduleId}`,
     scheduleKind: 'remote_schedule',
     modeKey: 'shiyu-defense'
@@ -78,8 +81,8 @@ export function parseZenlessDeadlyAssault(value: unknown): NormalizedSyncItem {
     title: '危局强袭战',
     completed,
     progressPercent: percentage(earnedStars, maximumStars),
-    startsAt: chinaDateTime(data.start_time, '危局强袭战开始时间'),
-    endsAt: chinaDateTime(data.end_time, '危局强袭战结束时间'),
+    startsAt: optionalChinaDateTime(data.start_time, '危局强袭战开始时间'),
+    endsAt: optionalChinaDateTime(data.end_time, '危局强袭战结束时间'),
     periodKey: `zenless:deadly-assault:${scheduleId}`,
     scheduleKind: 'remote_schedule',
     modeKey: 'deadly-assault'

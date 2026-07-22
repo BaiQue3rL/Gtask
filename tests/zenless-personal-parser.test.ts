@@ -68,6 +68,25 @@ describe('绝区零个人战绩解析', () => {
     expect(() => parseZenlessPersonalData({})).toThrow('没有可识别')
   })
 
+  it('个人接口省略排期时间时仍保留完成状态并交由公开排期补时', () => {
+    expect(parseZenlessShiyuDefense({
+      schedule_id: 62053,
+      passed_fifth_floor: false,
+      brief_info: { score: 50000, max_score: 100000 }
+    })).toEqual({
+      remoteKey: 'endgame:shiyu-defense',
+      category: 'endgame',
+      title: '式舆防卫战',
+      completed: false,
+      progressPercent: 50,
+      startsAt: undefined,
+      endsAt: undefined,
+      periodKey: 'zenless:shiyu-defense:62053',
+      scheduleKind: 'remote_schedule',
+      modeKey: 'shiyu-defense'
+    })
+  })
+
   it('正式适配器顺序请求两个已验证接口并拒绝用于其他游戏', async () => {
     const order: string[] = []
     const adapter = new ZenlessPersonalAdapter({
