@@ -113,6 +113,7 @@ export interface ChecklistItem {
   resetWeekday: number | null
   timeZone: string | null
   modeKey: string | null
+  recurrenceRule: string | null
   source: ChecklistSource
   remoteKey: string | null
   sourceUrl: string | null
@@ -136,6 +137,7 @@ export interface CreateChecklistItemInput {
   resetWeekday?: number | null
   timeZone?: string | null
   modeKey?: string | null
+  recurrenceRule?: string | null
 }
 
 export interface UpdateChecklistItemInput {
@@ -152,6 +154,7 @@ export interface UpdateChecklistItemInput {
   resetWeekday?: number | null
   timeZone?: string | null
   modeKey?: string | null
+  recurrenceRule?: string | null
 }
 
 export interface ArchiveCompletedSectionInput {

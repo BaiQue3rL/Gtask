@@ -93,6 +93,16 @@ function parseResetWeekday(value: unknown): number | null | undefined {
   return value
 }
 
+function parseRecurrenceRule(value: unknown): string | null | undefined {
+  const rule = parseNullableString(value, '自动周期规则')
+  if (!rule) return rule
+  if (
+    !/^interval-days:\d{1,3}$/.test(rule) &&
+    !/^monthly-days:[\d,]+@\d{2}:\d{2}\[Asia\/Shanghai\]$/.test(rule)
+  ) throw new Error('自动周期规则格式不正确')
+  return rule
+}
+
 export function parseCreateChecklistItem(value: unknown): CreateChecklistItemInput {
   if (!isRecord(value)) throw new Error('新增事项参数格式不正确')
   const startsAt = parseNullableDate(value.startsAt, '开始时间')
@@ -110,7 +120,8 @@ export function parseCreateChecklistItem(value: unknown): CreateChecklistItemInp
     scheduleKind: parseScheduleKind(value.scheduleKind),
     resetWeekday: parseResetWeekday(value.resetWeekday),
     timeZone: parseNullableString(value.timeZone, '时区'),
-    modeKey: parseNullableString(value.modeKey, '模式标识')
+    modeKey: parseNullableString(value.modeKey, '模式标识'),
+    recurrenceRule: parseRecurrenceRule(value.recurrenceRule)
   }
 }
 
@@ -139,7 +150,8 @@ export function parseUpdateChecklistItem(value: unknown): UpdateChecklistItemInp
     scheduleKind: parseScheduleKind(value.scheduleKind),
     resetWeekday: parseResetWeekday(value.resetWeekday),
     timeZone: parseNullableString(value.timeZone, '时区'),
-    modeKey: parseNullableString(value.modeKey, '模式标识')
+    modeKey: parseNullableString(value.modeKey, '模式标识'),
+    recurrenceRule: parseRecurrenceRule(value.recurrenceRule)
   }
 }
 

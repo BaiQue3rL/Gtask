@@ -103,7 +103,8 @@ const form = reactive({
   endsAt: '',
   resetRule: '',
   resetWeekday: 1,
-  modeKey: ''
+  modeKey: '',
+  recurrenceRule: ''
 })
 
 const selectedGame = computed(() => games.value.find((game) => game.id === selectedGameId.value))
@@ -504,6 +505,7 @@ function openCreate(category: ChecklistCategory): void {
   form.resetRule = category === 'weekly' ? '每周一重置' : ''
   form.resetWeekday = 1
   form.modeKey = ''
+  form.recurrenceRule = ''
   editorOpen.value = true
 }
 
@@ -518,6 +520,7 @@ function openEdit(item: ChecklistItem): void {
   form.resetRule = item.resetRule ?? ''
   form.resetWeekday = item.category === 'weekly' ? 1 : item.resetWeekday ?? 1
   form.modeKey = item.modeKey ?? ''
+  form.recurrenceRule = item.recurrenceRule ?? ''
   editorOpen.value = true
 }
 
@@ -549,7 +552,8 @@ async function saveItem(): Promise<void> {
             : null,
       resetWeekday: isWeekly ? 1 : null,
       timeZone: isWeekly ? 'Asia/Shanghai' : null,
-      modeKey: form.category === 'endgame' ? form.modeKey.trim() || null : null
+      modeKey: form.category === 'endgame' ? form.modeKey.trim() || null : null,
+      recurrenceRule: form.category === 'endgame' ? form.recurrenceRule.trim() || null : null
     }
     const saved = editingItem.value
       ? await window.gacha.updateChecklistItem({ id: editingItem.value.id, ...common })
@@ -925,6 +929,7 @@ function showError(error: unknown): void {
         <template v-if="form.category === 'endgame'">
           <label>玩法标识<input v-model="form.modeKey" maxlength="200" placeholder="例如：深境螺旋 / 幻想真境剧诗" /></label>
           <label>周期说明<input v-model="form.resetRule" maxlength="200" placeholder="例如：每月 1 日、16 日刷新" /></label>
+          <label>自动周期规则<input v-model="form.recurrenceRule" maxlength="200" placeholder="例如：monthly-days:1,16@04:00[Asia/Shanghai]" /></label>
         </template>
         <div v-if="editingItem?.sourceUrl" class="source-box">
           <div><span>同步来源</span><small>{{ editingItem.sourceUrl }}</small></div>

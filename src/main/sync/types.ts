@@ -21,6 +21,7 @@ export interface NormalizedSyncItem {
   resetWeekday?: number | null
   timeZone?: string | null
   modeKey?: string | null
+  recurrenceRule?: string | null
 }
 
 export interface SyncMergeResult {

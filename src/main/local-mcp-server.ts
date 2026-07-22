@@ -18,12 +18,19 @@ const scheduleKindSchema = z.enum(['weekly', 'fixed_window', 'remote_schedule'])
 const nullableTextSchema = z.string().max(200).nullable().optional()
 const nullableDateSchema = z.string().nullable().optional()
 const nullableProgressSchema = z.number().min(0).max(100).nullable().optional()
+const recurrenceRuleSchema = z.string().max(200).refine(
+  (value) => /^interval-days:\d{1,3}$/.test(value) ||
+    /^monthly-days:[\d,]+@\d{2}:\d{2}\[Asia\/Shanghai\]$/.test(value),
+  '自动周期规则格式不正确'
+).nullable().optional()
 const publicScheduleCategorySchema = z.enum(['limited_event', 'weekly', 'endgame', 'exploration'])
 const chineseScheduleTitleSchema = z.string().min(1).max(100).regex(
   /\p{Script=Han}/u,
   '公开排期名称必须包含经中文来源核对的中文正式名称'
 )
-const isoDateSchema = z.string().max(50).refine((value) => !Number.isNaN(Date.parse(value)), '必须是有效时间')
+const isoDateSchema = z.string().max(50)
+  .regex(/T.*(?:Z|[+-]\d{2}:\d{2})$/i, '时间必须包含 Z 或明确的 UTC 偏移量')
+  .refine((value) => !Number.isNaN(Date.parse(value)), '必须是有效时间')
 const httpUrlSchema = z.string().max(500).url().refine((value) => {
   const protocol = new URL(value).protocol
   return protocol === 'https:' || protocol === 'http:'
@@ -40,7 +47,8 @@ const checklistFields = {
   scheduleKind: scheduleKindSchema.nullable().optional(),
   resetWeekday: z.number().int().min(1).max(7).nullable().optional(),
   timeZone: nullableTextSchema,
-  modeKey: nullableTextSchema
+  modeKey: nullableTextSchema,
+  recurrenceRule: recurrenceRuleSchema
 }
 
 function toolResult(result: LocalCommandResult | Record<string, unknown>) {
@@ -167,7 +175,8 @@ export function createLocalMcpServer(
         scheduleKind: scheduleKindSchema.nullable().optional(),
         resetWeekday: z.number().int().min(1).max(7).nullable().optional(),
         timeZone: nullableTextSchema,
-        modeKey: nullableTextSchema
+        modeKey: nullableTextSchema,
+        recurrenceRule: recurrenceRuleSchema
       },
       annotations: { destructiveHint: false, openWorldHint: false }
     },
@@ -304,6 +313,7 @@ export function createLocalMcpServer(
           resetWeekday: z.number().int().min(1).max(7).nullable().optional(),
           timeZone: z.string().max(200).nullable().optional(),
           modeKey: z.string().max(200).nullable().optional(),
+          recurrenceRule: recurrenceRuleSchema,
           sourceUrl: httpUrlSchema,
           confidence: z.number().min(0).max(1)
         }).strict()).min(1).max(200),

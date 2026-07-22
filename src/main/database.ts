@@ -3,6 +3,7 @@ import { dirname } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { backup, DatabaseSync } from 'node:sqlite'
 import { getWeeklyPeriod } from './periods'
+import { rollRecurringWindow } from './recurrence'
 import type {
   ChecklistCategory,
   ChecklistItem,
@@ -56,7 +57,7 @@ const DEFAULT_GAMES: GameSummary[] = [
   }
 ]
 
-export const CURRENT_SCHEMA_VERSION = 8
+export const CURRENT_SCHEMA_VERSION = 9
 
 const AI_AGENT_MAX_AGE_MS = 5 * 60 * 1000
 const AI_JOB_CLAIM_MAX_AGE_MS = 15 * 60 * 1000
@@ -74,6 +75,7 @@ export class AppDatabase {
       this.seedQuestChecklists()
       this.normalizeWeeklySchedules()
       this.resetDueWeeklyItems()
+      this.rollDueRecurringItems()
       this.markStaleSyncStates()
     } catch (error) {
       this.database.close()
@@ -419,6 +421,7 @@ export class AppDatabase {
           reset_weekday AS resetWeekday,
           timezone AS timeZone,
           mode_key AS modeKey,
+          recurrence_rule AS recurrenceRule,
           source,
           remote_key AS remoteKey,
           source_url AS sourceUrl,
@@ -476,6 +479,7 @@ export class AppDatabase {
           reset_weekday AS resetWeekday,
           timezone AS timeZone,
           mode_key AS modeKey,
+          recurrence_rule AS recurrenceRule,
           source,
           remote_key AS remoteKey,
           source_url AS sourceUrl,
@@ -513,8 +517,8 @@ export class AppDatabase {
         INSERT INTO checklist_items(
           id, game_id, category, title, progress_percent, parent_title, starts_at, ends_at,
           reset_rule, period_key, schedule_kind, reset_weekday, timezone, mode_key,
-          source, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?)
+          recurrence_rule, source, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?)
       `)
       .run(
         id,
@@ -531,10 +535,14 @@ export class AppDatabase {
         resetWeekday,
         timeZone,
         input.modeKey ?? null,
+        input.recurrenceRule ?? null,
         now,
         now
       )
 
+    if (input.category === 'exploration' && input.progressPercent === 100) {
+      return this.updateChecklistItem({ id, completed: true })
+    }
     return this.getChecklistItem(id)
   }
 
@@ -544,16 +552,20 @@ export class AppDatabase {
 
   updateChecklistItem(input: UpdateChecklistItemInput): ChecklistItem {
     const current = this.getChecklistItem(input.id)
-    const completed = input.completed ?? current.completed
-    const manualCompletionLocked =
-      input.completed === undefined ? current.manualCompletionLocked : input.completed
-    const completedAt =
-      input.completed === undefined
-        ? current.completedAt
+    const category = input.category ?? current.category
+    const requestedCompleted =
+      category === 'exploration' && input.progressPercent !== undefined
+        ? input.progressPercent === 100
         : input.completed
+    const completed = requestedCompleted ?? current.completed
+    const manualCompletionLocked =
+      requestedCompleted === undefined ? current.manualCompletionLocked : requestedCompleted
+    const completedAt =
+      requestedCompleted === undefined
+        ? current.completedAt
+        : requestedCompleted
           ? current.completedAt ?? new Date().toISOString()
           : null
-    const category = input.category ?? current.category
     if (
       (category === 'main_quest' || category === 'side_quest') &&
       category !== current.category
@@ -608,6 +620,7 @@ export class AppDatabase {
           reset_weekday = ?,
           timezone = ?,
           mode_key = ?,
+          recurrence_rule = ?,
           manual_completion_locked = ?,
           completed_at = ?,
           updated_at = ?
@@ -627,6 +640,11 @@ export class AppDatabase {
         resetWeekday,
         timeZone,
         input.modeKey === undefined ? (categoryChanged ? null : current.modeKey) : input.modeKey,
+        input.recurrenceRule === undefined
+          ? categoryChanged
+            ? null
+            : current.recurrenceRule
+          : input.recurrenceRule,
         manualCompletionLocked ? 1 : 0,
         completedAt,
         new Date().toISOString(),
@@ -757,15 +775,18 @@ export class AppDatabase {
 
         if (!identity) {
           const id = item.category === 'weekly' ? `${gameId}:weekly` : randomUUID()
-          const remoteCompleted = source === 'personal_sync' && item.completed === true
+          const inferredCompletion = item.category === 'exploration' && item.progressPercent !== undefined
+            ? item.progressPercent === 100
+            : item.completed
+          const remoteCompleted = source === 'personal_sync' && inferredCompletion === true
           this.database
             .prepare(`
               INSERT INTO checklist_items(
                 id, game_id, category, title, completed, progress_percent, parent_title,
                 starts_at, ends_at, reset_rule, period_key, schedule_kind,
-                reset_weekday, timezone, mode_key, source, remote_key,
+                reset_weekday, timezone, mode_key, recurrence_rule, source, remote_key,
                 source_url, completed_at, last_synced_at, created_at, updated_at
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `)
             .run(
               id,
@@ -787,6 +808,7 @@ export class AppDatabase {
               item.resetWeekday ?? null,
               item.timeZone ?? null,
               item.modeKey ?? null,
+              item.recurrenceRule ?? null,
               source,
               remoteKey,
               item.sourceUrl ?? null,
@@ -814,13 +836,16 @@ export class AppDatabase {
         const currentCompleted = periodChanged ? false : current.completed
         const currentCompletedAt = periodChanged ? null : current.completedAt
         const manualCompletionLocked = periodChanged ? false : current.manualCompletionLocked
-        const acceptsRemoteCompletion = source === 'personal_sync' && item.completed !== undefined
+        const inferredCompletion = item.category === 'exploration' && item.progressPercent !== undefined
+          ? item.progressPercent === 100
+          : item.completed
+        const acceptsRemoteCompletion = source === 'personal_sync' && inferredCompletion !== undefined
         const completionProtected =
-          acceptsRemoteCompletion && item.completed === false && manualCompletionLocked
+          acceptsRemoteCompletion && inferredCompletion === false && manualCompletionLocked
         const completed = completionProtected
           ? currentCompleted
           : acceptsRemoteCompletion
-            ? item.completed!
+            ? inferredCompletion!
             : currentCompleted
         const completedAt = completed
           ? currentCompletedAt ?? syncedAt
@@ -849,6 +874,7 @@ export class AppDatabase {
               reset_weekday = ?,
               timezone = ?,
               mode_key = ?,
+              recurrence_rule = ?,
               source = ?,
               source_url = ?,
               manual_completion_locked = ?,
@@ -877,6 +903,9 @@ export class AppDatabase {
               : item.resetWeekday,
             preservePublicSchedule || item.timeZone === undefined ? current.timeZone : item.timeZone,
             preservePublicSchedule || item.modeKey === undefined ? current.modeKey : item.modeKey,
+            preservePublicSchedule || item.recurrenceRule === undefined
+              ? current.recurrenceRule
+              : item.recurrenceRule,
             resolvedSource,
             preservePublicSchedule || item.sourceUrl === undefined ? current.sourceUrl : item.sourceUrl,
             manualCompletionLocked ? 1 : 0,
@@ -924,6 +953,57 @@ export class AppDatabase {
           resetWeekday,
           period.key
         )
+      changes += Number(result.changes)
+    }
+    return changes
+  }
+
+  rollDueRecurringItems(reference = new Date()): number {
+    const rows = this.database.prepare(`
+      SELECT id, starts_at AS startsAt, ends_at AS endsAt,
+        recurrence_rule AS recurrenceRule, mode_key AS modeKey
+      FROM checklist_items
+      WHERE archived = 0
+        AND category = 'endgame'
+        AND starts_at IS NOT NULL
+        AND ends_at IS NOT NULL
+        AND recurrence_rule IS NOT NULL
+        AND julianday(ends_at) <= julianday(?)
+    `).all(reference.toISOString()) as Array<{
+      id: string
+      startsAt: string
+      endsAt: string
+      recurrenceRule: string
+      modeKey: string | null
+    }>
+    let changes = 0
+    const update = this.database.prepare(`
+      UPDATE checklist_items
+      SET completed = 0,
+          completed_at = NULL,
+          manual_completion_locked = 0,
+          progress_percent = NULL,
+          starts_at = ?,
+          ends_at = ?,
+          period_key = ?,
+          updated_at = ?
+      WHERE id = ? AND archived = 0
+    `)
+    for (const row of rows) {
+      const next = rollRecurringWindow(
+        row.startsAt,
+        row.endsAt,
+        row.recurrenceRule,
+        reference
+      )
+      if (!next) continue
+      const result = update.run(
+        next.startsAt,
+        next.endsAt,
+        `recurring:${row.modeKey ?? row.id}:${next.startsAt}`,
+        reference.toISOString(),
+        row.id
+      )
       changes += Number(result.changes)
     }
     return changes
@@ -1148,6 +1228,24 @@ export class AppDatabase {
       `)
     }
 
+    const migration9 = this.database
+      .prepare('SELECT version FROM schema_migrations WHERE version = 9')
+      .get()
+
+    if (!migration9) {
+      const hasRecurrenceRule = (this.database.prepare('PRAGMA table_info(checklist_items)').all() as Array<{
+        name: string
+      }>).some((column) => column.name === 'recurrence_rule')
+      this.database.exec(hasRecurrenceRule
+        ? `INSERT INTO schema_migrations(version) VALUES (9);`
+        : `
+          BEGIN;
+          ALTER TABLE checklist_items ADD COLUMN recurrence_rule TEXT;
+          INSERT INTO schema_migrations(version) VALUES (9);
+          COMMIT;
+        `)
+    }
+
     const versionRow = this.database
       .prepare('SELECT MAX(version) AS version FROM schema_migrations')
       .get() as { version: number | null }
@@ -1236,6 +1334,7 @@ export class AppDatabase {
           reset_weekday AS resetWeekday,
           timezone AS timeZone,
           mode_key AS modeKey,
+          recurrence_rule AS recurrenceRule,
           source,
           remote_key AS remoteKey,
           source_url AS sourceUrl,

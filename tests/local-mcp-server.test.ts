@@ -258,4 +258,43 @@ describe('本地 MCP server', () => {
     )
     expect(database!.getSyncSettings('genshin')).toMatchObject({ status: 'success' })
   })
+
+  it('公开资料回写拒绝不带时区的时间', async () => {
+    const connected = await connect()
+    await connected.callTool({
+      name: 'register_gacha_schedule_agent',
+      arguments: { agentId: 'timezone-agent', name: '时区测试 Agent', webSearch: true }
+    })
+    const queued = database!.createAiScheduleJob('genshin', 'public_schedule')
+    await connected.callTool({
+      name: 'claim_gacha_schedule_job',
+      arguments: { agentId: 'timezone-agent' }
+    })
+    const result = await connected.callTool({
+      name: 'apply_gacha_public_schedule',
+      arguments: {
+        agentId: 'timezone-agent',
+        jobId: queued.id,
+        retrievedAt: '2026-07-22T20:00:00',
+        items: [{
+          remoteKey: 'event:no-timezone',
+          category: 'limited_event',
+          title: '缺少时区的活动',
+          titleSourceUrl: 'https://example.com/cn',
+          endsAt: '2026-07-23T20:00:00',
+          sourceUrl: 'https://example.com/cn',
+          confidence: 0.9
+        }],
+        evidence: [{
+          url: 'https://example.com/cn',
+          platform: '官方平台',
+          publisher: '官方账号',
+          official: true,
+          language: 'zh-CN'
+        }]
+      }
+    })
+    expect(result.isError).toBe(true)
+    expect(database!.listChecklistItems('genshin').some((item) => item.remoteKey === 'event:no-timezone')).toBe(false)
+  })
 })

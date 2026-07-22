@@ -175,6 +175,30 @@ describe('AppDatabase', () => {
     expect(eventIds).toEqual([pendingUrgent.id, normal.id, urgent.id])
   })
 
+  it('深渊模板到期后按服务器周期自动进入下一期', () => {
+    database = new AppDatabase(':memory:')
+    const abyss = database.createChecklistItem({
+      gameId: 'genshin',
+      category: 'endgame',
+      title: '深境螺旋',
+      startsAt: '2026-07-01T20:00:00.000Z',
+      endsAt: '2026-07-15T20:00:00.000Z',
+      modeKey: 'spiral-abyss',
+      recurrenceRule: 'monthly-days:1,16@04:00[Asia/Shanghai]'
+    })
+    database.updateChecklistItem({ id: abyss.id, completed: true, progressPercent: 100 })
+
+    expect(database.rollDueRecurringItems(new Date('2026-07-16T00:00:00.000Z'))).toBe(1)
+    expect(database.listChecklistItems('genshin').find((item) => item.id === abyss.id)).toMatchObject({
+      completed: false,
+      completedAt: null,
+      manualCompletionLocked: false,
+      progressPercent: null,
+      startsAt: '2026-07-15T20:00:00.000Z',
+      endsAt: '2026-07-31T20:00:00.000Z'
+    })
+  })
+
   it('按游戏独立保存自动同步模式和范围', () => {
     database = new AppDatabase(':memory:')
     expect(database.getSyncSettings('genshin')).toMatchObject({
@@ -547,8 +571,7 @@ describe('AppDatabase', () => {
       category: 'exploration',
       title: '纳塔个人探索',
       modeKey: 'region:natlan',
-      progressPercent: 100,
-      completed: true
+      progressPercent: 100
     }])
     const maps = database.listChecklistItems('genshin').filter((item) => item.modeKey === 'region:natlan')
     expect(maps).toHaveLength(1)

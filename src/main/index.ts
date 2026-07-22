@@ -15,7 +15,10 @@ import { MiyousheQrLoginService } from './auth/miyoushe-qr-login'
 import { solveMiyousheGeetest } from './auth/miyoushe-geetest-window'
 import { createElectronNetFetcher } from './sync/electron-net-fetcher'
 import { CredentialBackedAdapter } from './sync/credential-backed-adapter'
-import { createMiyousheZenlessPersonalAdapter } from './sync/miyoushe-chronicle-client'
+import {
+  createMiyousheGenshinPersonalAdapter,
+  createMiyousheZenlessPersonalAdapter
+} from './sync/miyoushe-chronicle-client'
 import { SyncOrchestrator } from './sync/orchestrator'
 import { restoreRelaunchOptions } from './relaunch'
 import type { GameId, SyncResult, SyncScope, SyncTarget } from '../shared/contracts'
@@ -414,6 +417,7 @@ if (!app.requestSingleInstanceLock()) {
     periodTimer = setInterval(() => {
       const changes =
         (appDatabase?.resetDueWeeklyItems() ?? 0) +
+        (appDatabase?.rollDueRecurringItems() ?? 0) +
         (appDatabase?.markStaleSyncStates() ?? 0)
       if (changes > 0) mainWindow?.webContents.send('checklist:changed')
     }, 60_000)
@@ -462,6 +466,15 @@ function createAppSyncOrchestrator(database: AppDatabase): SyncOrchestrator {
   return new SyncOrchestrator(database, {
     publicSchedule: {},
     personalData: {
+      genshin: new CredentialBackedAdapter(
+        'miyoushe',
+        credentialVault,
+        (credential) => createMiyousheGenshinPersonalAdapter(
+          credential,
+          fetcher,
+          (challenge) => solveMiyousheGeetest(mainWindow, challenge)
+        )
+      ),
       zenless: new CredentialBackedAdapter(
         'miyoushe',
         credentialVault,
