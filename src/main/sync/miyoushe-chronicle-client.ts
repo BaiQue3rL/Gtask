@@ -3,10 +3,12 @@ import type { CredentialPayload } from '../credential-vault'
 import { SyncVerificationRequiredError } from './types'
 import { ZenlessPersonalAdapter, type ZenlessBattleChronicleClient } from './zenless-personal-adapter'
 import { GenshinPersonalAdapter, type GenshinBattleChronicleClient } from './genshin-personal-adapter'
+import { StarRailPersonalAdapter, type StarRailBattleChronicleClient } from './star-rail-personal-adapter'
 
 const ACCOUNT_ROLES_URL = 'https://api-takumi.mihoyo.com/binding/api/getUserGameRolesByCookie'
 const ZENLESS_RECORD_BASE = 'https://api-takumi-record.mihoyo.com/event/game_record_zzz/api/zzz'
 const GENSHIN_RECORD_BASE = 'https://api-takumi-record.mihoyo.com/game_record/app/genshin/api'
+const STAR_RAIL_RECORD_BASE = 'https://api-takumi-record.mihoyo.com/game_record/app/hkrpg/api'
 const CREATE_VERIFICATION_URL = 'https://api-takumi-record.mihoyo.com/game_record/app/card/wapi/createVerification?is_high=false'
 const CN_DS_SALT = 'xV8v4Qu54lUKrEYFZkJhB8cuOh9Asafs'
 const GEETEST_RETCODES = new Set([10035, 5003, 10041, 1034])
@@ -222,6 +224,35 @@ export class MiyousheGenshinClient extends MiyousheChronicleClient implements Ge
   }
 }
 
+export class MiyousheStarRailClient extends MiyousheChronicleClient implements StarRailBattleChronicleClient {
+  private async getChallenge(endpoint: string, extraQuery: Record<string, string> = {}): Promise<unknown> {
+    const account = await this.getAccount('hkrpg_cn', '崩坏：星穹铁道')
+    return await this.request(`${STAR_RAIL_RECORD_BASE}/${endpoint}`, {
+      role_id: account.uid,
+      server: account.region,
+      schedule_type: '1',
+      ...extraQuery
+    })
+  }
+
+  async getMemoryOfChaos(): Promise<unknown> {
+    return await this.getChallenge('challenge', { need_all: 'true' })
+  }
+
+  async getPureFiction(): Promise<unknown> {
+    return await this.getChallenge('challenge_story', { need_all: 'true' })
+  }
+
+  async getApocalypticShadow(): Promise<unknown> {
+    return await this.getChallenge('challenge_boss', { need_all: 'true' })
+  }
+
+  async getAnomalyArbitration(): Promise<unknown> {
+    // 新接口返回最近三期，解析器会优先选择当前状态记录。
+    return await this.getChallenge('challenge_peak', { schedule_type: '3' })
+  }
+}
+
 export function createMiyousheZenlessPersonalAdapter(
   credential: CredentialPayload,
   fetcher: typeof fetch,
@@ -242,6 +273,17 @@ export function createMiyousheGenshinPersonalAdapter(
     throw new SyncVerificationRequiredError('米游社凭据格式已过期，请重新登录')
   }
   return new GenshinPersonalAdapter(new MiyousheGenshinClient(credential.value, fetcher, solveGeetest))
+}
+
+export function createMiyousheStarRailPersonalAdapter(
+  credential: CredentialPayload,
+  fetcher: typeof fetch,
+  solveGeetest?: MiyousheGeetestSolver
+): StarRailPersonalAdapter {
+  if (credential.kind !== 'cookie') {
+    throw new SyncVerificationRequiredError('米游社凭据格式已过期，请重新登录')
+  }
+  return new StarRailPersonalAdapter(new MiyousheStarRailClient(credential.value, fetcher, solveGeetest))
 }
 
 function generateCnDynamicSecret(query: Record<string, string>): string {

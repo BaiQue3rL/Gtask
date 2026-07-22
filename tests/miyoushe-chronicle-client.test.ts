@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   MiyousheGenshinClient,
+  MiyousheStarRailClient,
   MiyousheZenlessClient,
   createMiyousheZenlessPersonalAdapter
 } from '../src/main/sync/miyoushe-chronicle-client'
@@ -151,6 +152,33 @@ describe('MiyousheGenshinClient', () => {
     for (const call of fetcher.mock.calls.slice(1)) {
       expect(String(call[0])).toContain('role_id=100071776')
       expect(String(call[0])).toContain('server=cn_gf01')
+    }
+  })
+})
+
+describe('MiyousheStarRailClient', () => {
+  it('uses the bound Star Rail role for all current endgame endpoints', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(response({ retcode: 0, data: { list: [
+        { game_biz: 'hkrpg_cn', game_uid: '100000001', region: 'prod_gf_cn' }
+      ] } }))
+      .mockImplementation(async () => response({ retcode: 0, data: { groups: [] } }))
+    const client = new MiyousheStarRailClient('cookie=secret', fetcher)
+
+    await client.getMemoryOfChaos()
+    await client.getPureFiction()
+    await client.getApocalypticShadow()
+    await client.getAnomalyArbitration()
+
+    expect(fetcher).toHaveBeenCalledTimes(5)
+    expect(String(fetcher.mock.calls[1][0])).toContain('/hkrpg/api/challenge?')
+    expect(String(fetcher.mock.calls[2][0])).toContain('/hkrpg/api/challenge_story?')
+    expect(String(fetcher.mock.calls[3][0])).toContain('/hkrpg/api/challenge_boss?')
+    expect(String(fetcher.mock.calls[4][0])).toContain('/hkrpg/api/challenge_peak?')
+    expect(String(fetcher.mock.calls[4][0])).toContain('schedule_type=3')
+    for (const call of fetcher.mock.calls.slice(1)) {
+      expect(String(call[0])).toContain('role_id=100000001')
+      expect(String(call[0])).toContain('server=prod_gf_cn')
     }
   })
 })

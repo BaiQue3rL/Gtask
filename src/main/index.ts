@@ -18,6 +18,7 @@ import { createElectronNetFetcher } from './sync/electron-net-fetcher'
 import { CredentialBackedAdapter } from './sync/credential-backed-adapter'
 import {
   createMiyousheGenshinPersonalAdapter,
+  createMiyousheStarRailPersonalAdapter,
   createMiyousheZenlessPersonalAdapter
 } from './sync/miyoushe-chronicle-client'
 import { SyncOrchestrator } from './sync/orchestrator'
@@ -571,6 +572,15 @@ function createAppSyncOrchestrator(database: AppDatabase): SyncOrchestrator {
         'miyoushe',
         credentialVault,
         (credential) => createMiyousheGenshinPersonalAdapter(
+          credential,
+          fetcher,
+          (challenge) => solveMiyousheGeetest(mainWindow, challenge)
+        )
+      ),
+      'star-rail': new CredentialBackedAdapter(
+        'miyoushe',
+        credentialVault,
+        (credential) => createMiyousheStarRailPersonalAdapter(
           credential,
           fetcher,
           (challenge) => solveMiyousheGeetest(mainWindow, challenge)
