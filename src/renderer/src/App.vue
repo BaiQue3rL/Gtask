@@ -474,6 +474,10 @@ function itemsFor(categories: ChecklistCategory[]): ChecklistItem[] {
   )
 }
 
+function isPersistentWeekly(item: ChecklistItem): boolean {
+  return item.category === 'weekly' && item.id === `${item.gameId}:weekly`
+}
+
 function openCreate(category: ChecklistCategory): void {
   editingItem.value = null
   form.category = category
@@ -497,7 +501,7 @@ function openEdit(item: ChecklistItem): void {
   form.startsAt = toLocalDateTime(item.startsAt)
   form.endsAt = toLocalDateTime(item.endsAt)
   form.resetRule = item.resetRule ?? ''
-  form.resetWeekday = item.resetWeekday ?? 1
+  form.resetWeekday = item.category === 'weekly' ? 1 : item.resetWeekday ?? 1
   form.modeKey = item.modeKey ?? ''
   editorOpen.value = true
 }
@@ -528,7 +532,7 @@ async function saveItem(): Promise<void> {
           : form.category === 'endgame'
             ? 'remote_schedule'
             : null,
-      resetWeekday: isWeekly ? form.resetWeekday : null,
+      resetWeekday: isWeekly ? 1 : null,
       timeZone: isWeekly ? 'Asia/Shanghai' : null,
       modeKey: form.category === 'endgame' ? form.modeKey.trim() || null : null
     }
@@ -549,9 +553,8 @@ async function saveItem(): Promise<void> {
 
 async function toggleCompleted(item: ChecklistItem): Promise<void> {
   try {
-    const updated = await window.gacha.updateChecklistItem({ id: item.id, completed: !item.completed })
-    const index = items.value.findIndex((candidate) => candidate.id === item.id)
-    if (index >= 0) items.value[index] = updated
+    await window.gacha.updateChecklistItem({ id: item.id, completed: !item.completed })
+    await loadItems()
   } catch (error) {
     showError(error)
   }
@@ -575,16 +578,14 @@ async function archiveCompletedSection(
   sectionTitle: string
 ): Promise<void> {
   const completedItems = items.value.filter(
-    (item) => categories.includes(item.category) && item.completed
+    (item) => categories.includes(item.category) && item.completed && !isPersistentWeekly(item)
   )
   if (completedItems.length === 0) return
   if (!window.confirm(`确定删除“${sectionTitle}”中的 ${completedItems.length} 个已完成事项吗？`)) return
 
   try {
     await window.gacha.archiveCompletedSection({ gameId: selectedGameId.value, section })
-    const archivedIds = new Set(completedItems.map((item) => item.id))
-    items.value = items.value.filter((item) => !archivedIds.has(item.id))
-    archivedItems.value = [...completedItems, ...archivedItems.value]
+    await Promise.all([loadItems(), loadArchivedItems()])
   } catch (error) {
     showError(error)
   }
@@ -774,7 +775,7 @@ function showError(error: unknown): void {
                 <button
                   class="clear-completed-button"
                   type="button"
-                  :disabled="!items.some((item) => panel.categories.includes(item.category) && item.completed)"
+                  :disabled="!items.some((item) => panel.categories.includes(item.category) && item.completed && !isPersistentWeekly(item))"
                   @click="archiveCompletedSection(panel.section, panel.categories, panel.title)"
                 >删除已完成</button>
               </div>
@@ -861,7 +862,7 @@ function showError(error: unknown): void {
 
         <label>事项名称<input v-model="form.title" maxlength="100" autofocus placeholder="例如：刷角色突破素材" /></label>
         <label>分类
-          <select v-model="form.category" :disabled="editingItem ? ['main_quest', 'side_quest'].includes(editingItem.category) : false">
+          <select v-model="form.category" :disabled="editingItem ? ['main_quest', 'side_quest'].includes(editingItem.category) || isPersistentWeekly(editingItem) : false">
             <option v-for="[category, label] in editorCategories" :key="category" :value="category">{{ label }}</option>
           </select>
         </label>
@@ -878,9 +879,7 @@ function showError(error: unknown): void {
           </div>
         </template>
         <label v-if="form.category === 'weekly'">每周重置日
-          <select v-model.number="form.resetWeekday">
-            <option v-for="(label, value) in weekdayLabels" :key="value" :value="Number(value)">{{ label }}</option>
-          </select>
+          <input value="周一（固定）" disabled />
         </label>
         <template v-if="form.category === 'endgame'">
           <label>玩法标识<input v-model="form.modeKey" maxlength="200" placeholder="例如：深境螺旋 / 幻想真境剧诗" /></label>
@@ -892,7 +891,7 @@ function showError(error: unknown): void {
         </div>
 
         <div class="modal-actions">
-          <button v-if="editingItem" class="danger-button" type="button" @click="archiveItem(editingItem)">删除</button>
+          <button v-if="editingItem && !isPersistentWeekly(editingItem)" class="danger-button" type="button" @click="archiveItem(editingItem)">删除</button>
           <span></span>
           <button class="secondary-button" type="button" @click="editorOpen = false">取消</button>
           <button class="primary-button" type="submit" :disabled="saving || !form.title.trim()">{{ saving ? '保存中…' : '保存' }}</button>

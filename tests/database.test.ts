@@ -16,7 +16,7 @@ afterEach(() => {
 })
 
 describe('AppDatabase', () => {
-  it('只初始化四款支持的游戏和每款游戏的主支线状态', () => {
+  it('只初始化四款支持的游戏以及每款游戏的主支线和固定周常状态', () => {
     database = new AppDatabase(':memory:')
 
     expect(database.listGames().map((game) => game.id)).toEqual([
@@ -28,7 +28,13 @@ describe('AppDatabase', () => {
 
     for (const game of database.listGames()) {
       const items = database.listChecklistItems(game.id)
-      expect(items.map((item) => item.category)).toEqual(['main_quest', 'side_quest'])
+      expect(items.map((item) => item.category)).toEqual(['main_quest', 'side_quest', 'weekly'])
+      expect(items.find((item) => item.id === `${game.id}:weekly`)).toMatchObject({
+        title: '周常',
+        scheduleKind: 'weekly',
+        resetWeekday: 1,
+        timeZone: 'Asia/Shanghai'
+      })
     }
     expect(() =>
       database!.createChecklistItem({
@@ -124,6 +130,51 @@ describe('AppDatabase', () => {
     expect(remaining.some((item) => item.id === completedCustom.id)).toBe(true)
   })
 
+  it('固定周常不会被删除，并在周一跨周期后恢复为未完成', () => {
+    database = new AppDatabase(':memory:')
+    const weekly = database.listChecklistItems('genshin').find((item) => item.id === 'genshin:weekly')!
+    database.updateChecklistItem({ id: weekly.id, completed: true })
+
+    expect(database.archiveCompletedSection('genshin', ['weekly', 'endgame'])).toBe(0)
+    expect(() => database!.archiveChecklistItem(weekly.id)).toThrow('固定周常不能删除')
+
+    const nextPeriodReference = new Date(new Date(weekly.endsAt!).getTime() + 1)
+    expect(database.resetDueWeeklyItems(nextPeriodReference)).toBeGreaterThanOrEqual(1)
+    expect(database.listChecklistItems('genshin').find((item) => item.id === weekly.id)).toMatchObject({
+      completed: false,
+      manualCompletionLocked: false
+    })
+  })
+
+  it('同一版块中临期事项优先、完成事项沉底', () => {
+    database = new AppDatabase(':memory:')
+    const normal = database.createChecklistItem({
+      gameId: 'genshin',
+      category: 'limited_event',
+      title: '普通活动',
+      endsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    })
+    const urgent = database.createChecklistItem({
+      gameId: 'genshin',
+      category: 'permanent_event',
+      title: '最后一天活动',
+      endsAt: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString()
+    })
+    database.updateChecklistItem({ id: urgent.id, completed: true })
+    const pendingUrgent = database.createChecklistItem({
+      gameId: 'genshin',
+      category: 'permanent_event',
+      title: '未完成的最后一天活动',
+      endsAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString()
+    })
+
+    const eventIds = database
+      .listChecklistItems('genshin')
+      .filter((item) => item.category === 'limited_event' || item.category === 'permanent_event')
+      .map((item) => item.id)
+    expect(eventIds).toEqual([pendingUrgent.id, normal.id, urgent.id])
+  })
+
   it('按游戏独立保存自动同步模式和范围', () => {
     database = new AppDatabase(':memory:')
     expect(database.getSyncSettings('genshin')).toMatchObject({
@@ -165,7 +216,7 @@ describe('AppDatabase', () => {
     expect(completed.manualCompletionLocked).toBe(true)
     const nextPeriodReference = new Date(new Date(completed.endsAt!).getTime() + 1)
 
-    expect(database.resetDueWeeklyItems(nextPeriodReference)).toBe(1)
+    expect(database.resetDueWeeklyItems(nextPeriodReference)).toBeGreaterThanOrEqual(1)
     const reset = database.listChecklistItems('zenless').find((item) => item.id === weekly.id)!
     expect(reset.completed).toBe(false)
     expect(reset.completedAt).toBeNull()

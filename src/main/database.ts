@@ -70,7 +70,8 @@ export class AppDatabase {
       this.database.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;')
       this.migrate()
       this.seedGames()
-      this.seedQuestChecklists()
+      this.seedCoreChecklists()
+      this.normalizeWeeklySchedules()
       this.resetDueWeeklyItems()
       this.markStaleSyncStates()
     } catch (error) {
@@ -410,6 +411,14 @@ export class AppDatabase {
         FROM checklist_items
         WHERE game_id = ? AND archived = 0
         ORDER BY
+          completed ASC,
+          CASE
+            WHEN completed = 0
+              AND ends_at IS NOT NULL
+              AND julianday(ends_at) BETWEEN julianday('now') AND julianday('now', '+1 day')
+            THEN 0
+            ELSE 1
+          END,
           CASE category
             WHEN 'main_quest' THEN 10
             WHEN 'side_quest' THEN 20
@@ -420,7 +429,6 @@ export class AppDatabase {
             WHEN 'exploration' THEN 70
             ELSE 80
           END,
-          completed ASC,
           CASE WHEN ends_at IS NULL THEN 1 ELSE 0 END,
           ends_at ASC,
           created_at ASC
@@ -473,7 +481,7 @@ export class AppDatabase {
     const id = randomUUID()
     const now = new Date().toISOString()
     const scheduleKind = input.scheduleKind ?? this.defaultScheduleKind(input.category)
-    const resetWeekday = scheduleKind === 'weekly' ? input.resetWeekday ?? 1 : input.resetWeekday ?? null
+    const resetWeekday = scheduleKind === 'weekly' ? 1 : input.resetWeekday ?? null
     const timeZone = scheduleKind === 'weekly' ? input.timeZone ?? 'Asia/Shanghai' : input.timeZone ?? null
     const weeklyPeriod =
       scheduleKind === 'weekly' ? getWeeklyPeriod(new Date(), resetWeekday ?? 1, timeZone ?? 'Asia/Shanghai') : null
@@ -541,13 +549,13 @@ export class AppDatabase {
           : current.scheduleKind
         : input.scheduleKind
     const resetWeekday =
-      input.resetWeekday === undefined
-        ? scheduleKind === 'weekly'
-          ? current.resetWeekday ?? 1
-          : categoryChanged
+      scheduleKind === 'weekly'
+        ? 1
+        : input.resetWeekday === undefined
+          ? categoryChanged
             ? null
             : current.resetWeekday
-        : input.resetWeekday
+          : input.resetWeekday
     const timeZone =
       input.timeZone === undefined
         ? scheduleKind === 'weekly'
@@ -614,6 +622,7 @@ export class AppDatabase {
   }
 
   archiveChecklistItem(id: string): void {
+    if (this.isPersistentChecklistId(id)) throw new Error('固定周常不能删除')
     const result = this.database
       .prepare(`
         UPDATE checklist_items
@@ -657,6 +666,7 @@ export class AppDatabase {
           AND category IN (${placeholders})
           AND completed = 1
           AND archived = 0
+          AND id <> (game_id || ':weekly')
       `)
       .run(new Date().toISOString(), gameId, ...categories)
 
@@ -675,6 +685,16 @@ export class AppDatabase {
     this.database.exec('BEGIN IMMEDIATE')
     try {
       for (const item of items) {
+        if (item.category === 'weekly') {
+          const weeklyPeriod = getWeeklyPeriod(new Date(syncedAt), 1, 'Asia/Shanghai')
+          item.scheduleKind = 'weekly'
+          item.resetWeekday = 1
+          item.timeZone = 'Asia/Shanghai'
+          item.resetRule = '每周一重置'
+          item.periodKey = weeklyPeriod.key
+          item.startsAt = weeklyPeriod.startsAt
+          item.endsAt = weeklyPeriod.endsAt
+        }
         const remoteKey = item.remoteKey.trim()
         if (!remoteKey || remoteKey.length > 200) throw new Error('远端事项标识格式不正确')
         this.assertTimeWindow(item.startsAt ?? null, item.endsAt ?? null)
@@ -880,6 +900,27 @@ export class AppDatabase {
       changes += Number(result.changes)
     }
     return changes
+  }
+
+  private normalizeWeeklySchedules(): void {
+    this.database
+      .prepare(`
+        UPDATE checklist_items
+        SET schedule_kind = 'weekly',
+            reset_weekday = 1,
+            timezone = 'Asia/Shanghai',
+            reset_rule = '每周一重置',
+            updated_at = ?
+        WHERE category = 'weekly'
+          AND archived = 0
+          AND (
+            schedule_kind IS NOT 'weekly'
+            OR reset_weekday IS NOT 1
+            OR timezone IS NOT 'Asia/Shanghai'
+            OR reset_rule IS NOT '每周一重置'
+          )
+      `)
+      .run(new Date().toISOString())
   }
 
   close(): void {
@@ -1109,18 +1150,60 @@ export class AppDatabase {
     }
   }
 
-  private seedQuestChecklists(): void {
-    const insert = this.database.prepare(`
+  private seedCoreChecklists(): void {
+    const insertQuest = this.database.prepare(`
       INSERT OR IGNORE INTO checklist_items(
         id, game_id, category, title, source, created_at, updated_at
       ) VALUES (?, ?, ?, ?, 'manual', ?, ?)
     `)
+    const upsertWeekly = this.database.prepare(`
+      INSERT INTO checklist_items(
+        id, game_id, category, title, completed, starts_at, ends_at,
+        reset_rule, period_key, schedule_kind, reset_weekday, timezone,
+        source, archived, created_at, updated_at
+      ) VALUES (?, ?, 'weekly', '周常', 0, ?, ?, '每周一重置', ?, 'weekly', 1,
+        'Asia/Shanghai', 'manual', 0, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        archived = 0,
+        category = 'weekly',
+        schedule_kind = 'weekly',
+        reset_weekday = 1,
+        timezone = 'Asia/Shanghai',
+        reset_rule = '每周一重置',
+        period_key = CASE
+          WHEN checklist_items.period_key IS NULL THEN excluded.period_key
+          ELSE checklist_items.period_key
+        END,
+        starts_at = CASE
+          WHEN checklist_items.period_key IS NULL THEN excluded.starts_at
+          ELSE checklist_items.starts_at
+        END,
+        ends_at = CASE
+          WHEN checklist_items.period_key IS NULL THEN excluded.ends_at
+          ELSE checklist_items.ends_at
+        END,
+        updated_at = excluded.updated_at
+    `)
     const now = new Date().toISOString()
+    const weeklyPeriod = getWeeklyPeriod(new Date(), 1, 'Asia/Shanghai')
 
     for (const game of DEFAULT_GAMES) {
-      insert.run(`${game.id}:main_quest`, game.id, 'main_quest', '主线任务', now, now)
-      insert.run(`${game.id}:side_quest`, game.id, 'side_quest', '支线任务', now, now)
+      insertQuest.run(`${game.id}:main_quest`, game.id, 'main_quest', '主线任务', now, now)
+      insertQuest.run(`${game.id}:side_quest`, game.id, 'side_quest', '支线任务', now, now)
+      upsertWeekly.run(
+        `${game.id}:weekly`,
+        game.id,
+        weeklyPeriod.startsAt,
+        weeklyPeriod.endsAt,
+        weeklyPeriod.key,
+        now,
+        now
+      )
     }
+  }
+
+  private isPersistentChecklistId(id: string): boolean {
+    return DEFAULT_GAMES.some((game) => id === `${game.id}:weekly`)
   }
 
   private getChecklistItem(id: string): ChecklistItem {
