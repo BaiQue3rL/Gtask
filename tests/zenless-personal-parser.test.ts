@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   parseZenlessDeadlyAssault,
+  parseZenlessEvents,
   parseZenlessPersonalData,
   parseZenlessShiyuDefense
 } from '../src/main/sync/zenless-personal-parser'
@@ -68,6 +69,28 @@ describe('绝区零个人战绩解析', () => {
     expect(() => parseZenlessPersonalData({})).toThrow('没有可识别')
   })
 
+  it('把活动状态和菲林领取进度映射到活动清单', () => {
+    expect(parseZenlessEvents({
+      activity_list: [{
+        activity_id: 7001,
+        name: '嗯呢从天降',
+        state: 'STATE_IN_PROGRESS',
+        monochrome_got_cnt: 240,
+        monochrome_cnt: 300,
+        start_ts: 1784505600,
+        end_ts: 1787183999
+      }]
+    })).toEqual([
+      expect.objectContaining({
+        remoteKey: 'event:miyoushe:7001',
+        category: 'limited_event',
+        title: '嗯呢从天降',
+        progressPercent: 80,
+        completed: false
+      })
+    ])
+  })
+
   it('个人接口省略排期时间时仍保留完成状态并交由公开排期补时', () => {
     expect(parseZenlessShiyuDefense({
       schedule_id: 62053,
@@ -84,6 +107,17 @@ describe('绝区零个人战绩解析', () => {
       periodKey: 'zenless:shiyu-defense:62053',
       scheduleKind: 'remote_schedule',
       modeKey: 'shiyu-defense'
+    })
+
+    const endTimestamp = Date.parse('2026-07-23T19:59:59.000Z') / 1000
+    expect(parseZenlessShiyuDefense({
+      schedule_id: 62054,
+      begin_time: { year: 2026, month: 7, day: 10, hour: 4, minute: 0, second: 0 },
+      end_time: endTimestamp,
+      passed_fifth_floor: true
+    })).toMatchObject({
+      startsAt: '2026-07-09T20:00:00.000Z',
+      endsAt: '2026-07-23T19:59:59.000Z'
     })
   })
 
@@ -109,12 +143,34 @@ describe('绝区零个人战绩解析', () => {
           total_star: 0,
           challenges: []
         }
+      },
+      getZenlessEventCalendar: async () => {
+        order.push('events')
+        return {
+          activity_list: [{
+            activity_id: 7001,
+            name: '嗯呢从天降',
+            state: 'STATE_COMPLETED',
+            monochrome_got_cnt: 300,
+            monochrome_cnt: 300,
+            start_ts: 1784505600,
+            end_ts: 1787183999
+          }]
+        }
       }
     })
 
     const output = await adapter.sync('zenless')
-    expect(order).toEqual(['shiyu', 'deadly'])
-    expect(output.items).toHaveLength(2)
+    expect(order).toEqual(['shiyu', 'deadly', 'events'])
+    expect(output.items).toHaveLength(3)
+    order.length = 0
+    const eventsOnly = await adapter.sync('zenless', 'events')
+    expect(order).toEqual(['events'])
+    expect(eventsOnly.items).toHaveLength(1)
+    order.length = 0
+    const exploration = await adapter.sync('zenless', 'exploration')
+    expect(order).toEqual([])
+    expect(exploration.items).toEqual([])
     await expect(adapter.sync('genshin')).rejects.toThrow('不能用于其他游戏')
   })
 })

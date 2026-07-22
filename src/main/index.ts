@@ -66,6 +66,7 @@ async function queueAiScheduleSync(
 ): Promise<SyncResult> {
   if (!appDatabase) throw new Error('数据库尚未初始化')
   const startedAt = new Date().toISOString()
+  const sources: SyncResult['sources'] = []
   try {
     const plugin = detectCodexPlugin()
     const agent = appDatabase.getAiScheduleAgentStatus()
@@ -73,70 +74,68 @@ async function queueAiScheduleSync(
     const publicMessage = agent.connected
       ? `已提交给 ${agent.name ?? 'AI 排期 Agent'}，等待联网检索和交叉验证（任务 ${job.id.slice(0, 8)}）`
       : `已排队（任务 ${job.id.slice(0, 8)}）；请在 Codex 打开“幻游清单”插件并运行 $sync-gacha-schedules`
-    const sources: SyncResult['sources'] = [{
+    sources.push({
       source: 'public_schedule',
       status: 'skipped',
       message: publicMessage,
       added: 0,
       updated: 0,
       preserved: 0
-    }]
-    if (scope === 'public_and_personal') {
-      const personal = syncOrchestrator
-        ? await syncOrchestrator.syncPersonalData(gameId, target)
-        : {
-            source: 'personal_data' as const,
-            status: 'error' as const,
-            message: '个人数据同步服务尚未初始化',
-            added: 0,
-            updated: 0,
-            preserved: 0
-          }
-      sources.push(personal)
-      const waitingMessage = `${personal.message}；公开排期任务等待 AI 处理`
-      const personalStatus = personal.status === 'verification_required'
-        ? 'verification_required'
-        : personal.status === 'success'
-          ? 'idle'
-          : 'error'
-      appDatabase.recordSyncOutcome(
-        gameId,
-        personalStatus,
-        waitingMessage,
-        personal.status === 'success'
-      )
-    }
-    return {
-      gameId,
-      requestedScope: scope,
-      requestedTarget: target,
-      status: 'partial',
-      startedAt,
-      finishedAt: new Date().toISOString(),
-      sources,
-      message: sources.map((source) => source.message).join('；')
-    }
+    })
   } catch (error) {
     const message = error instanceof Error ? error.message : '无法创建 AI 排期任务'
-    appDatabase.recordSyncAttempt(gameId, scope)
-    appDatabase.recordSyncOutcome(gameId, 'error', message, false)
-    return {
-      gameId,
-      requestedScope: scope,
-      requestedTarget: target,
+    sources.push({
+      source: 'public_schedule',
       status: 'error',
-      startedAt,
-      finishedAt: new Date().toISOString(),
-      sources: [{
-        source: 'public_schedule',
-        status: 'error',
-        message,
-        added: 0,
-        updated: 0,
-        preserved: 0
-      }],
-      message
-    }
+      message,
+      added: 0,
+      updated: 0,
+      preserved: 0
+    })
+  }
+
+  if (scope === 'public_and_personal') {
+    const personal = syncOrchestrator
+      ? await syncOrchestrator.syncPersonalData(gameId, target)
+      : {
+          source: 'personal_data' as const,
+          status: 'error' as const,
+          message: '个人数据同步服务尚未初始化',
+          added: 0,
+          updated: 0,
+          preserved: 0
+        }
+    sources.push(personal)
+    const publicPending = sources[0]?.status === 'skipped'
+    const combinedMessage = `${personal.message}；${publicPending ? '公开资料任务等待 AI 处理' : '公开资料任务未能排队'}`
+    const personalStatus = personal.status === 'verification_required'
+      ? 'verification_required'
+      : personal.status === 'success'
+        ? 'idle'
+        : 'error'
+    appDatabase.recordSyncOutcome(
+      gameId,
+      personalStatus,
+      combinedMessage,
+      personal.status === 'success'
+    )
+  } else if (sources[0]?.status === 'error') {
+    appDatabase.recordSyncAttempt(gameId, scope)
+    appDatabase.recordSyncOutcome(gameId, 'error', sources[0].message, false)
+  }
+
+  const hasPersonalSuccess = sources.some(
+    (source) => source.source === 'personal_data' && source.status === 'success'
+  )
+  return {
+    gameId,
+    requestedScope: scope,
+    requestedTarget: target,
+    status: sources[0]?.status === 'error' && !hasPersonalSuccess ? 'error' : 'partial',
+    startedAt,
+    finishedAt: new Date().toISOString(),
+    sources,
+    message: sources.map((source) => source.message).join('；')
   }
 }
 

@@ -2,7 +2,8 @@ import type {
   ChecklistCategory,
   GameId,
   ScheduleKind,
-  SyncSourceResult
+  SyncSourceResult,
+  SyncTarget
 } from '../../shared/contracts'
 
 export interface NormalizedSyncItem {
@@ -36,7 +37,7 @@ export interface SyncAdapterOutput {
 }
 
 export interface SyncAdapter {
-  sync: (gameId: GameId) => Promise<SyncAdapterOutput>
+  sync: (gameId: GameId, target?: SyncTarget) => Promise<SyncAdapterOutput>
 }
 
 export interface SyncAdapterRegistry {

@@ -937,6 +937,74 @@ export class AppDatabase {
     remoteKey: string,
     syncedAt: string
   ): { id: string; archived: number; source: ChecklistSource } | undefined {
+    if (item.category === 'exploration') {
+      return this.database.prepare(`
+        SELECT id, archived, source
+        FROM checklist_items
+        WHERE game_id = ?
+          AND category = 'exploration'
+          AND source <> 'manual'
+          AND (
+            remote_key = ?
+            OR (? IS NOT NULL AND mode_key = ?)
+            OR title = ?
+          )
+        ORDER BY CASE WHEN remote_key = ? THEN 0 ELSE 1 END,
+          CASE WHEN ? IS NOT NULL AND mode_key = ? THEN 0 ELSE 1 END,
+          CASE WHEN source = 'public_schedule' THEN 0 ELSE 1 END,
+          updated_at DESC
+        LIMIT 1
+      `).get(
+        gameId,
+        remoteKey,
+        item.modeKey ?? null,
+        item.modeKey ?? null,
+        item.title,
+        remoteKey,
+        item.modeKey ?? null,
+        item.modeKey ?? null
+      ) as { id: string; archived: number; source: ChecklistSource } | undefined
+    }
+
+    if (item.category === 'limited_event') {
+      return this.database.prepare(`
+        SELECT id, archived, source
+        FROM checklist_items
+        WHERE game_id = ?
+          AND category = 'limited_event'
+          AND source <> 'manual'
+          AND (
+            remote_key = ?
+            OR (? IS NOT NULL AND mode_key = ?)
+            OR (
+              title = ?
+              AND starts_at IS NOT NULL AND ends_at IS NOT NULL
+              AND ? IS NOT NULL AND ? IS NOT NULL
+              AND julianday(starts_at) <= julianday(?)
+              AND julianday(ends_at) >= julianday(?)
+            )
+          )
+        ORDER BY CASE WHEN remote_key = ? THEN 0 ELSE 1 END,
+          CASE WHEN ? IS NOT NULL AND mode_key = ? THEN 0 ELSE 1 END,
+          CASE WHEN source = 'public_schedule' THEN 0 ELSE 1 END,
+          updated_at DESC
+        LIMIT 1
+      `).get(
+        gameId,
+        remoteKey,
+        item.modeKey ?? null,
+        item.modeKey ?? null,
+        item.title,
+        item.startsAt ?? null,
+        item.endsAt ?? null,
+        item.endsAt ?? null,
+        item.startsAt ?? null,
+        remoteKey,
+        item.modeKey ?? null,
+        item.modeKey ?? null
+      ) as { id: string; archived: number; source: ChecklistSource } | undefined
+    }
+
     if (item.category === 'endgame' && source === 'public_schedule') {
       return this.database.prepare(`
         SELECT id, archived, source

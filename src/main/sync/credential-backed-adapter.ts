@@ -1,4 +1,4 @@
-import type { GameId } from '../../shared/contracts'
+import type { GameId, SyncTarget } from '../../shared/contracts'
 import type { CredentialPayload } from '../credential-vault'
 import type { CredentialProvider } from '../../shared/contracts'
 import { SyncVerificationRequiredError, type SyncAdapter, type SyncAdapterOutput } from './types'
@@ -19,7 +19,7 @@ export class CredentialBackedAdapter implements SyncAdapter {
     private readonly createAdapter: (credential: CredentialPayload) => SyncAdapter
   ) {}
 
-  async sync(gameId: GameId): Promise<SyncAdapterOutput> {
+  async sync(gameId: GameId, target: SyncTarget = 'all'): Promise<SyncAdapterOutput> {
     let credential: CredentialPayload | null
     try {
       credential = this.credentials.read(this.provider)
@@ -29,6 +29,6 @@ export class CredentialBackedAdapter implements SyncAdapter {
     if (!credential) {
       throw new SyncVerificationRequiredError(`${PROVIDER_LABELS[this.provider]}尚未登录`)
     }
-    return this.createAdapter(credential).sync(gameId)
+    return this.createAdapter(credential).sync(gameId, target)
   }
 }

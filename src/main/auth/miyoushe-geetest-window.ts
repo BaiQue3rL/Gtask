@@ -80,7 +80,7 @@ function buildVerificationPage(challenge: MiyousheGeetestChallenge): string {
 <head>
   <meta charset="utf-8">
   <meta name="referrer" content="no-referrer">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}' https://static.geetest.com; connect-src https://*.geetest.com https://*.captchami.com; img-src data: https://*.geetest.com https://*.captchami.com; style-src 'unsafe-inline' https://*.geetest.com; frame-src https://*.geetest.com https://*.captchami.com">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}' https://*.geetest.com https://*.geevisit.com https://*.gsensebot.com; connect-src https://*.geetest.com https://*.geevisit.com https://*.gsensebot.com https://*.captchami.com; img-src data: https://*.geetest.com https://*.geevisit.com https://*.gsensebot.com https://*.captchami.com; style-src 'unsafe-inline' https://*.geetest.com https://*.geevisit.com https://*.gsensebot.com; frame-src https://*.geetest.com https://*.geevisit.com https://*.gsensebot.com https://*.captchami.com">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>米游社安全验证</title>
   <style>
@@ -104,8 +104,8 @@ function buildVerificationPage(challenge: MiyousheGeetestChallenge): string {
       window.initGeetest({
         gt: challenge.gt,
         challenge: challenge.challenge,
-        new_captcha: challenge.newCaptcha,
-        success: challenge.success,
+        new_captcha: Boolean(challenge.newCaptcha),
+        offline: !Boolean(challenge.success),
         api_server: 'api.geetest.com',
         https: true,
         product: 'bind',

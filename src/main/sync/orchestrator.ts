@@ -137,7 +137,7 @@ export class SyncOrchestrator {
     }
 
     try {
-      const result = await adapter.sync(gameId)
+      const result = await adapter.sync(gameId, target)
       const checklistSource = source === 'public_schedule' ? 'public_schedule' : 'personal_sync'
       const targetCategories: Partial<Record<SyncTarget, ChecklistCategory[]>> = {
         tasks: ['main_quest', 'side_quest'],

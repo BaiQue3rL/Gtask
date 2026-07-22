@@ -49,8 +49,8 @@ describe('SyncOrchestrator', () => {
     const result = await orchestrator.syncGame('genshin', 'public_and_personal')
 
     expect(order).toEqual(['public', 'personal'])
-    expect(publicSync).toHaveBeenCalledWith('genshin')
-    expect(personalSync).toHaveBeenCalledWith('genshin')
+    expect(publicSync).toHaveBeenCalledWith('genshin', 'all')
+    expect(personalSync).toHaveBeenCalledWith('genshin', 'all')
     expect(result.status).toBe('success')
     expect(result.sources.map((source) => source.added)).toEqual([1, 1])
     expect(database.listChecklistItems('genshin')).toEqual(

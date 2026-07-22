@@ -1,5 +1,6 @@
 import { createHash, randomInt } from 'node:crypto'
 import type { CredentialPayload } from '../credential-vault'
+import { MIYOUSHE_WEB_DEVICE_PROFILE } from '../auth/miyoushe-device-profile'
 import { SyncVerificationRequiredError } from './types'
 import { ZenlessPersonalAdapter, type ZenlessBattleChronicleClient } from './zenless-personal-adapter'
 import { GenshinPersonalAdapter, type GenshinBattleChronicleClient } from './genshin-personal-adapter'
@@ -30,12 +31,14 @@ export interface MiyousheGeetestChallenge {
   challenge: string
   newCaptcha: number
   success: number
+  sessionId?: string
 }
 
 export interface MiyousheGeetestResult {
   geetest_challenge: string
   geetest_validate: string
   geetest_seccode: string
+  sessionId?: string
 }
 
 export type MiyousheGeetestSolver = (
@@ -48,7 +51,8 @@ class MiyousheChronicleClient {
   constructor(
     private readonly cookie: string,
     private readonly fetcher: typeof fetch,
-    private readonly solveGeetest?: MiyousheGeetestSolver
+    private readonly solveGeetest?: MiyousheGeetestSolver,
+    private readonly reuseLoginDevice = false
   ) {
     if (!cookie.trim()) throw new Error('米游社登录凭据为空')
   }
@@ -73,6 +77,14 @@ class MiyousheChronicleClient {
     return normalizeDeadlyAssault(data)
   }
 
+  async getZenlessEventCalendar(): Promise<unknown> {
+    const account = await this.getAccount('nap_cn', '绝区零')
+    return await this.request(`${ZENLESS_RECORD_BASE}/activity_calendar`, {
+      uid: account.uid,
+      region: account.region
+    })
+  }
+
   protected async getAccount(gameBiz: string, gameLabel: string): Promise<{ uid: string; region: string }> {
     const cached = this.accounts.get(gameBiz)
     if (cached) return cached
@@ -91,7 +103,9 @@ class MiyousheChronicleClient {
   protected async request(
     url: string,
     query: Record<string, string>,
-    verification?: MiyousheGeetestResult
+    verification?: MiyousheGeetestResult,
+    method: 'GET' | 'POST' = 'GET',
+    body?: Record<string, string>
   ): Promise<unknown> {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 15_000)
@@ -99,31 +113,43 @@ class MiyousheChronicleClient {
       const requestUrl = new URL(url)
       for (const [key, value] of Object.entries(query)) requestUrl.searchParams.set(key, value)
       const response = await this.fetcher(requestUrl, {
-        method: 'GET',
+        method,
         redirect: 'error',
         signal: controller.signal,
         headers: {
           cookie: this.cookie,
-          ds: generateCnDynamicSecret(query),
+          ds: generateCnDynamicSecret(query, body),
           'x-rpc-app_version': '2.11.1',
           'x-rpc-client_type': '5',
           'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/58.0.3029.110 Safari/537.36',
-          ...(verification ? {
+          ...(this.reuseLoginDevice ? MIYOUSHE_WEB_DEVICE_PROFILE : {}),
+          ...(body ? { 'content-type': 'application/json' } : {}),
+          ...(verification?.sessionId ? {
+            'x-rpc-aigis': buildAigisHeader(verification)
+          } : verification ? {
             'x-rpc-challenge': verification.geetest_challenge,
             'x-rpc-validate': verification.geetest_validate,
             'x-rpc-seccode': verification.geetest_seccode
           } : {})
-        }
+        },
+        ...(body ? { body: JSON.stringify(body) } : {})
       })
       if (!response.ok) throw new Error(`米游社个人数据请求失败（HTTP ${response.status}）`)
       const envelope = await response.json() as MiyousheEnvelope
       const retcode = envelope.retcode ?? 0
       if (GEETEST_RETCODES.has(retcode) || response.headers.has('x-rpc-aigis')) {
         if (!verification && this.solveGeetest) {
-          const challenge = await this.createGeetestChallenge()
+          const challenge = parseAigisChallenge(response.headers.get('x-rpc-aigis'))
+            ?? await this.createGeetestChallenge()
           const result = await this.solveGeetest(challenge)
           if (!result) throw new SyncVerificationRequiredError('米游社滑块验证已取消')
-          return await this.request(url, query, result)
+          return await this.request(
+            url,
+            query,
+            challenge.sessionId ? { ...result, sessionId: challenge.sessionId } : result,
+            method,
+            body
+          )
         }
         throw new SyncVerificationRequiredError('米游社需要完成滑块或设备验证')
       }
@@ -188,6 +214,10 @@ class MiyousheChronicleClient {
 export class MiyousheZenlessClient extends MiyousheChronicleClient implements ZenlessBattleChronicleClient {}
 
 export class MiyousheGenshinClient extends MiyousheChronicleClient implements GenshinBattleChronicleClient {
+  constructor(cookie: string, fetcher: typeof fetch, solveGeetest?: MiyousheGeetestSolver) {
+    super(cookie, fetcher, solveGeetest, true)
+  }
+
   async getProfile(): Promise<unknown> {
     const account = await this.getAccount('hk4e_cn', '原神')
     return await this.request(`${GENSHIN_RECORD_BASE}/index`, {
@@ -222,9 +252,24 @@ export class MiyousheGenshinClient extends MiyousheChronicleClient implements Ge
       need_detail: 'true'
     })
   }
+
+  async getEventCalendar(): Promise<unknown> {
+    const account = await this.getAccount('hk4e_cn', '原神')
+    return await this.request(
+      `${GENSHIN_RECORD_BASE}/act_calendar`,
+      {},
+      undefined,
+      'POST',
+      { role_id: account.uid, server: account.region }
+    )
+  }
 }
 
 export class MiyousheStarRailClient extends MiyousheChronicleClient implements StarRailBattleChronicleClient {
+  constructor(cookie: string, fetcher: typeof fetch, solveGeetest?: MiyousheGeetestSolver) {
+    super(cookie, fetcher, solveGeetest, true)
+  }
+
   private async getChallenge(endpoint: string, extraQuery: Record<string, string> = {}): Promise<unknown> {
     const account = await this.getAccount('hkrpg_cn', '崩坏：星穹铁道')
     return await this.request(`${STAR_RAIL_RECORD_BASE}/${endpoint}`, {
@@ -250,6 +295,14 @@ export class MiyousheStarRailClient extends MiyousheChronicleClient implements S
   async getAnomalyArbitration(): Promise<unknown> {
     // 新接口返回最近三期，解析器会优先选择当前状态记录。
     return await this.getChallenge('challenge_peak', { schedule_type: '3' })
+  }
+
+  async getEventCalendar(): Promise<unknown> {
+    const account = await this.getAccount('hkrpg_cn', '崩坏：星穹铁道')
+    return await this.request(`${STAR_RAIL_RECORD_BASE}/get_act_calender`, {
+      role_id: account.uid,
+      server: account.region
+    })
   }
 }
 
@@ -286,7 +339,10 @@ export function createMiyousheStarRailPersonalAdapter(
   return new StarRailPersonalAdapter(new MiyousheStarRailClient(credential.value, fetcher, solveGeetest))
 }
 
-function generateCnDynamicSecret(query: Record<string, string>): string {
+function generateCnDynamicSecret(
+  query: Record<string, string>,
+  body?: Record<string, string>
+): string {
   const timestamp = Math.floor(Date.now() / 1000)
   const random = randomInt(100001, 200001)
   const normalizedQuery = Object.entries(query)
@@ -294,7 +350,7 @@ function generateCnDynamicSecret(query: Record<string, string>): string {
     .map(([key, value]) => `${key}=${value}`)
     .join('&')
   const hash = createHash('md5')
-    .update(`salt=${CN_DS_SALT}&t=${timestamp}&r=${random}&b=&q=${normalizedQuery}`)
+    .update(`salt=${CN_DS_SALT}&t=${timestamp}&r=${random}&b=${body ? JSON.stringify(body) : ''}&q=${normalizedQuery}`)
     .digest('hex')
   return `${timestamp},${random},${hash}`
 }
@@ -345,4 +401,38 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function toNonEmptyString(value: unknown): string | null {
   if ((typeof value !== 'string' && typeof value !== 'number') || !String(value).trim()) return null
   return String(value)
+}
+
+function parseAigisChallenge(value: string | null): MiyousheGeetestChallenge | null {
+  if (!value) return null
+  try {
+    const root = asRecord(JSON.parse(value))
+    const sessionId = toNonEmptyString(root.session_id)
+    let data: unknown = root.data
+    if (typeof data === 'string') data = JSON.parse(data)
+    const challenge = asRecord(data)
+    const gt = toNonEmptyString(challenge.gt)
+    const challengeId = toNonEmptyString(challenge.challenge)
+    if (!sessionId || !gt || !challengeId) return null
+    return {
+      gt,
+      challenge: challengeId,
+      newCaptcha: Number(challenge.new_captcha ?? 1),
+      success: Number(challenge.success ?? 1),
+      sessionId
+    }
+  } catch {
+    return null
+  }
+}
+
+function buildAigisHeader(result: MiyousheGeetestResult): string {
+  const sessionId = toNonEmptyString(result.sessionId)
+  if (!sessionId) throw new Error('米游社 Aigis 验证缺少会话标识')
+  const payload = JSON.stringify({
+    geetest_challenge: result.geetest_challenge,
+    geetest_validate: result.geetest_validate,
+    geetest_seccode: result.geetest_seccode
+  })
+  return `${sessionId};${Buffer.from(payload, 'utf8').toString('base64')}`
 }

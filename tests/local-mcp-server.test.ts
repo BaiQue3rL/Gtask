@@ -309,4 +309,53 @@ describe('本地 MCP server', () => {
     expect(result.isError).toBe(true)
     expect(database!.listChecklistItems('genshin').some((item) => item.remoteKey === 'event:no-timezone')).toBe(false)
   })
+
+  it('公开资料 MCP 接受地图区域目录并以 0% 初始化', async () => {
+    const connected = await connect()
+    await connected.callTool({
+      name: 'register_gacha_schedule_agent',
+      arguments: { agentId: 'map-agent', name: '地图测试 Agent', webSearch: true }
+    })
+    const queued = database!.createAiScheduleJob(
+      'genshin',
+      'public_schedule',
+      new Date(),
+      false,
+      'exploration'
+    )
+    await connected.callTool({
+      name: 'claim_gacha_schedule_job',
+      arguments: { agentId: 'map-agent' }
+    })
+    const sourceUrl = 'https://example.com/genshin-map-cn'
+    const result = await connected.callTool({
+      name: 'apply_gacha_public_schedule',
+      arguments: {
+        agentId: 'map-agent',
+        jobId: queued.id,
+        retrievedAt: '2026-07-22T13:30:00.000Z',
+        items: [{
+          remoteKey: 'exploration:fontaine',
+          category: 'exploration',
+          title: '枫丹',
+          titleSourceUrl: sourceUrl,
+          parentTitle: '提瓦特大陆',
+          modeKey: 'fontaine',
+          sourceUrl,
+          confidence: 0.98
+        }],
+        evidence: [{
+          url: sourceUrl,
+          platform: '官方平台',
+          publisher: '原神官方',
+          official: true,
+          language: 'zh-CN'
+        }]
+      }
+    })
+
+    expect(result.isError).not.toBe(true)
+    expect(database!.listChecklistItems('genshin').find((item) => item.title === '枫丹'))
+      .toMatchObject({ category: 'exploration', progressPercent: 0, completed: false })
+  })
 })

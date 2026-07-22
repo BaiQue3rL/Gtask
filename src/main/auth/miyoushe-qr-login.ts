@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import QRCode from 'qrcode'
 import type { MiyousheQrLoginState, MiyousheQrLoginStatus } from '../../shared/contracts'
+import { MIYOUSHE_WEB_DEVICE_PROFILE } from './miyoushe-device-profile'
 
 const CREATE_QR_URL = 'https://passport-api.miyoushe.com/account/ma-cn-passport/web/createQRLogin'
 const CHECK_QR_URL = 'https://passport-api.miyoushe.com/account/ma-cn-passport/web/queryQRLoginStatus'
@@ -119,8 +120,7 @@ export class MiyousheQrLoginService {
           'x-rpc-app_id': 'bll8iq97cem8',
           'x-rpc-client_type': '4',
           'x-rpc-game_biz': 'bbs_cn',
-          'x-rpc-device_fp': '38d7fa104e5d7',
-          'x-rpc-device_id': '586f1440-856a-4243-8076-2b0a12314197'
+          ...MIYOUSHE_WEB_DEVICE_PROFILE
         },
         body: body ? JSON.stringify(body) : undefined
       })

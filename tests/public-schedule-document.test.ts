@@ -26,6 +26,13 @@ describe('公开排期文档', () => {
         title: '深境螺旋',
         periodKey: '2026-07-b',
         modeKey: 'abyss'
+      },
+      {
+        remoteKey: 'exploration:fontaine',
+        category: 'exploration',
+        title: '枫丹',
+        parentTitle: '提瓦特大陆',
+        progressPercent: 100
       }
     ]
   }
@@ -44,6 +51,11 @@ describe('公开排期文档', () => {
         expect.objectContaining({
           remoteKey: 'endgame:abyss',
           scheduleKind: 'remote_schedule'
+        }),
+        expect.objectContaining({
+          remoteKey: 'exploration:fontaine',
+          progressPercent: undefined,
+          scheduleKind: null
         })
       ])
     )
@@ -59,7 +71,7 @@ describe('公开排期文档', () => {
         { ...document, items: [{ remoteKey: 'custom:1', category: 'custom', title: '事项' }] },
         'genshin'
       )
-    ).toThrow('只允许限时活动和周期挑战')
+    ).toThrow('只允许限时活动、周期挑战和地图区域')
   })
 
   it('拒绝没有经中文来源核对的纯英文名称', () => {
@@ -78,7 +90,7 @@ describe('公开排期文档', () => {
       now: () => new Date('2026-07-20T02:00:00.000Z')
     })
     const output = await adapter.sync('genshin')
-    expect(output.items).toHaveLength(2)
+    expect(output.items).toHaveLength(3)
     expect(output.message).toContain('2026-07-20T01:00:00.000Z')
   })
 

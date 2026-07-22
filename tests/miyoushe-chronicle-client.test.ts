@@ -41,6 +41,7 @@ describe('MiyousheZenlessClient', () => {
           { star: 3, total_star: 3 }
         ]
       } }))
+      .mockResolvedValueOnce(response({ retcode: 0, data: { activity_list: [] } }))
     const client = new MiyousheZenlessClient('cookie_token_v2=secret', fetcher)
 
     await expect(client.getShiyuDefense()).resolves.toMatchObject({
@@ -52,7 +53,8 @@ describe('MiyousheZenlessClient', () => {
       id: 69041,
       total_star: 6
     })
-    expect(fetcher).toHaveBeenCalledTimes(3)
+    await expect(client.getZenlessEventCalendar()).resolves.toEqual({ activity_list: [] })
+    expect(fetcher).toHaveBeenCalledTimes(4)
     expect(String(fetcher.mock.calls[1][0])).toContain('role_id=10194867')
     const headers = new Headers(fetcher.mock.calls[1][1]?.headers)
     expect(headers.get('cookie')).toBe('cookie_token_v2=secret')
@@ -119,6 +121,55 @@ describe('MiyousheZenlessClient', () => {
     expect(retryHeaders.get('x-rpc-seccode')).toBe('verified-seccode')
   })
 
+  it('uses the session-bound Aigis header when the record endpoint supplies one', async () => {
+    const aigis = JSON.stringify({
+      session_id: 'record-session',
+      data: JSON.stringify({
+        gt: 'record-geetest-id',
+        challenge: 'record-challenge-id',
+        new_captcha: 1,
+        success: 1
+      })
+    })
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(response({ retcode: 0, data: { list: [
+        { game_biz: 'nap_cn', game_uid: '10194867', region: 'prod_gf_cn' }
+      ] } }))
+      .mockResolvedValueOnce(response(
+        { retcode: 1034, message: 'Verification required', data: null },
+        { 'x-rpc-aigis': aigis }
+      ))
+      .mockResolvedValueOnce(response({ retcode: 0, data: {
+        hadal_ver: 'v2',
+        hadal_info_v2: { zone_id: 62052, pass_fifth_floor: false }
+      } }))
+    const solver = vi.fn(async () => ({
+      geetest_challenge: 'verified-challenge',
+      geetest_validate: 'verified-validate',
+      geetest_seccode: 'verified-seccode'
+    }))
+    const client = new MiyousheZenlessClient('cookie=secret', fetcher, solver)
+
+    await expect(client.getShiyuDefense()).resolves.toMatchObject({ schedule_id: 62052 })
+    expect(solver).toHaveBeenCalledWith({
+      gt: 'record-geetest-id',
+      challenge: 'record-challenge-id',
+      newCaptcha: 1,
+      success: 1,
+      sessionId: 'record-session'
+    })
+    const retryHeaders = new Headers(fetcher.mock.calls[2][1]?.headers)
+    const aigisHeader = retryHeaders.get('x-rpc-aigis')!
+    const [sessionId, encoded] = aigisHeader.split(';')
+    expect(sessionId).toBe('record-session')
+    expect(JSON.parse(Buffer.from(encoded, 'base64').toString('utf8'))).toEqual({
+      geetest_challenge: 'verified-challenge',
+      geetest_validate: 'verified-validate',
+      geetest_seccode: 'verified-seccode'
+    })
+    expect(retryHeaders.get('x-rpc-challenge')).toBeNull()
+  })
+
   it('rejects retired credential payloads before a network request', () => {
     expect(() => createMiyousheZenlessPersonalAdapter(
       { kind: 'session', value: 'old-session' },
@@ -128,7 +179,7 @@ describe('MiyousheZenlessClient', () => {
 })
 
 describe('MiyousheGenshinClient', () => {
-  it('uses the bound Genshin role for profile and three endgame endpoints', async () => {
+  it('uses the bound Genshin role for profile, three endgame endpoints and activities', async () => {
     const fetcher = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(response({ retcode: 0, data: { list: [
         { game_biz: 'hk4e_cn', game_uid: '100071776', region: 'cn_gf01' }
@@ -137,19 +188,30 @@ describe('MiyousheGenshinClient', () => {
       .mockResolvedValueOnce(response({ retcode: 0, data: { schedule_id: 1 } }))
       .mockResolvedValueOnce(response({ retcode: 0, data: { is_unlock: true, data: [] } }))
       .mockResolvedValueOnce(response({ retcode: 0, data: { data: [] } }))
+      .mockResolvedValueOnce(response({ retcode: 0, data: { act_list: [] } }))
     const client = new MiyousheGenshinClient('cookie=secret', fetcher)
 
     await client.getProfile()
     await client.getSpiralAbyss()
     await client.getImaginariumTheater()
     await client.getStygianOnslaught()
+    await client.getEventCalendar()
 
-    expect(fetcher).toHaveBeenCalledTimes(5)
+    expect(fetcher).toHaveBeenCalledTimes(6)
     expect(String(fetcher.mock.calls[1][0])).toContain('/genshin/api/index')
     expect(String(fetcher.mock.calls[2][0])).toContain('/genshin/api/spiralAbyss')
     expect(String(fetcher.mock.calls[3][0])).toContain('/genshin/api/role_combat')
     expect(String(fetcher.mock.calls[4][0])).toContain('/genshin/api/hard_challenge')
-    for (const call of fetcher.mock.calls.slice(1)) {
+    expect(String(fetcher.mock.calls[5][0])).toContain('/genshin/api/act_calendar')
+    expect(fetcher.mock.calls[5][1]?.method).toBe('POST')
+    const profileHeaders = new Headers(fetcher.mock.calls[1][1]?.headers)
+    expect(profileHeaders.get('x-rpc-device_id')).toBe('586f1440-856a-4243-8076-2b0a12314197')
+    expect(profileHeaders.get('x-rpc-device_fp')).toBe('38d7fa104e5d7')
+    expect(JSON.parse(String(fetcher.mock.calls[5][1]?.body))).toEqual({
+      role_id: '100071776',
+      server: 'cn_gf01'
+    })
+    for (const call of fetcher.mock.calls.slice(1, 5)) {
       expect(String(call[0])).toContain('role_id=100071776')
       expect(String(call[0])).toContain('server=cn_gf01')
     }
@@ -157,7 +219,7 @@ describe('MiyousheGenshinClient', () => {
 })
 
 describe('MiyousheStarRailClient', () => {
-  it('uses the bound Star Rail role for all current endgame endpoints', async () => {
+  it('uses the bound Star Rail role for all current endgame endpoints and activities', async () => {
     const fetcher = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(response({ retcode: 0, data: { list: [
         { game_biz: 'hkrpg_cn', game_uid: '100000001', region: 'prod_gf_cn' }
@@ -169,13 +231,18 @@ describe('MiyousheStarRailClient', () => {
     await client.getPureFiction()
     await client.getApocalypticShadow()
     await client.getAnomalyArbitration()
+    const challengeHeaders = new Headers(fetcher.mock.calls[1][1]?.headers)
+    expect(challengeHeaders.get('x-rpc-device_id')).toBe('586f1440-856a-4243-8076-2b0a12314197')
+    expect(challengeHeaders.get('x-rpc-device_fp')).toBe('38d7fa104e5d7')
+    await client.getEventCalendar()
 
-    expect(fetcher).toHaveBeenCalledTimes(5)
+    expect(fetcher).toHaveBeenCalledTimes(6)
     expect(String(fetcher.mock.calls[1][0])).toContain('/hkrpg/api/challenge?')
     expect(String(fetcher.mock.calls[2][0])).toContain('/hkrpg/api/challenge_story?')
     expect(String(fetcher.mock.calls[3][0])).toContain('/hkrpg/api/challenge_boss?')
     expect(String(fetcher.mock.calls[4][0])).toContain('/hkrpg/api/challenge_peak?')
     expect(String(fetcher.mock.calls[4][0])).toContain('schedule_type=3')
+    expect(String(fetcher.mock.calls[5][0])).toContain('/hkrpg/api/get_act_calender?')
     for (const call of fetcher.mock.calls.slice(1)) {
       expect(String(call[0])).toContain('role_id=100000001')
       expect(String(call[0])).toContain('server=prod_gf_cn')

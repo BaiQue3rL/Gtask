@@ -368,6 +368,71 @@ describe('AppDatabase', () => {
     })
   })
 
+  it('个人活动按中文名和重叠时间回填公开排期且不产生重复项', () => {
+    database = new AppDatabase(':memory:')
+    database.mergeSyncedItems('star-rail', 'public_schedule', [{
+      remoteKey: 'event:public:paper-bird',
+      category: 'limited_event',
+      title: '折纸小鸟对对碰',
+      startsAt: '2026-07-01T04:00:00.000Z',
+      endsAt: '2026-07-30T03:59:59.000Z',
+      sourceUrl: 'https://example.com/star-rail/events'
+    }])
+    database.mergeSyncedItems('star-rail', 'personal_sync', [{
+      remoteKey: 'event:miyoushe:5001',
+      category: 'limited_event',
+      title: '折纸小鸟对对碰',
+      completed: true,
+      progressPercent: 100,
+      startsAt: '2026-07-01T04:00:00.000Z',
+      endsAt: '2026-07-30T03:59:59.000Z',
+      modeKey: 'official-event-5001'
+    }])
+
+    const matches = database.listChecklistItems('star-rail')
+      .filter((item) => item.category === 'limited_event')
+    expect(matches).toHaveLength(1)
+    expect(matches[0]).toMatchObject({
+      title: '折纸小鸟对对碰',
+      completed: true,
+      progressPercent: 100,
+      source: 'public_schedule',
+      remoteKey: 'event:public:paper-bird'
+    })
+  })
+
+  it('公开地图先建 0% 清单，再按区域中文名回填个人探索度', () => {
+    database = new AppDatabase(':memory:')
+    database.mergeSyncedItems('genshin', 'public_schedule', [{
+      remoteKey: 'exploration:public:fontaine',
+      category: 'exploration',
+      title: '枫丹',
+      parentTitle: '提瓦特大陆'
+    }])
+    expect(database.listChecklistItems('genshin').find((item) => item.title === '枫丹'))
+      .toMatchObject({ progressPercent: 0, completed: false })
+
+    database.mergeSyncedItems('genshin', 'personal_sync', [{
+      remoteKey: 'exploration:world:6',
+      category: 'exploration',
+      title: '枫丹',
+      parentTitle: '世界探索',
+      progressPercent: 87.5,
+      completed: false,
+      modeKey: 'world-exploration-6'
+    }])
+
+    const matches = database.listChecklistItems('genshin')
+      .filter((item) => item.category === 'exploration' && item.title === '枫丹')
+    expect(matches).toHaveLength(1)
+    expect(matches[0]).toMatchObject({
+      progressPercent: 87.5,
+      completed: false,
+      source: 'public_schedule',
+      remoteKey: 'exploration:public:fontaine'
+    })
+  })
+
   it('个人数据先到达时，后续公开排期仍取得元数据优先级', () => {
     database = new AppDatabase(':memory:')
     const remoteKey = 'endgame:shiyu-defense'

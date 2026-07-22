@@ -52,6 +52,20 @@ const payload = {
       boss_stars: 3,
       mob_stars: 9
     }]
+  },
+  eventCalendar: {
+    act_list: [{
+      id: 5001,
+      name: '折纸小鸟对对碰',
+      time_info: {
+        start_ts: 1784505600,
+        end_ts: 1787183999
+      },
+      act_status: 'OtherActStatusUnFinish',
+      current_progress: 3,
+      total_progress: 5,
+      all_finished: false
+    }]
   }
 }
 
@@ -69,7 +83,14 @@ describe('Star Rail personal parsing', () => {
       }),
       expect.objectContaining({ modeKey: 'pure-fiction', progressPercent: 75, completed: false }),
       expect.objectContaining({ modeKey: 'apocalyptic-shadow', progressPercent: 100, completed: true }),
-      expect.objectContaining({ modeKey: 'anomaly-arbitration', progressPercent: 100, completed: true })
+      expect.objectContaining({ modeKey: 'anomaly-arbitration', progressPercent: 100, completed: true }),
+      expect.objectContaining({
+        remoteKey: 'event:miyoushe:5001',
+        category: 'limited_event',
+        title: '折纸小鸟对对碰',
+        progressPercent: 60,
+        completed: false
+      })
     ]))
   })
 
@@ -79,13 +100,22 @@ describe('Star Rail personal parsing', () => {
       getMemoryOfChaos: async () => { order.push('memory'); return payload.memoryOfChaos },
       getPureFiction: async () => { order.push('fiction'); return payload.pureFiction },
       getApocalypticShadow: async () => { order.push('shadow'); return payload.apocalypticShadow },
-      getAnomalyArbitration: async () => { order.push('arbitration'); return payload.anomalyArbitration }
+      getAnomalyArbitration: async () => { order.push('arbitration'); return payload.anomalyArbitration },
+      getEventCalendar: async () => { order.push('events'); return payload.eventCalendar }
     }
     const adapter = new StarRailPersonalAdapter(client)
 
     const result = await adapter.sync('star-rail')
-    expect(order).toEqual(['memory', 'fiction', 'shadow', 'arbitration'])
-    expect(result.items).toHaveLength(4)
+    expect(order).toEqual(['memory', 'fiction', 'shadow', 'arbitration', 'events'])
+    expect(result.items).toHaveLength(5)
+    order.length = 0
+    const eventsOnly = await adapter.sync('star-rail', 'events')
+    expect(order).toEqual(['events'])
+    expect(eventsOnly.items).toHaveLength(1)
+    order.length = 0
+    const exploration = await adapter.sync('star-rail', 'exploration')
+    expect(order).toEqual([])
+    expect(exploration.items).toEqual([])
     await expect(adapter.sync('genshin')).rejects.toThrow('不能用于其他游戏')
   })
 })

@@ -5,6 +5,7 @@ export interface GenshinPersonalPayload {
   spiralAbyss?: unknown
   imaginariumTheater?: unknown
   stygianOnslaught?: unknown
+  eventCalendar?: unknown
 }
 
 export function parseGenshinPersonalData(input: GenshinPersonalPayload): NormalizedSyncItem[] {
@@ -19,8 +20,37 @@ export function parseGenshinPersonalData(input: GenshinPersonalPayload): Normali
     const stygian = parseStygianOnslaught(input.stygianOnslaught)
     if (stygian) items.push(stygian)
   }
+  if (input.eventCalendar !== undefined) items.push(...parseGenshinEvents(input.eventCalendar))
   if (items.length === 0) throw new Error('原神个人数据没有可识别的探索或周期玩法')
   return items
+}
+
+export function parseGenshinEvents(value: unknown): NormalizedSyncItem[] {
+  const root = requiredRecord(value, '活动日历')
+  const events = Array.isArray(root.act_list) ? root.act_list.filter(isRecord) : []
+  return events.flatMap((event) => {
+    const id = requiredIdentifier(event.id, '活动 id')
+    const title = requiredString(event.name, '活动名称')
+    const startsAt = toIsoDate(event.start_timestamp ?? event.start_time, `${title}开始时间`)
+    const endsAt = toIsoDate(event.end_timestamp ?? event.end_time, `${title}结束时间`)
+    const exploration = isRecord(event.explore_detail) ? event.explore_detail : null
+    const rawProgress = exploration ? finiteNumber(exploration.explore_percent) : null
+    const progressPercent = rawProgress === null
+      ? undefined
+      : clampPercentage(rawProgress > 100 ? rawProgress / 10 : rawProgress)
+    return [{
+      remoteKey: `event:miyoushe:${id}`,
+      category: 'limited_event' as const,
+      title,
+      completed: event.is_finished === true || exploration?.is_finished === true,
+      progressPercent,
+      startsAt,
+      endsAt,
+      periodKey: `genshin:event:${id}:${startsAt}`,
+      scheduleKind: 'fixed_window' as const,
+      modeKey: `official-event-${id}`
+    }]
+  })
 }
 
 export function parseExplorations(value: unknown): NormalizedSyncItem[] {

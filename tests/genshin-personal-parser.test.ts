@@ -36,6 +36,16 @@ const payload = {
       },
       single: { has_data: true, best: { difficulty: 5 } }
     }]
+  },
+  eventCalendar: {
+    act_list: [{
+      id: 9001,
+      name: '砺行修远',
+      start_timestamp: 1784505600,
+      end_timestamp: 1787183999,
+      is_finished: false,
+      explore_detail: { explore_percent: 85.5, is_finished: false }
+    }]
   }
 }
 
@@ -62,7 +72,14 @@ describe('Genshin personal parsing', () => {
         completed: true
       }),
       expect.objectContaining({ modeKey: 'imaginarium-theater', completed: true }),
-      expect.objectContaining({ modeKey: 'stygian-onslaught', progressPercent: 83.33, completed: false })
+      expect.objectContaining({ modeKey: 'stygian-onslaught', progressPercent: 83.33, completed: false }),
+      expect.objectContaining({
+        remoteKey: 'event:miyoushe:9001',
+        category: 'limited_event',
+        title: '砺行修远',
+        progressPercent: 85.5,
+        completed: false
+      })
     ]))
   })
 
@@ -72,13 +89,18 @@ describe('Genshin personal parsing', () => {
       getProfile: async () => { order.push('profile'); return payload.profile },
       getSpiralAbyss: async () => { order.push('abyss'); return payload.spiralAbyss },
       getImaginariumTheater: async () => { order.push('theater'); return payload.imaginariumTheater },
-      getStygianOnslaught: async () => { order.push('stygian'); return payload.stygianOnslaught }
+      getStygianOnslaught: async () => { order.push('stygian'); return payload.stygianOnslaught },
+      getEventCalendar: async () => { order.push('events'); return payload.eventCalendar }
     }
     const adapter = new GenshinPersonalAdapter(client)
 
     const result = await adapter.sync('genshin')
-    expect(order).toEqual(['profile', 'abyss', 'theater', 'stygian'])
-    expect(result.items).toHaveLength(5)
+    expect(order).toEqual(['profile', 'abyss', 'theater', 'stygian', 'events'])
+    expect(result.items).toHaveLength(6)
+    order.length = 0
+    const eventsOnly = await adapter.sync('genshin', 'events')
+    expect(order).toEqual(['events'])
+    expect(eventsOnly.items).toHaveLength(1)
     await expect(adapter.sync('zenless')).rejects.toThrow('不能用于其他游戏')
   })
 })

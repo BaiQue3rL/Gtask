@@ -5,6 +5,7 @@ export interface StarRailPersonalPayload {
   pureFiction?: unknown
   apocalypticShadow?: unknown
   anomalyArbitration?: unknown
+  eventCalendar?: unknown
 }
 
 interface ChallengeModeDefinition {
@@ -47,8 +48,50 @@ export function parseStarRailPersonalData(input: StarRailPersonalPayload): Norma
     const arbitration = parseAnomalyArbitration(input.anomalyArbitration)
     if (arbitration) items.push(arbitration)
   }
+  if (input.eventCalendar !== undefined) items.push(...parseStarRailEvents(input.eventCalendar))
   if (items.length === 0) throw new Error('星铁个人数据没有可识别的周期玩法')
   return items
+}
+
+export function parseStarRailEvents(value: unknown): NormalizedSyncItem[] {
+  const root = requiredRecord(value, '活动日历')
+  const events = Array.isArray(root.act_list) ? root.act_list.filter(isRecord) : []
+  return events.flatMap((event) => {
+    const timeInfo = isRecord(event.time_info) ? event.time_info : null
+    if (!timeInfo) return []
+    const id = requiredIdentifier(event.id, '活动 id')
+    const title = requiredOptionalString(event.name)
+    if (!title) throw new Error('星铁个人数据缺少活动名称')
+    const startsAt = toIsoDate(
+      timeInfo.start_ts ?? timeInfo.start_time ?? timeInfo.start,
+      `${title}开始时间`
+    )
+    const endsAt = toIsoDate(
+      timeInfo.end_ts ?? timeInfo.end_time ?? timeInfo.end,
+      `${title}结束时间`
+    )
+    const current = finiteNumber(event.current_progress)
+    const total = finiteNumber(event.total_progress)
+    const progressPercent = current !== null && total !== null && total > 0
+      ? clampPercentage((current / total) * 100)
+      : undefined
+    const status = requiredOptionalString(event.act_status) ?? ''
+    const completed = event.all_finished === true ||
+      status === 'OtherActStatusFinish' ||
+      (current !== null && total !== null && total > 0 && current >= total)
+    return [{
+      remoteKey: `event:miyoushe:${id}`,
+      category: 'limited_event' as const,
+      title: title.replaceAll('\\n', ' '),
+      completed,
+      progressPercent,
+      startsAt,
+      endsAt,
+      periodKey: `star-rail:event:${id}:${startsAt}`,
+      scheduleKind: 'fixed_window' as const,
+      modeKey: `official-event-${id}`
+    }]
+  })
 }
 
 function parseChallengeMode(definition: ChallengeModeDefinition): NormalizedSyncItem {
