@@ -12,6 +12,7 @@ import {
 } from './backup'
 import { CredentialVault, removeRetiredDeepSeekCredential } from './credential-vault'
 import { detectCodexPlugin } from './ai/codex-plugin'
+import { prepareCodexPluginMarketplace } from './ai/codex-plugin-installer'
 import { MiyousheQrLoginService } from './auth/miyoushe-qr-login'
 import { solveMiyousheGeetest } from './auth/miyoushe-geetest-window'
 import { createElectronNetFetcher } from './sync/electron-net-fetcher'
@@ -362,15 +363,32 @@ function registerIpcHandlers(): void {
   })
   ipcMain.handle('ai-schedule:get-agent-status', () => {
     if (!appDatabase) throw new Error('数据库尚未初始化')
+    const appMarketplacePath = join(app.getPath('userData'), 'codex-integration', 'marketplace.json')
     return {
       ...appDatabase.getAiScheduleAgentStatus(),
-      codexPluginInstalled: detectCodexPlugin().installed
+      codexPluginInstalled: detectCodexPlugin({ appMarketplacePath }).installed
     }
   })
   ipcMain.handle('codex-plugin:open', async () => {
-    const plugin = detectCodexPlugin()
-    if (!plugin.installed) throw new Error('尚未安装或启用“幻游清单”Codex 插件')
-    await shell.openExternal(plugin.deeplink)
+    const integrationDirectory = join(app.getPath('userData'), 'codex-integration')
+    const appMarketplacePath = join(integrationDirectory, 'marketplace.json')
+    const plugin = detectCodexPlugin({ appMarketplacePath })
+    if (plugin.installed) {
+      await shell.openExternal(plugin.deeplink)
+      return
+    }
+    const sourcePluginPath = app.isPackaged
+      ? join(process.resourcesPath, 'codex-plugin')
+      : join(app.getAppPath(), 'integrations', 'gacha-task-manager')
+    const prepared = prepareCodexPluginMarketplace({
+      sourcePluginPath,
+      integrationDirectory,
+      executablePath: process.execPath,
+      mcpScriptPath: app.isPackaged
+        ? join(process.resourcesPath, 'app.asar', 'out', 'main', 'local-mcp-server-cli.js')
+        : join(app.getAppPath(), 'out', 'main', 'local-mcp-server-cli.js')
+    })
+    await shell.openExternal(prepared.deeplink)
   })
 
   ipcMain.handle('games:list', () => appDatabase?.listGames() ?? [])

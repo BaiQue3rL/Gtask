@@ -1,0 +1,22 @@
+{
+  "name": "gacha-task-manager",
+  "version": "0.1.0+app.20260722203000",
+  "description": "Connect Codex to the local Gacha Task Manager and safely synchronize verified schedules and map catalogs.",
+  "author": {
+    "name": "Gacha Task Manager contributors"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "幻游清单",
+    "shortDescription": "读取四款游戏清单并安全同步已验证的公开排期。",
+    "longDescription": "将 Codex 连接到本机幻游清单，通过专用 MCP 工具读取清单、领取刷新任务，并在联网交叉验证后回写活动、周期玩法和地图目录。",
+    "developerName": "Gacha Task Manager contributors",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Write"],
+    "defaultPrompt": [
+      "使用幻游清单插件处理当前待同步的公开排期任务。",
+      "读取我的四款游戏清单并汇总未完成事项。"
+    ]
+  },
+  "mcpServers": "./.mcp.json"
+}

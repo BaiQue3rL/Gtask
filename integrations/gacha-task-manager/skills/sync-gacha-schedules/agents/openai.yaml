@@ -1,0 +1,4 @@
+interface:
+  display_name: "同步幻游清单排期"
+  short_description: "按版块联网核验活动、周期排期或地图目录，并安全同步到本地幻游清单"
+  default_prompt: "Use $sync-gacha-schedules to process the pending verified public schedule refresh."

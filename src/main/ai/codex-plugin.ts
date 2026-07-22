@@ -14,6 +14,7 @@ export interface CodexPluginDetectionOptions {
   exists?: (path: string) => boolean
   readText?: (path: string) => string
   listDirectory?: (path: string) => string[]
+  appMarketplacePath?: string
 }
 
 export function detectCodexPlugin(
@@ -24,23 +25,25 @@ export function detectCodexPlugin(
   const readText = options.readText ?? ((path: string) => readFileSync(path, 'utf8'))
   const listDirectory = options.listDirectory ?? ((path: string) => readdirSync(path))
   const configPath = join(userHome, '.codex', 'config.toml')
-  const marketplacePath = join(userHome, '.agents', 'plugins', 'marketplace.json')
-  const cachePath = join(userHome, '.codex', 'plugins', 'cache', 'personal', 'gacha-task-manager')
+  const personalMarketplacePath = join(userHome, '.agents', 'plugins', 'marketplace.json')
+  const cacheRoot = join(userHome, '.codex', 'plugins', 'cache')
   let enabled = false
+  let marketplaceName = 'personal'
   try {
     if (exists(configPath)) {
       const config = readText(configPath)
-      const heading = '[plugins."gacha-task-manager@personal"]'
-      const sectionStart = config.indexOf(heading)
-      const remainder = sectionStart >= 0 ? config.slice(sectionStart + heading.length) : ''
-      const nextSection = remainder.search(/\r?\n\[/)
-      const block = nextSection >= 0 ? remainder.slice(0, nextSection) : remainder
-      enabled = /^enabled\s*=\s*true\s*$/m.test(block)
+      const matches = [...config.matchAll(
+        /\[plugins\."gacha-task-manager@([^"]+)"\]([\s\S]*?)(?=\r?\n\[|$)/g
+      )]
+      const active = matches.find((match) => /^enabled\s*=\s*true\s*$/m.test(match[2]))
+      marketplaceName = active?.[1] ?? matches[0]?.[1] ?? marketplaceName
+      enabled = Boolean(active)
     }
   } catch {
     enabled = false
   }
 
+  let cachePath = join(cacheRoot, marketplaceName, 'gacha-task-manager')
   let cached = false
   try {
     cached = exists(cachePath) && listDirectory(cachePath).length > 0
@@ -48,8 +51,11 @@ export function detectCodexPlugin(
     cached = false
   }
 
+  const marketplacePath = marketplaceName === 'personal'
+    ? personalMarketplacePath
+    : options.appMarketplacePath ?? personalMarketplacePath
   return {
-    installed: enabled && cached && exists(marketplacePath),
+    installed: enabled && cached,
     marketplacePath,
     cachePath,
     deeplink: `codex://plugins/gacha-task-manager?marketplacePath=${encodeURIComponent(marketplacePath)}`

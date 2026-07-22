@@ -59,6 +59,10 @@
       {
         "from": "node_modules/@tesseract.js-data/chi_sim/4.0.0/chi_sim.traineddata.gz",
         "to": "ocr/chi_sim.traineddata.gz"
+      },
+      {
+        "from": "integrations/gacha-task-manager",
+        "to": "codex-plugin"
       }
     ],
     "win": {

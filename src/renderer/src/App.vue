@@ -898,8 +898,8 @@ function showError(error: unknown): void {
           <strong>先完成一次初始全局同步</strong>
           <span>将按你的系统时区建立活动、周期事项和地图目录；周期与地图之后会在本地长期维护。</span>
         </div>
-        <button type="button" :disabled="syncing || !aiScheduleAvailable" @click="runSync('public_schedule', 'all')">
-          {{ aiScheduleAvailable ? '开始初始同步' : '请先连接 Codex/MCP' }}
+        <button type="button" :disabled="syncing" @click="aiScheduleAvailable ? runSync('public_schedule', 'all') : settingsOpen = true">
+          {{ aiScheduleAvailable ? '开始初始同步' : '配置 Codex/MCP' }}
         </button>
       </div>
       <div v-if="syncNotice" class="sync-banner" :class="syncNotice.status" aria-live="polite">
@@ -1192,12 +1192,11 @@ function showError(error: unknown): void {
             <button
               class="secondary-button"
               type="button"
-              :disabled="!aiScheduleAgent?.codexPluginInstalled"
               @click="openCodexPlugin"
-            >打开 Codex</button>
+            >{{ aiScheduleAgent?.codexPluginInstalled ? '打开 Codex' : '安装 / 启用' }}</button>
           </div>
         </div>
-        <p class="recycle-hint">公开排期统一由 Codex/MCP 联网检索、交叉验证并结构化回写，不再要求配置额外 AI API。</p>
+        <p class="recycle-hint">公开排期统一由 Codex/MCP 联网检索、交叉验证并结构化回写。首次点击“安装 / 启用”会打开本机插件页，由 Codex 完成安装；应用不会直接修改 Codex 缓存。</p>
         <h3 class="settings-heading data-heading">登录凭据</h3>
         <p class="recycle-hint">登录完全可选。凭据仅通过 Windows 安全存储加密后保存在本机，不读取浏览器 Cookie。</p>
         <div class="recycle-list">
