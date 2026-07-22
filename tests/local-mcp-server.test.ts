@@ -124,8 +124,20 @@ describe('本地 MCP server', () => {
       agentId: 'test-agent'
     })
 
-    const queued = database!.createAiScheduleJob('genshin', 'public_schedule')
-    expect(database!.createAiScheduleJob('genshin', 'public_schedule').id).toBe(queued.id)
+    const queued = database!.createAiScheduleJob(
+      'genshin',
+      'public_schedule',
+      new Date(),
+      false,
+      'events'
+    )
+    expect(database!.createAiScheduleJob(
+      'genshin',
+      'public_schedule',
+      new Date(),
+      false,
+      'events'
+    ).id).toBe(queued.id)
     const claimed = await connected.callTool({
       name: 'claim_gacha_schedule_job',
       arguments: { agentId: 'test-agent' }

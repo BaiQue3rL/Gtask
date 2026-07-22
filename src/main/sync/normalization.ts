@@ -86,13 +86,6 @@ export function normalizeSyncItem(value: unknown): NormalizedSyncItem {
     throw new Error('同步结束时间不能早于开始时间')
   }
 
-  const recurrenceRule = nullableString(value.recurrenceRule, '同步自动周期规则')
-  if (
-    recurrenceRule &&
-    !/^interval-days:\d{1,3}$/.test(recurrenceRule) &&
-    !/^monthly-days:[\d,]+@\d{2}:\d{2}\[Asia\/Shanghai\]$/.test(recurrenceRule)
-  ) throw new Error('同步自动周期规则格式不正确')
-
   return {
     remoteKey: requiredString(value.remoteKey, '远端事项标识', 200),
     sourceUrl: nullableHttpUrl(value.sourceUrl),
@@ -109,7 +102,7 @@ export function normalizeSyncItem(value: unknown): NormalizedSyncItem {
     resetWeekday: value.resetWeekday as number | null | undefined,
     timeZone: nullableString(value.timeZone, '同步时区'),
     modeKey: nullableString(value.modeKey, '同步模式标识'),
-    recurrenceRule
+    recurrenceRule: null
   }
 }
 

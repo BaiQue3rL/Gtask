@@ -175,7 +175,7 @@ describe('AppDatabase', () => {
     expect(eventIds).toEqual([pendingUrgent.id, normal.id, urgent.id])
   })
 
-  it('深渊模板到期后按服务器周期自动进入下一期', () => {
+  it('挑战事项到期后不再自动重置完成状态', () => {
     database = new AppDatabase(':memory:')
     const abyss = database.createChecklistItem({
       gameId: 'genshin',
@@ -188,14 +188,14 @@ describe('AppDatabase', () => {
     })
     database.updateChecklistItem({ id: abyss.id, completed: true, progressPercent: 100 })
 
-    expect(database.rollDueRecurringItems(new Date('2026-07-16T00:00:00.000Z'))).toBe(1)
+    expect(database.resetDueWeeklyItems(new Date('2026-07-16T00:00:00.000Z'))).toBe(0)
     expect(database.listChecklistItems('genshin').find((item) => item.id === abyss.id)).toMatchObject({
-      completed: false,
-      completedAt: null,
-      manualCompletionLocked: false,
-      progressPercent: null,
-      startsAt: '2026-07-15T20:00:00.000Z',
-      endsAt: '2026-07-31T20:00:00.000Z'
+      completed: true,
+      manualCompletionLocked: true,
+      progressPercent: 100,
+      startsAt: '2026-07-01T20:00:00.000Z',
+      endsAt: '2026-07-15T20:00:00.000Z',
+      recurrenceRule: null
     })
   })
 
@@ -417,7 +417,7 @@ describe('AppDatabase', () => {
     })
   })
 
-  it('挑战玩法进入新周期时清除上一周期完成状态和手动完成锁', () => {
+  it('挑战玩法进入新周期时新增清单并保留上一期完成记录', () => {
     database = new AppDatabase(':memory:')
     database.mergeSyncedItems('zenless', 'public_schedule', [
       {
@@ -435,7 +435,7 @@ describe('AppDatabase', () => {
 
     database.mergeSyncedItems('zenless', 'public_schedule', [
       {
-        remoteKey: 'endgame:shiyu-defense',
+        remoteKey: 'endgame:shiyu-defense:2026-07-b',
         category: 'endgame',
         title: '式舆防卫战',
         periodKey: '2026-07-b',
@@ -443,12 +443,69 @@ describe('AppDatabase', () => {
       }
     ])
 
-    const nextPeriod = database.listChecklistItems('zenless').find((candidate) => candidate.id === item.id)!
-    expect(nextPeriod).toMatchObject({
+    const periods = database.listChecklistItems('zenless')
+      .filter((candidate) => candidate.modeKey === 'shiyu-defense')
+    expect(periods).toHaveLength(2)
+    expect(periods.find((candidate) => candidate.id === item.id)).toMatchObject({
+      periodKey: '2026-07-a',
+      completed: true,
+      manualCompletionLocked: true
+    })
+    expect(periods.find((candidate) => candidate.periodKey === '2026-07-b')).toMatchObject({
       periodKey: '2026-07-b',
       completed: false,
       completedAt: null,
       manualCompletionLocked: false
+    })
+  })
+
+  it('个人战绩只更新当前挑战周期，不改写已完成历史期', () => {
+    database = new AppDatabase(':memory:')
+    database.mergeSyncedItems('zenless', 'public_schedule', [
+      {
+        remoteKey: 'official:shiyu:2026-07-a',
+        category: 'endgame',
+        title: '式舆防卫战·上一期',
+        startsAt: '2026-07-01T20:00:00.000Z',
+        endsAt: '2026-07-15T19:59:59.999Z',
+        periodKey: 'public-period-a',
+        modeKey: 'shiyu-defense'
+      },
+      {
+        remoteKey: 'official:shiyu:2026-07-b',
+        category: 'endgame',
+        title: '式舆防卫战·本期',
+        startsAt: '2026-07-15T20:00:00.000Z',
+        endsAt: '2026-08-01T19:59:59.999Z',
+        periodKey: 'public-period-b',
+        modeKey: 'shiyu-defense'
+      }
+    ], '2026-07-20T00:00:00.000Z')
+    const history = database.listChecklistItems('zenless')
+      .find((item) => item.periodKey === 'public-period-a')!
+    database.updateChecklistItem({ id: history.id, completed: true })
+
+    database.mergeSyncedItems('zenless', 'personal_sync', [{
+      remoteKey: 'endgame:shiyu-defense',
+      category: 'endgame',
+      title: '个人接口名称',
+      completed: true,
+      periodKey: 'personal-schedule-42',
+      modeKey: 'shiyu-defense'
+    }], '2026-07-20T01:00:00.000Z')
+
+    const periods = database.listChecklistItems('zenless')
+      .filter((item) => item.modeKey === 'shiyu-defense')
+    expect(periods).toHaveLength(2)
+    expect(periods.find((item) => item.id === history.id)).toMatchObject({
+      title: '式舆防卫战·上一期',
+      completed: true,
+      periodKey: 'public-period-a'
+    })
+    expect(periods.find((item) => item.periodKey === 'personal-schedule-42')).toMatchObject({
+      title: '式舆防卫战·本期',
+      completed: true,
+      source: 'public_schedule'
     })
   })
 
@@ -468,6 +525,27 @@ describe('AppDatabase', () => {
     } finally {
       externalConnection.close()
     }
+  })
+
+  it('已完成初始同步的游戏在下次启动时补齐固定周常', () => {
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-task-manager-weekly-test-'))
+    const databasePath = join(temporaryDirectory, 'test.sqlite')
+    database = new AppDatabase(databasePath)
+    database.recordSyncOutcome('genshin', 'success', '初始同步完成', true)
+    database.close()
+
+    database = new AppDatabase(databasePath)
+    expect(database.listChecklistItems('genshin').find((item) => item.id === 'genshin:weekly'))
+      .toMatchObject({
+        category: 'weekly',
+        title: '周常',
+        completed: false,
+        scheduleKind: 'weekly',
+        resetWeekday: 1,
+        timeZone: 'Asia/Shanghai'
+      })
+    expect(database.listChecklistItems('star-rail').some((item) => item.category === 'weekly'))
+      .toBe(false)
   })
 
   it('已安装 Codex 插件时可在没有活动心跳的情况下先排队', () => {
@@ -552,6 +630,73 @@ describe('AppDatabase', () => {
       [{ remoteKey: 'map:natlan', category: 'exploration', title: '纳塔' }],
       []
     )).toThrow('只允许回写“events”版块')
+  })
+
+  it('原神周期同步必须同时包含三种挑战并自动补齐周常', () => {
+    database = new AppDatabase(':memory:')
+    database.registerAiScheduleAgent('agent-genshin-cycles', '原神周期测试 Agent')
+    const queued = database.createAiScheduleJob(
+      'genshin',
+      'public_schedule',
+      new Date('2026-07-22T11:00:00.000Z'),
+      false,
+      'cycles'
+    )
+    database.claimAiScheduleJob('agent-genshin-cycles', new Date('2026-07-22T11:01:00.000Z'))
+
+    expect(() => database!.applyAiScheduleJob(
+      queued.id,
+      'agent-genshin-cycles',
+      [{
+        remoteKey: 'genshin:stygian-onslaught:2026-07',
+        category: 'endgame',
+        title: '幽境危战',
+        modeKey: 'stygian-onslaught',
+        periodKey: '2026-07'
+      }],
+      []
+    )).toThrow('缺少：深境螺旋、幻想真境剧诗')
+
+    database.applyAiScheduleJob(
+      queued.id,
+      'agent-genshin-cycles',
+      [
+        {
+          remoteKey: 'genshin:spiral-abyss:2026-07',
+          category: 'endgame',
+          title: '深境螺旋',
+          modeKey: 'spiral-abyss',
+          periodKey: '2026-07'
+        },
+        {
+          remoteKey: 'genshin:imaginarium-theater:2026-07',
+          category: 'endgame',
+          title: '幻想真境剧诗',
+          modeKey: 'imaginarium-theater',
+          periodKey: '2026-07'
+        },
+        {
+          remoteKey: 'genshin:stygian-onslaught:2026-07',
+          category: 'endgame',
+          title: '幽境危战',
+          modeKey: 'stygian-onslaught',
+          periodKey: '2026-07'
+        }
+      ],
+      []
+    )
+
+    const cycles = database.listChecklistItems('genshin')
+      .filter((item) => item.category === 'weekly' || item.category === 'endgame')
+    expect(cycles.map((item) => item.modeKey).filter(Boolean).sort()).toEqual([
+      'imaginarium-theater',
+      'spiral-abyss',
+      'stygian-onslaught'
+    ])
+    expect(cycles.find((item) => item.id === 'genshin:weekly')).toMatchObject({
+      title: '周常',
+      category: 'weekly'
+    })
   })
 
   it('公开地图目录新增为零进度，个人数据只补充对应探索度', () => {

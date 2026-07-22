@@ -3,7 +3,6 @@ import { dirname } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { backup, DatabaseSync } from 'node:sqlite'
 import { getWeeklyPeriod } from './periods'
-import { rollRecurringWindow } from './recurrence'
 import type {
   ChecklistCategory,
   ChecklistItem,
@@ -57,7 +56,7 @@ const DEFAULT_GAMES: GameSummary[] = [
   }
 ]
 
-export const CURRENT_SCHEMA_VERSION = 9
+export const CURRENT_SCHEMA_VERSION = 10
 
 const AI_AGENT_MAX_AGE_MS = 5 * 60 * 1000
 const AI_JOB_CLAIM_MAX_AGE_MS = 15 * 60 * 1000
@@ -73,9 +72,9 @@ export class AppDatabase {
       this.migrate()
       this.seedGames()
       this.seedQuestChecklists()
+      this.ensureWeeklyForInitializedGames()
       this.normalizeWeeklySchedules()
       this.resetDueWeeklyItems()
-      this.rollDueRecurringItems()
       this.markStaleSyncStates()
     } catch (error) {
       this.database.close()
@@ -323,7 +322,31 @@ export class AppDatabase {
       const invalid = items.find((item) => !allowedCategories.includes(item.category))
       if (invalid) throw new Error(`当前任务只允许回写“${job.target}”版块数据`)
     }
-    const merge = this.mergeSyncedItems(job.gameId, 'public_schedule', items, reference.toISOString())
+    const includesCycles = job.target === 'all' || job.target === 'cycles'
+    if (includesCycles && job.gameId === 'genshin') {
+      const requiredModes = new Map([
+        ['spiral-abyss', '深境螺旋'],
+        ['imaginarium-theater', '幻想真境剧诗'],
+        ['stygian-onslaught', '幽境危战']
+      ])
+      const submittedModes = new Set(items
+        .filter((item) => item.category === 'endgame')
+        .map((item) => item.modeKey))
+      const missing = [...requiredModes]
+        .filter(([modeKey]) => !submittedModes.has(modeKey))
+        .map(([, title]) => title)
+      if (missing.length > 0) {
+        throw new Error(`原神周期同步缺少：${missing.join('、')}；已保留原清单，请重新核验`)
+      }
+    }
+    const mergedItems = includesCycles && !items.some((item) => item.category === 'weekly')
+      ? [...items, {
+          remoteKey: `weekly:${job.gameId}`,
+          category: 'weekly' as const,
+          title: '周常'
+        }]
+      : items
+    const merge = this.mergeSyncedItems(job.gameId, 'public_schedule', mergedItems, reference.toISOString())
     const now = reference.toISOString()
     const message = `AI 排期同步完成：新增 ${merge.added}，更新 ${merge.updated}，保护 ${merge.preserved}`
     this.database.prepare(`
@@ -535,7 +558,7 @@ export class AppDatabase {
         resetWeekday,
         timeZone,
         input.modeKey ?? null,
-        input.recurrenceRule ?? null,
+        null,
         now,
         now
       )
@@ -640,11 +663,7 @@ export class AppDatabase {
         resetWeekday,
         timeZone,
         input.modeKey === undefined ? (categoryChanged ? null : current.modeKey) : input.modeKey,
-        input.recurrenceRule === undefined
-          ? categoryChanged
-            ? null
-            : current.recurrenceRule
-          : input.recurrenceRule,
+        null,
         manualCompletionLocked ? 1 : 0,
         completedAt,
         new Date().toISOString(),
@@ -742,31 +761,7 @@ export class AppDatabase {
         if (seenRemoteKeys.has(remoteKey)) throw new Error(`同步数据包含重复标识：${remoteKey}`)
         seenRemoteKeys.add(remoteKey)
 
-        const identity = this.database
-          .prepare(`
-            SELECT id, archived, source
-            FROM checklist_items
-            WHERE game_id = ?
-              AND (
-                remote_key = ?
-                OR (? IS NOT NULL AND mode_key = ? AND category = ?)
-              )
-              AND source <> 'manual'
-            ORDER BY CASE WHEN remote_key = ? THEN 0 ELSE 1 END,
-              CASE WHEN source = ? THEN 0 ELSE 1 END
-            LIMIT 1
-          `)
-          .get(
-            gameId,
-            remoteKey,
-            item.modeKey ?? null,
-            item.modeKey ?? null,
-            item.category,
-            remoteKey,
-            source
-          ) as
-          | { id: string; archived: number; source: ChecklistSource }
-          | undefined
+        const identity = this.findSyncIdentity(gameId, source, item, remoteKey, syncedAt)
 
         if (identity?.archived) {
           result.preserved += 1
@@ -808,7 +803,7 @@ export class AppDatabase {
               item.resetWeekday ?? null,
               item.timeZone ?? null,
               item.modeKey ?? null,
-              item.recurrenceRule ?? null,
+              null,
               source,
               remoteKey,
               item.sourceUrl ?? null,
@@ -828,14 +823,9 @@ export class AppDatabase {
           source === 'public_schedule' || current.source === 'public_schedule'
             ? 'public_schedule'
             : 'personal_sync'
-        const periodChanged =
-          item.periodKey !== undefined &&
-          item.periodKey !== null &&
-          current.periodKey !== null &&
-          item.periodKey !== current.periodKey
-        const currentCompleted = periodChanged ? false : current.completed
-        const currentCompletedAt = periodChanged ? null : current.completedAt
-        const manualCompletionLocked = periodChanged ? false : current.manualCompletionLocked
+        const currentCompleted = current.completed
+        const currentCompletedAt = current.completedAt
+        const manualCompletionLocked = current.manualCompletionLocked
         const inferredCompletion = item.category === 'exploration' && item.progressPercent !== undefined
           ? item.progressPercent === 100
           : item.completed
@@ -903,9 +893,7 @@ export class AppDatabase {
               : item.resetWeekday,
             preservePublicSchedule || item.timeZone === undefined ? current.timeZone : item.timeZone,
             preservePublicSchedule || item.modeKey === undefined ? current.modeKey : item.modeKey,
-            preservePublicSchedule || item.recurrenceRule === undefined
-              ? current.recurrenceRule
-              : item.recurrenceRule,
+            null,
             resolvedSource,
             preservePublicSchedule || item.sourceUrl === undefined ? current.sourceUrl : item.sourceUrl,
             manualCompletionLocked ? 1 : 0,
@@ -923,6 +911,103 @@ export class AppDatabase {
       this.database.exec('ROLLBACK')
       throw error
     }
+  }
+
+  private findSyncIdentity(
+    gameId: GameId,
+    source: Exclude<ChecklistSource, 'manual'>,
+    item: NormalizedSyncItem,
+    remoteKey: string,
+    syncedAt: string
+  ): { id: string; archived: number; source: ChecklistSource } | undefined {
+    if (item.category === 'endgame' && source === 'public_schedule') {
+      return this.database.prepare(`
+        SELECT id, archived, source
+        FROM checklist_items
+        WHERE game_id = ?
+          AND category = 'endgame'
+          AND source <> 'manual'
+          AND (
+            (remote_key = ? AND period_key IS ?)
+            OR (? IS NOT NULL AND mode_key = ? AND period_key IS ?)
+            OR (? IS NOT NULL AND mode_key = ? AND source = 'personal_sync'
+              AND starts_at IS NOT NULL AND ends_at IS NOT NULL
+              AND julianday(starts_at) <= julianday(?)
+              AND julianday(ends_at) >= julianday(?))
+          )
+        ORDER BY CASE WHEN remote_key = ? THEN 0 ELSE 1 END,
+          CASE WHEN period_key IS ? THEN 0 ELSE 1 END,
+          CASE WHEN source = 'public_schedule' THEN 0 ELSE 1 END,
+          updated_at DESC
+        LIMIT 1
+      `).get(
+        gameId,
+        remoteKey,
+        item.periodKey ?? null,
+        item.modeKey ?? null,
+        item.modeKey ?? null,
+        item.periodKey ?? null,
+        item.modeKey ?? null,
+        item.modeKey ?? null,
+        syncedAt,
+        syncedAt,
+        remoteKey,
+        item.periodKey ?? null
+      ) as { id: string; archived: number; source: ChecklistSource } | undefined
+    }
+
+    if (item.category === 'endgame' && source === 'personal_sync') {
+      return this.database.prepare(`
+        SELECT id, archived, source
+        FROM checklist_items
+        WHERE game_id = ?
+          AND category = 'endgame'
+          AND source <> 'manual'
+          AND (remote_key = ? OR (? IS NOT NULL AND mode_key = ?))
+        ORDER BY CASE WHEN ? IS NOT NULL AND period_key = ? THEN 0 ELSE 1 END,
+          CASE WHEN starts_at IS NOT NULL AND ends_at IS NOT NULL
+            AND julianday(starts_at) <= julianday(?)
+            AND julianday(ends_at) >= julianday(?) THEN 0 ELSE 1 END,
+          CASE WHEN source = 'public_schedule' THEN 0 ELSE 1 END,
+          updated_at DESC
+        LIMIT 1
+      `).get(
+        gameId,
+        remoteKey,
+        item.modeKey ?? null,
+        item.modeKey ?? null,
+        item.periodKey ?? null,
+        item.periodKey ?? null,
+        syncedAt,
+        syncedAt
+      ) as { id: string; archived: number; source: ChecklistSource } | undefined
+    }
+
+    return this.database.prepare(`
+      SELECT id, archived, source
+      FROM checklist_items
+      WHERE game_id = ?
+        AND (
+          remote_key = ?
+          OR (? IS NOT NULL AND mode_key = ? AND category = ?)
+        )
+        AND source <> 'manual'
+      ORDER BY CASE WHEN remote_key = ? THEN 0 ELSE 1 END,
+        CASE WHEN ? IS NOT NULL AND period_key = ? THEN 0 ELSE 1 END,
+        CASE WHEN source = ? THEN 0 ELSE 1 END,
+        updated_at DESC
+      LIMIT 1
+    `).get(
+      gameId,
+      remoteKey,
+      item.modeKey ?? null,
+      item.modeKey ?? null,
+      item.category,
+      remoteKey,
+      item.periodKey ?? null,
+      item.periodKey ?? null,
+      source
+    ) as { id: string; archived: number; source: ChecklistSource } | undefined
   }
 
   resetDueWeeklyItems(reference = new Date()): number {
@@ -953,57 +1038,6 @@ export class AppDatabase {
           resetWeekday,
           period.key
         )
-      changes += Number(result.changes)
-    }
-    return changes
-  }
-
-  rollDueRecurringItems(reference = new Date()): number {
-    const rows = this.database.prepare(`
-      SELECT id, starts_at AS startsAt, ends_at AS endsAt,
-        recurrence_rule AS recurrenceRule, mode_key AS modeKey
-      FROM checklist_items
-      WHERE archived = 0
-        AND category = 'endgame'
-        AND starts_at IS NOT NULL
-        AND ends_at IS NOT NULL
-        AND recurrence_rule IS NOT NULL
-        AND julianday(ends_at) <= julianday(?)
-    `).all(reference.toISOString()) as Array<{
-      id: string
-      startsAt: string
-      endsAt: string
-      recurrenceRule: string
-      modeKey: string | null
-    }>
-    let changes = 0
-    const update = this.database.prepare(`
-      UPDATE checklist_items
-      SET completed = 0,
-          completed_at = NULL,
-          manual_completion_locked = 0,
-          progress_percent = NULL,
-          starts_at = ?,
-          ends_at = ?,
-          period_key = ?,
-          updated_at = ?
-      WHERE id = ? AND archived = 0
-    `)
-    for (const row of rows) {
-      const next = rollRecurringWindow(
-        row.startsAt,
-        row.endsAt,
-        row.recurrenceRule,
-        reference
-      )
-      if (!next) continue
-      const result = update.run(
-        next.startsAt,
-        next.endsAt,
-        `recurring:${row.modeKey ?? row.id}:${next.startsAt}`,
-        reference.toISOString(),
-        row.id
-      )
       changes += Number(result.changes)
     }
     return changes
@@ -1246,6 +1280,19 @@ export class AppDatabase {
         `)
     }
 
+    const migration10 = this.database
+      .prepare('SELECT version FROM schema_migrations WHERE version = 10')
+      .get()
+
+    if (!migration10) {
+      this.database.exec(`
+        BEGIN;
+        UPDATE checklist_items SET recurrence_rule = NULL WHERE recurrence_rule IS NOT NULL;
+        INSERT INTO schema_migrations(version) VALUES (10);
+        COMMIT;
+      `)
+    }
+
     const versionRow = this.database
       .prepare('SELECT MAX(version) AS version FROM schema_migrations')
       .get() as { version: number | null }
@@ -1306,6 +1353,36 @@ export class AppDatabase {
     for (const game of DEFAULT_GAMES) {
       upsertQuest.run(`${game.id}:main_quest`, game.id, 'main_quest', '主线任务', now, now)
       upsertQuest.run(`${game.id}:side_quest`, game.id, 'side_quest', '支线任务', now, now)
+    }
+  }
+
+  private ensureWeeklyForInitializedGames(reference = new Date()): void {
+    const initializedGames = this.database.prepare(`
+      SELECT game_id AS gameId FROM sync_states WHERE last_success_at IS NOT NULL
+    `).all() as Array<{ gameId: GameId }>
+    if (initializedGames.length === 0) return
+    const period = getWeeklyPeriod(reference, 1, 'Asia/Shanghai')
+    const now = reference.toISOString()
+    const insert = this.database.prepare(`
+      INSERT OR IGNORE INTO checklist_items(
+        id, game_id, category, title, completed, starts_at, ends_at,
+        reset_rule, period_key, schedule_kind, reset_weekday, timezone,
+        source, remote_key, last_synced_at, created_at, updated_at
+      ) VALUES (?, ?, 'weekly', '周常', 0, ?, ?, '每周一重置', ?, 'weekly', 1,
+        'Asia/Shanghai', 'public_schedule', ?, ?, ?, ?)
+    `)
+    for (const { gameId } of initializedGames) {
+      insert.run(
+        `${gameId}:weekly`,
+        gameId,
+        period.startsAt,
+        period.endsAt,
+        period.key,
+        `weekly:${gameId}`,
+        now,
+        now,
+        now
+      )
     }
   }
 

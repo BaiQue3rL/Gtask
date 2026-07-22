@@ -537,7 +537,6 @@ if (!app.requestSingleInstanceLock()) {
     periodTimer = setInterval(() => {
       const changes =
         (appDatabase?.resetDueWeeklyItems() ?? 0) +
-        (appDatabase?.rollDueRecurringItems() ?? 0) +
         (appDatabase?.markStaleSyncStates() ?? 0)
       if (changes > 0) mainWindow?.webContents.send('checklist:changed')
     }, 60_000)

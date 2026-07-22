@@ -23,9 +23,9 @@ Use the `gacha_task_manager` MCP tools. Do not run shell commands or edit the SQ
 - Allow only `limited_event`, `weekly`, `endgame`, and `exploration`. Permanent events remain user-maintained.
 - For `exploration`, submit the released region catalog only. Use a stable `modeKey` and `parentTitle` when known. Do not submit progress or completion; new regions start at 0% and personal data fills progress later.
 - Public map refreshes are append/update only. Missing regions must never be deleted or archived.
-- For recurring `endgame` modes, include a verified `recurrenceRule`: `interval-days:N` or `monthly-days:D1,D2@HH:mm[Asia/Shanghai]`. Keep the readable cadence in `resetRule`; omit the machine rule if it cannot be verified.
-- A full initial Genshin sync must keep 深境螺旋 (`spiral-abyss`), 幻想真境剧诗 (`imaginarium-theater`), and 幽境危战 (`stygian-onslaught`) as separate modes.
-- Use stable `remoteKey` values across refreshes.
+- Never submit a `recurrenceRule` for `endgame`. Only weeklies reset locally. Each new endgame period is a separate checklist record so completed historical periods remain completed.
+- A Genshin `cycles` or `all` submission must include 深境螺旋 (`spiral-abyss`), 幻想真境剧诗 (`imaginarium-theater`), and 幽境危战 (`stygian-onslaught`) as three separate modes. The app supplies the fixed Monday weekly item.
+- For `endgame`, use a stable `modeKey` for the mode and a period-specific `periodKey` plus `remoteKey` for the current window. For other categories, keep `remoteKey` stable across refreshes.
 - Every `title` must be an official Simplified Chinese name confirmed by a Chinese source. Pure English titles and AI-authored translations are forbidden.
 - Set `titleSourceUrl` to the matching Chinese page and include it in `evidence` with `language: zh-CN`.
 - Use ISO-8601 timestamps with an explicit offset or `Z`.

@@ -36,7 +36,7 @@ interface ChecklistPanel {
 const panels: ChecklistPanel[] = [
   { title: '任务', icon: '▣', section: 'tasks', categories: ['main_quest', 'side_quest'], defaultCategory: 'side_quest', allowCreate: false, allowClear: false },
   { title: '活动', icon: '♧', section: 'events', categories: ['limited_event', 'permanent_event'], defaultCategory: 'limited_event', syncTarget: 'events' },
-  { title: '周期事项', icon: '◴', section: 'cycles', categories: ['weekly', 'endgame'], defaultCategory: 'weekly', syncTarget: 'cycles' },
+  { title: '周期事项', icon: '◴', section: 'cycles', categories: ['weekly', 'endgame'], defaultCategory: 'endgame', syncTarget: 'cycles' },
   { title: '地图探索', icon: '◇', section: 'exploration', categories: ['exploration'], defaultCategory: 'exploration', syncTarget: 'exploration' }
 ]
 const panelColumns: ChecklistPanel[][] = [
@@ -63,6 +63,54 @@ const weekdayLabels: Record<number, string> = {
   5: '周五',
   6: '周六',
   7: '周日'
+}
+
+const gameEditorExamples: Record<GameId, {
+  titles: Record<ChecklistCategory, string>
+  parentTitle: string
+  modeKey: string
+  resetRule: string
+}> = {
+  genshin: {
+    titles: {
+      main_quest: '例如：主线任务', side_quest: '例如：支线任务', limited_event: '例如：砺行修远',
+      permanent_event: '例如：七圣召唤', weekly: '例如：周常', endgame: '例如：深境螺旋',
+      exploration: '例如：枫丹廷区', custom: '例如：刷角色突破素材'
+    },
+    parentTitle: '例如：枫丹',
+    modeKey: '例如：深境螺旋 / 幻想真境剧诗',
+    resetRule: '例如：本期结束时间以游戏内为准'
+  },
+  'star-rail': {
+    titles: {
+      main_quest: '例如：开拓任务', side_quest: '例如：冒险任务', limited_event: '例如：折纸小鸟对对碰',
+      permanent_event: '例如：模拟宇宙', weekly: '例如：周常', endgame: '例如：混沌回忆',
+      exploration: '例如：黄金的时刻', custom: '例如：刷行迹材料'
+    },
+    parentTitle: '例如：匹诺康尼',
+    modeKey: '例如：混沌回忆 / 虚构叙事',
+    resetRule: '例如：本期名称与结束时间以游戏内为准'
+  },
+  zenless: {
+    titles: {
+      main_quest: '例如：主线任务', side_quest: '例如：代理人秘闻', limited_event: '例如：嗯呢从天降',
+      permanent_event: '例如：零号空洞', weekly: '例如：周常', endgame: '例如：式舆防卫战',
+      exploration: '例如：六分街', custom: '例如：刷驱动盘'
+    },
+    parentTitle: '例如：新艾利都',
+    modeKey: '例如：式舆防卫战 / 危局强袭战',
+    resetRule: '例如：本期结束时间以游戏内为准'
+  },
+  'wuthering-waves': {
+    titles: {
+      main_quest: '例如：潮汐任务', side_quest: '例如：危行任务', limited_event: '例如：限时活动',
+      permanent_event: '例如：常驻活动', weekly: '例如：周常', endgame: '例如：逆境深塔',
+      exploration: '例如：乘霄山', custom: '例如：刷声骸'
+    },
+    parentTitle: '例如：瑝珑',
+    modeKey: '例如：逆境深塔 / 冥歌海墟',
+    resetRule: '例如：本期结束时间以游戏内为准'
+  }
 }
 
 const games = ref<GameSummary[]>([])
@@ -104,7 +152,6 @@ const imageImportRows = ref<Array<{
   startsAt: string
   endsAt: string
   modeKey: string
-  recurrenceRule: string
   warnings: string[]
 }>>([])
 const aiScheduleAgent = ref<AiScheduleAgentStatus | null>(null)
@@ -121,10 +168,10 @@ const form = reactive({
   resetRule: '',
   resetWeekday: 1,
   modeKey: '',
-  recurrenceRule: ''
 })
 
 const selectedGame = computed(() => games.value.find((game) => game.id === selectedGameId.value))
+const editorExamples = computed(() => gameEditorExamples[selectedGameId.value])
 const visibleGames = computed(() => games.value.filter((game) => !hiddenGameIds.value.includes(game.id)))
 const gameCredentialStatuses = computed(() => credentialStatuses.value)
 const aiScheduleAvailable = computed(() =>
@@ -158,7 +205,7 @@ const needsInitialSync = computed(() =>
 )
 const imageImportCategories = computed<Array<[ScheduleImageCandidate['category'], string]>>(() => {
   if (imageImportTarget.value === 'events') return [['limited_event', '限时活动']]
-  if (imageImportTarget.value === 'cycles') return [['weekly', '周常'], ['endgame', '深渊/挑战模式']]
+  if (imageImportTarget.value === 'cycles') return [['endgame', '深渊/挑战模式'], ['weekly', '周常']]
   return [['exploration', '地图探索']]
 })
 const sourceOffsetOptions = [-720, -660, -600, -540, -480, -420, -360, -300, -240, -180,
@@ -528,7 +575,6 @@ async function openScheduleImageImport(
       startsAt: toLocalDateTime(candidate.startsAt),
       endsAt: toLocalDateTime(candidate.endsAt),
       modeKey: '',
-      recurrenceRule: '',
       warnings: candidate.warnings
     }))
   } catch (error) {
@@ -553,7 +599,6 @@ async function reparseScheduleImageText(): Promise<void> {
       startsAt: toLocalDateTime(candidate.startsAt),
       endsAt: toLocalDateTime(candidate.endsAt),
       modeKey: '',
-      recurrenceRule: '',
       warnings: candidate.warnings
     }))
   } catch (error) {
@@ -575,7 +620,6 @@ function addImageImportRow(): void {
     startsAt: '',
     endsAt: '',
     modeKey: '',
-    recurrenceRule: '',
     warnings: []
   })
 }
@@ -596,8 +640,7 @@ async function applyScheduleImageImport(): Promise<void> {
         endsAt: ['limited_event', 'endgame'].includes(row.category)
           ? toIsoOrNull(row.endsAt)
           : null,
-        modeKey: row.category === 'endgame' ? row.modeKey.trim() || null : null,
-        recurrenceRule: row.category === 'endgame' ? row.recurrenceRule.trim() || null : null
+        modeKey: row.category === 'endgame' ? row.modeKey.trim() || null : null
       }))
     })
     imageImportDraft.value = null
@@ -638,7 +681,6 @@ function openCreate(category: ChecklistCategory): void {
   form.resetRule = category === 'weekly' ? '每周一重置' : ''
   form.resetWeekday = 1
   form.modeKey = ''
-  form.recurrenceRule = ''
   editorOpen.value = true
 }
 
@@ -653,7 +695,6 @@ function openEdit(item: ChecklistItem): void {
   form.resetRule = item.resetRule ?? ''
   form.resetWeekday = item.category === 'weekly' ? 1 : item.resetWeekday ?? 1
   form.modeKey = item.modeKey ?? ''
-  form.recurrenceRule = item.recurrenceRule ?? ''
   editorOpen.value = true
 }
 
@@ -686,7 +727,7 @@ async function saveItem(): Promise<void> {
       resetWeekday: isWeekly ? 1 : null,
       timeZone: isWeekly ? 'Asia/Shanghai' : null,
       modeKey: form.category === 'endgame' ? form.modeKey.trim() || null : null,
-      recurrenceRule: form.category === 'endgame' ? form.recurrenceRule.trim() || null : null
+      recurrenceRule: null
     }
     const saved = editingItem.value
       ? await window.gacha.updateChecklistItem({ id: editingItem.value.id, ...common })
@@ -1039,7 +1080,7 @@ function showError(error: unknown): void {
           <button class="close-button" type="button" aria-label="关闭事项编辑器" @click="editorOpen = false">×</button>
         </div>
 
-        <label>事项名称<input v-model="form.title" maxlength="100" autofocus placeholder="例如：刷角色突破素材" /></label>
+        <label>事项名称<input v-model="form.title" maxlength="100" autofocus :placeholder="editorExamples.titles[form.category]" /></label>
         <label>分类
           <select v-model="form.category" :disabled="editingItem ? ['main_quest', 'side_quest'].includes(editingItem.category) || isPersistentItem(editingItem) : false">
             <option v-for="[category, label] in editorCategories" :key="category" :value="category">{{ label }}</option>
@@ -1047,7 +1088,7 @@ function showError(error: unknown): void {
         </label>
         <template v-if="form.category === 'exploration'">
           <div class="form-grid">
-            <label>上级区域（可选）<input v-model="form.parentTitle" maxlength="200" placeholder="例如：枫丹" /></label>
+            <label>上级区域（可选）<input v-model="form.parentTitle" maxlength="200" :placeholder="editorExamples.parentTitle" /></label>
             <label>探索进度（%）<input v-model.number="form.progressPercent" type="number" min="0" max="100" /></label>
           </div>
         </template>
@@ -1061,9 +1102,8 @@ function showError(error: unknown): void {
           <input value="周一（固定）" disabled />
         </label>
         <template v-if="form.category === 'endgame'">
-          <label>玩法标识<input v-model="form.modeKey" maxlength="200" placeholder="例如：深境螺旋 / 幻想真境剧诗" /></label>
-          <label>周期说明<input v-model="form.resetRule" maxlength="200" placeholder="例如：每月 1 日、16 日刷新" /></label>
-          <label>自动周期规则<input v-model="form.recurrenceRule" maxlength="200" placeholder="例如：monthly-days:1,16@04:00[Asia/Shanghai]" /></label>
+          <label>玩法标识<input v-model="form.modeKey" maxlength="200" :placeholder="editorExamples.modeKey" /></label>
+          <label>周期说明<input v-model="form.resetRule" maxlength="200" :placeholder="editorExamples.resetRule" /></label>
         </template>
         <div v-if="editingItem?.sourceUrl" class="source-box">
           <div><span>同步来源</span><small>{{ editingItem.sourceUrl }}</small></div>
@@ -1105,7 +1145,7 @@ function showError(error: unknown): void {
               <select v-model="row.category">
                 <option v-for="[category, label] in imageImportCategories" :key="category" :value="category">{{ label }}</option>
               </select>
-              <input v-model="row.title" maxlength="100" placeholder="官方中文名称" />
+              <input v-model="row.title" maxlength="100" :placeholder="editorExamples.titles[row.category]" />
               <button class="danger-button compact" type="button" @click="imageImportRows.splice(index, 1)">移除</button>
             </div>
             <div v-if="['limited_event', 'endgame'].includes(row.category)" class="form-grid">
@@ -1113,8 +1153,7 @@ function showError(error: unknown): void {
               <label>结束时间<input v-model="row.endsAt" type="datetime-local" /></label>
             </div>
             <div v-if="row.category === 'endgame'" class="form-grid">
-              <label>玩法标识<input v-model="row.modeKey" maxlength="200" placeholder="例如：深境螺旋" /></label>
-              <label>自动周期规则<input v-model="row.recurrenceRule" maxlength="200" placeholder="例如：monthly-days:1,16@04:00[Asia/Shanghai]" /></label>
+              <label>玩法标识<input v-model="row.modeKey" maxlength="200" :placeholder="editorExamples.modeKey" /></label>
             </div>
             <p v-for="warning in row.warnings" :key="warning" class="image-import-warning">⚠ {{ warning }}</p>
           </div>
