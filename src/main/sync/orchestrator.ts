@@ -18,6 +18,7 @@ const PERSONAL_PLATFORM_NAMES: Record<GameId, string> = {
 
 export class SyncOrchestrator {
   private readonly inFlight = new Map<GameId, { scope: SyncScope; operation: Promise<SyncResult> }>()
+  private readonly personalInFlight = new Map<GameId, Promise<SyncSourceResult>>()
 
   constructor(
     private readonly database: AppDatabase,
@@ -92,6 +93,21 @@ export class SyncOrchestrator {
       results.push(await this.syncGame(settings.gameId, settings.autoScope))
     }
     return results
+  }
+
+  syncPersonalData(gameId: GameId): Promise<SyncSourceResult> {
+    const existing = this.personalInFlight.get(gameId)
+    if (existing) return existing
+    const operation = this.runAdapter(
+      gameId,
+      'personal_data',
+      this.adapters.personalData[gameId],
+      `${PERSONAL_PLATFORM_NAMES[gameId]}个人数据适配器尚未接入`
+    ).finally(() => {
+      this.personalInFlight.delete(gameId)
+    })
+    this.personalInFlight.set(gameId, operation)
+    return operation
   }
 
   private async runAdapter(

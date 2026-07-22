@@ -84,7 +84,8 @@ h2 { margin: 0; font-size: 19px; }
 .summary-card strong { display: block; margin-top: 4px; font-size: 30px; }
 .summary-card em { color: #aebed3; font-size: 13px; font-style: normal; font-weight: 400; }
 
-.content-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.content-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 14px; }
+.checklist-column { display: grid; align-content: start; gap: 14px; min-width: 0; }
 .empty-card { min-height: 180px; padding: 18px; }
 .empty-card p, .custom-list p { color: #7187a4; font-size: 14px; }
 .checklist-card { min-height: 240px; padding: 18px 14px 12px; }

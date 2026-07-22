@@ -239,11 +239,22 @@ export class AppDatabase {
     }
     this.requeueStaleAiScheduleJobs(reference)
     const active = this.database.prepare(`
-      SELECT id FROM ai_schedule_jobs
+      SELECT id, scope FROM ai_schedule_jobs
       WHERE game_id = ? AND status IN ('pending', 'claimed')
       ORDER BY requested_at ASC LIMIT 1
-    `).get(gameId) as { id: string } | undefined
-    if (active) return this.getAiScheduleJob(active.id)
+    `).get(gameId) as { id: string; scope: SyncScope } | undefined
+    if (active) {
+      if (scope === 'public_and_personal' && active.scope === 'public_schedule') {
+        const now = reference.toISOString()
+        this.database.prepare(`
+          UPDATE ai_schedule_jobs SET scope = 'public_and_personal', updated_at = ? WHERE id = ?
+        `).run(now, active.id)
+        this.database.prepare(`
+          UPDATE sync_states SET last_scope = 'public_and_personal', updated_at = ? WHERE game_id = ?
+        `).run(now, gameId)
+      }
+      return this.getAiScheduleJob(active.id)
+    }
     const id = randomUUID()
     const now = reference.toISOString()
     this.database.prepare(`
@@ -299,7 +310,18 @@ export class AppDatabase {
       SET status = 'completed', completed_at = ?, evidence_json = ?, message = ?, updated_at = ?
       WHERE id = ? AND status = 'claimed' AND agent_id = ?
     `).run(now, JSON.stringify(evidence), message, now, jobId, agentId)
-    this.recordSyncOutcome(job.gameId, 'success', message, true)
+    const current = this.getSyncSettings(job.gameId)
+    const personalIssue = job.scope === 'public_and_personal' &&
+      ['error', 'stale', 'verification_required'].includes(current.status)
+    const finalStatus = personalIssue
+      ? current.status === 'verification_required'
+        ? 'verification_required'
+        : 'stale'
+      : 'success'
+    const finalMessage = personalIssue && current.message
+      ? `${message}；${current.message}`
+      : message
+    this.recordSyncOutcome(job.gameId, finalStatus, finalMessage, true)
     return { job: this.getAiScheduleJob(jobId), merge }
   }
 

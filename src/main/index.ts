@@ -12,7 +12,10 @@ import {
 import { CredentialVault, removeRetiredDeepSeekCredential } from './credential-vault'
 import { detectCodexPlugin } from './ai/codex-plugin'
 import { MiyousheQrLoginService } from './auth/miyoushe-qr-login'
+import { solveMiyousheGeetest } from './auth/miyoushe-geetest-window'
 import { createElectronNetFetcher } from './sync/electron-net-fetcher'
+import { CredentialBackedAdapter } from './sync/credential-backed-adapter'
+import { createMiyousheZenlessPersonalAdapter } from './sync/miyoushe-chronicle-client'
 import { SyncOrchestrator } from './sync/orchestrator'
 import { restoreRelaunchOptions } from './relaunch'
 import type { GameId, SyncResult, SyncScope } from '../shared/contracts'
@@ -46,7 +49,7 @@ let miyousheQrLogin: MiyousheQrLoginService | null = null
 let appBackupDirectory: string | null = null
 let appDatabasePath: string | null = null
 
-function queueAiScheduleSync(gameId: GameId, scope: SyncScope): SyncResult {
+async function queueAiScheduleSync(gameId: GameId, scope: SyncScope): Promise<SyncResult> {
   if (!appDatabase) throw new Error('数据库尚未初始化')
   const startedAt = new Date().toISOString()
   try {
@@ -65,14 +68,29 @@ function queueAiScheduleSync(gameId: GameId, scope: SyncScope): SyncResult {
       preserved: 0
     }]
     if (scope === 'public_and_personal') {
-      sources.push({
-        source: 'personal_data',
-        status: 'error',
-        message: `${gameId === 'wuthering-waves' ? '库街区' : '米游社'}个人数据适配器尚未接入`,
-        added: 0,
-        updated: 0,
-        preserved: 0
-      })
+      const personal = syncOrchestrator
+        ? await syncOrchestrator.syncPersonalData(gameId)
+        : {
+            source: 'personal_data' as const,
+            status: 'error' as const,
+            message: '个人数据同步服务尚未初始化',
+            added: 0,
+            updated: 0,
+            preserved: 0
+          }
+      sources.push(personal)
+      const waitingMessage = `${personal.message}；公开排期任务等待 AI 处理`
+      const personalStatus = personal.status === 'verification_required'
+        ? 'verification_required'
+        : personal.status === 'success'
+          ? 'idle'
+          : 'error'
+      appDatabase.recordSyncOutcome(
+        gameId,
+        personalStatus,
+        waitingMessage,
+        personal.status === 'success'
+      )
     }
     return {
       gameId,
@@ -205,7 +223,7 @@ function registerIpcHandlers(): void {
         // The restore helper may already have closed this handle.
       }
       appDatabase = new AppDatabase(appDatabasePath)
-      syncOrchestrator = new SyncOrchestrator(appDatabase)
+      syncOrchestrator = createAppSyncOrchestrator(appDatabase)
       throw error
     }
     appDatabase = null
@@ -289,7 +307,7 @@ function registerIpcHandlers(): void {
     })
   })
   ipcMain.handle('sync:run', async (_event, gameId: unknown, scope: unknown) => {
-    return queueAiScheduleSync(parseGameId(gameId), parseSyncScope(scope))
+    return await queueAiScheduleSync(parseGameId(gameId), parseSyncScope(scope))
   })
   ipcMain.handle('credentials:list-status', () => {
     if (!credentialVault) throw new Error('安全凭据存储尚未初始化')
@@ -374,12 +392,13 @@ if (!app.requestSingleInstanceLock()) {
     } catch (error) {
       console.error('创建或整理每日数据库备份失败', error)
     }
-    syncOrchestrator = new SyncOrchestrator(appDatabase)
+    syncOrchestrator = createAppSyncOrchestrator(appDatabase)
     registerIpcHandlers()
     createWindow()
     for (const settings of appDatabase.listAutomaticSyncSettings()) {
-      const result = queueAiScheduleSync(settings.gameId as GameId, settings.autoScope)
-      mainWindow?.webContents.send('sync:completed', result)
+      void queueAiScheduleSync(settings.gameId as GameId, settings.autoScope).then((result) => {
+        mainWindow?.webContents.send('sync:completed', result)
+      })
     }
     periodTimer = setInterval(() => {
       const changes =
@@ -424,4 +443,23 @@ function parseQrLoginSessionId(value: unknown): string {
     throw new Error('二维码登录会话标识格式不正确')
   }
   return value
+}
+
+function createAppSyncOrchestrator(database: AppDatabase): SyncOrchestrator {
+  if (!credentialVault) return new SyncOrchestrator(database)
+  const fetcher = createElectronNetFetcher(net.fetch)
+  return new SyncOrchestrator(database, {
+    publicSchedule: {},
+    personalData: {
+      zenless: new CredentialBackedAdapter(
+        'miyoushe',
+        credentialVault,
+        (credential) => createMiyousheZenlessPersonalAdapter(
+          credential,
+          fetcher,
+          (challenge) => solveMiyousheGeetest(mainWindow, challenge)
+        )
+      )
+    }
+  })
 }

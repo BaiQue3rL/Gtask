@@ -34,6 +34,10 @@ const panels: ChecklistPanel[] = [
   { title: '周期事项', icon: '◴', section: 'cycles', categories: ['weekly', 'endgame'], defaultCategory: 'weekly' },
   { title: '地图探索', icon: '◇', section: 'exploration', categories: ['exploration'], defaultCategory: 'exploration' }
 ]
+const panelColumns: ChecklistPanel[][] = [
+  [panels[0], panels[2]],
+  [panels[1], panels[3]]
+]
 
 const categoryLabels: Record<ChecklistCategory, string> = {
   main_quest: '主线任务',
@@ -763,50 +767,52 @@ function showError(error: unknown): void {
       <section v-if="loading" class="panel centered" role="status" aria-live="polite">正在读取本地清单…</section>
       <template v-else>
         <section class="content-grid">
-          <article v-for="panel in panels" :key="panel.title" class="panel checklist-card">
-            <div class="section-header">
-              <h2><span>{{ panel.icon }}</span>{{ panel.title }}</h2>
-              <button
-                class="clear-completed-button"
-                type="button"
-                :disabled="!items.some((item) => panel.categories.includes(item.category) && item.completed)"
-                @click="archiveCompletedSection(panel.section, panel.categories, panel.title)"
-              >删除已完成</button>
-            </div>
-            <div class="item-list">
-              <div
-                v-for="item in itemsFor(panel.categories)"
-                :key="item.id"
-                class="checklist-row"
-                :class="{ completed: item.completed }"
-              >
-                <button class="check-button" type="button" :aria-label="item.completed ? '标为未完成' : '标为完成'" @click="toggleCompleted(item)">
-                  {{ item.completed ? '✓' : '' }}
-                </button>
-                <button class="item-main" type="button" :title="item.title" @click="openEdit(item)">
-                  <span class="item-title">{{ item.title }}</span>
-                  <span class="item-details">
-                    <b>{{ categoryLabels[item.category] }}</b>
-                    <span v-if="item.parentTitle">{{ item.parentTitle }}</span>
-                    <span v-if="item.progressPercent !== null">{{ item.progressPercent }}%</span>
-                    <span v-if="item.resetRule" class="reset-detail">{{ item.resetRule }}</span>
-                    <span
-                      v-if="item.source !== 'manual' && item.lastSyncedAt"
-                      class="source-detail"
-                      :title="`${item.source === 'public_schedule' ? '公开排期' : '个人数据'} · 同步于 ${formatLocalTime(item.lastSyncedAt)}${item.sourceUrl ? ` · ${item.sourceUrl}` : ''}`"
-                    >
-                      {{ item.source === 'public_schedule' ? '公开排期' : '个人数据' }}
-                    </span>
-                  </span>
-                  <span v-if="item.startsAt && isUpcoming(item.startsAt)" class="item-timing deadline upcoming">{{ countdown(item.startsAt, '距离开始') }}</span>
-                  <span v-else-if="item.endsAt" class="item-timing deadline" :class="{ expired: isExpired(item.endsAt) }">{{ countdown(item.endsAt) }}</span>
-                </button>
-                <button class="more-button" type="button" aria-label="编辑" @click="openEdit(item)">⋮</button>
+          <div v-for="(column, columnIndex) in panelColumns" :key="columnIndex" class="checklist-column">
+            <article v-for="panel in column" :key="panel.title" class="panel checklist-card">
+              <div class="section-header">
+                <h2><span>{{ panel.icon }}</span>{{ panel.title }}</h2>
+                <button
+                  class="clear-completed-button"
+                  type="button"
+                  :disabled="!items.some((item) => panel.categories.includes(item.category) && item.completed)"
+                  @click="archiveCompletedSection(panel.section, panel.categories, panel.title)"
+                >删除已完成</button>
               </div>
-              <p v-if="itemsFor(panel.categories).length === 0" class="empty-text">暂无事项</p>
-            </div>
-            <button v-if="panel.allowCreate !== false" class="add-button" type="button" @click="openCreate(panel.defaultCategory)">＋ 新增{{ panel.title }}</button>
-          </article>
+              <div class="item-list">
+                <div
+                  v-for="item in itemsFor(panel.categories)"
+                  :key="item.id"
+                  class="checklist-row"
+                  :class="{ completed: item.completed }"
+                >
+                  <button class="check-button" type="button" :aria-label="item.completed ? '标为未完成' : '标为完成'" @click="toggleCompleted(item)">
+                    {{ item.completed ? '✓' : '' }}
+                  </button>
+                  <button class="item-main" type="button" :title="item.title" @click="openEdit(item)">
+                    <span class="item-title">{{ item.title }}</span>
+                    <span class="item-details">
+                      <b>{{ categoryLabels[item.category] }}</b>
+                      <span v-if="item.parentTitle">{{ item.parentTitle }}</span>
+                      <span v-if="item.progressPercent !== null">{{ item.progressPercent }}%</span>
+                      <span v-if="item.resetRule" class="reset-detail">{{ item.resetRule }}</span>
+                      <span
+                        v-if="item.source !== 'manual' && item.lastSyncedAt"
+                        class="source-detail"
+                        :title="`${item.source === 'public_schedule' ? '公开排期' : '个人数据'} · 同步于 ${formatLocalTime(item.lastSyncedAt)}${item.sourceUrl ? ` · ${item.sourceUrl}` : ''}`"
+                      >
+                        {{ item.source === 'public_schedule' ? '公开排期' : '个人数据' }}
+                      </span>
+                    </span>
+                    <span v-if="item.startsAt && isUpcoming(item.startsAt)" class="item-timing deadline upcoming">{{ countdown(item.startsAt, '距离开始') }}</span>
+                    <span v-else-if="item.endsAt" class="item-timing deadline" :class="{ expired: isExpired(item.endsAt) }">{{ countdown(item.endsAt) }}</span>
+                  </button>
+                  <button class="more-button" type="button" aria-label="编辑" @click="openEdit(item)">⋮</button>
+                </div>
+                <p v-if="itemsFor(panel.categories).length === 0" class="empty-text">暂无事项</p>
+              </div>
+              <button v-if="panel.allowCreate !== false" class="add-button" type="button" @click="openCreate(panel.defaultCategory)">＋ 新增{{ panel.title }}</button>
+            </article>
+          </div>
         </section>
 
         <section class="panel custom-list">

@@ -5,6 +5,7 @@ import { ZenlessPersonalAdapter, type ZenlessBattleChronicleClient } from './zen
 
 const ACCOUNT_ROLES_URL = 'https://api-takumi.mihoyo.com/binding/api/getUserGameRolesByCookie'
 const ZENLESS_RECORD_BASE = 'https://api-takumi-record.mihoyo.com/event/game_record_zzz/api/zzz'
+const CREATE_VERIFICATION_URL = 'https://api-takumi-record.mihoyo.com/game_record/app/card/wapi/createVerification?is_high=false'
 const CN_DS_SALT = 'xV8v4Qu54lUKrEYFZkJhB8cuOh9Asafs'
 const GEETEST_RETCODES = new Set([10035, 5003, 10041, 1034])
 
@@ -20,12 +21,30 @@ interface MiyousheGameAccount {
   region?: unknown
 }
 
+export interface MiyousheGeetestChallenge {
+  gt: string
+  challenge: string
+  newCaptcha: number
+  success: number
+}
+
+export interface MiyousheGeetestResult {
+  geetest_challenge: string
+  geetest_validate: string
+  geetest_seccode: string
+}
+
+export type MiyousheGeetestSolver = (
+  challenge: MiyousheGeetestChallenge
+) => Promise<MiyousheGeetestResult | null>
+
 export class MiyousheZenlessClient implements ZenlessBattleChronicleClient {
   private account: { uid: string; region: string } | null = null
 
   constructor(
     private readonly cookie: string,
-    private readonly fetcher: typeof fetch
+    private readonly fetcher: typeof fetch,
+    private readonly solveGeetest?: MiyousheGeetestSolver
   ) {
     if (!cookie.trim()) throw new Error('米游社登录凭据为空')
   }
@@ -63,7 +82,11 @@ export class MiyousheZenlessClient implements ZenlessBattleChronicleClient {
     return this.account
   }
 
-  private async request(url: string, query: Record<string, string>): Promise<unknown> {
+  private async request(
+    url: string,
+    query: Record<string, string>,
+    verification?: MiyousheGeetestResult
+  ): Promise<unknown> {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 15_000)
     try {
@@ -78,13 +101,24 @@ export class MiyousheZenlessClient implements ZenlessBattleChronicleClient {
           ds: generateCnDynamicSecret(query),
           'x-rpc-app_version': '2.11.1',
           'x-rpc-client_type': '5',
-          'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/58.0.3029.110 Safari/537.36'
+          'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/58.0.3029.110 Safari/537.36',
+          ...(verification ? {
+            'x-rpc-challenge': verification.geetest_challenge,
+            'x-rpc-validate': verification.geetest_validate,
+            'x-rpc-seccode': verification.geetest_seccode
+          } : {})
         }
       })
       if (!response.ok) throw new Error(`米游社个人数据请求失败（HTTP ${response.status}）`)
       const envelope = await response.json() as MiyousheEnvelope
       const retcode = envelope.retcode ?? 0
       if (GEETEST_RETCODES.has(retcode) || response.headers.has('x-rpc-aigis')) {
+        if (!verification && this.solveGeetest) {
+          const challenge = await this.createGeetestChallenge()
+          const result = await this.solveGeetest(challenge)
+          if (!result) throw new SyncVerificationRequiredError('米游社滑块验证已取消')
+          return await this.request(url, query, result)
+        }
         throw new SyncVerificationRequiredError('米游社需要完成滑块或设备验证')
       }
       if (retcode === -100 || retcode === 10001) {
@@ -100,16 +134,60 @@ export class MiyousheZenlessClient implements ZenlessBattleChronicleClient {
       clearTimeout(timeout)
     }
   }
+
+  private async createGeetestChallenge(): Promise<MiyousheGeetestChallenge> {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 15_000)
+    try {
+      const response = await this.fetcher(CREATE_VERIFICATION_URL, {
+        method: 'GET',
+        redirect: 'error',
+        signal: controller.signal,
+        headers: {
+          cookie: this.cookie,
+          ds: generateGeetestDynamicSecret(),
+          'x-rpc-app_version': '2.60.1',
+          'x-rpc-client_type': '5',
+          'x-rpc-challenge_game': '6',
+          'x-rpc-page': 'v1.4.1-rpg_#/rpg',
+          'x-rpc-tool-version': 'v1.4.1-rpg'
+        }
+      })
+      if (!response.ok) throw new Error(`米游社验证服务请求失败（HTTP ${response.status}）`)
+      const envelope = await response.json() as MiyousheEnvelope
+      if ((envelope.retcode ?? 0) !== 0) {
+        throw new SyncVerificationRequiredError(envelope.message || '米游社无法创建滑块验证')
+      }
+      const data = asRecord(envelope.data)
+      const gt = toNonEmptyString(data.gt)
+      const challenge = toNonEmptyString(data.challenge)
+      if (!gt || !challenge) throw new SyncVerificationRequiredError('米游社未返回完整的滑块验证参数')
+      return {
+        gt,
+        challenge,
+        newCaptcha: Number(data.new_captcha ?? 1),
+        success: Number(data.success ?? 1)
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new SyncVerificationRequiredError('米游社验证服务请求超时')
+      }
+      throw error
+    } finally {
+      clearTimeout(timeout)
+    }
+  }
 }
 
 export function createMiyousheZenlessPersonalAdapter(
   credential: CredentialPayload,
-  fetcher: typeof fetch
+  fetcher: typeof fetch,
+  solveGeetest?: MiyousheGeetestSolver
 ): ZenlessPersonalAdapter {
   if (credential.kind !== 'cookie') {
     throw new SyncVerificationRequiredError('米游社凭据格式已过期，请重新登录')
   }
-  return new ZenlessPersonalAdapter(new MiyousheZenlessClient(credential.value, fetcher))
+  return new ZenlessPersonalAdapter(new MiyousheZenlessClient(credential.value, fetcher, solveGeetest))
 }
 
 function generateCnDynamicSecret(query: Record<string, string>): string {
@@ -121,6 +199,15 @@ function generateCnDynamicSecret(query: Record<string, string>): string {
     .join('&')
   const hash = createHash('md5')
     .update(`salt=${CN_DS_SALT}&t=${timestamp}&r=${random}&b=&q=${normalizedQuery}`)
+    .digest('hex')
+  return `${timestamp},${random},${hash}`
+}
+
+function generateGeetestDynamicSecret(): string {
+  const timestamp = Math.floor(Date.now() / 1000)
+  const random = randomInt(100000, 200001)
+  const hash = createHash('md5')
+    .update(`salt=${CN_DS_SALT}&t=${timestamp}&r=${random}&b=&q=is_high=false`)
     .digest('hex')
   return `${timestamp},${random},${hash}`
 }

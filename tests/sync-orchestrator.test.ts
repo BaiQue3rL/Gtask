@@ -161,4 +161,40 @@ describe('SyncOrchestrator', () => {
     expect(adapter).toHaveBeenCalledTimes(1)
     expect(secondResult).toEqual(firstResult)
   })
+
+  it('可单独运行个人适配器并复用同一游戏的并发请求', async () => {
+    database = new AppDatabase(':memory:')
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const personal = vi.fn(async () => {
+      await gate
+      return {
+        items: [{
+          remoteKey: 'endgame:shiyu-defense',
+          category: 'endgame' as const,
+          title: '式舆防卫战',
+          completed: true
+        }],
+        message: '绝区零个人数据已同步'
+      }
+    })
+    const orchestrator = new SyncOrchestrator(database, {
+      publicSchedule: {},
+      personalData: { zenless: { sync: personal } }
+    })
+
+    const first = orchestrator.syncPersonalData('zenless')
+    const second = orchestrator.syncPersonalData('zenless')
+    release()
+    const [firstResult, secondResult] = await Promise.all([first, second])
+
+    expect(personal).toHaveBeenCalledTimes(1)
+    expect(secondResult).toEqual(firstResult)
+    expect(firstResult).toMatchObject({ source: 'personal_data', status: 'success', added: 1 })
+    expect(database.listChecklistItems('zenless')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ title: '式舆防卫战', completed: true, source: 'personal_sync' })
+    ]))
+  })
 })

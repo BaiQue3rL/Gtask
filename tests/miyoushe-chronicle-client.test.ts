@@ -72,6 +72,48 @@ describe('MiyousheZenlessClient', () => {
     })
   })
 
+  it('opens the injected manual solver and retries once with Geetest headers', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(response({ retcode: 0, data: { list: [
+        { game_biz: 'nap_cn', game_uid: '10194867', region: 'prod_gf_cn' }
+      ] } }))
+      .mockResolvedValueOnce(response({ retcode: 1034, message: 'Verification required', data: null }))
+      .mockResolvedValueOnce(response({ retcode: 0, data: {
+        gt: 'geetest-id',
+        challenge: 'challenge-id',
+        new_captcha: 1,
+        success: 1
+      } }))
+      .mockResolvedValueOnce(response({ retcode: 0, data: {
+        hadal_ver: 'v2',
+        hadal_info_v2: {
+          zone_id: 62052,
+          hadal_begin_time: '2026-07-10T04:00:00+08:00',
+          hadal_end_time: '2026-07-24T03:59:59+08:00',
+          pass_fifth_floor: true,
+          brief: { score: 150000, max_score: 150000 }
+        }
+      } }))
+    const solver = vi.fn(async () => ({
+      geetest_challenge: 'verified-challenge',
+      geetest_validate: 'verified-validate',
+      geetest_seccode: 'verified-seccode'
+    }))
+    const client = new MiyousheZenlessClient('cookie=secret', fetcher, solver)
+
+    await expect(client.getShiyuDefense()).resolves.toMatchObject({ schedule_id: 62052 })
+    expect(solver).toHaveBeenCalledWith({
+      gt: 'geetest-id',
+      challenge: 'challenge-id',
+      newCaptcha: 1,
+      success: 1
+    })
+    const retryHeaders = new Headers(fetcher.mock.calls[3][1]?.headers)
+    expect(retryHeaders.get('x-rpc-challenge')).toBe('verified-challenge')
+    expect(retryHeaders.get('x-rpc-validate')).toBe('verified-validate')
+    expect(retryHeaders.get('x-rpc-seccode')).toBe('verified-seccode')
+  })
+
   it('rejects retired credential payloads before a network request', () => {
     expect(() => createMiyousheZenlessPersonalAdapter(
       { kind: 'session', value: 'old-session' },

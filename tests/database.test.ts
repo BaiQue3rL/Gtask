@@ -413,6 +413,46 @@ describe('AppDatabase', () => {
       agentId: null,
       agentName: null
     })
+
+    const upgraded = database.createAiScheduleJob(
+      'genshin',
+      'public_and_personal',
+      new Date('2026-07-21T14:46:00.000Z'),
+      true
+    )
+    expect(upgraded).toMatchObject({ id: queued.id, scope: 'public_and_personal' })
+    expect(database.getSyncSettings('genshin').lastScope).toBe('public_and_personal')
+  })
+
+  it('公开排期回写后保留同轮个人数据需要验证的状态', () => {
+    database = new AppDatabase(':memory:')
+    database.registerAiScheduleAgent('agent-personal-state', '测试 Agent')
+    const queued = database.createAiScheduleJob('zenless', 'public_and_personal')
+    const claimed = database.claimAiScheduleJob('agent-personal-state')!
+    expect(claimed.id).toBe(queued.id)
+    database.recordSyncOutcome(
+      'zenless',
+      'verification_required',
+      '米游社需要完成滑块或设备验证',
+      false
+    )
+
+    database.applyAiScheduleJob(
+      queued.id,
+      'agent-personal-state',
+      [{
+        remoteKey: 'event:test-public',
+        category: 'limited_event',
+        title: '公开活动'
+      }],
+      []
+    )
+
+    expect(database.getSyncSettings('zenless')).toMatchObject({
+      status: 'verification_required',
+      message: expect.stringContaining('米游社需要完成滑块或设备验证')
+    })
+    expect(database.getSyncSettings('zenless').lastSuccessAt).not.toBeNull()
   })
 
   it('成功同步超过时限后只标记过期并保留最后成功时间', () => {
