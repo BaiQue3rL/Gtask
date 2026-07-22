@@ -5,6 +5,7 @@ import {
   SCHEDULE_KINDS,
   SYNC_RUN_MODES,
   SYNC_SCOPES,
+  SYNC_TARGETS,
   SUPPORTED_GAME_IDS,
   type ChecklistCategory,
   type ChecklistSection,
@@ -14,6 +15,7 @@ import {
   type ScheduleKind,
   type SyncRunMode,
   type SyncScope,
+  type SyncTarget,
   type UpdateChecklistItemInput
 } from '../shared/contracts'
 
@@ -165,6 +167,13 @@ export function parseSyncScope(value: unknown): SyncScope {
     throw new Error('不支持的同步范围')
   }
   return value as SyncScope
+}
+
+export function parseSyncTarget(value: unknown): SyncTarget {
+  if (typeof value !== 'string' || !SYNC_TARGETS.includes(value as SyncTarget)) {
+    throw new Error('不支持的同步版块')
+  }
+  return value as SyncTarget
 }
 
 export function parseCredentialProvider(value: unknown): CredentialProvider {

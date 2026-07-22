@@ -15,6 +15,7 @@ import type {
   MiyousheQrLoginState,
   SyncResult,
   SyncScope,
+  SyncTarget,
   SyncSettings
 } from '../../shared/contracts'
 import { readHiddenGameIds, writeHiddenGameIds } from './game-visibility'
@@ -26,13 +27,15 @@ interface ChecklistPanel {
   categories: ChecklistCategory[]
   defaultCategory: ChecklistCategory
   allowCreate?: boolean
+  allowClear?: boolean
+  syncTarget?: Exclude<SyncTarget, 'all'>
 }
 
 const panels: ChecklistPanel[] = [
-  { title: '任务', icon: '▣', section: 'tasks', categories: ['main_quest', 'side_quest'], defaultCategory: 'side_quest', allowCreate: false },
-  { title: '活动', icon: '♧', section: 'events', categories: ['limited_event', 'permanent_event'], defaultCategory: 'limited_event' },
-  { title: '周期事项', icon: '◴', section: 'cycles', categories: ['weekly', 'endgame'], defaultCategory: 'weekly' },
-  { title: '地图探索', icon: '◇', section: 'exploration', categories: ['exploration'], defaultCategory: 'exploration' }
+  { title: '任务', icon: '▣', section: 'tasks', categories: ['main_quest', 'side_quest'], defaultCategory: 'side_quest', allowCreate: false, allowClear: false },
+  { title: '活动', icon: '♧', section: 'events', categories: ['limited_event', 'permanent_event'], defaultCategory: 'limited_event', syncTarget: 'events' },
+  { title: '周期事项', icon: '◴', section: 'cycles', categories: ['weekly', 'endgame'], defaultCategory: 'weekly', syncTarget: 'cycles' },
+  { title: '地图探索', icon: '◇', section: 'exploration', categories: ['exploration'], defaultCategory: 'exploration', syncTarget: 'exploration' }
 ]
 const panelColumns: ChecklistPanel[][] = [
   [panels[0], panels[2]],
@@ -71,6 +74,7 @@ const errorMessage = ref('')
 const selectedGameId = ref<GameId>('genshin')
 const showIncompleteOnly = ref(false)
 const refreshMenuOpen = ref(false)
+const sectionSyncMenuOpen = ref<ChecklistSection | null>(null)
 const syncing = ref(false)
 const syncSettings = ref<SyncSettings | null>(null)
 const syncNotice = ref<{ status: SyncResult['status']; message: string } | null>(null)
@@ -130,6 +134,10 @@ const syncModeValue = computed(() => {
     : 'automatic_personal'
 })
 const incompleteCount = computed(() => items.value.filter((item) => !item.completed).length)
+const needsInitialSync = computed(() =>
+  syncSettings.value?.lastSuccessAt === null &&
+  items.value.every((item) => ['main_quest', 'side_quest'].includes(item.category))
+)
 const completedCount = computed(() => {
   const weekStart = startOfCurrentWeek()
   return items.value.filter((item) => item.completedAt && new Date(item.completedAt) >= weekStart).length
@@ -222,6 +230,7 @@ function handleGlobalKeydown(event: KeyboardEvent): void {
     return
   }
   refreshMenuOpen.value = false
+  sectionSyncMenuOpen.value = null
   editorOpen.value = false
   recycleBinOpen.value = false
   settingsOpen.value = false
@@ -230,6 +239,7 @@ function handleGlobalKeydown(event: KeyboardEvent): void {
 watch(selectedGameId, () => {
   syncNotice.value = null
   refreshMenuOpen.value = false
+  sectionSyncMenuOpen.value = null
   recycleBinOpen.value = false
   void Promise.all([loadItems(), loadArchivedItems(), loadSyncSettings()])
 })
@@ -450,13 +460,14 @@ async function updateSyncMode(event: Event): Promise<void> {
   }
 }
 
-async function runSync(scope: SyncScope): Promise<void> {
+async function runSync(scope: SyncScope, target: SyncTarget = 'all'): Promise<void> {
   const gameId = selectedGameId.value
   refreshMenuOpen.value = false
+  sectionSyncMenuOpen.value = null
   syncing.value = true
   syncNotice.value = null
   try {
-    const result = await window.gacha.syncGame(gameId, scope)
+    const result = await window.gacha.syncGame(gameId, scope, target)
     if (selectedGameId.value === gameId) {
       syncNotice.value = { status: result.status, message: result.message }
       await Promise.all([loadItems(), loadSyncSettings()])
@@ -474,8 +485,12 @@ function itemsFor(categories: ChecklistCategory[]): ChecklistItem[] {
   )
 }
 
-function isPersistentWeekly(item: ChecklistItem): boolean {
-  return item.category === 'weekly' && item.id === `${item.gameId}:weekly`
+function isPersistentItem(item: ChecklistItem): boolean {
+  return [
+    `${item.gameId}:main_quest`,
+    `${item.gameId}:side_quest`,
+    `${item.gameId}:weekly`
+  ].includes(item.id)
 }
 
 function openCreate(category: ChecklistCategory): void {
@@ -578,7 +593,7 @@ async function archiveCompletedSection(
   sectionTitle: string
 ): Promise<void> {
   const completedItems = items.value.filter(
-    (item) => categories.includes(item.category) && item.completed && !isPersistentWeekly(item)
+    (item) => categories.includes(item.category) && item.completed && !isPersistentItem(item)
   )
   if (completedItems.length === 0) return
   if (!window.confirm(`确定删除“${sectionTitle}”中的 ${completedItems.length} 个已完成事项吗？`)) return
@@ -741,6 +756,15 @@ function showError(error: unknown): void {
       </header>
 
       <p v-if="errorMessage" class="error-banner" role="alert">{{ errorMessage }}</p>
+      <div v-if="needsInitialSync" class="onboarding-banner">
+        <div>
+          <strong>先完成一次初始全局同步</strong>
+          <span>将按你的系统时区建立活动、周期事项和地图目录；周期与地图之后会在本地长期维护。</span>
+        </div>
+        <button type="button" :disabled="syncing || !aiScheduleAvailable" @click="runSync('public_schedule', 'all')">
+          {{ aiScheduleAvailable ? '开始初始同步' : '请先连接 Codex/MCP' }}
+        </button>
+      </div>
       <div v-if="syncNotice" class="sync-banner" :class="syncNotice.status" aria-live="polite">
         <span>{{ syncNotice.message }}</span>
         <button
@@ -772,12 +796,29 @@ function showError(error: unknown): void {
             <article v-for="panel in column" :key="panel.title" class="panel checklist-card">
               <div class="section-header">
                 <h2><span>{{ panel.icon }}</span>{{ panel.title }}</h2>
-                <button
-                  class="clear-completed-button"
-                  type="button"
-                  :disabled="!items.some((item) => panel.categories.includes(item.category) && item.completed && !isPersistentWeekly(item))"
-                  @click="archiveCompletedSection(panel.section, panel.categories, panel.title)"
-                >删除已完成</button>
+                <div class="section-actions">
+                  <div v-if="panel.syncTarget" class="dropdown" @click.stop>
+                    <button
+                      class="section-sync-button"
+                      type="button"
+                      :disabled="syncing || !aiScheduleAvailable"
+                      aria-haspopup="menu"
+                      :aria-expanded="sectionSyncMenuOpen === panel.section"
+                      @click="sectionSyncMenuOpen = sectionSyncMenuOpen === panel.section ? null : panel.section"
+                    >↻ 同步 ▾</button>
+                    <div v-if="sectionSyncMenuOpen === panel.section" class="dropdown-menu section-sync-menu" role="menu">
+                      <button role="menuitem" type="button" @click="runSync('public_schedule', panel.syncTarget)">仅同步{{ panel.title }}公开资料</button>
+                      <button role="menuitem" type="button" @click="runSync('public_and_personal', panel.syncTarget)">同步公开资料 + {{ personalPlatform }}</button>
+                    </div>
+                  </div>
+                  <button
+                    v-if="panel.allowClear !== false"
+                    class="clear-completed-button"
+                    type="button"
+                    :disabled="!items.some((item) => panel.categories.includes(item.category) && item.completed && !isPersistentItem(item))"
+                    @click="archiveCompletedSection(panel.section, panel.categories, panel.title)"
+                  >删除已完成</button>
+                </div>
               </div>
               <div class="item-list">
                 <div
@@ -862,7 +903,7 @@ function showError(error: unknown): void {
 
         <label>事项名称<input v-model="form.title" maxlength="100" autofocus placeholder="例如：刷角色突破素材" /></label>
         <label>分类
-          <select v-model="form.category" :disabled="editingItem ? ['main_quest', 'side_quest'].includes(editingItem.category) || isPersistentWeekly(editingItem) : false">
+          <select v-model="form.category" :disabled="editingItem ? ['main_quest', 'side_quest'].includes(editingItem.category) || isPersistentItem(editingItem) : false">
             <option v-for="[category, label] in editorCategories" :key="category" :value="category">{{ label }}</option>
           </select>
         </label>
@@ -891,7 +932,7 @@ function showError(error: unknown): void {
         </div>
 
         <div class="modal-actions">
-          <button v-if="editingItem && !isPersistentWeekly(editingItem)" class="danger-button" type="button" @click="archiveItem(editingItem)">删除</button>
+          <button v-if="editingItem && !isPersistentItem(editingItem)" class="danger-button" type="button" @click="archiveItem(editingItem)">删除</button>
           <span></span>
           <button class="secondary-button" type="button" @click="editorOpen = false">取消</button>
           <button class="primary-button" type="submit" :disabled="saving || !form.title.trim()">{{ saving ? '保存中…' : '保存' }}</button>

@@ -23,6 +23,8 @@ export const SYNC_RUN_MODES = ['manual', 'automatic'] as const
 export type SyncRunMode = (typeof SYNC_RUN_MODES)[number]
 export const SYNC_SCOPES = ['public_schedule', 'public_and_personal'] as const
 export type SyncScope = (typeof SYNC_SCOPES)[number]
+export const SYNC_TARGETS = ['all', 'tasks', 'events', 'cycles', 'exploration'] as const
+export type SyncTarget = (typeof SYNC_TARGETS)[number]
 export type SyncStatus = 'idle' | 'success' | 'error' | 'stale' | 'verification_required'
 export const SCHEDULE_KINDS = ['weekly', 'fixed_window', 'remote_schedule'] as const
 export type ScheduleKind = (typeof SCHEDULE_KINDS)[number]
@@ -70,6 +72,8 @@ export interface AiScheduleJob {
   id: string
   gameId: GameId
   scope: SyncScope
+  target: SyncTarget
+  userTimeZone: string
   status: AiScheduleJobStatus
   requestedAt: string
   claimedAt: string | null
@@ -184,6 +188,7 @@ export interface SyncSourceResult {
 export interface SyncResult {
   gameId: GameId
   requestedScope: SyncScope
+  requestedTarget: SyncTarget
   status: 'success' | 'partial' | 'error'
   startedAt: string
   finishedAt: string
@@ -210,7 +215,7 @@ export interface GachaApi {
   archiveCompletedSection: (input: ArchiveCompletedSectionInput) => Promise<number>
   getSyncSettings: (gameId: GameId) => Promise<SyncSettings>
   updateSyncSettings: (input: UpdateSyncSettingsInput) => Promise<SyncSettings>
-  syncGame: (gameId: GameId, scope: SyncScope) => Promise<SyncResult>
+  syncGame: (gameId: GameId, scope: SyncScope, target?: SyncTarget) => Promise<SyncResult>
   listCredentialStatuses: () => Promise<CredentialStatus[]>
   startMiyousheQrLogin: () => Promise<MiyousheQrLoginState>
   pollMiyousheQrLogin: (sessionId: string) => Promise<MiyousheQrLoginState>

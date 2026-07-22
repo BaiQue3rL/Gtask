@@ -1,7 +1,9 @@
 import type {
+  ChecklistCategory,
   GameId,
   SyncResult,
   SyncScope,
+  SyncTarget,
   SyncSourceResult,
   SyncStatus
 } from '../../shared/contracts'
@@ -17,26 +19,27 @@ const PERSONAL_PLATFORM_NAMES: Record<GameId, string> = {
 }
 
 export class SyncOrchestrator {
-  private readonly inFlight = new Map<GameId, { scope: SyncScope; operation: Promise<SyncResult> }>()
-  private readonly personalInFlight = new Map<GameId, Promise<SyncSourceResult>>()
+  private readonly inFlight = new Map<string, { scope: SyncScope; operation: Promise<SyncResult> }>()
+  private readonly personalInFlight = new Map<string, Promise<SyncSourceResult>>()
 
   constructor(
     private readonly database: AppDatabase,
     private readonly adapters: SyncAdapterRegistry = { publicSchedule: {}, personalData: {} }
   ) {}
 
-  syncGame(gameId: GameId, scope: SyncScope): Promise<SyncResult> {
-    const existing = this.inFlight.get(gameId)
+  syncGame(gameId: GameId, scope: SyncScope, target: SyncTarget = 'all'): Promise<SyncResult> {
+    const key = `${gameId}:${target}`
+    const existing = this.inFlight.get(key)
     if (existing?.scope === scope) return existing.operation
-    if (existing) return existing.operation.then(() => this.syncGame(gameId, scope))
-    const operation = this.performSync(gameId, scope).finally(() => {
-      this.inFlight.delete(gameId)
+    if (existing) return existing.operation.then(() => this.syncGame(gameId, scope, target))
+    const operation = this.performSync(gameId, scope, target).finally(() => {
+      this.inFlight.delete(key)
     })
-    this.inFlight.set(gameId, { scope, operation })
+    this.inFlight.set(key, { scope, operation })
     return operation
   }
 
-  private async performSync(gameId: GameId, scope: SyncScope): Promise<SyncResult> {
+  private async performSync(gameId: GameId, scope: SyncScope, target: SyncTarget): Promise<SyncResult> {
     const startedAt = new Date().toISOString()
     this.database.recordSyncAttempt(gameId, scope)
 
@@ -46,7 +49,8 @@ export class SyncOrchestrator {
         gameId,
         'public_schedule',
         this.adapters.publicSchedule[gameId],
-        '公开排期适配器尚未接入'
+        '公开排期适配器尚未接入',
+        target
       )
     )
 
@@ -56,7 +60,8 @@ export class SyncOrchestrator {
           gameId,
           'personal_data',
           this.adapters.personalData[gameId],
-          `${PERSONAL_PLATFORM_NAMES[gameId]}个人数据适配器尚未接入`
+          `${PERSONAL_PLATFORM_NAMES[gameId]}个人数据适配器尚未接入`,
+          target
         )
       )
     }
@@ -79,6 +84,7 @@ export class SyncOrchestrator {
     return {
       gameId,
       requestedScope: scope,
+      requestedTarget: target,
       status,
       startedAt,
       finishedAt: new Date().toISOString(),
@@ -95,18 +101,20 @@ export class SyncOrchestrator {
     return results
   }
 
-  syncPersonalData(gameId: GameId): Promise<SyncSourceResult> {
-    const existing = this.personalInFlight.get(gameId)
+  syncPersonalData(gameId: GameId, target: SyncTarget = 'all'): Promise<SyncSourceResult> {
+    const key = `${gameId}:${target}`
+    const existing = this.personalInFlight.get(key)
     if (existing) return existing
     const operation = this.runAdapter(
       gameId,
       'personal_data',
       this.adapters.personalData[gameId],
-      `${PERSONAL_PLATFORM_NAMES[gameId]}个人数据适配器尚未接入`
+      `${PERSONAL_PLATFORM_NAMES[gameId]}个人数据适配器尚未接入`,
+      target
     ).finally(() => {
-      this.personalInFlight.delete(gameId)
+      this.personalInFlight.delete(key)
     })
-    this.personalInFlight.set(gameId, operation)
+    this.personalInFlight.set(key, operation)
     return operation
   }
 
@@ -114,7 +122,8 @@ export class SyncOrchestrator {
     gameId: GameId,
     source: SyncSourceResult['source'],
     adapter: SyncAdapter | undefined,
-    unavailableMessage: string
+    unavailableMessage: string,
+    target: SyncTarget = 'all'
   ): Promise<SyncSourceResult> {
     if (!adapter) {
       return {
@@ -130,10 +139,20 @@ export class SyncOrchestrator {
     try {
       const result = await adapter.sync(gameId)
       const checklistSource = source === 'public_schedule' ? 'public_schedule' : 'personal_sync'
+      const targetCategories: Partial<Record<SyncTarget, ChecklistCategory[]>> = {
+        tasks: ['main_quest', 'side_quest'],
+        events: ['limited_event', 'permanent_event'],
+        cycles: ['weekly', 'endgame'],
+        exploration: ['exploration']
+      }
+      const categories = targetCategories[target]
+      const normalizedItems = normalizeSyncItems(result.items).filter(
+        (item) => !categories || categories.includes(item.category)
+      )
       const merge = this.database.mergeSyncedItems(
         gameId,
         checklistSource,
-        normalizeSyncItems(result.items)
+        normalizedItems
       )
       const changes = merge.added + merge.updated
       const changeMessage = changes > 0

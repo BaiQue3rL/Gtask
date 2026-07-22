@@ -18,7 +18,7 @@ const scheduleKindSchema = z.enum(['weekly', 'fixed_window', 'remote_schedule'])
 const nullableTextSchema = z.string().max(200).nullable().optional()
 const nullableDateSchema = z.string().nullable().optional()
 const nullableProgressSchema = z.number().min(0).max(100).nullable().optional()
-const publicScheduleCategorySchema = z.enum(['limited_event', 'weekly', 'endgame'])
+const publicScheduleCategorySchema = z.enum(['limited_event', 'weekly', 'endgame', 'exploration'])
 const chineseScheduleTitleSchema = z.string().min(1).max(100).regex(
   /\p{Script=Han}/u,
   '公开排期名称必须包含经中文来源核对的中文正式名称'
@@ -285,7 +285,7 @@ export function createLocalMcpServer(
     'apply_gacha_public_schedule',
     {
       title: '提交已验证的公开排期',
-      description: '把联网检索并交叉验证后的公开排期提交给已领取任务。每个名称必须来自中文来源并包含中文，不能提交完成状态、探索度或删除操作。',
+      description: '把联网检索并交叉验证后的活动、周期排期或地图区域目录提交给已领取任务。每个名称必须来自中文来源并包含中文，不能提交个人探索度、完成状态或删除操作。',
       inputSchema: {
         agentId: z.string().min(1).max(100),
         jobId: z.string().uuid(),
@@ -295,6 +295,7 @@ export function createLocalMcpServer(
           category: publicScheduleCategorySchema,
           title: chineseScheduleTitleSchema,
           titleSourceUrl: httpUrlSchema,
+          parentTitle: z.string().max(200).nullable().optional(),
           startsAt: isoDateSchema.nullable().optional(),
           endsAt: isoDateSchema.nullable().optional(),
           resetRule: z.string().max(200).nullable().optional(),

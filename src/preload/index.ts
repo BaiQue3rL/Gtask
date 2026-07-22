@@ -20,7 +20,7 @@ const gachaApi: GachaApi = {
   archiveCompletedSection: (input) => ipcRenderer.invoke('checklist:archive-completed-section', input),
   getSyncSettings: (gameId) => ipcRenderer.invoke('sync:get-settings', gameId),
   updateSyncSettings: (input) => ipcRenderer.invoke('sync:update-settings', input),
-  syncGame: (gameId, scope) => ipcRenderer.invoke('sync:run', gameId, scope),
+  syncGame: (gameId, scope, target = 'all') => ipcRenderer.invoke('sync:run', gameId, scope, target),
   listCredentialStatuses: () => ipcRenderer.invoke('credentials:list-status'),
   startMiyousheQrLogin: () => ipcRenderer.invoke('miyoushe-login:start'),
   pollMiyousheQrLogin: (sessionId) => ipcRenderer.invoke('miyoushe-login:poll', sessionId),

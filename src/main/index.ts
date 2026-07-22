@@ -18,7 +18,7 @@ import { CredentialBackedAdapter } from './sync/credential-backed-adapter'
 import { createMiyousheZenlessPersonalAdapter } from './sync/miyoushe-chronicle-client'
 import { SyncOrchestrator } from './sync/orchestrator'
 import { restoreRelaunchOptions } from './relaunch'
-import type { GameId, SyncResult, SyncScope } from '../shared/contracts'
+import type { GameId, SyncResult, SyncScope, SyncTarget } from '../shared/contracts'
 import {
   parseChecklistSection,
   parseCredentialProvider,
@@ -28,6 +28,7 @@ import {
   parseItemId,
   parseSyncRunMode,
   parseSyncScope,
+  parseSyncTarget,
   parseUpdateChecklistItem
 } from './validation'
 
@@ -49,13 +50,17 @@ let miyousheQrLogin: MiyousheQrLoginService | null = null
 let appBackupDirectory: string | null = null
 let appDatabasePath: string | null = null
 
-async function queueAiScheduleSync(gameId: GameId, scope: SyncScope): Promise<SyncResult> {
+async function queueAiScheduleSync(
+  gameId: GameId,
+  scope: SyncScope,
+  target: SyncTarget = 'all'
+): Promise<SyncResult> {
   if (!appDatabase) throw new Error('数据库尚未初始化')
   const startedAt = new Date().toISOString()
   try {
     const plugin = detectCodexPlugin()
     const agent = appDatabase.getAiScheduleAgentStatus()
-    const job = appDatabase.createAiScheduleJob(gameId, scope, new Date(), plugin.installed)
+    const job = appDatabase.createAiScheduleJob(gameId, scope, new Date(), plugin.installed, target)
     const publicMessage = agent.connected
       ? `已提交给 ${agent.name ?? 'AI 排期 Agent'}，等待联网检索和交叉验证（任务 ${job.id.slice(0, 8)}）`
       : `已排队（任务 ${job.id.slice(0, 8)}）；请在 Codex 打开“幻游清单”插件并运行 $sync-gacha-schedules`
@@ -69,7 +74,7 @@ async function queueAiScheduleSync(gameId: GameId, scope: SyncScope): Promise<Sy
     }]
     if (scope === 'public_and_personal') {
       const personal = syncOrchestrator
-        ? await syncOrchestrator.syncPersonalData(gameId)
+        ? await syncOrchestrator.syncPersonalData(gameId, target)
         : {
             source: 'personal_data' as const,
             status: 'error' as const,
@@ -95,6 +100,7 @@ async function queueAiScheduleSync(gameId: GameId, scope: SyncScope): Promise<Sy
     return {
       gameId,
       requestedScope: scope,
+      requestedTarget: target,
       status: 'partial',
       startedAt,
       finishedAt: new Date().toISOString(),
@@ -108,6 +114,7 @@ async function queueAiScheduleSync(gameId: GameId, scope: SyncScope): Promise<Sy
     return {
       gameId,
       requestedScope: scope,
+      requestedTarget: target,
       status: 'error',
       startedAt,
       finishedAt: new Date().toISOString(),
@@ -306,8 +313,12 @@ function registerIpcHandlers(): void {
       autoScope: parseSyncScope(value.autoScope)
     })
   })
-  ipcMain.handle('sync:run', async (_event, gameId: unknown, scope: unknown) => {
-    return await queueAiScheduleSync(parseGameId(gameId), parseSyncScope(scope))
+  ipcMain.handle('sync:run', async (_event, gameId: unknown, scope: unknown, target: unknown = 'all') => {
+    return await queueAiScheduleSync(
+      parseGameId(gameId),
+      parseSyncScope(scope),
+      parseSyncTarget(target)
+    )
   })
   ipcMain.handle('credentials:list-status', () => {
     if (!credentialVault) throw new Error('安全凭据存储尚未初始化')

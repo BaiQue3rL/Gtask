@@ -13,6 +13,7 @@ import type {
   GameId,
   GameSummary,
   SyncScope,
+  SyncTarget,
   SyncSettings,
   SyncStatus,
   UpdateSyncSettingsInput,
@@ -55,7 +56,7 @@ const DEFAULT_GAMES: GameSummary[] = [
   }
 ]
 
-export const CURRENT_SCHEMA_VERSION = 7
+export const CURRENT_SCHEMA_VERSION = 8
 
 const AI_AGENT_MAX_AGE_MS = 5 * 60 * 1000
 const AI_JOB_CLAIM_MAX_AGE_MS = 15 * 60 * 1000
@@ -70,7 +71,7 @@ export class AppDatabase {
       this.database.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;')
       this.migrate()
       this.seedGames()
-      this.seedCoreChecklists()
+      this.seedQuestChecklists()
       this.normalizeWeeklySchedules()
       this.resetDueWeeklyItems()
       this.markStaleSyncStates()
@@ -232,7 +233,9 @@ export class AppDatabase {
     gameId: GameId,
     scope: SyncScope,
     reference = new Date(),
-    allowWithoutAgent = false
+    allowWithoutAgent = false,
+    target: SyncTarget = 'all',
+    userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
   ): AiScheduleJob {
     const agent = this.getAiScheduleAgentStatus(reference)
     if (!agent.connected && !allowWithoutAgent) {
@@ -240,11 +243,14 @@ export class AppDatabase {
     }
     this.requeueStaleAiScheduleJobs(reference)
     const active = this.database.prepare(`
-      SELECT id, scope FROM ai_schedule_jobs
+      SELECT id, scope, target FROM ai_schedule_jobs
       WHERE game_id = ? AND status IN ('pending', 'claimed')
       ORDER BY requested_at ASC LIMIT 1
-    `).get(gameId) as { id: string; scope: SyncScope } | undefined
+    `).get(gameId) as { id: string; scope: SyncScope; target: SyncTarget } | undefined
     if (active) {
+      if (active.target !== target) {
+        throw new Error(`该游戏已有“${active.target}”版块同步任务等待处理`)
+      }
       if (scope === 'public_and_personal' && active.scope === 'public_schedule') {
         const now = reference.toISOString()
         this.database.prepare(`
@@ -259,9 +265,10 @@ export class AppDatabase {
     const id = randomUUID()
     const now = reference.toISOString()
     this.database.prepare(`
-      INSERT INTO ai_schedule_jobs(id, game_id, scope, status, requested_at, updated_at)
-      VALUES (?, ?, ?, 'pending', ?, ?)
-    `).run(id, gameId, scope, now, now)
+      INSERT INTO ai_schedule_jobs(
+        id, game_id, scope, target, user_timezone, status, requested_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)
+    `).run(id, gameId, scope, target, userTimeZone, now, now)
     this.database.prepare(`
       UPDATE sync_states
       SET status = 'idle', last_scope = ?, last_attempt_at = ?,
@@ -303,6 +310,17 @@ export class AppDatabase {
     if (job.status !== 'claimed' || job.agentId !== agentId) {
       throw new Error('AI 排期任务未由当前 Agent 领取或已经结束')
     }
+    const targetCategories: Partial<Record<SyncTarget, ChecklistCategory[]>> = {
+      events: ['limited_event'],
+      cycles: ['weekly', 'endgame'],
+      exploration: ['exploration'],
+      tasks: []
+    }
+    const allowedCategories = targetCategories[job.target]
+    if (allowedCategories) {
+      const invalid = items.find((item) => !allowedCategories.includes(item.category))
+      if (invalid) throw new Error(`当前任务只允许回写“${job.target}”版块数据`)
+    }
     const merge = this.mergeSyncedItems(job.gameId, 'public_schedule', items, reference.toISOString())
     const now = reference.toISOString()
     const message = `AI 排期同步完成：新增 ${merge.added}，更新 ${merge.updated}，保护 ${merge.preserved}`
@@ -341,7 +359,8 @@ export class AppDatabase {
 
   private getAiScheduleJob(id: string): AiScheduleJob {
     const row = this.database.prepare(`
-      SELECT j.id, j.game_id AS gameId, j.scope, j.status,
+      SELECT j.id, j.game_id AS gameId, j.scope, j.target,
+        j.user_timezone AS userTimeZone, j.status,
         j.requested_at AS requestedAt, j.claimed_at AS claimedAt,
         j.completed_at AS completedAt, j.agent_id AS agentId,
         a.name AS agentName, j.message
@@ -622,7 +641,7 @@ export class AppDatabase {
   }
 
   archiveChecklistItem(id: string): void {
-    if (this.isPersistentChecklistId(id)) throw new Error('固定周常不能删除')
+    if (this.isPersistentChecklistId(id)) throw new Error('固定清单事项不能删除')
     const result = this.database
       .prepare(`
         UPDATE checklist_items
@@ -666,7 +685,11 @@ export class AppDatabase {
           AND category IN (${placeholders})
           AND completed = 1
           AND archived = 0
-          AND id <> (game_id || ':weekly')
+          AND id NOT IN (
+            game_id || ':main_quest',
+            game_id || ':side_quest',
+            game_id || ':weekly'
+          )
       `)
       .run(new Date().toISOString(), gameId, ...categories)
 
@@ -733,7 +756,7 @@ export class AppDatabase {
         }
 
         if (!identity) {
-          const id = randomUUID()
+          const id = item.category === 'weekly' ? `${gameId}:weekly` : randomUUID()
           const remoteCompleted = source === 'personal_sync' && item.completed === true
           this.database
             .prepare(`
@@ -750,7 +773,11 @@ export class AppDatabase {
               item.category,
               item.title,
               remoteCompleted ? 1 : 0,
-              source === 'personal_sync' ? item.progressPercent ?? null : null,
+              source === 'personal_sync'
+                ? item.progressPercent ?? null
+                : item.category === 'exploration'
+                  ? 0
+                  : null,
               item.parentTitle ?? null,
               item.startsAt ?? null,
               item.endsAt ?? null,
@@ -1106,6 +1133,21 @@ export class AppDatabase {
       `)
     }
 
+    const migration8 = this.database
+      .prepare('SELECT version FROM schema_migrations WHERE version = 8')
+      .get()
+
+    if (!migration8) {
+      this.database.exec(`
+        BEGIN;
+        ALTER TABLE ai_schedule_jobs ADD COLUMN target TEXT NOT NULL DEFAULT 'all'
+          CHECK (target IN ('all', 'tasks', 'events', 'cycles', 'exploration'));
+        ALTER TABLE ai_schedule_jobs ADD COLUMN user_timezone TEXT NOT NULL DEFAULT 'UTC';
+        INSERT INTO schema_migrations(version) VALUES (8);
+        COMMIT;
+      `)
+    }
+
     const versionRow = this.database
       .prepare('SELECT MAX(version) AS version FROM schema_migrations')
       .get() as { version: number | null }
@@ -1150,60 +1192,29 @@ export class AppDatabase {
     }
   }
 
-  private seedCoreChecklists(): void {
-    const insertQuest = this.database.prepare(`
-      INSERT OR IGNORE INTO checklist_items(
+  private seedQuestChecklists(): void {
+    const upsertQuest = this.database.prepare(`
+      INSERT INTO checklist_items(
         id, game_id, category, title, source, created_at, updated_at
       ) VALUES (?, ?, ?, ?, 'manual', ?, ?)
-    `)
-    const upsertWeekly = this.database.prepare(`
-      INSERT INTO checklist_items(
-        id, game_id, category, title, completed, starts_at, ends_at,
-        reset_rule, period_key, schedule_kind, reset_weekday, timezone,
-        source, archived, created_at, updated_at
-      ) VALUES (?, ?, 'weekly', '周常', 0, ?, ?, '每周一重置', ?, 'weekly', 1,
-        'Asia/Shanghai', 'manual', 0, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         archived = 0,
-        category = 'weekly',
-        schedule_kind = 'weekly',
-        reset_weekday = 1,
-        timezone = 'Asia/Shanghai',
-        reset_rule = '每周一重置',
-        period_key = CASE
-          WHEN checklist_items.period_key IS NULL THEN excluded.period_key
-          ELSE checklist_items.period_key
-        END,
-        starts_at = CASE
-          WHEN checklist_items.period_key IS NULL THEN excluded.starts_at
-          ELSE checklist_items.starts_at
-        END,
-        ends_at = CASE
-          WHEN checklist_items.period_key IS NULL THEN excluded.ends_at
-          ELSE checklist_items.ends_at
-        END,
+        category = excluded.category,
+        source = 'manual',
         updated_at = excluded.updated_at
     `)
     const now = new Date().toISOString()
-    const weeklyPeriod = getWeeklyPeriod(new Date(), 1, 'Asia/Shanghai')
 
     for (const game of DEFAULT_GAMES) {
-      insertQuest.run(`${game.id}:main_quest`, game.id, 'main_quest', '主线任务', now, now)
-      insertQuest.run(`${game.id}:side_quest`, game.id, 'side_quest', '支线任务', now, now)
-      upsertWeekly.run(
-        `${game.id}:weekly`,
-        game.id,
-        weeklyPeriod.startsAt,
-        weeklyPeriod.endsAt,
-        weeklyPeriod.key,
-        now,
-        now
-      )
+      upsertQuest.run(`${game.id}:main_quest`, game.id, 'main_quest', '主线任务', now, now)
+      upsertQuest.run(`${game.id}:side_quest`, game.id, 'side_quest', '支线任务', now, now)
     }
   }
 
   private isPersistentChecklistId(id: string): boolean {
-    return DEFAULT_GAMES.some((game) => id === `${game.id}:weekly`)
+    return DEFAULT_GAMES.some((game) =>
+      [`${game.id}:main_quest`, `${game.id}:side_quest`, `${game.id}:weekly`].includes(id)
+    )
   }
 
   private getChecklistItem(id: string): ChecklistItem {

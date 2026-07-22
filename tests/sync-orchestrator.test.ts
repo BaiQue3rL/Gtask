@@ -75,6 +75,29 @@ describe('SyncOrchestrator', () => {
     expect(database.getSyncSettings('wuthering-waves').status).toBe('error')
   })
 
+  it('版块同步只合并目标版块内的数据', async () => {
+    database = new AppDatabase(':memory:')
+    const orchestrator = new SyncOrchestrator(database, {
+      publicSchedule: {
+        genshin: {
+          sync: async () => ({
+            items: [
+              { remoteKey: 'event:one', category: 'limited_event', title: '目标活动' },
+              { remoteKey: 'map:one', category: 'exploration', title: '不应写入的地图' }
+            ],
+            message: '混合数据'
+          })
+        }
+      },
+      personalData: {}
+    })
+
+    const result = await orchestrator.syncGame('genshin', 'public_schedule', 'events')
+    expect(result.requestedTarget).toBe('events')
+    expect(database.listChecklistItems('genshin').some((item) => item.title === '目标活动')).toBe(true)
+    expect(database.listChecklistItems('genshin').some((item) => item.title === '不应写入的地图')).toBe(false)
+  })
+
   it('软件启动时只依次同步设置为自动模式的游戏', async () => {
     database = new AppDatabase(':memory:')
     database.updateSyncSettings({

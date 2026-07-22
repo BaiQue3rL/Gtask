@@ -16,7 +16,7 @@ afterEach(() => {
 })
 
 describe('AppDatabase', () => {
-  it('只初始化四款支持的游戏以及每款游戏的主支线和固定周常状态', () => {
+  it('新用户只初始化四款游戏的主线和支线状态', () => {
     database = new AppDatabase(':memory:')
 
     expect(database.listGames().map((game) => game.id)).toEqual([
@@ -28,13 +28,7 @@ describe('AppDatabase', () => {
 
     for (const game of database.listGames()) {
       const items = database.listChecklistItems(game.id)
-      expect(items.map((item) => item.category)).toEqual(['main_quest', 'side_quest', 'weekly'])
-      expect(items.find((item) => item.id === `${game.id}:weekly`)).toMatchObject({
-        title: '周常',
-        scheduleKind: 'weekly',
-        resetWeekday: 1,
-        timeZone: 'Asia/Shanghai'
-      })
+      expect(items.map((item) => item.category)).toEqual(['main_quest', 'side_quest'])
     }
     expect(() =>
       database!.createChecklistItem({
@@ -43,6 +37,7 @@ describe('AppDatabase', () => {
         title: '第二条主线'
       })
     ).toThrow('不能重复新增')
+    expect(() => database!.archiveChecklistItem('genshin:main_quest')).toThrow('固定清单事项不能删除')
   })
 
   it('新增、编辑、手动完成和软删除事项', () => {
@@ -132,11 +127,16 @@ describe('AppDatabase', () => {
 
   it('固定周常不会被删除，并在周一跨周期后恢复为未完成', () => {
     database = new AppDatabase(':memory:')
+    database.mergeSyncedItems('genshin', 'public_schedule', [{
+      remoteKey: 'weekly:genshin',
+      category: 'weekly',
+      title: '周常'
+    }])
     const weekly = database.listChecklistItems('genshin').find((item) => item.id === 'genshin:weekly')!
     database.updateChecklistItem({ id: weekly.id, completed: true })
 
     expect(database.archiveCompletedSection('genshin', ['weekly', 'endgame'])).toBe(0)
-    expect(() => database!.archiveChecklistItem(weekly.id)).toThrow('固定周常不能删除')
+    expect(() => database!.archiveChecklistItem(weekly.id)).toThrow('固定清单事项不能删除')
 
     const nextPeriodReference = new Date(new Date(weekly.endsAt!).getTime() + 1)
     expect(database.resetDueWeeklyItems(nextPeriodReference)).toBeGreaterThanOrEqual(1)
@@ -454,12 +454,16 @@ describe('AppDatabase', () => {
       'genshin',
       'public_schedule',
       new Date('2026-07-21T14:45:00.000Z'),
-      true
+      true,
+      'all',
+      'Asia/Shanghai'
     )
 
     expect(queued).toMatchObject({
       gameId: 'genshin',
       scope: 'public_schedule',
+      target: 'all',
+      userTimeZone: 'Asia/Shanghai',
       status: 'pending',
       agentId: null,
       agentName: null
@@ -504,6 +508,51 @@ describe('AppDatabase', () => {
       message: expect.stringContaining('米游社需要完成滑块或设备验证')
     })
     expect(database.getSyncSettings('zenless').lastSuccessAt).not.toBeNull()
+  })
+
+  it('版块同步任务拒绝跨版块回写', () => {
+    database = new AppDatabase(':memory:')
+    database.registerAiScheduleAgent('agent-section', '版块测试 Agent')
+    const queued = database.createAiScheduleJob(
+      'genshin',
+      'public_schedule',
+      new Date('2026-07-22T11:00:00.000Z'),
+      false,
+      'events'
+    )
+    database.claimAiScheduleJob('agent-section', new Date('2026-07-22T11:01:00.000Z'))
+
+    expect(() => database!.applyAiScheduleJob(
+      queued.id,
+      'agent-section',
+      [{ remoteKey: 'map:natlan', category: 'exploration', title: '纳塔' }],
+      []
+    )).toThrow('只允许回写“events”版块')
+  })
+
+  it('公开地图目录新增为零进度，个人数据只补充对应探索度', () => {
+    database = new AppDatabase(':memory:')
+    database.mergeSyncedItems('genshin', 'public_schedule', [{
+      remoteKey: 'official-map:natlan',
+      category: 'exploration',
+      title: '纳塔',
+      parentTitle: '提瓦特大陆',
+      modeKey: 'region:natlan'
+    }])
+    expect(database.listChecklistItems('genshin').find((item) => item.modeKey === 'region:natlan'))
+      .toMatchObject({ progressPercent: 0, completed: false })
+
+    database.mergeSyncedItems('genshin', 'personal_sync', [{
+      remoteKey: 'chronicle:natlan',
+      category: 'exploration',
+      title: '纳塔个人探索',
+      modeKey: 'region:natlan',
+      progressPercent: 100,
+      completed: true
+    }])
+    const maps = database.listChecklistItems('genshin').filter((item) => item.modeKey === 'region:natlan')
+    expect(maps).toHaveLength(1)
+    expect(maps[0]).toMatchObject({ title: '纳塔', progressPercent: 100, completed: true })
   })
 
   it('个人战绩可按模式键补全公开排期，即使两个来源的远端键不同', () => {
