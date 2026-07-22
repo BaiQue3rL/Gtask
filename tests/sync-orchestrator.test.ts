@@ -98,39 +98,6 @@ describe('SyncOrchestrator', () => {
     expect(database.listChecklistItems('genshin').some((item) => item.title === '不应写入的地图')).toBe(false)
   })
 
-  it('软件启动时只依次同步设置为自动模式的游戏', async () => {
-    database = new AppDatabase(':memory:')
-    database.updateSyncSettings({
-      gameId: 'genshin',
-      runMode: 'automatic',
-      autoScope: 'public_schedule'
-    })
-    database.updateSyncSettings({
-      gameId: 'zenless',
-      runMode: 'automatic',
-      autoScope: 'public_schedule'
-    })
-    const order: string[] = []
-    const adapter = (label: string) => ({
-      sync: async () => {
-        order.push(label)
-        return { items: [], message: `${label}完成` }
-      }
-    })
-    const orchestrator = new SyncOrchestrator(database, {
-      publicSchedule: {
-        genshin: adapter('genshin'),
-        zenless: adapter('zenless')
-      },
-      personalData: {}
-    })
-
-    const results = await orchestrator.runStartupSync()
-
-    expect(order).toEqual(['genshin', 'zenless'])
-    expect(results).toHaveLength(2)
-  })
-
   it('个人数据需要验证时保留公开排期成功结果并标记验证状态', async () => {
     database = new AppDatabase(':memory:')
     const orchestrator = new SyncOrchestrator(database, {

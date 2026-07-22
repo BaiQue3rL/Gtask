@@ -86,7 +86,7 @@ function buildVerificationPage(challenge: MiyousheGeetestChallenge): string {
   <style>
     *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:28px;color:#dce9f8;background:linear-gradient(145deg,#0c213d,#07172e);font:14px/1.6 system-ui,"Microsoft YaHei",sans-serif}.card{width:min(390px,100%);padding:24px;border:1px solid #36577d;border-radius:14px;background:rgba(7,23,46,.9);box-shadow:0 20px 60px rgba(0,0,0,.35)}h1{margin:0 0 8px;font-size:20px}p{margin:0 0 18px;color:#8da4bf}.status{margin-top:16px;color:#78acd9;font-size:12px}#captcha{min-height:44px}
   </style>
-  <script src="https://static.geetest.com/static/js/gt.0.5.0.js"></script>
+  <script src="${challenge.version === 4 ? 'https://static.geetest.com/v4/gt4.js' : 'https://static.geetest.com/static/js/gt.0.5.0.js'}"></script>
 </head>
 <body>
   <main class="card">
@@ -98,10 +98,19 @@ function buildVerificationPage(challenge: MiyousheGeetestChallenge): string {
   <script nonce="${nonce}">
     const challenge = ${challengeJson};
     const status = document.getElementById('status');
-    if (typeof window.initGeetest !== 'function') {
+    const isV4 = challenge.version === 4;
+    const initializer = isV4 ? window.initGeetest4 : window.initGeetest;
+    if (typeof initializer !== 'function') {
       status.textContent = '验证组件加载失败，请关闭窗口后重试。';
     } else {
-      window.initGeetest({
+      const options = isV4 ? {
+        captchaId: challenge.gt,
+        riskType: challenge.riskType,
+        userInfo: JSON.stringify({ mmt_key: challenge.sessionId }),
+        apiServers: ['gcaptcha4.captchami.com'],
+        product: 'bind',
+        language: 'zh-cn'
+      } : {
         gt: challenge.gt,
         challenge: challenge.challenge,
         new_captcha: Boolean(challenge.newCaptcha),
@@ -110,11 +119,12 @@ function buildVerificationPage(challenge: MiyousheGeetestChallenge): string {
         https: true,
         product: 'bind',
         lang: 'zh-cn'
-      }, (captcha) => {
-        captcha.appendTo('#captcha');
+      };
+      initializer(options, (captcha) => {
+        if (!isV4) captcha.appendTo('#captcha');
         captcha.onReady(() => {
           status.textContent = '请完成上方验证';
-          captcha.verify();
+          isV4 ? captcha.showCaptcha() : captcha.verify();
         });
         captcha.onSuccess(() => {
           const result = captcha.getValidate();
@@ -123,7 +133,10 @@ function buildVerificationPage(challenge: MiyousheGeetestChallenge): string {
             return;
           }
           status.textContent = '验证成功，正在继续同步…';
-          window.location.href = '${COMPLETION_URL}#' + encodeURIComponent(JSON.stringify(result));
+          window.location.href = '${COMPLETION_URL}#' + encodeURIComponent(JSON.stringify({
+            ...result,
+            ...(isV4 && { version: 4 })
+          }));
         });
         captcha.onError(() => { status.textContent = '验证加载失败，请关闭窗口后重试。'; });
       });
@@ -136,6 +149,19 @@ function buildVerificationPage(challenge: MiyousheGeetestChallenge): string {
 function parseResult(value: unknown): MiyousheGeetestResult {
   if (typeof value !== 'object' || value === null) throw new Error('验证结果格式不正确')
   const record = value as Record<string, unknown>
+  if (record.version === 4) {
+    const result = {
+      captcha_id: record.captcha_id,
+      lot_number: record.lot_number,
+      pass_token: record.pass_token,
+      gen_time: record.gen_time,
+      captcha_output: record.captcha_output
+    }
+    if (Object.values(result).some((item) => typeof item !== 'string' || !item.trim())) {
+      throw new Error('Geetest V4 验证结果不完整')
+    }
+    return { ...result, version: 4 } as MiyousheGeetestResult
+  }
   const result = {
     geetest_challenge: record.geetest_challenge,
     geetest_validate: record.geetest_validate,

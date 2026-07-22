@@ -28,6 +28,10 @@ import { recognizeScheduleImage } from './schedule-image-import'
 import { parseScheduleImageText } from './schedule-image-parser'
 import { normalizeSyncItems } from './sync/normalization'
 import { getBundledExplorationCatalog } from './sync/bundled-exploration-catalog'
+import {
+  getPersonalSyncTargets,
+  supportsPersonalSyncTarget
+} from './sync/personal-sync-capabilities'
 import type { GameId, SyncResult, SyncScope, SyncTarget } from '../shared/contracts'
 import {
   parseChecklistSection,
@@ -36,7 +40,6 @@ import {
   parseCreateChecklistItem,
   parseGameId,
   parseItemId,
-  parseSyncRunMode,
   parseSyncScope,
   parseSyncTarget,
   parseUpdateChecklistItem
@@ -369,11 +372,13 @@ function registerIpcHandlers(): void {
         scheduleKind: parsed.scheduleKind
       }
     })
-    return appDatabase.mergeSyncedItems(
+    const merge = appDatabase.mergeSyncedItems(
       gameId,
       'public_schedule',
       normalizeSyncItems(items)
     )
+    appDatabase.recordSyncTargetSuccess(gameId, target)
+    return merge
   })
   ipcMain.handle('ai-schedule:get-agent-status', () => {
     if (!appDatabase) throw new Error('数据库尚未初始化')
@@ -440,16 +445,13 @@ function registerIpcHandlers(): void {
     if (!appDatabase) throw new Error('数据库尚未初始化')
     return appDatabase.getSyncSettings(parseGameId(gameId))
   })
-  ipcMain.handle('sync:update-settings', (_event, input: unknown) => {
+  ipcMain.handle('sync:get-target-states', (_event, gameId: unknown) => {
     if (!appDatabase) throw new Error('数据库尚未初始化')
-    if (typeof input !== 'object' || input === null) throw new Error('同步设置参数格式不正确')
-    const value = input as Record<string, unknown>
-    return appDatabase.updateSyncSettings({
-      gameId: parseGameId(value.gameId),
-      runMode: parseSyncRunMode(value.runMode),
-      autoScope: parseSyncScope(value.autoScope)
-    })
+    return appDatabase.getSyncTargetStates(parseGameId(gameId))
   })
+  ipcMain.handle('sync:get-personal-targets', (_event, gameId: unknown) =>
+    getPersonalSyncTargets(parseGameId(gameId))
+  )
   ipcMain.handle('sync:run', async (_event, gameId: unknown, scope: unknown, target: unknown = 'all') => {
     return await queueAiScheduleSync(
       parseGameId(gameId),
@@ -459,9 +461,17 @@ function registerIpcHandlers(): void {
   })
   ipcMain.handle('sync:run-personal', async (_event, gameId: unknown, target: unknown = 'all') => {
     if (!syncOrchestrator) throw new Error('个人数据同步服务尚未初始化')
+    const parsedGameId = parseGameId(gameId)
+    const parsedTarget = parseSyncTarget(target)
+    if (parsedTarget === 'all' || parsedTarget === 'tasks') {
+      throw new Error('同步进度只能从活动、周期事项或地图探索版块发起')
+    }
+    if (!supportsPersonalSyncTarget(parsedGameId, parsedTarget)) {
+      throw new Error('当前游戏的个人数据接口不提供该版块进度')
+    }
     return await syncOrchestrator.syncPersonalOnly(
-      parseGameId(gameId),
-      parseSyncTarget(target)
+      parsedGameId,
+      parsedTarget
     )
   })
   ipcMain.handle('credentials:list-status', () => {
@@ -550,11 +560,6 @@ if (!app.requestSingleInstanceLock()) {
     syncOrchestrator = createAppSyncOrchestrator(appDatabase)
     registerIpcHandlers()
     createWindow()
-    for (const settings of appDatabase.listAutomaticSyncSettings()) {
-      void queueAiScheduleSync(settings.gameId as GameId, settings.autoScope).then((result) => {
-        mainWindow?.webContents.send('sync:completed', result)
-      })
-    }
     periodTimer = setInterval(() => {
       const changes =
         (appDatabase?.resetDueWeeklyItems() ?? 0) +

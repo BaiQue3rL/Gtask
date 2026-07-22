@@ -1,5 +1,11 @@
 import type { GameId, SyncTarget } from '../../shared/contracts'
 import { parseZenlessPersonalData } from './zenless-personal-parser'
+import {
+  assertAnyPersonalRequestSucceeded,
+  capturePersonalRequest,
+  personalPartialSuffix,
+  type PersonalRequestOutcome
+} from './personal-sync-settler'
 import type { SyncAdapter, SyncAdapterOutput } from './types'
 
 export interface ZenlessBattleChronicleClient {
@@ -17,18 +23,25 @@ export class ZenlessPersonalAdapter implements SyncAdapter {
       return { items: [], message: '米游社暂不提供绝区零区域探索百分比，已保留公开地图清单' }
     }
     // 保持顺序请求，降低同一平台短时间并发触发风控的概率。
-    const shiyuDefense = ['all', 'cycles'].includes(target) ? await this.client.getShiyuDefense() : undefined
-    const deadlyAssault = ['all', 'cycles'].includes(target) ? await this.client.getDeadlyAssault() : undefined
-    const eventCalendar = ['all', 'events'].includes(target)
-      ? await this.client.getZenlessEventCalendar()
+    const outcomes: PersonalRequestOutcome[] = []
+    const shiyuDefense = ['all', 'cycles'].includes(target)
+      ? await capturePersonalRequest(() => this.client.getShiyuDefense(), outcomes)
       : undefined
+    const deadlyAssault = ['all', 'cycles'].includes(target)
+      ? await capturePersonalRequest(() => this.client.getDeadlyAssault(), outcomes)
+      : undefined
+    const eventCalendar = ['all', 'events'].includes(target)
+      ? await capturePersonalRequest(() => this.client.getZenlessEventCalendar(), outcomes)
+      : undefined
+    assertAnyPersonalRequestSucceeded(outcomes)
+    const suffix = personalPartialSuffix(outcomes)
     return {
       items: parseZenlessPersonalData({ shiyuDefense, deadlyAssault, eventCalendar }),
-      message: target === 'events'
+      message: (target === 'events'
         ? '绝区零活动进度已同步'
         : target === 'cycles'
           ? '绝区零式舆防卫战和危局强袭战已同步'
-          : '绝区零活动、式舆防卫战和危局强袭战已同步'
+          : '绝区零活动、式舆防卫战和危局强袭战已同步') + suffix
     }
   }
 }

@@ -26,6 +26,8 @@ export type SyncScope = (typeof SYNC_SCOPES)[number]
 export type SyncRequestScope = SyncScope | 'personal_data'
 export const SYNC_TARGETS = ['all', 'tasks', 'events', 'cycles', 'exploration'] as const
 export type SyncTarget = (typeof SYNC_TARGETS)[number]
+export type SyncIndicatorTarget = Exclude<SyncTarget, 'tasks'>
+export type PersonalSyncTarget = Exclude<SyncTarget, 'all' | 'tasks'>
 export type SyncStatus = 'idle' | 'success' | 'error' | 'stale' | 'verification_required'
 export const SCHEDULE_KINDS = ['weekly', 'fixed_window', 'remote_schedule'] as const
 export type ScheduleKind = (typeof SCHEDULE_KINDS)[number]
@@ -206,10 +208,10 @@ export interface SyncSettings {
   message: string | null
 }
 
-export interface UpdateSyncSettingsInput {
+export interface SyncTargetState {
   gameId: GameId
-  runMode: SyncRunMode
-  autoScope: SyncScope
+  target: SyncIndicatorTarget
+  lastSuccessAt: string | null
 }
 
 export interface SyncSourceResult {
@@ -261,7 +263,8 @@ export interface GachaApi {
   restoreChecklistItem: (id: string) => Promise<ChecklistItem>
   archiveCompletedSection: (input: ArchiveCompletedSectionInput) => Promise<number>
   getSyncSettings: (gameId: GameId) => Promise<SyncSettings>
-  updateSyncSettings: (input: UpdateSyncSettingsInput) => Promise<SyncSettings>
+  getSyncTargetStates: (gameId: GameId) => Promise<SyncTargetState[]>
+  getPersonalSyncTargets: (gameId: GameId) => Promise<PersonalSyncTarget[]>
   syncGame: (gameId: GameId, scope: SyncScope, target?: SyncTarget) => Promise<SyncResult>
   syncPersonalData: (gameId: GameId, target?: SyncTarget) => Promise<SyncResult>
   listCredentialStatuses: () => Promise<CredentialStatus[]>

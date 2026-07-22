@@ -199,27 +199,39 @@ describe('AppDatabase', () => {
     })
   })
 
-  it('按游戏独立保存自动同步模式和范围', () => {
+  it('同步设置固定为手动模式', () => {
     database = new AppDatabase(':memory:')
     expect(database.getSyncSettings('genshin')).toMatchObject({
       runMode: 'manual',
       autoScope: 'public_schedule'
     })
-
-    database.updateSyncSettings({
-      gameId: 'genshin',
-      runMode: 'automatic',
-      autoScope: 'public_and_personal'
+    expect(database.getSyncSettings('star-rail')).toMatchObject({
+      runMode: 'manual',
+      autoScope: 'public_schedule'
     })
+  })
 
-    expect(database.getSyncSettings('genshin')).toMatchObject({
-      runMode: 'automatic',
-      autoScope: 'public_and_personal'
-    })
-    expect(database.getSyncSettings('star-rail').runMode).toBe('manual')
-    expect(database.listAutomaticSyncSettings().map((settings) => settings.gameId)).toEqual([
-      'genshin'
+  it('分别记录全局和版块同步时间', () => {
+    database = new AppDatabase(':memory:')
+    expect(database.getSyncTargetStates('genshin')).toEqual([
+      { gameId: 'genshin', target: 'all', lastSuccessAt: null },
+      { gameId: 'genshin', target: 'events', lastSuccessAt: null },
+      { gameId: 'genshin', target: 'cycles', lastSuccessAt: null },
+      { gameId: 'genshin', target: 'exploration', lastSuccessAt: null }
     ])
+
+    database.recordSyncTargetSuccess('genshin', 'events', new Date('2026-07-22T12:00:00.000Z'))
+    expect(database.getSyncTargetStates('genshin')).toEqual(
+      expect.arrayContaining([
+        { gameId: 'genshin', target: 'all', lastSuccessAt: null },
+        { gameId: 'genshin', target: 'events', lastSuccessAt: '2026-07-22T12:00:00.000Z' }
+      ])
+    )
+
+    database.recordSyncTargetSuccess('genshin', 'all', new Date('2026-07-22T13:00:00.000Z'), true)
+    expect(database.getSyncTargetStates('genshin').every(
+      (state) => state.lastSuccessAt === '2026-07-22T13:00:00.000Z'
+    )).toBe(true)
   })
 
   it('周常跨周期后自动重置完成状态和手动完成锁', () => {

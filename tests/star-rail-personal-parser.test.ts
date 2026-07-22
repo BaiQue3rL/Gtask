@@ -118,4 +118,19 @@ describe('Star Rail personal parsing', () => {
     expect(exploration.items).toEqual([])
     await expect(adapter.sync('genshin')).rejects.toThrow('不能用于其他游戏')
   })
+
+  it('周期接口部分失败时仍返回已取得的数据', async () => {
+    const adapter = new StarRailPersonalAdapter({
+      getMemoryOfChaos: async () => payload.memoryOfChaos,
+      getPureFiction: async () => { throw new Error('虚构风控') },
+      getApocalypticShadow: async () => { throw new Error('末日风控') },
+      getAnomalyArbitration: async () => { throw new Error('仲裁风控') },
+      getEventCalendar: async () => payload.eventCalendar
+    })
+    const partial = await adapter.sync('star-rail', 'cycles')
+    expect(partial.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ modeKey: 'memory-of-chaos' })
+    ]))
+    expect(partial.message).toContain('部分成功 1/4')
+  })
 })

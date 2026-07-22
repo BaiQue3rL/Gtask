@@ -14,9 +14,9 @@ import type {
   GameSummary,
   SyncScope,
   SyncTarget,
+  SyncTargetState,
   SyncSettings,
   SyncStatus,
-  UpdateSyncSettingsInput,
   UpdateChecklistItemInput
 } from '../shared/contracts'
 import type { NormalizedSyncItem, SyncMergeResult } from './sync/types'
@@ -56,7 +56,7 @@ const DEFAULT_GAMES: GameSummary[] = [
   }
 ]
 
-export const CURRENT_SCHEMA_VERSION = 10
+export const CURRENT_SCHEMA_VERSION = 11
 
 const AI_AGENT_MAX_AGE_MS = 5 * 60 * 1000
 const AI_JOB_CLAIM_MAX_AGE_MS = 15 * 60 * 1000
@@ -159,30 +159,39 @@ export class AppDatabase {
     return row as unknown as SyncSettings
   }
 
-  updateSyncSettings(input: UpdateSyncSettingsInput): SyncSettings {
-    const result = this.database
-      .prepare(`
-        UPDATE sync_states
-        SET run_mode = ?, auto_scope = ?, updated_at = ?
-        WHERE game_id = ?
-      `)
-      .run(input.runMode, input.autoScope, new Date().toISOString(), input.gameId)
-
-    if (result.changes === 0) throw new Error('游戏同步设置不存在')
-    return this.getSyncSettings(input.gameId)
+  getSyncTargetStates(gameId: GameId): SyncTargetState[] {
+    const rows = this.database.prepare(`
+      SELECT target, last_success_at AS lastSuccessAt
+      FROM sync_target_states
+      WHERE game_id = ?
+    `).all(gameId) as Array<{ target: SyncTargetState['target']; lastSuccessAt: string }>
+    const timestamps = new Map(rows.map((row) => [row.target, row.lastSuccessAt]))
+    return (['all', 'events', 'cycles', 'exploration'] as const).map((target) => ({
+      gameId,
+      target,
+      lastSuccessAt: timestamps.get(target) ?? null
+    }))
   }
 
-  listAutomaticSyncSettings(): SyncSettings[] {
-    const gameIds = this.database
-      .prepare(`
-        SELECT game_id AS gameId
-        FROM sync_states
-        WHERE run_mode = 'automatic'
-        ORDER BY game_id
-      `)
-      .all() as Array<{ gameId: string }>
-
-    return gameIds.map((row) => this.getSyncSettings(row.gameId))
+  recordSyncTargetSuccess(
+    gameId: GameId,
+    target: SyncTarget,
+    reference = new Date(),
+    includeGlobal = false
+  ): void {
+    if (target === 'tasks') return
+    const targets = target === 'all'
+      ? includeGlobal
+        ? (['all', 'events', 'cycles', 'exploration'] as const)
+        : (['events', 'cycles', 'exploration'] as const)
+      : [target]
+    const timestamp = reference.toISOString()
+    const statement = this.database.prepare(`
+      INSERT INTO sync_target_states(game_id, target, last_success_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(game_id, target) DO UPDATE SET last_success_at = excluded.last_success_at
+    `)
+    for (const resolvedTarget of targets) statement.run(gameId, resolvedTarget, timestamp)
   }
 
   recordSyncAttempt(gameId: string, scope: SyncScope): void {
@@ -394,6 +403,7 @@ export class AppDatabase {
       ? `${message}；${current.message}`
       : message
     this.recordSyncOutcome(job.gameId, finalStatus, finalMessage, true)
+    this.recordSyncTargetSuccess(job.gameId, job.target, reference, true)
     return { job: this.getAiScheduleJob(jobId), merge }
   }
 
@@ -1385,6 +1395,47 @@ export class AppDatabase {
         BEGIN;
         UPDATE checklist_items SET recurrence_rule = NULL WHERE recurrence_rule IS NOT NULL;
         INSERT INTO schema_migrations(version) VALUES (10);
+        COMMIT;
+      `)
+    }
+
+    const migration11 = this.database
+      .prepare('SELECT version FROM schema_migrations WHERE version = 11')
+      .get()
+
+    if (!migration11) {
+      this.database.exec(`
+        BEGIN;
+        UPDATE sync_states
+          SET run_mode = 'manual', auto_scope = 'public_schedule'
+          WHERE run_mode <> 'manual' OR auto_scope <> 'public_schedule';
+        CREATE TABLE IF NOT EXISTS sync_target_states (
+          game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+          target TEXT NOT NULL CHECK (target IN ('all', 'events', 'cycles', 'exploration')),
+          last_success_at TEXT NOT NULL,
+          PRIMARY KEY(game_id, target)
+        );
+        INSERT OR REPLACE INTO sync_target_states(game_id, target, last_success_at)
+          SELECT game_id, 'all', MAX(completed_at)
+          FROM ai_schedule_jobs
+          WHERE status = 'completed' AND target = 'all' AND completed_at IS NOT NULL
+          GROUP BY game_id;
+        INSERT OR REPLACE INTO sync_target_states(game_id, target, last_success_at)
+          SELECT game_id, 'events', MAX(completed_at)
+          FROM ai_schedule_jobs
+          WHERE status = 'completed' AND target IN ('all', 'events') AND completed_at IS NOT NULL
+          GROUP BY game_id;
+        INSERT OR REPLACE INTO sync_target_states(game_id, target, last_success_at)
+          SELECT game_id, 'cycles', MAX(completed_at)
+          FROM ai_schedule_jobs
+          WHERE status = 'completed' AND target IN ('all', 'cycles') AND completed_at IS NOT NULL
+          GROUP BY game_id;
+        INSERT OR REPLACE INTO sync_target_states(game_id, target, last_success_at)
+          SELECT game_id, 'exploration', MAX(completed_at)
+          FROM ai_schedule_jobs
+          WHERE status = 'completed' AND target IN ('all', 'exploration') AND completed_at IS NOT NULL
+          GROUP BY game_id;
+        INSERT INTO schema_migrations(version) VALUES (11);
         COMMIT;
       `)
     }

@@ -13,11 +13,13 @@ import type {
   GameId,
   GameSummary,
   MiyousheQrLoginState,
+  PersonalSyncTarget,
   ScheduleImageCandidate,
   ScheduleImageDraft,
   SyncResult,
   SyncScope,
   SyncTarget,
+  SyncTargetState,
   SyncSettings
 } from '../../shared/contracts'
 import { readHiddenGameIds, writeHiddenGameIds } from './game-visibility'
@@ -127,6 +129,8 @@ const refreshMenuOpen = ref(false)
 const sectionSyncMenuOpen = ref<ChecklistSection | null>(null)
 const syncing = ref(false)
 const syncSettings = ref<SyncSettings | null>(null)
+const syncTargetStates = ref<SyncTargetState[]>([])
+const personalSyncTargets = ref<PersonalSyncTarget[]>([])
 const syncNotice = ref<{ status: SyncResult['status']; message: string } | null>(null)
 const clockNow = ref(Date.now())
 const editorOpen = ref(false)
@@ -193,17 +197,9 @@ const editorCategories = computed(() => {
 const personalPlatform = computed(() =>
   selectedGameId.value === 'wuthering-waves' ? '库街区' : '米游社'
 )
-const syncModeValue = computed(() => {
-  if (!syncSettings.value || syncSettings.value.runMode === 'manual') return 'manual'
-  return syncSettings.value.autoScope === 'public_schedule'
-    ? 'automatic_public'
-    : 'automatic_personal'
-})
 const incompleteCount = computed(() => items.value.filter((item) => !item.completed).length)
-const needsInitialSync = computed(() =>
-  syncSettings.value?.lastSuccessAt === null &&
-  items.value.every((item) => ['main_quest', 'side_quest'].includes(item.category))
-)
+const globalSyncState = computed(() => syncTargetStates.value.find((state) => state.target === 'all'))
+const needsInitialSync = computed(() => !globalSyncState.value?.lastSuccessAt)
 const imageImportCategories = computed<Array<[ScheduleImageCandidate['category'], string]>>(() => {
   if (imageImportTarget.value === 'events') return [['limited_event', '限时活动']]
   if (imageImportTarget.value === 'cycles') return [['endgame', '深渊/挑战模式'], ['weekly', '周常']]
@@ -262,7 +258,13 @@ onMounted(async () => {
     if (hiddenGameIds.value.includes(selectedGameId.value)) {
       selectedGameId.value = visibleGames.value[0]?.id ?? 'genshin'
     }
-    await Promise.all([loadItems(), loadArchivedItems(), loadSyncSettings()])
+    await Promise.all([
+      loadItems(),
+      loadArchivedItems(),
+      loadSyncSettings(),
+      loadSyncTargetStates(),
+      loadPersonalSyncTargets()
+    ])
   } catch (error) {
     showError(error)
   } finally {
@@ -273,10 +275,16 @@ onMounted(async () => {
 const removeSyncListener = window.gacha.onSyncCompleted((result) => {
   if (result.gameId !== selectedGameId.value) return
   syncNotice.value = { status: result.status, message: displaySyncMessage(result.message) }
-  void Promise.all([loadItems(), loadSyncSettings()])
+  void Promise.all([loadItems(), loadSyncSettings(), loadSyncTargetStates()])
 })
 const removeChecklistListener = window.gacha.onChecklistChanged(() => {
-  void Promise.all([loadItems(), loadArchivedItems(), loadSyncSettings(), loadAiScheduleAgentStatus()])
+  void Promise.all([
+    loadItems(),
+    loadArchivedItems(),
+    loadSyncSettings(),
+    loadSyncTargetStates(),
+    loadAiScheduleAgentStatus()
+  ])
     .then(() => {
       const settings = syncSettings.value
       if (!settings?.message || settings.status === 'idle') return
@@ -329,7 +337,13 @@ watch(selectedGameId, () => {
   refreshMenuOpen.value = false
   sectionSyncMenuOpen.value = null
   recycleBinOpen.value = false
-  void Promise.all([loadItems(), loadArchivedItems(), loadSyncSettings()])
+  void Promise.all([
+    loadItems(),
+    loadArchivedItems(),
+    loadSyncSettings(),
+    loadSyncTargetStates(),
+    loadPersonalSyncTargets()
+  ])
 })
 
 async function loadItems(): Promise<void> {
@@ -354,6 +368,39 @@ async function loadSyncSettings(): Promise<void> {
   } catch (error) {
     if (selectedGameId.value === gameId) showError(error)
   }
+}
+
+async function loadSyncTargetStates(): Promise<void> {
+  const gameId = selectedGameId.value
+  try {
+    const states = await window.gacha.getSyncTargetStates(gameId)
+    if (selectedGameId.value === gameId) syncTargetStates.value = states
+  } catch (error) {
+    if (selectedGameId.value === gameId) showError(error)
+  }
+}
+
+async function loadPersonalSyncTargets(): Promise<void> {
+  const gameId = selectedGameId.value
+  try {
+    const targets = await window.gacha.getPersonalSyncTargets(gameId)
+    if (selectedGameId.value === gameId) personalSyncTargets.value = targets
+  } catch (error) {
+    if (selectedGameId.value === gameId) showError(error)
+  }
+}
+
+function syncTargetState(target: SyncTargetState['target']): SyncTargetState | undefined {
+  return syncTargetStates.value.find((state) => state.target === target)
+}
+
+function formatSyncTimestamp(timestamp: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(timestamp))
 }
 
 async function loadAiScheduleAgentStatus(): Promise<void> {
@@ -528,26 +575,6 @@ async function openCodexPlugin(): Promise<void> {
   }
 }
 
-async function updateSyncMode(event: Event): Promise<void> {
-  const gameId = selectedGameId.value
-  const value = (event.target as HTMLSelectElement).value
-  const runMode = value === 'manual' ? 'manual' : 'automatic'
-  const autoScope = value === 'automatic_personal' ? 'public_and_personal' : 'public_schedule'
-  try {
-    const updatedSettings = await window.gacha.updateSyncSettings({
-      gameId,
-      runMode,
-      autoScope
-    })
-    if (selectedGameId.value === gameId) syncSettings.value = updatedSettings
-  } catch (error) {
-    if (selectedGameId.value === gameId) {
-      showError(error)
-      await loadSyncSettings()
-    }
-  }
-}
-
 async function runSync(scope: SyncScope, target: SyncTarget = 'all'): Promise<void> {
   const gameId = selectedGameId.value
   refreshMenuOpen.value = false
@@ -558,7 +585,7 @@ async function runSync(scope: SyncScope, target: SyncTarget = 'all'): Promise<vo
     const result = await window.gacha.syncGame(gameId, scope, target)
     if (selectedGameId.value === gameId) {
       syncNotice.value = { status: result.status, message: displaySyncMessage(result.message) }
-      await Promise.all([loadItems(), loadSyncSettings()])
+      await Promise.all([loadItems(), loadSyncSettings(), loadSyncTargetStates()])
     }
   } catch (error) {
     if (selectedGameId.value === gameId) showError(error)
@@ -577,7 +604,7 @@ async function runPersonalSync(target: SyncTarget = 'all'): Promise<void> {
     const result = await window.gacha.syncPersonalData(gameId, target)
     if (selectedGameId.value === gameId) {
       syncNotice.value = { status: result.status, message: displaySyncMessage(result.message) }
-      await Promise.all([loadItems(), loadSyncSettings()])
+      await Promise.all([loadItems(), loadSyncSettings(), loadSyncTargetStates()])
     }
   } catch (error) {
     if (selectedGameId.value === gameId) showError(error)
@@ -685,7 +712,7 @@ async function applyScheduleImageImport(): Promise<void> {
       status: 'success',
       message: `图片导入完成：新增 ${result.added}，更新 ${result.updated}，保护 ${result.preserved}`
     }
-    await loadItems()
+    await Promise.all([loadItems(), loadSyncTargetStates()])
   } catch (error) {
     showError(error)
   } finally {
@@ -945,7 +972,7 @@ function showError(error: unknown): void {
                   ? `已连接 ${aiScheduleAgent.name}`
                   : aiScheduleAgent?.codexPluginInstalled
                     ? '已安装 Codex 插件；同步清单后请在 Codex 处理资料任务'
-                    : '同步清单需要 AI；同步进度和同步本地仍可使用'"
+                    : '同步清单需要 AI；同步本地仍可使用'"
               aria-haspopup="menu"
               :aria-expanded="refreshMenuOpen"
               @click="refreshMenuOpen = !refreshMenuOpen"
@@ -954,15 +981,19 @@ function showError(error: unknown): void {
             </button>
             <div v-if="refreshMenuOpen" class="dropdown-menu" role="menu">
               <button role="menuitem" type="button" :disabled="!aiScheduleAvailable" @click="runSync('public_schedule')">同步清单</button>
-              <button role="menuitem" type="button" @click="runPersonalSync()">同步进度</button>
               <button role="menuitem" type="button" @click="openLocalImportTargetPicker">同步本地</button>
             </div>
           </div>
-          <select class="toolbar-select" :value="syncModeValue" aria-label="同步模式" @change="updateSyncMode">
-            <option value="manual">手动模式</option>
-            <option value="automatic_public">自动模式 · 同步清单</option>
-            <option value="automatic_personal">自动模式 · 清单和进度</option>
-          </select>
+          <span
+            class="sync-indicator"
+            :class="{ synced: Boolean(globalSyncState?.lastSuccessAt) }"
+            :title="globalSyncState?.lastSuccessAt
+              ? `最后全局同步：${new Date(globalSyncState.lastSuccessAt).toLocaleString()}`
+              : '尚未完成全局同步'"
+          >
+            <strong>{{ globalSyncState?.lastSuccessAt ? '已同步' : '未同步' }}</strong>
+            <time v-if="globalSyncState?.lastSuccessAt">{{ formatSyncTimestamp(globalSyncState.lastSuccessAt) }}</time>
+          </span>
           <span
             class="sync-status"
             :class="syncSettings?.status"
@@ -1011,7 +1042,22 @@ function showError(error: unknown): void {
           <div v-for="(column, columnIndex) in panelColumns" :key="columnIndex" class="checklist-column">
             <article v-for="panel in column" :key="panel.title" class="panel checklist-card">
               <div class="section-header">
-                <h2><span>{{ panel.icon }}</span>{{ panel.title }}</h2>
+                <div class="section-title">
+                  <h2><span>{{ panel.icon }}</span>{{ panel.title }}</h2>
+                  <span
+                    v-if="panel.syncTarget"
+                    class="section-sync-indicator"
+                    :class="{ synced: Boolean(syncTargetState(panel.syncTarget)?.lastSuccessAt) }"
+                    :title="syncTargetState(panel.syncTarget)?.lastSuccessAt
+                      ? `最后同步：${new Date(syncTargetState(panel.syncTarget)!.lastSuccessAt!).toLocaleString()}`
+                      : '该版块尚未同步'"
+                  >
+                    {{ syncTargetState(panel.syncTarget)?.lastSuccessAt ? '已同步' : '未同步' }}
+                    <time v-if="syncTargetState(panel.syncTarget)?.lastSuccessAt">
+                      {{ formatSyncTimestamp(syncTargetState(panel.syncTarget)!.lastSuccessAt!) }}
+                    </time>
+                  </span>
+                </div>
                 <div class="section-actions">
                   <div v-if="panel.syncTarget" class="dropdown" @click.stop>
                     <button
@@ -1024,7 +1070,12 @@ function showError(error: unknown): void {
                     >↻ 同步 ▾</button>
                     <div v-if="sectionSyncMenuOpen === panel.section" class="dropdown-menu section-sync-menu" role="menu">
                       <button role="menuitem" type="button" :disabled="!aiScheduleAvailable" @click="runSync('public_schedule', panel.syncTarget)">同步清单</button>
-                      <button role="menuitem" type="button" @click="runPersonalSync(panel.syncTarget)">同步进度</button>
+                      <button
+                        v-if="personalSyncTargets.includes(panel.syncTarget)"
+                        role="menuitem"
+                        type="button"
+                        @click="runPersonalSync(panel.syncTarget)"
+                      >同步进度</button>
                       <button role="menuitem" type="button" @click="openScheduleImageImport(panel.syncTarget)">同步本地</button>
                     </div>
                   </div>

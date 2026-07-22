@@ -1,6 +1,5 @@
 import { createHash, randomInt } from 'node:crypto'
 import type { CredentialPayload } from '../credential-vault'
-import { MIYOUSHE_WEB_DEVICE_PROFILE } from '../auth/miyoushe-device-profile'
 import { SyncVerificationRequiredError } from './types'
 import { ZenlessPersonalAdapter, type ZenlessBattleChronicleClient } from './zenless-personal-adapter'
 import { GenshinPersonalAdapter, type GenshinBattleChronicleClient } from './genshin-personal-adapter'
@@ -10,8 +9,11 @@ const ACCOUNT_ROLES_URL = 'https://api-takumi.mihoyo.com/binding/api/getUserGame
 const ZENLESS_RECORD_BASE = 'https://api-takumi-record.mihoyo.com/event/game_record_zzz/api/zzz'
 const GENSHIN_RECORD_BASE = 'https://api-takumi-record.mihoyo.com/game_record/app/genshin/api'
 const STAR_RAIL_RECORD_BASE = 'https://api-takumi-record.mihoyo.com/game_record/app/hkrpg/api'
-const CREATE_VERIFICATION_URL = 'https://api-takumi-record.mihoyo.com/game_record/app/card/wapi/createVerification?is_high=false'
+const DEVICE_FP_URL = 'https://public-data-api.mihoyo.com/device-fp/api/getFp'
+const CREATE_VERIFICATION_URL = 'https://bbs-api.miyoushe.com/misc/api/createVerification?is_high=true'
+const VERIFY_VERIFICATION_URL = 'https://bbs-api.miyoushe.com/misc/api/verifyVerification'
 const CN_DS_SALT = 'xV8v4Qu54lUKrEYFZkJhB8cuOh9Asafs'
+const BBS_DS_SALT = '9ttJY72HxbjwWRNHJvn0n2AYue47nYsK'
 const GEETEST_RETCODES = new Set([10035, 5003, 10041, 1034])
 
 interface MiyousheEnvelope {
@@ -26,20 +28,43 @@ interface MiyousheGameAccount {
   region?: unknown
 }
 
-export interface MiyousheGeetestChallenge {
+export interface MiyousheGeetestV3Challenge {
   gt: string
   challenge: string
   newCaptcha: number
   success: number
   sessionId?: string
+  version?: 3
 }
 
-export interface MiyousheGeetestResult {
+export interface MiyousheGeetestV4Challenge {
+  gt: string
+  riskType: string
+  sessionId: string
+  version: 4
+}
+
+export type MiyousheGeetestChallenge = MiyousheGeetestV3Challenge | MiyousheGeetestV4Challenge
+
+export interface MiyousheGeetestV3Result {
   geetest_challenge: string
   geetest_validate: string
   geetest_seccode: string
   sessionId?: string
+  version?: 3
 }
+
+export interface MiyousheGeetestV4Result {
+  captcha_id: string
+  lot_number: string
+  pass_token: string
+  gen_time: string
+  captcha_output: string
+  sessionId?: string
+  version: 4
+}
+
+export type MiyousheGeetestResult = MiyousheGeetestV3Result | MiyousheGeetestV4Result
 
 export type MiyousheGeetestSolver = (
   challenge: MiyousheGeetestChallenge
@@ -47,6 +72,10 @@ export type MiyousheGeetestSolver = (
 
 class MiyousheChronicleClient {
   private readonly accounts = new Map<string, { uid: string; region: string }>()
+  private verificationAttempted = false
+  private readonly deviceId: string | null
+  private deviceFp: string | null = null
+  private deviceFpPromise: Promise<void> | null = null
 
   constructor(
     private readonly cookie: string,
@@ -55,6 +84,8 @@ class MiyousheChronicleClient {
     private readonly reuseLoginDevice = false
   ) {
     if (!cookie.trim()) throw new Error('米游社登录凭据为空')
+    const accountId = readCookieValue(cookie, 'account_id_v2') ?? readCookieValue(cookie, 'ltuid_v2')
+    this.deviceId = reuseLoginDevice && accountId ? createStableDeviceId(accountId) : null
   }
 
   async getShiyuDefense(): Promise<unknown> {
@@ -110,6 +141,9 @@ class MiyousheChronicleClient {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 15_000)
     try {
+      if (this.deviceId && url.startsWith('https://api-takumi-record.mihoyo.com/')) {
+        await this.ensureDeviceFingerprint()
+      }
       const requestUrl = new URL(url)
       for (const [key, value] of Object.entries(query)) requestUrl.searchParams.set(key, value)
       const response = await this.fetcher(requestUrl, {
@@ -122,11 +156,11 @@ class MiyousheChronicleClient {
           'x-rpc-app_version': '2.11.1',
           'x-rpc-client_type': '5',
           'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/58.0.3029.110 Safari/537.36',
-          ...(this.reuseLoginDevice ? MIYOUSHE_WEB_DEVICE_PROFILE : {}),
+          ...(this.deviceFp ? { 'x-rpc-device_fp': this.deviceFp } : {}),
           ...(body ? { 'content-type': 'application/json' } : {}),
           ...(verification?.sessionId ? {
             'x-rpc-aigis': buildAigisHeader(verification)
-          } : verification ? {
+          } : verification && 'geetest_challenge' in verification ? {
             'x-rpc-challenge': verification.geetest_challenge,
             'x-rpc-validate': verification.geetest_validate,
             'x-rpc-seccode': verification.geetest_seccode
@@ -141,11 +175,19 @@ class MiyousheChronicleClient {
       // verification. Only the documented risk retcodes mean the request was
       // rejected; treating the header alone as failure discards successful data.
       if (GEETEST_RETCODES.has(retcode)) {
-        if (!verification && this.solveGeetest) {
+        if (!verification && this.solveGeetest && !this.verificationAttempted) {
+          this.verificationAttempted = true
           const challenge = parseAigisChallenge(response.headers.get('x-rpc-aigis'))
             ?? await this.createGeetestChallenge()
           const result = await this.solveGeetest(challenge)
           if (!result) throw new SyncVerificationRequiredError('米游社滑块验证已取消')
+          if (!challenge.sessionId) {
+            if (challenge.version === 4 || result.version === 4) {
+              throw new SyncVerificationRequiredError('米游社兼容验证服务返回了无法提交的 V4 票据')
+            }
+            await this.verifyGeetestChallenge(challenge, result)
+            return await this.request(url, query, undefined, method, body)
+          }
           return await this.request(
             url,
             query,
@@ -154,7 +196,16 @@ class MiyousheChronicleClient {
             body
           )
         }
-        throw new SyncVerificationRequiredError('米游社需要完成滑块或设备验证')
+        const verificationMode = verification?.version === 4
+          ? 'Geetest V4 Aigis'
+          : verification?.sessionId
+            ? 'Geetest V3 Aigis'
+            : verification
+              ? 'Geetest V3 兼容模式'
+              : '未取得验证票据'
+        throw new SyncVerificationRequiredError(
+          `米游社验证票据未被战绩接口接受（${verificationMode}，返回代码 ${retcode}）`
+        )
       }
       if (retcode === -100 || retcode === 10001) {
         throw new SyncVerificationRequiredError('米游社登录已失效，请重新登录')
@@ -170,6 +221,56 @@ class MiyousheChronicleClient {
     }
   }
 
+  private async ensureDeviceFingerprint(): Promise<void> {
+    if (!this.deviceId || this.deviceFp) return
+    if (this.deviceFpPromise) return await this.deviceFpPromise
+    this.deviceFpPromise = (async () => {
+      const seedId = randomString(16)
+      const body = {
+        seed_id: seedId,
+        device_id: this.deviceId!.toUpperCase(),
+        platform: '1',
+        seed_time: String(Date.now()),
+        ext_fields: JSON.stringify({
+          proxyStatus: '0',
+          IDFV: this.deviceId!.toUpperCase(),
+          isJailBreak: '0',
+          model: 'iPhone12,5',
+          osVersion: '17.0.2',
+          networkType: 'WIFI',
+          screenSize: '414x896',
+          cpuCores: '6',
+          cpuType: 'CPU_TYPE_ARM64'
+        }),
+        app_name: 'bbs_cn',
+        device_fp: '38d7ee834d1e9'
+      }
+      try {
+        const response = await this.fetcher(DEVICE_FP_URL, {
+          method: 'POST',
+          redirect: 'error',
+          headers: {
+            'content-type': 'application/json',
+            ds: generateCnDynamicSecret({}, body),
+            'x-rpc-app_version': '2.40.1',
+            'x-rpc-client_type': '5',
+            'user-agent': `Mozilla/5.0 (Linux; Android 12; ${this.deviceId}) AppleWebKit/537.36 Chrome/99.0.4844.73 Mobile Safari/537.36 miHoYoBBS/2.40.1`,
+            referer: 'https://webstatic.mihoyo.com/'
+          },
+          body: JSON.stringify(body)
+        })
+        if (!response.ok) return
+        const envelope = await response.json() as MiyousheEnvelope
+        const fp = toNonEmptyString(asRecord(envelope.data).device_fp)
+        if ((envelope.retcode ?? 0) === 0 && fp) this.deviceFp = fp
+      } catch {
+        // Fingerprint registration is an optimization. The battle-chronicle
+        // request can still proceed without it and surface its own result.
+      }
+    })()
+    await this.deviceFpPromise
+  }
+
   private async createGeetestChallenge(): Promise<MiyousheGeetestChallenge> {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 15_000)
@@ -180,12 +281,7 @@ class MiyousheChronicleClient {
         signal: controller.signal,
         headers: {
           cookie: this.cookie,
-          ds: generateGeetestDynamicSecret(),
-          'x-rpc-app_version': '2.60.1',
-          'x-rpc-client_type': '5',
-          'x-rpc-challenge_game': '6',
-          'x-rpc-page': 'v1.4.1-rpg_#/rpg',
-          'x-rpc-tool-version': 'v1.4.1-rpg'
+          ...createBbsVerificationHeaders(this.deviceId, this.deviceFp)
         }
       })
       if (!response.ok) throw new Error(`米游社验证服务请求失败（HTTP ${response.status}）`)
@@ -206,6 +302,46 @@ class MiyousheChronicleClient {
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         throw new SyncVerificationRequiredError('米游社验证服务请求超时')
+      }
+      throw error
+    } finally {
+      clearTimeout(timeout)
+    }
+  }
+
+  private async verifyGeetestChallenge(
+    challenge: MiyousheGeetestV3Challenge,
+    result: MiyousheGeetestV3Result
+  ): Promise<void> {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 15_000)
+    try {
+      const body = {
+        geetest_seccode: result.geetest_seccode,
+        geetest_challenge: challenge.challenge,
+        geetest_validate: result.geetest_validate
+      }
+      const response = await this.fetcher(VERIFY_VERIFICATION_URL, {
+        method: 'POST',
+        redirect: 'error',
+        signal: controller.signal,
+        headers: {
+          cookie: this.cookie,
+          'content-type': 'application/json; charset=UTF-8',
+          ...createBbsVerificationHeaders(this.deviceId, this.deviceFp)
+        },
+        body: JSON.stringify(body)
+      })
+      if (!response.ok) throw new Error(`米游社验证确认请求失败（HTTP ${response.status}）`)
+      const envelope = await response.json() as MiyousheEnvelope
+      if ((envelope.retcode ?? 0) !== 0) {
+        throw new SyncVerificationRequiredError(
+          envelope.message || `米游社未接受滑块验证结果（${envelope.retcode}）`
+        )
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new SyncVerificationRequiredError('米游社验证确认请求超时')
       }
       throw error
     } finally {
@@ -358,13 +494,52 @@ function generateCnDynamicSecret(
   return `${timestamp},${random},${hash}`
 }
 
-function generateGeetestDynamicSecret(): string {
+function createBbsVerificationHeaders(
+  deviceId: string | null,
+  deviceFp: string | null
+): Record<string, string> {
+  return {
+    ds: generateBbsDynamicSecret(),
+    'x-rpc-verify_key': 'bll8iq97cem8',
+    'x-rpc-client_type': '1',
+    'x-rpc-channel': 'appstore',
+    'x-rpc-app_version': '2.63.1',
+    'x-rpc-sys_version': '16.2',
+    'x-rpc-device_name': 'iPhone',
+    'x-rpc-device_model': 'iPhone10,2',
+    'user-agent': 'Hyperion/275 CFNetwork/1402.0.8 Darwin/22.2.0',
+    referer: 'https://app.mihoyo.com',
+    ...(deviceId ? { 'x-rpc-device_id': deviceId } : {}),
+    ...(deviceFp ? { 'x-rpc-device_fp': deviceFp } : {})
+  }
+}
+
+function generateBbsDynamicSecret(): string {
   const timestamp = Math.floor(Date.now() / 1000)
-  const random = randomInt(100000, 200001)
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789'
+  let random = ''
+  for (let index = 0; index < 6; index += 1) random += alphabet[randomInt(0, alphabet.length)]
   const hash = createHash('md5')
-    .update(`salt=${CN_DS_SALT}&t=${timestamp}&r=${random}&b=&q=is_high=false`)
+    .update(`salt=${BBS_DS_SALT}&t=${timestamp}&r=${random}`)
     .digest('hex')
   return `${timestamp},${random},${hash}`
+}
+
+function randomString(length: number): string {
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789'
+  let result = ''
+  for (let index = 0; index < length; index += 1) result += alphabet[randomInt(0, alphabet.length)]
+  return result
+}
+
+function readCookieValue(cookie: string, name: string): string | null {
+  const part = cookie.split(';').find((candidate) => candidate.trim().startsWith(`${name}=`))
+  return part ? part.slice(part.indexOf('=') + 1).trim() || null : null
+}
+
+function createStableDeviceId(accountId: string): string {
+  const hex = createHash('sha256').update(`gacha-task-manager:${accountId}`).digest('hex').slice(0, 32)
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
 }
 
 function normalizeShiyuDefense(value: unknown): Record<string, unknown> {
@@ -415,6 +590,15 @@ function parseAigisChallenge(value: string | null): MiyousheGeetestChallenge | n
     if (typeof data === 'string') data = JSON.parse(data)
     const challenge = asRecord(data)
     const gt = toNonEmptyString(challenge.gt)
+    const riskType = toNonEmptyString(challenge.risk_type)
+    if (sessionId && gt && (challenge.use_v4 === true || riskType)) {
+      return {
+        gt,
+        riskType: riskType ?? 'slide',
+        sessionId,
+        version: 4
+      }
+    }
     const challengeId = toNonEmptyString(challenge.challenge)
     if (!sessionId || !gt || !challengeId) return null
     return {
@@ -432,7 +616,13 @@ function parseAigisChallenge(value: string | null): MiyousheGeetestChallenge | n
 function buildAigisHeader(result: MiyousheGeetestResult): string {
   const sessionId = toNonEmptyString(result.sessionId)
   if (!sessionId) throw new Error('米游社 Aigis 验证缺少会话标识')
-  const payload = JSON.stringify({
+  const payload = JSON.stringify(result.version === 4 ? {
+    captcha_id: result.captcha_id,
+    lot_number: result.lot_number,
+    pass_token: result.pass_token,
+    gen_time: result.gen_time,
+    captcha_output: result.captcha_output
+  } : {
     geetest_challenge: result.geetest_challenge,
     geetest_validate: result.geetest_validate,
     geetest_seccode: result.geetest_seccode

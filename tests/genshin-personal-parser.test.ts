@@ -103,4 +103,21 @@ describe('Genshin personal parsing', () => {
     expect(eventsOnly.items).toHaveLength(1)
     await expect(adapter.sync('zenless')).rejects.toThrow('不能用于其他游戏')
   })
+
+  it('保留同版块内已成功的接口结果，仅在全部失败时抛错', async () => {
+    const adapter = new GenshinPersonalAdapter({
+      getProfile: async () => payload.profile,
+      getSpiralAbyss: async () => { throw new Error('螺旋风控') },
+      getImaginariumTheater: async () => payload.imaginariumTheater,
+      getStygianOnslaught: async () => { throw new Error('幽境风控') },
+      getEventCalendar: async () => { throw new Error('活动风控') }
+    })
+
+    const partial = await adapter.sync('genshin', 'cycles')
+    expect(partial.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ modeKey: 'imaginarium-theater' })
+    ]))
+    expect(partial.message).toContain('部分成功 1/3')
+    await expect(adapter.sync('genshin', 'events')).rejects.toThrow('活动风控')
+  })
 })

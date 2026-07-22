@@ -91,6 +91,7 @@ describe('MiyousheZenlessClient', () => {
         new_captcha: 1,
         success: 1
       } }))
+      .mockResolvedValueOnce(response({ retcode: 0, data: {} }))
       .mockResolvedValueOnce(response({ retcode: 0, data: {
         hadal_ver: 'v2',
         hadal_info_v2: {
@@ -115,10 +116,41 @@ describe('MiyousheZenlessClient', () => {
       newCaptcha: 1,
       success: 1
     })
-    const retryHeaders = new Headers(fetcher.mock.calls[3][1]?.headers)
-    expect(retryHeaders.get('x-rpc-challenge')).toBe('verified-challenge')
-    expect(retryHeaders.get('x-rpc-validate')).toBe('verified-validate')
-    expect(retryHeaders.get('x-rpc-seccode')).toBe('verified-seccode')
+    expect(String(fetcher.mock.calls[3][0])).toContain('/misc/api/verifyVerification')
+    expect(JSON.parse(String(fetcher.mock.calls[3][1]?.body))).toEqual({
+      geetest_seccode: 'verified-seccode',
+      geetest_challenge: 'challenge-id',
+      geetest_validate: 'verified-validate'
+    })
+    const retryHeaders = new Headers(fetcher.mock.calls[4][1]?.headers)
+    expect(retryHeaders.get('x-rpc-challenge')).toBeNull()
+    expect(retryHeaders.get('x-rpc-validate')).toBeNull()
+    expect(retryHeaders.get('x-rpc-seccode')).toBeNull()
+  })
+
+  it('never opens a second verification window in the same sync batch', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(response({ retcode: 0, data: { list: [
+        { game_biz: 'nap_cn', game_uid: '10194867', region: 'prod_gf_cn' }
+      ] } }))
+      .mockResolvedValueOnce(response({ retcode: 1034, message: 'Verification required', data: null }))
+      .mockResolvedValueOnce(response({ retcode: 0, data: {
+        gt: 'geetest-id', challenge: 'challenge-id', new_captcha: 1, success: 1
+      } }))
+      .mockResolvedValueOnce(response({ retcode: 0, data: {} }))
+      .mockResolvedValueOnce(response({ retcode: 1034, message: 'Verification required again', data: null }))
+    const solver = vi.fn(async () => ({
+      geetest_challenge: 'verified-challenge',
+      geetest_validate: 'verified-validate',
+      geetest_seccode: 'verified-seccode'
+    }))
+    const client = new MiyousheZenlessClient('cookie=secret', fetcher, solver)
+
+    await expect(client.getShiyuDefense()).rejects.toMatchObject({
+      name: 'SyncVerificationRequiredError'
+    })
+    expect(solver).toHaveBeenCalledTimes(1)
+    expect(fetcher).toHaveBeenCalledTimes(5)
   })
 
   it('uses the session-bound Aigis header when the record endpoint supplies one', async () => {
@@ -175,6 +207,58 @@ describe('MiyousheZenlessClient', () => {
     expect(retryHeaders.get('x-rpc-challenge')).toBeNull()
   })
 
+  it('uses a session-bound Geetest V4 result when the record endpoint requests it', async () => {
+    const aigis = JSON.stringify({
+      session_id: 'record-v4-session',
+      data: JSON.stringify({
+        gt: 'record-v4-captcha-id',
+        risk_type: 'slide',
+        use_v4: true
+      })
+    })
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(response({ retcode: 0, data: { list: [
+        { game_biz: 'nap_cn', game_uid: '10194867', region: 'prod_gf_cn' }
+      ] } }))
+      .mockResolvedValueOnce(response(
+        { retcode: 1034, message: 'Verification required', data: null },
+        { 'x-rpc-aigis': aigis }
+      ))
+      .mockResolvedValueOnce(response({ retcode: 0, data: {
+        hadal_ver: 'v2',
+        hadal_info_v2: { zone_id: 62052, pass_fifth_floor: false }
+      } }))
+    const solver = vi.fn(async () => ({
+      captcha_id: 'record-v4-captcha-id',
+      lot_number: 'verified-lot-number',
+      pass_token: 'verified-pass-token',
+      gen_time: '1753180000',
+      captcha_output: 'verified-captcha-output',
+      version: 4 as const
+    }))
+    const client = new MiyousheZenlessClient('cookie=secret', fetcher, solver)
+
+    await expect(client.getShiyuDefense()).resolves.toMatchObject({ schedule_id: 62052 })
+    expect(solver).toHaveBeenCalledWith({
+      gt: 'record-v4-captcha-id',
+      riskType: 'slide',
+      sessionId: 'record-v4-session',
+      version: 4
+    })
+    const retryHeaders = new Headers(fetcher.mock.calls[2][1]?.headers)
+    const aigisHeader = retryHeaders.get('x-rpc-aigis')!
+    const [sessionId, encoded] = aigisHeader.split(';')
+    expect(sessionId).toBe('record-v4-session')
+    expect(JSON.parse(Buffer.from(encoded, 'base64').toString('utf8'))).toEqual({
+      captcha_id: 'record-v4-captcha-id',
+      lot_number: 'verified-lot-number',
+      pass_token: 'verified-pass-token',
+      gen_time: '1753180000',
+      captcha_output: 'verified-captcha-output'
+    })
+    expect(retryHeaders.get('x-rpc-challenge')).toBeNull()
+  })
+
   it('rejects retired credential payloads before a network request', () => {
     expect(() => createMiyousheZenlessPersonalAdapter(
       { kind: 'session', value: 'old-session' },
@@ -210,8 +294,8 @@ describe('MiyousheGenshinClient', () => {
     expect(String(fetcher.mock.calls[5][0])).toContain('/genshin/api/act_calendar')
     expect(fetcher.mock.calls[5][1]?.method).toBe('POST')
     const profileHeaders = new Headers(fetcher.mock.calls[1][1]?.headers)
-    expect(profileHeaders.get('x-rpc-device_id')).toBe('586f1440-856a-4243-8076-2b0a12314197')
-    expect(profileHeaders.get('x-rpc-device_fp')).toBe('38d7fa104e5d7')
+    expect(profileHeaders.get('x-rpc-device_id')).toBeNull()
+    expect(profileHeaders.get('x-rpc-device_fp')).toBeNull()
     expect(JSON.parse(String(fetcher.mock.calls[5][1]?.body))).toEqual({
       role_id: '100071776',
       server: 'cn_gf01'
@@ -220,6 +304,28 @@ describe('MiyousheGenshinClient', () => {
       expect(String(call[0])).toContain('role_id=100071776')
       expect(String(call[0])).toContain('server=cn_gf01')
     }
+  })
+
+  it('registers a stable per-account fingerprint before requesting Genshin records', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(response({ retcode: 0, data: { list: [
+        { game_biz: 'hk4e_cn', game_uid: '100071776', region: 'cn_gf01' }
+      ] } }))
+      .mockResolvedValueOnce(response({ retcode: 0, data: { device_fp: 'account-device-fp' } }))
+      .mockResolvedValueOnce(response({ retcode: 0, data: { world_explorations: [] } }))
+    const client = new MiyousheGenshinClient(
+      'account_id_v2=12345678; cookie_token_v2=secret',
+      fetcher
+    )
+
+    await client.getProfile()
+
+    expect(String(fetcher.mock.calls[1][0])).toContain('/device-fp/api/getFp')
+    const fingerprintBody = JSON.parse(String(fetcher.mock.calls[1][1]?.body))
+    expect(fingerprintBody.device_id).toMatch(/^[0-9A-F]{8}(?:-[0-9A-F]{4}){3}-[0-9A-F]{12}$/)
+    const profileHeaders = new Headers(fetcher.mock.calls[2][1]?.headers)
+    expect(profileHeaders.get('x-rpc-device_id')).toBeNull()
+    expect(profileHeaders.get('x-rpc-device_fp')).toBe('account-device-fp')
   })
 })
 
@@ -237,8 +343,8 @@ describe('MiyousheStarRailClient', () => {
     await client.getApocalypticShadow()
     await client.getAnomalyArbitration()
     const challengeHeaders = new Headers(fetcher.mock.calls[1][1]?.headers)
-    expect(challengeHeaders.get('x-rpc-device_id')).toBe('586f1440-856a-4243-8076-2b0a12314197')
-    expect(challengeHeaders.get('x-rpc-device_fp')).toBe('38d7fa104e5d7')
+    expect(challengeHeaders.get('x-rpc-device_id')).toBeNull()
+    expect(challengeHeaders.get('x-rpc-device_fp')).toBeNull()
     await client.getEventCalendar()
 
     expect(fetcher).toHaveBeenCalledTimes(6)

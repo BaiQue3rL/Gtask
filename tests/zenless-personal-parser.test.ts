@@ -173,4 +173,22 @@ describe('绝区零个人战绩解析', () => {
     expect(exploration.items).toEqual([])
     await expect(adapter.sync('genshin')).rejects.toThrow('不能用于其他游戏')
   })
+
+  it('周期接口部分失败时保留另一项战绩', async () => {
+    const adapter = new ZenlessPersonalAdapter({
+      getShiyuDefense: async () => ({
+        schedule_id: 62052,
+        begin_time: '2026-07-10T04:00:00+08:00',
+        end_time: '2026-07-24T03:59:59+08:00',
+        passed_fifth_floor: true
+      }),
+      getDeadlyAssault: async () => { throw new Error('危局接口失败') },
+      getZenlessEventCalendar: async () => ({ activity_list: [] })
+    })
+    const partial = await adapter.sync('zenless', 'cycles')
+    expect(partial.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ modeKey: 'shiyu-defense' })
+    ]))
+    expect(partial.message).toContain('部分成功 1/2')
+  })
 })

@@ -80,6 +80,9 @@ export class SyncOrchestrator {
           ? 'stale'
           : 'error'
     this.database.recordSyncOutcome(gameId, databaseStatus, message, successCount > 0)
+    if (sources[0]?.status === 'success') {
+      this.database.recordSyncTargetSuccess(gameId, target, new Date(), true)
+    }
 
     return {
       gameId,
@@ -91,14 +94,6 @@ export class SyncOrchestrator {
       sources,
       message
     }
-  }
-
-  async runStartupSync(): Promise<SyncResult[]> {
-    const results: SyncResult[] = []
-    for (const settings of this.database.listAutomaticSyncSettings()) {
-      results.push(await this.syncGame(settings.gameId, settings.autoScope))
-    }
-    return results
   }
 
   async syncPersonalOnly(gameId: GameId, target: SyncTarget = 'all'): Promise<SyncResult> {
@@ -117,6 +112,9 @@ export class SyncOrchestrator {
       personal.message,
       personal.status === 'success'
     )
+    if (personal.status === 'success') {
+      this.database.recordSyncTargetSuccess(gameId, target)
+    }
     return {
       gameId,
       requestedScope: 'personal_data',
