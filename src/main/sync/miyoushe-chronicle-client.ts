@@ -2,9 +2,11 @@ import { createHash, randomInt } from 'node:crypto'
 import type { CredentialPayload } from '../credential-vault'
 import { SyncVerificationRequiredError } from './types'
 import { ZenlessPersonalAdapter, type ZenlessBattleChronicleClient } from './zenless-personal-adapter'
+import { GenshinPersonalAdapter, type GenshinBattleChronicleClient } from './genshin-personal-adapter'
 
 const ACCOUNT_ROLES_URL = 'https://api-takumi.mihoyo.com/binding/api/getUserGameRolesByCookie'
 const ZENLESS_RECORD_BASE = 'https://api-takumi-record.mihoyo.com/event/game_record_zzz/api/zzz'
+const GENSHIN_RECORD_BASE = 'https://api-takumi-record.mihoyo.com/game_record/app/genshin/api'
 const CREATE_VERIFICATION_URL = 'https://api-takumi-record.mihoyo.com/game_record/app/card/wapi/createVerification?is_high=false'
 const CN_DS_SALT = 'xV8v4Qu54lUKrEYFZkJhB8cuOh9Asafs'
 const GEETEST_RETCODES = new Set([10035, 5003, 10041, 1034])
@@ -38,8 +40,8 @@ export type MiyousheGeetestSolver = (
   challenge: MiyousheGeetestChallenge
 ) => Promise<MiyousheGeetestResult | null>
 
-export class MiyousheZenlessClient implements ZenlessBattleChronicleClient {
-  private account: { uid: string; region: string } | null = null
+class MiyousheChronicleClient {
+  private readonly accounts = new Map<string, { uid: string; region: string }>()
 
   constructor(
     private readonly cookie: string,
@@ -50,7 +52,7 @@ export class MiyousheZenlessClient implements ZenlessBattleChronicleClient {
   }
 
   async getShiyuDefense(): Promise<unknown> {
-    const account = await this.getAccount()
+    const account = await this.getAccount('nap_cn', '绝区零')
     const data = await this.request(`${ZENLESS_RECORD_BASE}/hadal_info_v2`, {
       role_id: account.uid,
       server: account.region,
@@ -60,7 +62,7 @@ export class MiyousheZenlessClient implements ZenlessBattleChronicleClient {
   }
 
   async getDeadlyAssault(): Promise<unknown> {
-    const account = await this.getAccount()
+    const account = await this.getAccount('nap_cn', '绝区零')
     const data = await this.request(`${ZENLESS_RECORD_BASE}/mem_detail`, {
       uid: account.uid,
       region: account.region,
@@ -69,20 +71,22 @@ export class MiyousheZenlessClient implements ZenlessBattleChronicleClient {
     return normalizeDeadlyAssault(data)
   }
 
-  private async getAccount(): Promise<{ uid: string; region: string }> {
-    if (this.account) return this.account
+  protected async getAccount(gameBiz: string, gameLabel: string): Promise<{ uid: string; region: string }> {
+    const cached = this.accounts.get(gameBiz)
+    if (cached) return cached
     const data = await this.request(ACCOUNT_ROLES_URL, {})
     const record = asRecord(data)
     const accounts = Array.isArray(record.list) ? record.list.filter(isRecord) as MiyousheGameAccount[] : []
-    const zenless = accounts.find((account) => account.game_biz === 'nap_cn')
-    const uid = toNonEmptyString(zenless?.game_uid)
-    const region = toNonEmptyString(zenless?.region)
-    if (!uid || !region) throw new SyncVerificationRequiredError('米游社账号未绑定绝区零国服角色')
-    this.account = { uid, region }
-    return this.account
+    const account = accounts.find((candidate) => candidate.game_biz === gameBiz)
+    const uid = toNonEmptyString(account?.game_uid)
+    const region = toNonEmptyString(account?.region)
+    if (!uid || !region) throw new SyncVerificationRequiredError(`米游社账号未绑定${gameLabel}国服角色`)
+    const result = { uid, region }
+    this.accounts.set(gameBiz, result)
+    return result
   }
 
-  private async request(
+  protected async request(
     url: string,
     query: Record<string, string>,
     verification?: MiyousheGeetestResult
@@ -179,6 +183,45 @@ export class MiyousheZenlessClient implements ZenlessBattleChronicleClient {
   }
 }
 
+export class MiyousheZenlessClient extends MiyousheChronicleClient implements ZenlessBattleChronicleClient {}
+
+export class MiyousheGenshinClient extends MiyousheChronicleClient implements GenshinBattleChronicleClient {
+  async getProfile(): Promise<unknown> {
+    const account = await this.getAccount('hk4e_cn', '原神')
+    return await this.request(`${GENSHIN_RECORD_BASE}/index`, {
+      role_id: account.uid,
+      server: account.region
+    })
+  }
+
+  async getSpiralAbyss(): Promise<unknown> {
+    const account = await this.getAccount('hk4e_cn', '原神')
+    return await this.request(`${GENSHIN_RECORD_BASE}/spiralAbyss`, {
+      role_id: account.uid,
+      server: account.region,
+      schedule_type: '1'
+    })
+  }
+
+  async getImaginariumTheater(): Promise<unknown> {
+    const account = await this.getAccount('hk4e_cn', '原神')
+    return await this.request(`${GENSHIN_RECORD_BASE}/role_combat`, {
+      role_id: account.uid,
+      server: account.region,
+      need_detail: 'true'
+    })
+  }
+
+  async getStygianOnslaught(): Promise<unknown> {
+    const account = await this.getAccount('hk4e_cn', '原神')
+    return await this.request(`${GENSHIN_RECORD_BASE}/hard_challenge`, {
+      role_id: account.uid,
+      server: account.region,
+      need_detail: 'true'
+    })
+  }
+}
+
 export function createMiyousheZenlessPersonalAdapter(
   credential: CredentialPayload,
   fetcher: typeof fetch,
@@ -188,6 +231,17 @@ export function createMiyousheZenlessPersonalAdapter(
     throw new SyncVerificationRequiredError('米游社凭据格式已过期，请重新登录')
   }
   return new ZenlessPersonalAdapter(new MiyousheZenlessClient(credential.value, fetcher, solveGeetest))
+}
+
+export function createMiyousheGenshinPersonalAdapter(
+  credential: CredentialPayload,
+  fetcher: typeof fetch,
+  solveGeetest?: MiyousheGeetestSolver
+): GenshinPersonalAdapter {
+  if (credential.kind !== 'cookie') {
+    throw new SyncVerificationRequiredError('米游社凭据格式已过期，请重新登录')
+  }
+  return new GenshinPersonalAdapter(new MiyousheGenshinClient(credential.value, fetcher, solveGeetest))
 }
 
 function generateCnDynamicSecret(query: Record<string, string>): string {

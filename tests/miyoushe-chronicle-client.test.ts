@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { MiyousheZenlessClient, createMiyousheZenlessPersonalAdapter } from '../src/main/sync/miyoushe-chronicle-client'
+import {
+  MiyousheGenshinClient,
+  MiyousheZenlessClient,
+  createMiyousheZenlessPersonalAdapter
+} from '../src/main/sync/miyoushe-chronicle-client'
 
 function response(data: unknown, headers?: HeadersInit): Response {
   return new Response(JSON.stringify(data), {
@@ -119,5 +123,34 @@ describe('MiyousheZenlessClient', () => {
       { kind: 'session', value: 'old-session' },
       vi.fn()
     )).toThrow('请重新登录')
+  })
+})
+
+describe('MiyousheGenshinClient', () => {
+  it('uses the bound Genshin role for profile and three endgame endpoints', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(response({ retcode: 0, data: { list: [
+        { game_biz: 'hk4e_cn', game_uid: '100071776', region: 'cn_gf01' }
+      ] } }))
+      .mockResolvedValueOnce(response({ retcode: 0, data: { world_explorations: [] } }))
+      .mockResolvedValueOnce(response({ retcode: 0, data: { schedule_id: 1 } }))
+      .mockResolvedValueOnce(response({ retcode: 0, data: { is_unlock: true, data: [] } }))
+      .mockResolvedValueOnce(response({ retcode: 0, data: { data: [] } }))
+    const client = new MiyousheGenshinClient('cookie=secret', fetcher)
+
+    await client.getProfile()
+    await client.getSpiralAbyss()
+    await client.getImaginariumTheater()
+    await client.getStygianOnslaught()
+
+    expect(fetcher).toHaveBeenCalledTimes(5)
+    expect(String(fetcher.mock.calls[1][0])).toContain('/genshin/api/index')
+    expect(String(fetcher.mock.calls[2][0])).toContain('/genshin/api/spiralAbyss')
+    expect(String(fetcher.mock.calls[3][0])).toContain('/genshin/api/role_combat')
+    expect(String(fetcher.mock.calls[4][0])).toContain('/genshin/api/hard_challenge')
+    for (const call of fetcher.mock.calls.slice(1)) {
+      expect(String(call[0])).toContain('role_id=100071776')
+      expect(String(call[0])).toContain('server=cn_gf01')
+    }
   })
 })

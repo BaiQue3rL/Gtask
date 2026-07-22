@@ -455,6 +455,39 @@ describe('AppDatabase', () => {
     expect(database.getSyncSettings('zenless').lastSuccessAt).not.toBeNull()
   })
 
+  it('个人战绩可按模式键补全公开排期，即使两个来源的远端键不同', () => {
+    database = new AppDatabase(':memory:')
+    database.mergeSyncedItems('genshin', 'public_schedule', [{
+      remoteKey: 'official:hard-challenge:202607',
+      category: 'endgame',
+      title: '幽境危战',
+      modeKey: 'stygian-onslaught',
+      periodKey: 'official-period-1',
+      startsAt: '2026-07-20T02:00:00.000Z',
+      endsAt: '2026-08-10T01:59:59.000Z'
+    }])
+
+    database.mergeSyncedItems('genshin', 'personal_sync', [{
+      remoteKey: 'endgame:stygian-onslaught',
+      category: 'endgame',
+      title: '幽境危战（个人数据）',
+      modeKey: 'stygian-onslaught',
+      periodKey: 'personal-period-1',
+      completed: true,
+      progressPercent: 100
+    }])
+
+    const items = database.listChecklistItems('genshin').filter((item) => item.modeKey === 'stygian-onslaught')
+    expect(items).toHaveLength(1)
+    expect(items[0]).toMatchObject({
+      title: '幽境危战',
+      source: 'public_schedule',
+      completed: true,
+      progressPercent: 100,
+      remoteKey: 'official:hard-challenge:202607'
+    })
+  })
+
   it('成功同步超过时限后只标记过期并保留最后成功时间', () => {
     database = new AppDatabase(':memory:')
     database.recordSyncOutcome('genshin', 'success', '同步成功')

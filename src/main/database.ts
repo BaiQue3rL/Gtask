@@ -686,12 +686,24 @@ export class AppDatabase {
             SELECT id, archived, source
             FROM checklist_items
             WHERE game_id = ?
-              AND remote_key = ?
+              AND (
+                remote_key = ?
+                OR (? IS NOT NULL AND mode_key = ? AND category = ?)
+              )
               AND source <> 'manual'
-            ORDER BY CASE WHEN source = ? THEN 0 ELSE 1 END
+            ORDER BY CASE WHEN remote_key = ? THEN 0 ELSE 1 END,
+              CASE WHEN source = ? THEN 0 ELSE 1 END
             LIMIT 1
           `)
-          .get(gameId, remoteKey, source) as
+          .get(
+            gameId,
+            remoteKey,
+            item.modeKey ?? null,
+            item.modeKey ?? null,
+            item.category,
+            remoteKey,
+            source
+          ) as
           | { id: string; archived: number; source: ChecklistSource }
           | undefined
 
