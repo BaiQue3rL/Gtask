@@ -1,4 +1,5 @@
 import { join } from 'node:path'
+import { createHash } from 'node:crypto'
 import { app, BrowserWindow, dialog, ipcMain, net, safeStorage, shell } from 'electron'
 import { AppDatabase, CURRENT_SCHEMA_VERSION } from './database'
 import {
@@ -21,6 +22,9 @@ import {
 } from './sync/miyoushe-chronicle-client'
 import { SyncOrchestrator } from './sync/orchestrator'
 import { restoreRelaunchOptions } from './relaunch'
+import { recognizeScheduleImage } from './schedule-image-import'
+import { parseScheduleImageText } from './schedule-image-parser'
+import { normalizeSyncItems } from './sync/normalization'
 import type { GameId, SyncResult, SyncScope, SyncTarget } from '../shared/contracts'
 import {
   parseChecklistSection,
@@ -257,6 +261,103 @@ function registerIpcHandlers(): void {
       }
     }, 150)
     return true
+  })
+  ipcMain.handle('schedule-image:recognize', async (_event, targetValue: unknown) => {
+    const target = parseSyncTarget(targetValue)
+    if (target === 'all' || target === 'tasks') throw new Error('该版块不支持图片导入')
+    const selection = await dialog.showOpenDialog(mainWindow!, {
+      title: '选择官方排期图片',
+      properties: ['openFile'],
+      filters: [{ name: '排期图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp'] }]
+    })
+    const imagePath = selection.filePaths[0]
+    if (selection.canceled || !imagePath) return null
+    return recognizeScheduleImage(imagePath, target, app.isPackaged ? {
+      langPath: join(process.resourcesPath, 'ocr'),
+      workerPath: join(
+        process.resourcesPath,
+        'app.asar.unpacked',
+        'node_modules',
+        'tesseract.js',
+        'src',
+        'worker-script',
+        'node',
+        'index.js'
+      )
+    } : {})
+  })
+  ipcMain.handle('schedule-image:parse-text', (_event, input: unknown) => {
+    if (typeof input !== 'object' || input === null) throw new Error('OCR 文本解析参数格式不正确')
+    const value = input as Record<string, unknown>
+    const target = parseSyncTarget(value.target)
+    if (target === 'all' || target === 'tasks') throw new Error('该版块不支持图片导入')
+    if (typeof value.rawText !== 'string' || !value.rawText.trim() || value.rawText.length > 50_000) {
+      throw new Error('OCR 文本为空或过长')
+    }
+    if (
+      typeof value.sourceOffsetMinutes !== 'number' ||
+      !Number.isInteger(value.sourceOffsetMinutes) ||
+      value.sourceOffsetMinutes < -12 * 60 ||
+      value.sourceOffsetMinutes > 14 * 60
+    ) throw new Error('来源 UTC 偏移量格式不正确')
+    return parseScheduleImageText(
+      value.rawText,
+      new Date(),
+      value.sourceOffsetMinutes
+    ).map((candidate) => ({
+      ...candidate,
+      category: target === 'cycles'
+        ? 'endgame' as const
+        : target === 'exploration'
+          ? 'exploration' as const
+          : candidate.category
+    }))
+  })
+  ipcMain.handle('schedule-image:apply', (_event, input: unknown) => {
+    if (!appDatabase) throw new Error('数据库尚未初始化')
+    if (typeof input !== 'object' || input === null) throw new Error('图片导入参数格式不正确')
+    const value = input as Record<string, unknown>
+    const gameId = parseGameId(value.gameId)
+    const target = parseSyncTarget(value.target)
+    if (target === 'all' || target === 'tasks' || !Array.isArray(value.items)) {
+      throw new Error('图片导入版块或事项格式不正确')
+    }
+    const allowed = {
+      events: ['limited_event'],
+      cycles: ['weekly', 'endgame'],
+      exploration: ['exploration']
+    }[target]
+    const items = value.items.map((candidate) => {
+      const parsed = parseCreateChecklistItem({
+        ...(typeof candidate === 'object' && candidate !== null ? candidate : {}),
+        gameId
+      })
+      if (!allowed.includes(parsed.category)) throw new Error('图片导入包含其他版块的数据')
+      if (
+        ['limited_event', 'endgame'].includes(parsed.category) &&
+        (!parsed.startsAt || !parsed.endsAt)
+      ) throw new Error(`“${parsed.title}”缺少完整起止时间`)
+      const identity = createHash('sha256')
+        .update(`${gameId}|${parsed.category}|${parsed.title}`)
+        .digest('hex')
+        .slice(0, 24)
+      return {
+        remoteKey: `image:${identity}`,
+        category: parsed.category,
+        title: parsed.title,
+        startsAt: parsed.startsAt,
+        endsAt: parsed.endsAt,
+        parentTitle: parsed.parentTitle,
+        modeKey: parsed.modeKey,
+        recurrenceRule: parsed.recurrenceRule,
+        scheduleKind: parsed.scheduleKind
+      }
+    })
+    return appDatabase.mergeSyncedItems(
+      gameId,
+      'public_schedule',
+      normalizeSyncItems(items)
+    )
   })
   ipcMain.handle('ai-schedule:get-agent-status', () => {
     if (!appDatabase) throw new Error('数据库尚未初始化')

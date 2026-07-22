@@ -58,6 +58,38 @@ export interface BackupSummary {
   kind: 'daily' | 'pre_migration' | 'pre_restore' | 'manual'
 }
 
+export interface ScheduleImageCandidate {
+  id: string
+  category: 'limited_event' | 'weekly' | 'endgame' | 'exploration'
+  title: string
+  startsAt: string | null
+  endsAt: string | null
+  confidence: number
+  warnings: string[]
+}
+
+export interface ScheduleImageDraft {
+  fileName: string
+  rawText: string
+  confidence: number
+  sourceTimeZone: string
+  candidates: ScheduleImageCandidate[]
+}
+
+export interface ApplyScheduleImageInput {
+  gameId: GameId
+  target: Exclude<SyncTarget, 'all' | 'tasks'>
+  items: Array<{
+    title: string
+    category: ScheduleImageCandidate['category']
+    startsAt?: string | null
+    endsAt?: string | null
+    parentTitle?: string | null
+    modeKey?: string | null
+    recurrenceRule?: string | null
+  }>
+}
+
 export type AiScheduleJobStatus = 'pending' | 'claimed' | 'completed' | 'failed'
 
 export interface AiScheduleAgentStatus {
@@ -206,6 +238,17 @@ export interface GachaApi {
   listBackups: () => Promise<BackupSummary[]>
   createBackup: () => Promise<BackupSummary>
   restoreBackup: (fileName: string) => Promise<boolean>
+  recognizeScheduleImage: (target: Exclude<SyncTarget, 'all' | 'tasks'>) => Promise<ScheduleImageDraft | null>
+  parseScheduleImageText: (input: {
+    rawText: string
+    target: Exclude<SyncTarget, 'all' | 'tasks'>
+    sourceOffsetMinutes: number
+  }) => Promise<ScheduleImageCandidate[]>
+  applyScheduleImage: (input: ApplyScheduleImageInput) => Promise<{
+    added: number
+    updated: number
+    preserved: number
+  }>
   getAiScheduleAgentStatus: () => Promise<AiScheduleAgentStatus>
   openCodexPlugin: () => Promise<void>
   listGames: () => Promise<GameSummary[]>

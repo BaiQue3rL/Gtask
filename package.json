@@ -47,6 +47,20 @@
       "LICENSE",
       "THIRD_PARTY_NOTICES.txt"
     ],
+    "asarUnpack": [
+      "node_modules/tesseract.js/**/*",
+      "node_modules/tesseract.js-core/**/*",
+      "node_modules/regenerator-runtime/**/*",
+      "node_modules/is-url/**/*",
+      "node_modules/wasm-feature-detect/**/*",
+      "node_modules/bmp-js/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "node_modules/@tesseract.js-data/chi_sim/4.0.0/chi_sim.traineddata.gz",
+        "to": "ocr/chi_sim.traineddata.gz"
+      }
+    ],
     "win": {
       "icon": "build/icon.svg",
       "target": [
@@ -59,6 +73,8 @@
   },
   "packageManager": "pnpm@11.9.0",
   "dependencies": {
-    "qrcode": "^1.5.4"
+    "@tesseract.js-data/chi_sim": "1.0.0",
+    "qrcode": "^1.5.4",
+    "tesseract.js": "7.0.0"
   }
 }

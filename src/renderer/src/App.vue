@@ -13,6 +13,8 @@ import type {
   GameId,
   GameSummary,
   MiyousheQrLoginState,
+  ScheduleImageCandidate,
+  ScheduleImageDraft,
   SyncResult,
   SyncScope,
   SyncTarget,
@@ -28,7 +30,7 @@ interface ChecklistPanel {
   defaultCategory: ChecklistCategory
   allowCreate?: boolean
   allowClear?: boolean
-  syncTarget?: Exclude<SyncTarget, 'all'>
+  syncTarget?: Exclude<SyncTarget, 'all' | 'tasks'>
 }
 
 const panels: ChecklistPanel[] = [
@@ -90,6 +92,21 @@ const credentialStatuses = ref<CredentialStatus[]>([])
 const backups = ref<BackupSummary[]>([])
 const backingUp = ref(false)
 const restoringBackup = ref<string | null>(null)
+const recognizingImage = ref(false)
+const applyingImageImport = ref(false)
+const imageImportDraft = ref<ScheduleImageDraft | null>(null)
+const imageImportTarget = ref<Exclude<SyncTarget, 'all' | 'tasks'>>('events')
+const imageSourceOffsetMinutes = ref(8 * 60)
+const imageImportRows = ref<Array<{
+  id: string
+  category: ScheduleImageCandidate['category']
+  title: string
+  startsAt: string
+  endsAt: string
+  modeKey: string
+  recurrenceRule: string
+  warnings: string[]
+}>>([])
 const aiScheduleAgent = ref<AiScheduleAgentStatus | null>(null)
 const editingItem = ref<ChecklistItem | null>(null)
 let miyousheLoginTimer: number | null = null
@@ -139,6 +156,14 @@ const needsInitialSync = computed(() =>
   syncSettings.value?.lastSuccessAt === null &&
   items.value.every((item) => ['main_quest', 'side_quest'].includes(item.category))
 )
+const imageImportCategories = computed<Array<[ScheduleImageCandidate['category'], string]>>(() => {
+  if (imageImportTarget.value === 'events') return [['limited_event', '限时活动']]
+  if (imageImportTarget.value === 'cycles') return [['weekly', '周常'], ['endgame', '深渊/挑战模式']]
+  return [['exploration', '地图探索']]
+})
+const sourceOffsetOptions = [-720, -660, -600, -540, -480, -420, -360, -300, -240, -180,
+  -120, -60, 0, 60, 120, 180, 240, 300, 330, 345, 360, 420, 480, 540, 570, 600, 660,
+  720, 780, 840]
 const completedCount = computed(() => {
   const weekStart = startOfCurrentWeek()
   return items.value.filter((item) => item.completedAt && new Date(item.completedAt) >= weekStart).length
@@ -226,6 +251,10 @@ onUnmounted(() => {
 
 function handleGlobalKeydown(event: KeyboardEvent): void {
   if (event.key !== 'Escape') return
+  if (imageImportDraft.value) {
+    imageImportDraft.value = null
+    return
+  }
   if (miyousheLoginOpen.value) {
     void closeMiyousheLogin()
     return
@@ -477,6 +506,110 @@ async function runSync(scope: SyncScope, target: SyncTarget = 'all'): Promise<vo
     if (selectedGameId.value === gameId) showError(error)
   } finally {
     syncing.value = false
+  }
+}
+
+async function openScheduleImageImport(
+  target: Exclude<SyncTarget, 'all' | 'tasks'>
+): Promise<void> {
+  if (recognizingImage.value) return
+  sectionSyncMenuOpen.value = null
+  recognizingImage.value = true
+  try {
+    const draft = await window.gacha.recognizeScheduleImage(target)
+    if (!draft) return
+    imageImportTarget.value = target
+    imageSourceOffsetMinutes.value = 8 * 60
+    imageImportDraft.value = draft
+    imageImportRows.value = draft.candidates.map((candidate) => ({
+      id: candidate.id,
+      category: candidate.category,
+      title: candidate.title,
+      startsAt: toLocalDateTime(candidate.startsAt),
+      endsAt: toLocalDateTime(candidate.endsAt),
+      modeKey: '',
+      recurrenceRule: '',
+      warnings: candidate.warnings
+    }))
+  } catch (error) {
+    showError(error)
+  } finally {
+    recognizingImage.value = false
+  }
+}
+
+async function reparseScheduleImageText(): Promise<void> {
+  if (!imageImportDraft.value) return
+  try {
+    const candidates = await window.gacha.parseScheduleImageText({
+      rawText: imageImportDraft.value.rawText,
+      target: imageImportTarget.value,
+      sourceOffsetMinutes: imageSourceOffsetMinutes.value
+    })
+    imageImportRows.value = candidates.map((candidate) => ({
+      id: candidate.id,
+      category: candidate.category,
+      title: candidate.title,
+      startsAt: toLocalDateTime(candidate.startsAt),
+      endsAt: toLocalDateTime(candidate.endsAt),
+      modeKey: '',
+      recurrenceRule: '',
+      warnings: candidate.warnings
+    }))
+  } catch (error) {
+    showError(error)
+  }
+}
+
+function formatUtcOffset(minutes: number): string {
+  const sign = minutes >= 0 ? '+' : '-'
+  const absolute = Math.abs(minutes)
+  return `UTC${sign}${String(Math.floor(absolute / 60)).padStart(2, '0')}:${String(absolute % 60).padStart(2, '0')}`
+}
+
+function addImageImportRow(): void {
+  imageImportRows.value.push({
+    id: crypto.randomUUID(),
+    category: imageImportCategories.value[0][0],
+    title: '',
+    startsAt: '',
+    endsAt: '',
+    modeKey: '',
+    recurrenceRule: '',
+    warnings: []
+  })
+}
+
+async function applyScheduleImageImport(): Promise<void> {
+  if (applyingImageImport.value || imageImportRows.value.length === 0) return
+  applyingImageImport.value = true
+  try {
+    const result = await window.gacha.applyScheduleImage({
+      gameId: selectedGameId.value,
+      target: imageImportTarget.value,
+      items: imageImportRows.value.map((row) => ({
+        title: row.title.trim(),
+        category: row.category,
+        startsAt: ['limited_event', 'endgame'].includes(row.category)
+          ? toIsoOrNull(row.startsAt)
+          : null,
+        endsAt: ['limited_event', 'endgame'].includes(row.category)
+          ? toIsoOrNull(row.endsAt)
+          : null,
+        modeKey: row.category === 'endgame' ? row.modeKey.trim() || null : null,
+        recurrenceRule: row.category === 'endgame' ? row.recurrenceRule.trim() || null : null
+      }))
+    })
+    imageImportDraft.value = null
+    syncNotice.value = {
+      status: 'success',
+      message: `图片导入完成：新增 ${result.added}，更新 ${result.updated}，保护 ${result.preserved}`
+    }
+    await loadItems()
+  } catch (error) {
+    showError(error)
+  } finally {
+    applyingImageImport.value = false
   }
 }
 
@@ -813,6 +946,7 @@ function showError(error: unknown): void {
                     <div v-if="sectionSyncMenuOpen === panel.section" class="dropdown-menu section-sync-menu" role="menu">
                       <button role="menuitem" type="button" @click="runSync('public_schedule', panel.syncTarget)">仅同步{{ panel.title }}公开资料</button>
                       <button role="menuitem" type="button" @click="runSync('public_and_personal', panel.syncTarget)">同步公开资料 + {{ personalPlatform }}</button>
+                      <button role="menuitem" type="button" @click="openScheduleImageImport(panel.syncTarget)">从官方图片离线导入</button>
                     </div>
                   </div>
                   <button
@@ -943,6 +1077,65 @@ function showError(error: unknown): void {
           <button class="primary-button" type="submit" :disabled="saving || !form.title.trim()">{{ saving ? '保存中…' : '保存' }}</button>
         </div>
       </form>
+    </div>
+
+    <div v-if="imageImportDraft" class="modal-backdrop" @click.self="imageImportDraft = null">
+      <section class="editor-modal image-import-modal" role="dialog" aria-modal="true" aria-label="官方排期图片导入预览">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">本地离线 OCR · {{ imageImportDraft.fileName }}</p>
+            <h2>确认图片识别结果</h2>
+          </div>
+          <button class="close-button" type="button" aria-label="关闭图片导入" @click="imageImportDraft = null">×</button>
+        </div>
+        <div class="image-import-timezone">
+          <p class="image-import-hint">
+            OCR 置信度 {{ Math.round(imageImportDraft.confidence * 100) }}%。图片不会上传或保存在应用中。
+            请先按图片或服务器说明选择来源 UTC 偏移，再逐项核对转换后的本地时间。
+          </p>
+          <label>图片来源时区
+            <select v-model.number="imageSourceOffsetMinutes" @change="reparseScheduleImageText">
+              <option v-for="offset in sourceOffsetOptions" :key="offset" :value="offset">{{ formatUtcOffset(offset) }}</option>
+            </select>
+          </label>
+        </div>
+        <div class="image-import-list">
+          <div v-for="(row, index) in imageImportRows" :key="row.id" class="image-import-row">
+            <div class="image-import-row-head">
+              <select v-model="row.category">
+                <option v-for="[category, label] in imageImportCategories" :key="category" :value="category">{{ label }}</option>
+              </select>
+              <input v-model="row.title" maxlength="100" placeholder="官方中文名称" />
+              <button class="danger-button compact" type="button" @click="imageImportRows.splice(index, 1)">移除</button>
+            </div>
+            <div v-if="['limited_event', 'endgame'].includes(row.category)" class="form-grid">
+              <label>开始时间<input v-model="row.startsAt" type="datetime-local" /></label>
+              <label>结束时间<input v-model="row.endsAt" type="datetime-local" /></label>
+            </div>
+            <div v-if="row.category === 'endgame'" class="form-grid">
+              <label>玩法标识<input v-model="row.modeKey" maxlength="200" placeholder="例如：深境螺旋" /></label>
+              <label>自动周期规则<input v-model="row.recurrenceRule" maxlength="200" placeholder="例如：monthly-days:1,16@04:00[Asia/Shanghai]" /></label>
+            </div>
+            <p v-for="warning in row.warnings" :key="warning" class="image-import-warning">⚠ {{ warning }}</p>
+          </div>
+          <p v-if="imageImportRows.length === 0" class="empty-text">未自动解析出完整日期区间，可根据下方 OCR 原文手动添加。</p>
+        </div>
+        <button class="add-button" type="button" @click="addImageImportRow">＋ 添加一项</button>
+        <details class="ocr-raw-text">
+          <summary>查看 OCR 原文</summary>
+          <textarea :value="imageImportDraft.rawText" readonly rows="7"></textarea>
+        </details>
+        <div class="modal-actions">
+          <span></span><span></span>
+          <button class="secondary-button" type="button" @click="imageImportDraft = null">取消</button>
+          <button
+            class="primary-button"
+            type="button"
+            :disabled="applyingImageImport || imageImportRows.length === 0 || imageImportRows.some((row) => !row.title.trim())"
+            @click="applyScheduleImageImport"
+          >{{ applyingImageImport ? '写入中…' : '确认写入' }}</button>
+        </div>
+      </section>
     </div>
 
     <div v-if="recycleBinOpen" class="modal-backdrop" @click.self="recycleBinOpen = false">
