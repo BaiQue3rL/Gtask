@@ -22,7 +22,7 @@ const payload = {
     data: [{
       has_data: true,
       schedule: { schedule_id: 456, start_time: 1784505600, end_time: 1787183999 },
-      stat: { max_round_id: 10, get_medal_round_list: Array.from({ length: 10 }, () => true) }
+      stat: { max_round_id: 10, get_medal_round_list: Array.from({ length: 12 }, () => true) }
     }]
   },
   stygianOnslaught: {
@@ -72,7 +72,7 @@ describe('Genshin personal parsing', () => {
         completed: true
       }),
       expect.objectContaining({ modeKey: 'imaginarium-theater', completed: true }),
-      expect.objectContaining({ modeKey: 'stygian-onslaught', progressPercent: 83.33, completed: false }),
+      expect.objectContaining({ modeKey: 'stygian-onslaught', progressPercent: 83.33, completed: true }),
       expect.objectContaining({
         remoteKey: 'event:miyoushe:9001',
         category: 'limited_event',
@@ -80,6 +80,43 @@ describe('Genshin personal parsing', () => {
         progressPercent: 85.5,
         completed: false
       })
+    ]))
+  })
+
+  it('兼容米游社把剧诗轮数和幽境难度返回为数字字符串', () => {
+    const items = parseGenshinPersonalData({
+      imaginariumTheater: {
+        is_unlock: true,
+        data: [{
+          has_data: true,
+          schedule: {
+            schedule_id: '456',
+            start_time: '1784505600',
+            end_time: '1787183999'
+          },
+          stat: {
+            max_round_id: '10',
+            get_medal_round_list: Array.from({ length: 10 }, () => true)
+          }
+        }]
+      },
+      stygianOnslaught: {
+        data: [{
+          schedule: {
+            schedule_id: '789',
+            name: '幽境危战',
+            is_valid: true,
+            start_time: '1784505600',
+            end_time: '1787183999'
+          },
+          single: { has_data: true, best: { difficulty: '5' } }
+        }]
+      }
+    })
+
+    expect(items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ modeKey: 'imaginarium-theater', completed: true }),
+      expect.objectContaining({ modeKey: 'stygian-onslaught', completed: true })
     ]))
   })
 

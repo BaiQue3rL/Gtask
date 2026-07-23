@@ -1,4 +1,5 @@
 import type { NormalizedSyncItem } from './types'
+import { finiteNumber } from './numbers'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -50,10 +51,6 @@ function optionalChinaDateTime(value: unknown, field: string): string | undefine
   }
   if (Number.isNaN(parsed.getTime())) throw new Error(`绝区零个人数据的 ${field} 不是有效时间`)
   return parsed.toISOString()
-}
-
-function finiteNumber(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
 function percentage(value: number, maximum: number): number | null {

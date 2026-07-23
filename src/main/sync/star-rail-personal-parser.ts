@@ -1,4 +1,5 @@
 import type { NormalizedSyncItem, SemanticReviewDraft } from './types'
+import { finiteNumber } from './numbers'
 
 export interface StarRailPersonalPayload {
   memoryOfChaos?: unknown
@@ -272,12 +273,6 @@ function requiredNumber(value: unknown, field: string): number {
   const number = finiteNumber(value)
   if (number === null) throw new Error(`星铁个人数据缺少 ${field}`)
   return number
-}
-
-function finiteNumber(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string' && value.trim() && Number.isFinite(Number(value))) return Number(value)
-  return null
 }
 
 function clampPercentage(value: number): number {

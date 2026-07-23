@@ -1,4 +1,5 @@
 import type { NormalizedSyncItem } from './types'
+import { finiteNumber } from './numbers'
 
 export interface GenshinPersonalPayload {
   profile?: unknown
@@ -192,14 +193,22 @@ export function parseImaginariumTheater(value: unknown): NormalizedSyncItem | nu
   const stats = requiredRecord(data.stat, '幻想真境剧诗 stat')
   const scheduleId = requiredIdentifier(schedule.schedule_id, '幻想真境剧诗 schedule_id')
   const bestRecord = finiteNumber(stats.max_round_id) ?? 0
-  const medalRounds = Array.isArray(stats.get_medal_round_list) ? stats.get_medal_round_list.length : 0
-  const targetRounds = medalRounds > 0 ? medalRounds : 10
+  const medalStates = Array.isArray(stats.get_medal_round_list)
+    ? stats.get_medal_round_list.filter((value): value is boolean => typeof value === 'boolean')
+    : []
+  const obtainedMedals = medalStates.filter(Boolean).length
+  const completed =
+    data.has_data === true &&
+    medalStates.length > 0 &&
+    obtainedMedals === medalStates.length
   return {
     remoteKey: 'endgame:imaginarium-theater',
     category: 'endgame',
     title: '幻想真境剧诗',
-    completed: data.has_data === true && bestRecord >= targetRounds,
-    progressPercent: clampPercentage((bestRecord / targetRounds) * 100),
+    completed,
+    progressPercent: medalStates.length > 0
+      ? clampPercentage((obtainedMedals / medalStates.length) * 100)
+      : clampPercentage((bestRecord / 10) * 100),
     startsAt: toIsoDate(schedule.start_time ?? schedule.start_date_time, '幻想真境剧诗开始时间'),
     endsAt: toIsoDate(schedule.end_time ?? schedule.end_date_time, '幻想真境剧诗结束时间'),
     periodKey: `genshin:imaginarium-theater:${scheduleId}`,
@@ -223,7 +232,9 @@ export function parseStygianOnslaught(value: unknown): NormalizedSyncItem | null
     remoteKey: 'endgame:stygian-onslaught',
     category: 'endgame',
     title: requiredOptionalString(schedule.name) ?? '幽境危战',
-    completed: single.has_data === true && difficulty >= 6,
+    // 难度 5 已包含本期全部常规资源奖励；难度 6 是额外极限/外观目标，
+    // 不应阻塞任务清单中的“已完成”。
+    completed: single.has_data === true && difficulty >= 5,
     progressPercent: clampPercentage((difficulty / 6) * 100),
     startsAt: toIsoDate(schedule.start_time ?? schedule.start_date_time, '幽境危战开始时间'),
     endsAt: toIsoDate(schedule.end_time ?? schedule.end_date_time, '幽境危战结束时间'),
@@ -309,10 +320,6 @@ function requiredNumber(value: unknown, field: string): number {
   const number = finiteNumber(value)
   if (number === null) throw new Error(`原神个人数据缺少 ${field}`)
   return number
-}
-
-function finiteNumber(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
 function clampPercentage(value: number): number {

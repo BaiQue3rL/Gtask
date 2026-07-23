@@ -55,6 +55,24 @@ describe('绝区零个人战绩解析', () => {
     })
   })
 
+  it('兼容绝区零战绩接口中的数字字符串', () => {
+    expect(parseZenlessDeadlyAssault({
+      id: '69042',
+      start_time: '2026-07-17T04:00:00',
+      end_time: '2026-07-29T03:59:59',
+      has_data: true,
+      total_star: '9',
+      challenges: [
+        { star: '3', total_star: '3' },
+        { star: '3', total_star: '3' },
+        { star: '3', total_star: '3' }
+      ]
+    })).toMatchObject({
+      completed: true,
+      progressPercent: 100
+    })
+  })
+
   it('允许单项响应，但拒绝完全无法识别的个人数据', () => {
     expect(
       parseZenlessPersonalData({
