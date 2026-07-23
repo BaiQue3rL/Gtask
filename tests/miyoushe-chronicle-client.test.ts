@@ -236,9 +236,27 @@ describe('MiyousheZenlessClient', () => {
       captcha_output: 'verified-captcha-output',
       version: 4 as const
     }))
-    const client = new MiyousheZenlessClient('cookie=secret', fetcher, solver)
+    const progress: Array<{ phase: string; status?: string; message: string }> = []
+    const client = new MiyousheZenlessClient(
+      'cookie=secret',
+      fetcher,
+      solver,
+      false,
+      (update) => progress.push(update)
+    )
 
     await expect(client.getShiyuDefense()).resolves.toMatchObject({ schedule_id: 62052 })
+    expect(progress).toEqual([
+      expect.objectContaining({
+        phase: 'verification',
+        status: 'verification_required',
+        message: '米游社要求人工验证，等待你完成滑块'
+      }),
+      expect.objectContaining({
+        phase: 'retrying',
+        message: '验证完成，正在重试战绩接口（1/1）'
+      })
+    ])
     expect(solver).toHaveBeenCalledWith({
       gt: 'record-v4-captcha-id',
       riskType: 'slide',

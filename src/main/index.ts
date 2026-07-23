@@ -29,7 +29,15 @@ import {
   getPersonalSyncTargets,
   supportsPersonalSyncTarget
 } from './sync/personal-sync-capabilities'
-import type { GameId, SyncResult, SyncScope, SyncTarget } from '../shared/contracts'
+import {
+  SUPPORTED_GAME_IDS,
+  type AiScheduleJob,
+  type GameId,
+  type SyncProgressUpdate,
+  type SyncResult,
+  type SyncScope,
+  type SyncTarget
+} from '../shared/contracts'
 import {
   parseChecklistSection,
   parseCredentialProvider,
@@ -55,6 +63,8 @@ let appDatabase: AppDatabase | null = null
 let syncOrchestrator: SyncOrchestrator | null = null
 let periodTimer: ReturnType<typeof setInterval> | null = null
 let externalChangeTimer: ReturnType<typeof setInterval> | null = null
+let aiJobProgressTimer: ReturnType<typeof setInterval> | null = null
+const aiJobProgressSignatures = new Map<GameId, string>()
 let credentialVault: CredentialVault | null = null
 let miyousheQrLogin: MiyousheQrLoginService | null = null
 let appBackupDirectory: string | null = null
@@ -79,6 +89,7 @@ async function queueAiScheduleSync(
     const plugin = detectCodexPlugin()
     const agent = appDatabase.getAiScheduleAgentStatus()
     const job = appDatabase.createAiScheduleJob(gameId, scope, new Date(), plugin.installed, target)
+    sendAiJobProgress(job)
     const publicMessage = agent.connected
       ? `已提交给 ${agent.name ?? 'AI 资料 Agent'}，等待联网检索和交叉验证（任务 ${job.id.slice(0, 8)}）`
       : `已排队（任务 ${job.id.slice(0, 8)}）；请在 Codex 打开“幻游清单”插件并运行 $sync-gacha-schedules`
@@ -151,6 +162,51 @@ async function queueAiScheduleSync(
     finishedAt: new Date().toISOString(),
     sources,
     message: sources.map((source) => source.message).join('；')
+  }
+}
+
+function toAiJobProgress(job: AiScheduleJob): SyncProgressUpdate {
+  return {
+    gameId: job.gameId,
+    target: job.target,
+    source: 'public_schedule',
+    phase: job.progressPhase,
+    status: job.status === 'pending' ? 'waiting' : 'running',
+    message: job.message ?? (job.status === 'pending' ? '等待 Codex 接单' : 'Codex 正在处理'),
+    current: job.progressCurrent,
+    total: job.progressTotal,
+    updatedAt: job.progressUpdatedAt
+  }
+}
+
+function sendAiJobProgress(job: AiScheduleJob): void {
+  mainWindow?.webContents.send('sync:progress', toAiJobProgress(job))
+}
+
+function pollAiJobProgress(): void {
+  if (!appDatabase) return
+  for (const gameId of SUPPORTED_GAME_IDS) {
+    const job = appDatabase.getActiveAiScheduleJob(gameId)
+    const previousSignature = aiJobProgressSignatures.get(gameId)
+    if (!job) {
+      if (previousSignature) {
+        aiJobProgressSignatures.delete(gameId)
+        mainWindow?.webContents.send('checklist:changed')
+      }
+      continue
+    }
+    const signature = [
+      job.id,
+      job.status,
+      job.progressPhase,
+      job.progressCurrent,
+      job.progressTotal,
+      job.progressUpdatedAt,
+      job.message
+    ].join(':')
+    if (signature === previousSignature) continue
+    aiJobProgressSignatures.set(gameId, signature)
+    sendAiJobProgress(job)
   }
 }
 
@@ -262,6 +318,9 @@ function registerIpcHandlers(): void {
     periodTimer = null
     if (externalChangeTimer) clearInterval(externalChangeTimer)
     externalChangeTimer = null
+    if (aiJobProgressTimer) clearInterval(aiJobProgressTimer)
+    aiJobProgressTimer = null
+    aiJobProgressSignatures.clear()
     setTimeout(() => {
       try {
         const relaunchOptions = restoreRelaunchOptions(process.env, process.argv)
@@ -285,6 +344,10 @@ function registerIpcHandlers(): void {
       ...appDatabase.getAiScheduleAgentStatus(),
       codexPluginInstalled: detectCodexPlugin({ appMarketplacePath }).installed
     }
+  })
+  ipcMain.handle('ai-schedule:get-active-job', (_event, gameId: unknown) => {
+    if (!appDatabase) throw new Error('数据库尚未初始化')
+    return appDatabase.getActiveAiScheduleJob(parseGameId(gameId))
   })
   ipcMain.handle('codex-plugin:open', async () => {
     const integrationDirectory = join(app.getPath('userData'), 'codex-integration')
@@ -471,6 +534,8 @@ if (!app.requestSingleInstanceLock()) {
       lastDataVersion = currentDataVersion
       mainWindow?.webContents.send('checklist:changed')
     }, 2_000)
+    pollAiJobProgress()
+    aiJobProgressTimer = setInterval(pollAiJobProgress, 2_000)
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -487,6 +552,9 @@ app.on('before-quit', () => {
   periodTimer = null
   if (externalChangeTimer) clearInterval(externalChangeTimer)
   externalChangeTimer = null
+  if (aiJobProgressTimer) clearInterval(aiJobProgressTimer)
+  aiJobProgressTimer = null
+  aiJobProgressSignatures.clear()
   appDatabase?.close()
   appDatabase = null
   syncOrchestrator = null
@@ -504,7 +572,10 @@ function parseQrLoginSessionId(value: unknown): string {
 }
 
 function createAppSyncOrchestrator(database: AppDatabase): SyncOrchestrator {
-  if (!credentialVault) return new SyncOrchestrator(database)
+  const reportProgress = (progress: SyncProgressUpdate): void => {
+    mainWindow?.webContents.send('sync:progress', progress)
+  }
+  if (!credentialVault) return new SyncOrchestrator(database, undefined, reportProgress)
   const fetcher = createElectronNetFetcher(net.fetch)
   return new SyncOrchestrator(database, {
     publicSchedule: {},
@@ -512,30 +583,33 @@ function createAppSyncOrchestrator(database: AppDatabase): SyncOrchestrator {
       genshin: new CredentialBackedAdapter(
         'miyoushe',
         credentialVault,
-        (credential) => createMiyousheGenshinPersonalAdapter(
+        (credential, onProgress) => createMiyousheGenshinPersonalAdapter(
           credential,
           fetcher,
-          (challenge) => solveMiyousheGeetest(mainWindow, challenge)
+          (challenge) => solveMiyousheGeetest(mainWindow, challenge),
+          onProgress
         )
       ),
       'star-rail': new CredentialBackedAdapter(
         'miyoushe',
         credentialVault,
-        (credential) => createMiyousheStarRailPersonalAdapter(
+        (credential, onProgress) => createMiyousheStarRailPersonalAdapter(
           credential,
           fetcher,
-          (challenge) => solveMiyousheGeetest(mainWindow, challenge)
+          (challenge) => solveMiyousheGeetest(mainWindow, challenge),
+          onProgress
         )
       ),
       zenless: new CredentialBackedAdapter(
         'miyoushe',
         credentialVault,
-        (credential) => createMiyousheZenlessPersonalAdapter(
+        (credential, onProgress) => createMiyousheZenlessPersonalAdapter(
           credential,
           fetcher,
-          (challenge) => solveMiyousheGeetest(mainWindow, challenge)
+          (challenge) => solveMiyousheGeetest(mainWindow, challenge),
+          onProgress
         )
       )
     }
-  })
+  }, reportProgress)
 }

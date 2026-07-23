@@ -2,6 +2,8 @@ import type {
   ChecklistCategory,
   GameId,
   ScheduleKind,
+  SyncProgressPhase,
+  SyncProgressStatus,
   SyncSourceResult,
   SyncTarget
 } from '../../shared/contracts'
@@ -43,8 +45,22 @@ export interface SyncAdapterOutput {
   message: string
 }
 
+export interface SyncAdapterProgress {
+  phase: SyncProgressPhase
+  status?: SyncProgressStatus
+  message: string
+  current?: number | null
+  total?: number | null
+}
+
+export type SyncProgressReporter = (progress: SyncAdapterProgress) => void
+
 export interface SyncAdapter {
-  sync: (gameId: GameId, target?: SyncTarget) => Promise<SyncAdapterOutput>
+  sync: (
+    gameId: GameId,
+    target?: SyncTarget,
+    reportProgress?: SyncProgressReporter
+  ) => Promise<SyncAdapterOutput>
 }
 
 export interface SyncAdapterRegistry {

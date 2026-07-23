@@ -49,8 +49,8 @@ describe('SyncOrchestrator', () => {
     const result = await orchestrator.syncGame('genshin', 'public_and_personal')
 
     expect(order).toEqual(['public', 'personal'])
-    expect(publicSync).toHaveBeenCalledWith('genshin', 'all')
-    expect(personalSync).toHaveBeenCalledWith('genshin', 'all')
+    expect(publicSync).toHaveBeenCalledWith('genshin', 'all', expect.any(Function))
+    expect(personalSync).toHaveBeenCalledWith('genshin', 'all', expect.any(Function))
     expect(result.status).toBe('success')
     expect(result.sources.map((source) => source.added)).toEqual([1, 1])
     expect(database.listChecklistItems('genshin')).toEqual(
@@ -208,7 +208,7 @@ describe('SyncOrchestrator', () => {
     const result = await orchestrator.syncPersonalOnly('genshin', 'exploration')
 
     expect(publicSync).not.toHaveBeenCalled()
-    expect(personalSync).toHaveBeenCalledWith('genshin', 'exploration')
+    expect(personalSync).toHaveBeenCalledWith('genshin', 'exploration', expect.any(Function))
     expect(result).toMatchObject({
       requestedScope: 'personal_data',
       requestedTarget: 'exploration',

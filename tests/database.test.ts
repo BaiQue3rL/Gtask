@@ -978,7 +978,35 @@ describe('AppDatabase', () => {
       userTimeZone: 'Asia/Shanghai',
       status: 'pending',
       agentId: null,
-      agentName: null
+      agentName: null,
+      progressPhase: 'queued',
+      progressCurrent: null,
+      progressTotal: null,
+      message: '等待 Codex 接单'
+    })
+    expect(database.getActiveAiScheduleJob('genshin')?.id).toBe(queued.id)
+
+    database.registerAiScheduleAgent('progress-agent', '进度测试 Agent')
+    const claimed = database.claimAiScheduleJob('progress-agent', new Date('2026-07-21T14:47:00.000Z'))
+    expect(claimed).toMatchObject({
+      id: queued.id,
+      progressPhase: 'searching',
+      progressCurrent: 0
+    })
+    const progress = database.updateAiScheduleJobProgress(
+      queued.id,
+      'progress-agent',
+      'verifying',
+      '正在核验第 2 个资料来源',
+      2,
+      4,
+      new Date('2026-07-21T14:48:00.000Z')
+    )
+    expect(progress).toMatchObject({
+      progressPhase: 'verifying',
+      progressCurrent: 2,
+      progressTotal: 4,
+      message: '正在核验第 2 个资料来源'
     })
 
     const upgraded = database.createAiScheduleJob(

@@ -9,7 +9,7 @@ import {
   personalPartialSuffix,
   type PersonalRequestOutcome
 } from './personal-sync-settler'
-import type { SyncAdapter, SyncAdapterOutput } from './types'
+import type { SyncAdapter, SyncAdapterOutput, SyncProgressReporter } from './types'
 
 export interface StarRailBattleChronicleClient {
   getMemoryOfChaos: () => Promise<unknown>
@@ -22,13 +22,23 @@ export interface StarRailBattleChronicleClient {
 export class StarRailPersonalAdapter implements SyncAdapter {
   constructor(private readonly client: StarRailBattleChronicleClient) {}
 
-  async sync(gameId: GameId, target: SyncTarget = 'all'): Promise<SyncAdapterOutput> {
+  async sync(
+    gameId: GameId,
+    target: SyncTarget = 'all',
+    reportProgress?: SyncProgressReporter
+  ): Promise<SyncAdapterOutput> {
     if (gameId !== 'star-rail') throw new Error('星铁个人数据适配器不能用于其他游戏')
     if (target === 'exploration') {
       return { items: [], message: '米游社暂不提供星铁区域探索百分比，已保留公开地图清单' }
     }
     if (target === 'events') {
       const outcomes: PersonalRequestOutcome[] = []
+      reportProgress?.({
+        phase: 'fetching',
+        message: '正在读取星铁活动原始状态',
+        current: 1,
+        total: 1
+      })
       const eventCalendar = await capturePersonalRequest(
         () => this.client.getEventCalendar(),
         outcomes
@@ -42,20 +52,36 @@ export class StarRailPersonalAdapter implements SyncAdapter {
     }
     // 保持顺序请求，降低短时间并发触发米游社风控的概率。
     const outcomes: PersonalRequestOutcome[] = []
+    const total = target === 'cycles' ? 4 : 5
+    let current = 0
+    const request = async (message: string, operation: () => Promise<unknown>): Promise<unknown> => {
+      current += 1
+      reportProgress?.({ phase: 'fetching', message, current, total })
+      const value = await capturePersonalRequest(operation, outcomes)
+      if (!outcomes.at(-1)?.succeeded) {
+        reportProgress?.({
+          phase: 'fetching',
+          message: `${message.replace('正在读取', '')}读取失败，继续下一项`,
+          current,
+          total
+        })
+      }
+      return value
+    }
     const memoryOfChaos = ['all', 'cycles'].includes(target)
-      ? await capturePersonalRequest(() => this.client.getMemoryOfChaos(), outcomes)
+      ? await request('正在读取混沌回忆战绩', () => this.client.getMemoryOfChaos())
       : undefined
     const pureFiction = ['all', 'cycles'].includes(target)
-      ? await capturePersonalRequest(() => this.client.getPureFiction(), outcomes)
+      ? await request('正在读取虚构叙事战绩', () => this.client.getPureFiction())
       : undefined
     const apocalypticShadow = ['all', 'cycles'].includes(target)
-      ? await capturePersonalRequest(() => this.client.getApocalypticShadow(), outcomes)
+      ? await request('正在读取末日幻影战绩', () => this.client.getApocalypticShadow())
       : undefined
     const anomalyArbitration = ['all', 'cycles'].includes(target)
-      ? await capturePersonalRequest(() => this.client.getAnomalyArbitration(), outcomes)
+      ? await request('正在读取异相仲裁战绩', () => this.client.getAnomalyArbitration())
       : undefined
     const eventCalendar = target === 'all'
-      ? await capturePersonalRequest(() => this.client.getEventCalendar(), outcomes)
+      ? await request('正在读取星铁活动原始状态', () => this.client.getEventCalendar())
       : undefined
     assertAnyPersonalRequestSucceeded(outcomes)
     const suffix = personalPartialSuffix(outcomes)

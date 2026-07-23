@@ -1,6 +1,7 @@
 import { createHash, randomInt } from 'node:crypto'
 import type { CredentialPayload } from '../credential-vault'
 import { SyncVerificationRequiredError } from './types'
+import type { SyncProgressReporter } from './types'
 import { ZenlessPersonalAdapter, type ZenlessBattleChronicleClient } from './zenless-personal-adapter'
 import { GenshinPersonalAdapter, type GenshinBattleChronicleClient } from './genshin-personal-adapter'
 import { StarRailPersonalAdapter, type StarRailBattleChronicleClient } from './star-rail-personal-adapter'
@@ -81,7 +82,8 @@ class MiyousheChronicleClient {
     private readonly cookie: string,
     private readonly fetcher: typeof fetch,
     private readonly solveGeetest?: MiyousheGeetestSolver,
-    private readonly reuseLoginDevice = false
+    private readonly reuseLoginDevice = false,
+    private readonly reportProgress?: SyncProgressReporter
   ) {
     if (!cookie.trim()) throw new Error('米游社登录凭据为空')
     const accountId = readCookieValue(cookie, 'account_id_v2') ?? readCookieValue(cookie, 'ltuid_v2')
@@ -177,10 +179,23 @@ class MiyousheChronicleClient {
       if (GEETEST_RETCODES.has(retcode)) {
         if (!verification && this.solveGeetest && !this.verificationAttempted) {
           this.verificationAttempted = true
+          this.reportProgress?.({
+            phase: 'verification',
+            status: 'verification_required',
+            message: '米游社要求人工验证，等待你完成滑块',
+            current: null,
+            total: null
+          })
           const challenge = parseAigisChallenge(response.headers.get('x-rpc-aigis'))
             ?? await this.createGeetestChallenge()
           const result = await this.solveGeetest(challenge)
           if (!result) throw new SyncVerificationRequiredError('米游社滑块验证已取消')
+          this.reportProgress?.({
+            phase: 'retrying',
+            message: '验证完成，正在重试战绩接口（1/1）',
+            current: 1,
+            total: 1
+          })
           if (!challenge.sessionId) {
             if (challenge.version === 4 || result.version === 4) {
               throw new SyncVerificationRequiredError('米游社兼容验证服务返回了无法提交的 V4 票据')
@@ -353,8 +368,13 @@ class MiyousheChronicleClient {
 export class MiyousheZenlessClient extends MiyousheChronicleClient implements ZenlessBattleChronicleClient {}
 
 export class MiyousheGenshinClient extends MiyousheChronicleClient implements GenshinBattleChronicleClient {
-  constructor(cookie: string, fetcher: typeof fetch, solveGeetest?: MiyousheGeetestSolver) {
-    super(cookie, fetcher, solveGeetest, true)
+  constructor(
+    cookie: string,
+    fetcher: typeof fetch,
+    solveGeetest?: MiyousheGeetestSolver,
+    reportProgress?: SyncProgressReporter
+  ) {
+    super(cookie, fetcher, solveGeetest, true, reportProgress)
   }
 
   async getProfile(): Promise<unknown> {
@@ -405,8 +425,13 @@ export class MiyousheGenshinClient extends MiyousheChronicleClient implements Ge
 }
 
 export class MiyousheStarRailClient extends MiyousheChronicleClient implements StarRailBattleChronicleClient {
-  constructor(cookie: string, fetcher: typeof fetch, solveGeetest?: MiyousheGeetestSolver) {
-    super(cookie, fetcher, solveGeetest, true)
+  constructor(
+    cookie: string,
+    fetcher: typeof fetch,
+    solveGeetest?: MiyousheGeetestSolver,
+    reportProgress?: SyncProgressReporter
+  ) {
+    super(cookie, fetcher, solveGeetest, true, reportProgress)
   }
 
   private async getChallenge(endpoint: string, extraQuery: Record<string, string> = {}): Promise<unknown> {
@@ -448,34 +473,43 @@ export class MiyousheStarRailClient extends MiyousheChronicleClient implements S
 export function createMiyousheZenlessPersonalAdapter(
   credential: CredentialPayload,
   fetcher: typeof fetch,
-  solveGeetest?: MiyousheGeetestSolver
+  solveGeetest?: MiyousheGeetestSolver,
+  reportProgress?: SyncProgressReporter
 ): ZenlessPersonalAdapter {
   if (credential.kind !== 'cookie') {
     throw new SyncVerificationRequiredError('米游社凭据格式已过期，请重新登录')
   }
-  return new ZenlessPersonalAdapter(new MiyousheZenlessClient(credential.value, fetcher, solveGeetest))
+  return new ZenlessPersonalAdapter(
+    new MiyousheZenlessClient(credential.value, fetcher, solveGeetest, false, reportProgress)
+  )
 }
 
 export function createMiyousheGenshinPersonalAdapter(
   credential: CredentialPayload,
   fetcher: typeof fetch,
-  solveGeetest?: MiyousheGeetestSolver
+  solveGeetest?: MiyousheGeetestSolver,
+  reportProgress?: SyncProgressReporter
 ): GenshinPersonalAdapter {
   if (credential.kind !== 'cookie') {
     throw new SyncVerificationRequiredError('米游社凭据格式已过期，请重新登录')
   }
-  return new GenshinPersonalAdapter(new MiyousheGenshinClient(credential.value, fetcher, solveGeetest))
+  return new GenshinPersonalAdapter(
+    new MiyousheGenshinClient(credential.value, fetcher, solveGeetest, reportProgress)
+  )
 }
 
 export function createMiyousheStarRailPersonalAdapter(
   credential: CredentialPayload,
   fetcher: typeof fetch,
-  solveGeetest?: MiyousheGeetestSolver
+  solveGeetest?: MiyousheGeetestSolver,
+  reportProgress?: SyncProgressReporter
 ): StarRailPersonalAdapter {
   if (credential.kind !== 'cookie') {
     throw new SyncVerificationRequiredError('米游社凭据格式已过期，请重新登录')
   }
-  return new StarRailPersonalAdapter(new MiyousheStarRailClient(credential.value, fetcher, solveGeetest))
+  return new StarRailPersonalAdapter(
+    new MiyousheStarRailClient(credential.value, fetcher, solveGeetest, reportProgress)
+  )
 }
 
 function generateCnDynamicSecret(

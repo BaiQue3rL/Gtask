@@ -1,7 +1,12 @@
 import type { GameId, SyncTarget } from '../../shared/contracts'
 import type { CredentialPayload } from '../credential-vault'
 import type { CredentialProvider } from '../../shared/contracts'
-import { SyncVerificationRequiredError, type SyncAdapter, type SyncAdapterOutput } from './types'
+import {
+  SyncVerificationRequiredError,
+  type SyncAdapter,
+  type SyncAdapterOutput,
+  type SyncProgressReporter
+} from './types'
 
 export interface CredentialReader {
   read: (provider: CredentialProvider) => CredentialPayload | null
@@ -16,10 +21,17 @@ export class CredentialBackedAdapter implements SyncAdapter {
   constructor(
     private readonly provider: CredentialProvider,
     private readonly credentials: CredentialReader,
-    private readonly createAdapter: (credential: CredentialPayload) => SyncAdapter
+    private readonly createAdapter: (
+      credential: CredentialPayload,
+      reportProgress?: SyncProgressReporter
+    ) => SyncAdapter
   ) {}
 
-  async sync(gameId: GameId, target: SyncTarget = 'all'): Promise<SyncAdapterOutput> {
+  async sync(
+    gameId: GameId,
+    target: SyncTarget = 'all',
+    reportProgress?: SyncProgressReporter
+  ): Promise<SyncAdapterOutput> {
     let credential: CredentialPayload | null
     try {
       credential = this.credentials.read(this.provider)
@@ -29,6 +41,9 @@ export class CredentialBackedAdapter implements SyncAdapter {
     if (!credential) {
       throw new SyncVerificationRequiredError(`${PROVIDER_LABELS[this.provider]}尚未登录`)
     }
-    return this.createAdapter(credential).sync(gameId, target)
+    const adapter = reportProgress
+      ? this.createAdapter(credential, reportProgress)
+      : this.createAdapter(credential)
+    return adapter.sync(gameId, target, reportProgress)
   }
 }

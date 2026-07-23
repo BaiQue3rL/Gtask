@@ -237,9 +237,15 @@ describe('Star Rail personal parsing', () => {
       getEventCalendar: async () => { order.push('events'); return payload.eventCalendar }
     }
     const adapter = new StarRailPersonalAdapter(client)
+    const progress: Array<{ message: string; current?: number | null; total?: number | null }> = []
 
-    const result = await adapter.sync('star-rail')
+    const result = await adapter.sync('star-rail', 'all', (update) => progress.push(update))
     expect(order).toEqual(['memory', 'fiction', 'shadow', 'arbitration', 'events'])
+    expect(progress.at(-1)).toMatchObject({
+      message: '正在读取星铁活动原始状态',
+      current: 5,
+      total: 5
+    })
     expect(result.items).toHaveLength(4)
     expect(result.reviewCandidates).toHaveLength(1)
     order.length = 0
@@ -263,10 +269,16 @@ describe('Star Rail personal parsing', () => {
       getAnomalyArbitration: async () => { throw new Error('仲裁风控') },
       getEventCalendar: async () => payload.eventCalendar
     })
-    const partial = await adapter.sync('star-rail', 'cycles')
+    const progress: Array<{ message: string }> = []
+    const partial = await adapter.sync('star-rail', 'cycles', (update) => progress.push(update))
     expect(partial.items).toEqual(expect.arrayContaining([
       expect.objectContaining({ modeKey: 'memory-of-chaos' })
     ]))
     expect(partial.message).toContain('部分成功 1/4')
+    expect(progress).toEqual(expect.arrayContaining([
+      expect.objectContaining({ message: '虚构叙事战绩读取失败，继续下一项' }),
+      expect.objectContaining({ message: '末日幻影战绩读取失败，继续下一项' }),
+      expect.objectContaining({ message: '异相仲裁战绩读取失败，继续下一项' })
+    ]))
   })
 })

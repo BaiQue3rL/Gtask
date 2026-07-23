@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import * as z from 'zod/v4'
 import {
   CHECKLIST_CATEGORIES,
+  SYNC_PROGRESS_PHASES,
   SUPPORTED_GAME_IDS,
   type ChecklistCategory,
   type GameId
@@ -24,6 +25,7 @@ const recurrenceRuleSchema = z.string().max(200).refine(
   '自动周期规则格式不正确'
 ).nullable().optional()
 const publicScheduleCategorySchema = z.enum(['limited_event', 'weekly', 'endgame', 'exploration'])
+const syncProgressPhaseSchema = z.enum(SYNC_PROGRESS_PHASES)
 const chineseScheduleTitleSchema = z.string().min(1).max(100).regex(
   /\p{Script=Han}/u,
   '公开资料名称必须包含经中文来源核对的中文正式名称'
@@ -284,6 +286,40 @@ export function createLocalMcpServer(
     async ({ agentId }) => {
       try {
         return toolResult({ command: 'claim_schedule_job', job: database.claimAiScheduleJob(agentId) })
+      } catch (error) {
+        return toolError(error)
+      }
+    }
+  )
+
+  server.registerTool(
+    'update_gacha_schedule_job_progress',
+    {
+      title: '更新公开资料同步进度',
+      description: '把 Codex 当前的检索、核验、整理、重试或写入阶段实时显示在幻游清单中。',
+      inputSchema: {
+        agentId: z.string().min(1).max(100),
+        jobId: z.string().uuid(),
+        phase: syncProgressPhaseSchema,
+        message: z.string().min(1).max(200),
+        current: z.number().int().min(0).nullable().optional(),
+        total: z.number().int().min(1).nullable().optional()
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true }
+    },
+    async ({ agentId, jobId, phase, message, current, total }) => {
+      try {
+        return toolResult({
+          command: 'update_schedule_job_progress',
+          job: database.updateAiScheduleJobProgress(
+            jobId,
+            agentId,
+            phase,
+            message,
+            current ?? null,
+            total ?? null
+          )
+        })
       } catch (error) {
         return toolError(error)
       }

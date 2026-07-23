@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import type {
   AiScheduleAgentStatus,
+  AiScheduleJob,
   AppInfo,
   BackupSummary,
   ChecklistCategory,
@@ -15,6 +16,7 @@ import type {
   MiyousheQrLoginState,
   PersonalSyncTarget,
   SyncResult,
+  SyncProgressUpdate,
   SyncScope,
   SyncTarget,
   SyncTargetState,
@@ -142,6 +144,8 @@ const backups = ref<BackupSummary[]>([])
 const backingUp = ref(false)
 const restoringBackup = ref<string | null>(null)
 const aiScheduleAgent = ref<AiScheduleAgentStatus | null>(null)
+const activeAiJob = ref<AiScheduleJob | null>(null)
+const personalSyncProgress = ref<SyncProgressUpdate | null>(null)
 const editingItem = ref<ChecklistItem | null>(null)
 let miyousheLoginTimer: number | null = null
 
@@ -163,6 +167,38 @@ const visibleGames = computed(() => games.value.filter((game) => !hiddenGameIds.
 const gameCredentialStatuses = computed(() => credentialStatuses.value)
 const aiScheduleAvailable = computed(() =>
   Boolean(aiScheduleAgent.value?.connected || aiScheduleAgent.value?.codexPluginInstalled)
+)
+const publicSyncProgress = computed<SyncProgressUpdate | null>(() => {
+  const job = activeAiJob.value
+  if (!job) return null
+  return {
+    gameId: job.gameId,
+    target: job.target,
+    source: 'public_schedule',
+    phase: job.progressPhase,
+    status: job.status === 'pending' ? 'waiting' : 'running',
+    message: job.message ?? (job.status === 'pending' ? '等待 Codex 接单' : 'Codex 正在处理'),
+    current: job.progressCurrent,
+    total: job.progressTotal,
+    updatedAt: job.progressUpdatedAt
+  }
+})
+const liveSyncProgress = computed(() =>
+  [publicSyncProgress.value, personalSyncProgress.value].filter(
+    (progress): progress is SyncProgressUpdate =>
+      Boolean(
+        progress &&
+        progress.gameId === selectedGameId.value &&
+        ['waiting', 'running', 'verification_required'].includes(progress.status)
+      )
+  )
+)
+const hasActivePublicSync = computed(() =>
+  Boolean(
+    publicSyncProgress.value &&
+    publicSyncProgress.value.gameId === selectedGameId.value &&
+    ['waiting', 'running'].includes(publicSyncProgress.value.status)
+  )
 )
 const editorCategories = computed(() => {
   const questCategories: ChecklistCategory[] = ['main_quest', 'side_quest']
@@ -237,7 +273,8 @@ onMounted(async () => {
       loadArchivedItems(),
       loadSyncSettings(),
       loadSyncTargetStates(),
-      loadPersonalSyncTargets()
+      loadPersonalSyncTargets(),
+      loadActiveAiJob()
     ])
   } catch (error) {
     showError(error)
@@ -257,7 +294,8 @@ const removeChecklistListener = window.gacha.onChecklistChanged(() => {
     loadArchivedItems(),
     loadSyncSettings(),
     loadSyncTargetStates(),
-    loadAiScheduleAgentStatus()
+    loadAiScheduleAgentStatus(),
+    loadActiveAiJob()
   ])
     .then(() => {
       const settings = syncSettings.value
@@ -272,16 +310,31 @@ const removeChecklistListener = window.gacha.onChecklistChanged(() => {
       }
     })
 })
+const removeSyncProgressListener = window.gacha.onSyncProgress((progress) => {
+  if (progress.source === 'personal_data') {
+    personalSyncProgress.value = progress
+    return
+  }
+  if (progress.gameId === selectedGameId.value) void loadActiveAiJob()
+})
 const clockTimer = window.setInterval(() => {
   clockNow.value = Date.now()
+}, 1_000)
+const agentTimer = window.setInterval(() => {
   void loadAiScheduleAgentStatus()
 }, 60_000)
+const progressTimer = window.setInterval(() => {
+  if (activeAiJob.value) void loadActiveAiJob()
+}, 2_000)
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
   removeSyncListener()
   removeChecklistListener()
+  removeSyncProgressListener()
   window.clearInterval(clockTimer)
+  window.clearInterval(agentTimer)
+  window.clearInterval(progressTimer)
   stopMiyousheLoginPolling()
 })
 
@@ -299,6 +352,8 @@ function handleGlobalKeydown(event: KeyboardEvent): void {
 
 watch(selectedGameId, () => {
   syncNotice.value = null
+  personalSyncProgress.value = null
+  activeAiJob.value = null
   sectionSyncMenuOpen.value = null
   recycleBinOpen.value = false
   void Promise.all([
@@ -306,7 +361,8 @@ watch(selectedGameId, () => {
     loadArchivedItems(),
     loadSyncSettings(),
     loadSyncTargetStates(),
-    loadPersonalSyncTargets()
+    loadPersonalSyncTargets(),
+    loadActiveAiJob()
   ])
 })
 
@@ -373,6 +429,72 @@ async function loadAiScheduleAgentStatus(): Promise<void> {
   } catch (error) {
     showError(error)
   }
+}
+
+async function loadActiveAiJob(): Promise<void> {
+  const gameId = selectedGameId.value
+  try {
+    const job = await window.gacha.getActiveAiScheduleJob(gameId)
+    if (selectedGameId.value === gameId) activeAiJob.value = job
+  } catch (error) {
+    if (selectedGameId.value === gameId) showError(error)
+  }
+}
+
+const syncProgressPhaseLabels: Record<SyncProgressUpdate['phase'], string> = {
+  queued: '等待接单',
+  fetching: '读取数据',
+  searching: '联网检索',
+  verifying: '交叉核验',
+  structuring: '整理数据',
+  writing: '写入清单',
+  retrying: '正在重试',
+  verification: '等待验证',
+  merging: '安全合并',
+  completed: '同步完成',
+  failed: '同步失败'
+}
+
+function syncProgressTitle(progress: SyncProgressUpdate): string {
+  return progress.source === 'public_schedule' ? 'Codex 公开资料同步' : `${personalPlatform.value}进度同步`
+}
+
+function syncProgressCount(progress: SyncProgressUpdate): string | null {
+  if (progress.current === null || progress.total === null) return null
+  return `${progress.current}/${progress.total}`
+}
+
+function syncProgressPercent(progress: SyncProgressUpdate): number | null {
+  if (progress.current === null || progress.total === null || progress.total <= 0) return null
+  return Math.min(100, Math.round(progress.current / progress.total * 100))
+}
+
+function syncProgressStalled(progress: SyncProgressUpdate): boolean {
+  return progress.status === 'running' &&
+    clockNow.value - new Date(progress.updatedAt).getTime() > 30_000
+}
+
+function syncProgressAge(progress: SyncProgressUpdate): string {
+  const seconds = Math.max(0, Math.floor((clockNow.value - new Date(progress.updatedAt).getTime()) / 1_000))
+  return seconds < 60 ? `${seconds} 秒前更新` : `${Math.floor(seconds / 60)} 分钟前更新`
+}
+
+function syncProgressMessage(progress: SyncProgressUpdate): string {
+  if (
+    progress.source !== 'public_schedule' ||
+    progress.status !== 'waiting' ||
+    activeAiJob.value?.status !== 'pending'
+  ) {
+    return progress.message
+  }
+  const waitingMs = clockNow.value - new Date(progress.updatedAt).getTime()
+  if (waitingMs < 10_000) return '等待 Codex 启动并领取同步任务'
+  if (waitingMs < 30_000) return 'Codex 尚未接单，可能正在启动或建立网络连接'
+  return 'Codex 仍在启动或连接；接单前的内部重试次数暂不可见'
+}
+
+function progressForTarget(target: SyncTarget): SyncProgressUpdate | null {
+  return liveSyncProgress.value.find((progress) => progress.target === target) ?? null
 }
 
 async function loadArchivedItems(): Promise<void> {
@@ -548,7 +670,7 @@ async function runSync(scope: SyncScope, target: SyncTarget = 'all'): Promise<vo
     const result = await window.gacha.syncGame(gameId, scope, target)
     if (selectedGameId.value === gameId) {
       syncNotice.value = { status: result.status, message: displaySyncMessage(result.message) }
-      await Promise.all([loadItems(), loadSyncSettings(), loadSyncTargetStates()])
+      await Promise.all([loadItems(), loadSyncSettings(), loadSyncTargetStates(), loadActiveAiJob()])
     }
   } catch (error) {
     if (selectedGameId.value === gameId) showError(error)
@@ -562,6 +684,7 @@ async function runPersonalSync(target: SyncTarget = 'all'): Promise<void> {
   sectionSyncMenuOpen.value = null
   syncing.value = true
   syncNotice.value = null
+  personalSyncProgress.value = null
   try {
     const result = await window.gacha.syncPersonalData(gameId, target)
     if (selectedGameId.value === gameId) {
@@ -572,6 +695,7 @@ async function runPersonalSync(target: SyncTarget = 'all'): Promise<void> {
     if (selectedGameId.value === gameId) showError(error)
   } finally {
     syncing.value = false
+    if (selectedGameId.value === gameId) personalSyncProgress.value = null
   }
 }
 
@@ -821,7 +945,7 @@ function showError(error: unknown): void {
           <button
             class="toolbar-button"
             type="button"
-            :disabled="syncing || !aiScheduleAvailable"
+            :disabled="syncing || hasActivePublicSync || !aiScheduleAvailable"
             :title="aiScheduleAgent?.connected
               ? `已连接 ${aiScheduleAgent.name}`
               : aiScheduleAgent?.codexPluginInstalled
@@ -829,7 +953,7 @@ function showError(error: unknown): void {
                 : '刷新清单需要连接 Codex/MCP'"
             @click="runSync('public_schedule')"
           >
-            {{ syncing ? '同步中…' : aiScheduleAvailable ? '↻ 刷新清单' : '↻ 未连接 AI' }}
+            {{ hasActivePublicSync ? 'AI 处理中…' : syncing ? '同步中…' : aiScheduleAvailable ? '↻ 刷新清单' : '↻ 未连接 AI' }}
           </button>
           <span
             class="sync-indicator"
@@ -855,14 +979,42 @@ function showError(error: unknown): void {
           <strong>先完成一次初始全局同步</strong>
           <span>将按你的系统时区建立活动、周期事项和地图目录；周期与地图之后会在本地长期维护。</span>
         </div>
-        <button type="button" :disabled="syncing" @click="aiScheduleAvailable ? runSync('public_schedule', 'all') : settingsOpen = true">
+        <button type="button" :disabled="syncing || hasActivePublicSync" @click="aiScheduleAvailable ? runSync('public_schedule', 'all') : settingsOpen = true">
           {{ aiScheduleAvailable ? '开始初始同步' : '配置 Codex/MCP' }}
         </button>
       </div>
-      <div v-if="syncNotice" class="sync-banner" :class="syncNotice.status" aria-live="polite">
+      <div v-if="liveSyncProgress.length" class="sync-progress-stack" aria-live="polite">
+        <article
+          v-for="progress in liveSyncProgress"
+          :key="`${progress.source}:${progress.target}`"
+          class="sync-progress-card"
+          :class="{ stalled: syncProgressStalled(progress), verification: progress.status === 'verification_required' }"
+        >
+          <div class="sync-progress-main">
+            <div class="sync-progress-heading">
+              <strong>{{ syncProgressTitle(progress) }}</strong>
+              <span>{{ syncProgressPhaseLabels[progress.phase] }}</span>
+              <b v-if="syncProgressCount(progress)">{{ syncProgressCount(progress) }}</b>
+            </div>
+            <p>{{ syncProgressMessage(progress) }}</p>
+            <div v-if="syncProgressPercent(progress) !== null" class="sync-progress-track" aria-hidden="true">
+              <i :style="{ width: `${syncProgressPercent(progress)}%` }"></i>
+            </div>
+            <small :class="{ warning: syncProgressStalled(progress) }">
+              {{ syncProgressStalled(progress) ? `进度暂未变化 · ${syncProgressAge(progress)}` : syncProgressAge(progress) }}
+            </small>
+          </div>
+          <button
+            v-if="progress.source === 'public_schedule' && activeAiJob?.status === 'pending' && aiScheduleAgent?.codexPluginInstalled"
+            type="button"
+            @click="openCodexPlugin"
+          >打开 Codex 接单</button>
+        </article>
+      </div>
+      <div v-else-if="syncNotice" class="sync-banner" :class="syncNotice.status" aria-live="polite">
         <span>{{ syncNotice.message }}</span>
         <button
-          v-if="aiScheduleAgent?.codexPluginInstalled && !aiScheduleAgent?.connected && syncNotice.status === 'partial'"
+          v-if="aiScheduleAgent?.codexPluginInstalled && !aiScheduleAgent?.connected && syncNotice.status === 'partial' && !activeAiJob"
           type="button"
           @click="openCodexPlugin"
         >打开 Codex 处理</button>
@@ -916,7 +1068,7 @@ function showError(error: unknown): void {
                       @click="sectionSyncMenuOpen = sectionSyncMenuOpen === panel.section ? null : panel.section"
                     >↻ 同步 ▾</button>
                     <div v-if="sectionSyncMenuOpen === panel.section" class="dropdown-menu section-sync-menu" role="menu">
-                      <button role="menuitem" type="button" :disabled="!aiScheduleAvailable" @click="runSync('public_schedule', panel.syncTarget)">同步清单</button>
+                      <button role="menuitem" type="button" :disabled="!aiScheduleAvailable || hasActivePublicSync" @click="runSync('public_schedule', panel.syncTarget)">同步清单</button>
                       <button
                         v-if="personalSyncTargets.includes(panel.syncTarget)"
                         role="menuitem"
@@ -933,6 +1085,18 @@ function showError(error: unknown): void {
                     @click="archiveCompletedSection(panel.section, panel.categories, panel.title)"
                   >删除已完成</button>
                 </div>
+              </div>
+              <div
+                v-if="panel.syncTarget && progressForTarget(panel.syncTarget)"
+                class="section-live-progress"
+                :class="{ stalled: syncProgressStalled(progressForTarget(panel.syncTarget)!) }"
+              >
+                <span class="section-live-dot"></span>
+                <strong>{{ syncProgressPhaseLabels[progressForTarget(panel.syncTarget)!.phase] }}</strong>
+                <span>{{ syncProgressMessage(progressForTarget(panel.syncTarget)!) }}</span>
+                <b v-if="syncProgressCount(progressForTarget(panel.syncTarget)!)">
+                  {{ syncProgressCount(progressForTarget(panel.syncTarget)!) }}
+                </b>
               </div>
               <div class="item-list">
                 <div

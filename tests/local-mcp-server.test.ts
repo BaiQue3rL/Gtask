@@ -51,6 +51,7 @@ describe('本地 MCP server', () => {
       'archive_completed_gacha_section',
       'register_gacha_schedule_agent',
       'claim_gacha_schedule_job',
+      'update_gacha_schedule_job_progress',
       'claim_gacha_semantic_review',
       'approve_gacha_semantic_review',
       'reject_gacha_semantic_review',
@@ -147,7 +148,34 @@ describe('本地 MCP server', () => {
     })
     expect(claimed.structuredContent).toMatchObject({
       command: 'claim_schedule_job',
-      job: { id: queued.id, gameId: 'genshin', status: 'claimed' }
+      job: {
+        id: queued.id,
+        gameId: 'genshin',
+        status: 'claimed',
+        progressPhase: 'searching'
+      }
+    })
+
+    const progress = await connected.callTool({
+      name: 'update_gacha_schedule_job_progress',
+      arguments: {
+        agentId: 'test-agent',
+        jobId: queued.id,
+        phase: 'verifying',
+        message: '正在交叉核验 2 个中文官方来源',
+        current: 2,
+        total: 3
+      }
+    })
+    expect(progress.structuredContent).toMatchObject({
+      command: 'update_schedule_job_progress',
+      job: {
+        id: queued.id,
+        progressPhase: 'verifying',
+        progressCurrent: 2,
+        progressTotal: 3,
+        message: '正在交叉核验 2 个中文官方来源'
+      }
     })
 
     const rejectedCompletion = await connected.callTool({

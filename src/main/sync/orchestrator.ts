@@ -2,13 +2,19 @@ import type {
   ChecklistCategory,
   GameId,
   SyncResult,
+  SyncProgressUpdate,
   SyncScope,
   SyncTarget,
   SyncSourceResult,
   SyncStatus
 } from '../../shared/contracts'
 import type { AppDatabase } from '../database'
-import { SyncVerificationRequiredError, type SyncAdapter, type SyncAdapterRegistry } from './types'
+import {
+  SyncVerificationRequiredError,
+  type SyncAdapter,
+  type SyncAdapterProgress,
+  type SyncAdapterRegistry
+} from './types'
 import { normalizeSyncItems } from './normalization'
 
 const PERSONAL_PLATFORM_NAMES: Record<GameId, string> = {
@@ -24,7 +30,8 @@ export class SyncOrchestrator {
 
   constructor(
     private readonly database: AppDatabase,
-    private readonly adapters: SyncAdapterRegistry = { publicSchedule: {}, personalData: {} }
+    private readonly adapters: SyncAdapterRegistry = { publicSchedule: {}, personalData: {} },
+    private readonly onProgress?: (progress: SyncProgressUpdate) => void
   ) {}
 
   syncGame(gameId: GameId, scope: SyncScope, target: SyncTarget = 'all'): Promise<SyncResult> {
@@ -171,7 +178,22 @@ export class SyncOrchestrator {
     }
 
     try {
-      const result = await adapter.sync(gameId, target)
+      const reportProgress = (progress: SyncAdapterProgress): void => {
+        this.emitProgress(gameId, target, source, progress)
+      }
+      reportProgress({
+        phase: 'fetching',
+        message: source === 'personal_data' ? '正在连接个人数据服务' : '正在连接公开资料来源',
+        current: 0,
+        total: null
+      })
+      const result = await adapter.sync(gameId, target, reportProgress)
+      reportProgress({
+        phase: 'merging',
+        message: '数据读取完成，正在安全合并清单',
+        current: 1,
+        total: 1
+      })
       const checklistSource = source === 'public_schedule' ? 'public_schedule' : 'personal_sync'
       const targetCategories: Partial<Record<SyncTarget, ChecklistCategory[]>> = {
         tasks: ['main_quest', 'side_quest'],
@@ -201,6 +223,15 @@ export class SyncOrchestrator {
       const reviewMessage = review.pending > 0
         ? `；${review.pending} 项待 Codex 核验`
         : ''
+      reportProgress({
+        phase: 'completed',
+        status: review.pending > 0 ? 'waiting' : 'completed',
+        message: review.pending > 0
+          ? `${review.pending} 项数据等待 Codex 语义核验`
+          : '同步完成',
+        current: 1,
+        total: 1
+      })
       return {
         source,
         status: 'success',
@@ -210,6 +241,13 @@ export class SyncOrchestrator {
       }
     } catch (error) {
       const verificationRequired = error instanceof SyncVerificationRequiredError
+      this.emitProgress(gameId, target, source, {
+        phase: verificationRequired ? 'verification' : 'failed',
+        status: verificationRequired ? 'verification_required' : 'error',
+        message: error instanceof Error ? error.message : '同步来源发生未知错误',
+        current: null,
+        total: null
+      })
       return {
         source,
         status: verificationRequired ? 'verification_required' : 'error',
@@ -219,5 +257,24 @@ export class SyncOrchestrator {
         preserved: 0
       }
     }
+  }
+
+  private emitProgress(
+    gameId: GameId,
+    target: SyncTarget,
+    source: SyncSourceResult['source'],
+    progress: SyncAdapterProgress
+  ): void {
+    this.onProgress?.({
+      gameId,
+      target,
+      source,
+      phase: progress.phase,
+      status: progress.status ?? 'running',
+      message: progress.message,
+      current: progress.current ?? null,
+      total: progress.total ?? null,
+      updatedAt: new Date().toISOString()
+    })
   }
 }

@@ -223,9 +223,17 @@ describe('Genshin personal parsing', () => {
       getEventCalendar: async () => { order.push('events'); return payload.eventCalendar }
     }
     const adapter = new GenshinPersonalAdapter(client)
+    const progress: Array<{ message: string; current?: number | null; total?: number | null }> = []
 
-    const result = await adapter.sync('genshin')
+    const result = await adapter.sync('genshin', 'all', (update) => progress.push(update))
     expect(order).toEqual(['profile', 'abyss', 'theater', 'stygian', 'events'])
+    expect(progress).toEqual([
+      expect.objectContaining({ message: '正在读取原神地图探索进度', current: 1, total: 5 }),
+      expect.objectContaining({ message: '正在读取深境螺旋战绩', current: 2, total: 5 }),
+      expect.objectContaining({ message: '正在读取幻想真境剧诗战绩', current: 3, total: 5 }),
+      expect.objectContaining({ message: '正在读取幽境危战战绩', current: 4, total: 5 }),
+      expect.objectContaining({ message: '正在读取原神活动进度', current: 5, total: 5 })
+    ])
     expect(result.items).toHaveLength(6)
     order.length = 0
     const eventsOnly = await adapter.sync('genshin', 'events')
@@ -243,11 +251,16 @@ describe('Genshin personal parsing', () => {
       getEventCalendar: async () => { throw new Error('活动风控') }
     })
 
-    const partial = await adapter.sync('genshin', 'cycles')
+    const progress: Array<{ message: string }> = []
+    const partial = await adapter.sync('genshin', 'cycles', (update) => progress.push(update))
     expect(partial.items).toEqual(expect.arrayContaining([
       expect.objectContaining({ modeKey: 'imaginarium-theater' })
     ]))
     expect(partial.message).toContain('部分成功 1/3')
+    expect(progress).toEqual(expect.arrayContaining([
+      expect.objectContaining({ message: '深境螺旋战绩读取失败，继续下一项' }),
+      expect.objectContaining({ message: '幽境危战战绩读取失败，继续下一项' })
+    ]))
     await expect(adapter.sync('genshin', 'events')).rejects.toThrow('活动风控')
   })
 })

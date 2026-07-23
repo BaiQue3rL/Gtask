@@ -14,6 +14,7 @@ import type {
   GameSummary,
   PersonalSyncTarget,
   SemanticReviewCandidate,
+  SyncProgressPhase,
   SyncScope,
   SyncTarget,
   SyncTargetState,
@@ -58,7 +59,7 @@ const DEFAULT_GAMES: GameSummary[] = [
   }
 ]
 
-export const CURRENT_SCHEMA_VERSION = 12
+export const CURRENT_SCHEMA_VERSION = 13
 
 const AI_AGENT_MAX_AGE_MS = 5 * 60 * 1000
 const AI_JOB_CLAIM_MAX_AGE_MS = 15 * 60 * 1000
@@ -528,9 +529,11 @@ export class AppDatabase {
     const now = reference.toISOString()
     this.database.prepare(`
       INSERT INTO ai_schedule_jobs(
-        id, game_id, scope, target, user_timezone, status, requested_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)
-    `).run(id, gameId, scope, target, userTimeZone, now, now)
+        id, game_id, scope, target, user_timezone, status, requested_at,
+        progress_phase, progress_updated_at, message, updated_at
+      ) VALUES (?, ?, ?, ?, ?, 'pending', ?, 'queued', ?,
+        '等待 Codex 接单', ?)
+    `).run(id, gameId, scope, target, userTimeZone, now, now, now)
     this.database.prepare(`
       UPDATE sync_states
       SET status = 'idle', last_scope = ?, last_attempt_at = ?,
@@ -554,11 +557,59 @@ export class AppDatabase {
       if (!pending) return null
       this.database.prepare(`
         UPDATE ai_schedule_jobs
-        SET status = 'claimed', agent_id = ?, claimed_at = ?, updated_at = ?
+        SET status = 'claimed', agent_id = ?, claimed_at = ?,
+            progress_phase = 'searching', progress_current = 0,
+            progress_total = NULL, progress_updated_at = ?,
+            message = 'Codex 已接单，正在准备检索', updated_at = ?
         WHERE id = ? AND status = 'pending'
-      `).run(agentId, now, now, pending.id)
+      `).run(agentId, now, now, now, pending.id)
       return this.getAiScheduleJob(pending.id)
     })
+  }
+
+  getActiveAiScheduleJob(gameId: GameId): AiScheduleJob | null {
+    const row = this.database.prepare(`
+      SELECT id FROM ai_schedule_jobs
+      WHERE game_id = ? AND status IN ('pending', 'claimed')
+      ORDER BY requested_at ASC LIMIT 1
+    `).get(gameId) as { id: string } | undefined
+    return row ? this.getAiScheduleJob(row.id) : null
+  }
+
+  updateAiScheduleJobProgress(
+    jobId: string,
+    agentId: string,
+    phase: SyncProgressPhase,
+    message: string,
+    current: number | null,
+    total: number | null,
+    reference = new Date()
+  ): AiScheduleJob {
+    if (!message.trim()) throw new Error('同步进度说明不能为空')
+    if (['queued', 'completed', 'failed'].includes(phase)) {
+      throw new Error('该同步阶段只能由任务领取、提交或失败操作设置')
+    }
+    if (current !== null && (!Number.isInteger(current) || current < 0)) {
+      throw new Error('同步进度当前值格式不正确')
+    }
+    if (total !== null && (!Number.isInteger(total) || total < 1)) {
+      throw new Error('同步进度总数格式不正确')
+    }
+    if (current !== null && total !== null && current > total) {
+      throw new Error('同步进度当前值不能超过总数')
+    }
+    const now = reference.toISOString()
+    const result = this.database.prepare(`
+      UPDATE ai_schedule_jobs
+      SET progress_phase = ?, progress_current = ?, progress_total = ?,
+          progress_updated_at = ?, message = ?, updated_at = ?
+      WHERE id = ? AND status = 'claimed' AND agent_id = ?
+    `).run(phase, current, total, now, message.trim(), now, jobId, agentId)
+    if (result.changes === 0) throw new Error('AI 资料任务未由当前 Agent 领取或已经结束')
+    this.database.prepare(`
+      UPDATE ai_schedule_agents SET last_seen_at = ?, updated_at = ? WHERE id = ?
+    `).run(now, now, agentId)
+    return this.getAiScheduleJob(jobId)
   }
 
   applyAiScheduleJob(
@@ -620,9 +671,12 @@ export class AppDatabase {
     const message = `AI 资料同步完成：新增 ${merge.added}，更新 ${merge.updated}，保护 ${merge.preserved}`
     this.database.prepare(`
       UPDATE ai_schedule_jobs
-      SET status = 'completed', completed_at = ?, evidence_json = ?, message = ?, updated_at = ?
+      SET status = 'completed', completed_at = ?, evidence_json = ?, message = ?,
+          progress_phase = 'completed',
+          progress_current = COALESCE(progress_total, progress_current),
+          progress_updated_at = ?, updated_at = ?
       WHERE id = ? AND status = 'claimed' AND agent_id = ?
-    `).run(now, JSON.stringify(evidence), message, now, jobId, agentId)
+    `).run(now, JSON.stringify(evidence), message, now, now, jobId, agentId)
     const current = this.getSyncSettings(job.gameId)
     const personalIssue = job.scope === 'public_and_personal' &&
       ['error', 'stale', 'verification_required'].includes(current.status)
@@ -643,9 +697,10 @@ export class AppDatabase {
     const now = reference.toISOString()
     const result = this.database.prepare(`
       UPDATE ai_schedule_jobs
-      SET status = 'failed', completed_at = ?, message = ?, updated_at = ?
+      SET status = 'failed', completed_at = ?, message = ?,
+          progress_phase = 'failed', progress_updated_at = ?, updated_at = ?
       WHERE id = ? AND status = 'claimed' AND agent_id = ?
-    `).run(now, message, now, jobId, agentId)
+    `).run(now, message, now, now, jobId, agentId)
     if (result.changes === 0) throw new Error('AI 资料任务未由当前 Agent 领取或已经结束')
     const job = this.getAiScheduleJob(jobId)
     this.recordSyncOutcome(job.gameId, 'error', message, false)
@@ -658,7 +713,11 @@ export class AppDatabase {
         j.user_timezone AS userTimeZone, j.status,
         j.requested_at AS requestedAt, j.claimed_at AS claimedAt,
         j.completed_at AS completedAt, j.agent_id AS agentId,
-        a.name AS agentName, j.message
+        a.name AS agentName, j.message,
+        j.progress_phase AS progressPhase,
+        j.progress_current AS progressCurrent,
+        j.progress_total AS progressTotal,
+        j.progress_updated_at AS progressUpdatedAt
       FROM ai_schedule_jobs j
       LEFT JOIN ai_schedule_agents a ON a.id = j.agent_id
       WHERE j.id = ?
@@ -673,9 +732,10 @@ export class AppDatabase {
     const result = this.database.prepare(`
       UPDATE ai_schedule_jobs
       SET status = 'pending', agent_id = NULL, claimed_at = NULL,
-          message = 'Agent 超时，任务已重新排队', updated_at = ?
+          progress_phase = 'queued', progress_current = NULL, progress_total = NULL,
+          progress_updated_at = ?, message = 'Codex 超时，任务已重新排队', updated_at = ?
       WHERE status = 'claimed' AND claimed_at < ?
-    `).run(now, threshold)
+    `).run(now, now, threshold)
     return Number(result.changes)
   }
 
@@ -1816,6 +1876,34 @@ export class AppDatabase {
         CREATE INDEX semantic_review_candidates_pending
           ON semantic_review_candidates(status, requested_at);
         INSERT INTO schema_migrations(version) VALUES (12);
+        COMMIT;
+      `)
+    }
+
+    const migration13 = this.database
+      .prepare('SELECT version FROM schema_migrations WHERE version = 13')
+      .get()
+
+    if (!migration13) {
+      this.database.exec(`
+        BEGIN;
+        ALTER TABLE ai_schedule_jobs ADD COLUMN progress_phase TEXT NOT NULL DEFAULT 'queued'
+          CHECK (progress_phase IN (
+            'queued', 'fetching', 'searching', 'verifying', 'structuring',
+            'writing', 'retrying', 'verification', 'merging', 'completed', 'failed'
+          ));
+        ALTER TABLE ai_schedule_jobs ADD COLUMN progress_current INTEGER;
+        ALTER TABLE ai_schedule_jobs ADD COLUMN progress_total INTEGER;
+        ALTER TABLE ai_schedule_jobs ADD COLUMN progress_updated_at TEXT;
+        UPDATE ai_schedule_jobs
+          SET progress_phase = CASE
+            WHEN status = 'completed' THEN 'completed'
+            WHEN status = 'failed' THEN 'failed'
+            WHEN status = 'claimed' THEN 'searching'
+            ELSE 'queued'
+          END,
+          progress_updated_at = updated_at;
+        INSERT INTO schema_migrations(version) VALUES (13);
         COMMIT;
       `)
     }

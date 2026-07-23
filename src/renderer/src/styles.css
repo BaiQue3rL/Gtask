@@ -145,6 +145,26 @@ h2 { margin: 0; font-size: 19px; }
 .sync-banner.success { border-color: #34705d; color: #83dcb2; background: rgba(30, 99, 74, 0.3); }
 .sync-banner.error { border-color: #7e403f; color: #ff9d92; background: rgba(110, 38, 38, 0.35); }
 .sync-banner.partial { border-color: #80652d; color: #ecc66a; background: rgba(109, 80, 20, 0.28); }
+.sync-progress-stack { display: grid; gap: 9px; margin: 0 0 14px; }
+.sync-progress-card { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 78px; padding: 12px 14px; border: 1px solid #326fa1; border-radius: 9px; background: linear-gradient(105deg, rgba(21, 60, 98, .72), rgba(12, 37, 69, .76)); box-shadow: inset 3px 0 0 #4ea7e7; }
+.sync-progress-card.stalled { border-color: #80652d; box-shadow: inset 3px 0 0 #d0a748; }
+.sync-progress-card.verification { border-color: #9a7140; box-shadow: inset 3px 0 0 #f0ac52; }
+.sync-progress-main { min-width: 0; flex: 1; }
+.sync-progress-heading { display: flex; align-items: center; gap: 9px; margin-bottom: 5px; }
+.sync-progress-heading strong { color: #e8f4ff; font-size: 13px; }
+.sync-progress-heading span { padding: 2px 7px; border-radius: 999px; color: #91cff7; background: rgba(46, 126, 181, .24); font-size: 10px; }
+.sync-progress-heading b { color: #acd9f6; font-size: 11px; font-variant-numeric: tabular-nums; }
+.sync-progress-card p { margin: 0; overflow: hidden; color: #b8cde3; font-size: 12px; line-height: 1.5; text-overflow: ellipsis; white-space: nowrap; }
+.sync-progress-card small { display: block; margin-top: 5px; color: #718ca9; font-size: 10px; }
+.sync-progress-card small.warning { color: #e4bd63; }
+.sync-progress-track { height: 3px; margin-top: 8px; overflow: hidden; border-radius: 999px; background: rgba(72, 112, 149, .32); }
+.sync-progress-track i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #3b94d2, #66cae5); transition: width .25s ease; }
+.sync-progress-card > button { flex: none; padding: 7px 11px; border: 1px solid #65a5d2; border-radius: 6px; color: #d9efff; background: rgba(31, 101, 148, .35); cursor: pointer; }
+.section-live-progress { display: flex; align-items: center; gap: 7px; min-width: 0; margin: -3px 16px 9px; padding: 6px 8px; border: 1px solid rgba(55, 124, 174, .45); border-radius: 6px; color: #86bfe4; background: rgba(26, 70, 105, .22); font-size: 10px; }
+.section-live-progress.stalled { border-color: rgba(167, 125, 43, .55); color: #d8b45e; }
+.section-live-progress span:not(.section-live-dot) { min-width: 0; overflow: hidden; color: #8da9c3; text-overflow: ellipsis; white-space: nowrap; }
+.section-live-progress b { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.section-live-dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px rgba(89, 173, 224, .13); }
 .dev-footer { padding: 14px 4px 0; color: #526c8d; font-size: 11px; }
 
 .modal-backdrop { position: fixed; z-index: 10; inset: 0; display: grid; place-items: center; padding: 30px; background: rgba(1, 7, 18, 0.72); backdrop-filter: blur(8px); }

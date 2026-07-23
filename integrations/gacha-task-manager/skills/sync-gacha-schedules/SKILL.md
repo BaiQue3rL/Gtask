@@ -11,12 +11,13 @@ Use the `gacha_task_manager` MCP tools. Do not run shell commands or edit the SQ
 
 1. Call `register_gacha_schedule_agent` with a stable Agent ID, a descriptive name, and `webSearch: true`.
 2. Call `claim_gacha_schedule_job` once. If it returns `null`, skip the public schedule workflow and continue to the semantic review workflow below.
-3. Read the claimed job's `target`. Search only that target: `events` for limited-time events, `cycles` for weeklies/endgame calibration, `exploration` for the currently released map-region catalog, or `all` for the full supported set. Never broaden a section job into other sections.
-4. Search official Simplified Chinese sources for the current version and active/upcoming windows. Reuse fresh trustworthy URLs from the existing checklist when they still cover the current period. Run independent source queries in parallel when supported.
-5. Prefer the Chinese official game site, publisher/community account, or verified Chinese Bilibili account. Use other-language official pages only for date cross-checking. If an item is first found in another language, find a Chinese source for its official Chinese name; never translate the name yourself.
-6. Keep the fast path bounded: normally no more than 6 targeted searches and a 90-second soft deadline. Escalate to broader community search only when official sources are missing or materially conflict.
-7. Submit only exact, supported records through `apply_gacha_public_schedule`. If evidence is insufficient or conflicting at the deadline, call `fail_gacha_schedule_job` with a precise reason and retain the previous checklist.
-8. Report the job ID, target, elapsed time, sources, and merge counts or failure reason. Never leave a claimed job unfinished.
+3. Immediately call `update_gacha_schedule_job_progress` after claiming, and update it again at every material phase: `searching`, `verifying`, `structuring`, `writing`, or `retrying`. Include truthful `current`/`total` counts whenever bounded work or retries are known. Keep each message concise and user-facing because it is displayed live inside the desktop app. Never leave the app showing a stale phase while doing materially different work.
+4. Read the claimed job's `target`. Search only that target: `events` for limited-time events, `cycles` for weeklies/endgame calibration, `exploration` for the currently released map-region catalog, or `all` for the full supported set. Never broaden a section job into other sections.
+5. Search official Simplified Chinese sources for the current version and active/upcoming windows. Reuse fresh trustworthy URLs from the existing checklist when they still cover the current period. Run independent source queries in parallel when supported.
+6. Prefer the Chinese official game site, publisher/community account, or verified Chinese Bilibili account. Use other-language official pages only for date cross-checking. If an item is first found in another language, find a Chinese source for its official Chinese name; never translate the name yourself.
+7. Keep the fast path bounded: normally no more than 6 targeted searches and a 90-second soft deadline. Escalate to broader community search only when official sources are missing or materially conflict.
+8. Submit only exact, supported records through `apply_gacha_public_schedule`. Set progress to `writing` immediately before submission. If evidence is insufficient or conflicting at the deadline, call `fail_gacha_schedule_job` with a precise reason and retain the previous checklist.
+9. Report the job ID, target, elapsed time, sources, and merge counts or failure reason. Never leave a claimed job unfinished.
 
 ## Submission rules
 

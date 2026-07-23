@@ -62,6 +62,38 @@ export interface BackupSummary {
 }
 
 export type AiScheduleJobStatus = 'pending' | 'claimed' | 'completed' | 'failed'
+export const SYNC_PROGRESS_PHASES = [
+  'queued',
+  'fetching',
+  'searching',
+  'verifying',
+  'structuring',
+  'writing',
+  'retrying',
+  'verification',
+  'merging',
+  'completed',
+  'failed'
+] as const
+export type SyncProgressPhase = (typeof SYNC_PROGRESS_PHASES)[number]
+export type SyncProgressStatus =
+  | 'waiting'
+  | 'running'
+  | 'verification_required'
+  | 'completed'
+  | 'error'
+
+export interface SyncProgressUpdate {
+  gameId: GameId
+  target: SyncTarget
+  source: 'public_schedule' | 'personal_data'
+  phase: SyncProgressPhase
+  status: SyncProgressStatus
+  message: string
+  current: number | null
+  total: number | null
+  updatedAt: string
+}
 
 export interface AiScheduleAgentStatus {
   connected: boolean
@@ -84,6 +116,10 @@ export interface AiScheduleJob {
   agentId: string | null
   agentName: string | null
   message: string | null
+  progressPhase: SyncProgressPhase
+  progressCurrent: number | null
+  progressTotal: number | null
+  progressUpdatedAt: string
 }
 
 export type SemanticReviewStatus = 'pending' | 'claimed' | 'approved' | 'rejected'
@@ -229,6 +265,7 @@ export interface GachaApi {
   createBackup: () => Promise<BackupSummary>
   restoreBackup: (fileName: string) => Promise<boolean>
   getAiScheduleAgentStatus: () => Promise<AiScheduleAgentStatus>
+  getActiveAiScheduleJob: (gameId: GameId) => Promise<AiScheduleJob | null>
   openCodexPlugin: () => Promise<void>
   listGames: () => Promise<GameSummary[]>
   listChecklistItems: (gameId: GameId) => Promise<ChecklistItem[]>
@@ -249,5 +286,6 @@ export interface GachaApi {
   cancelMiyousheQrLogin: (sessionId: string) => Promise<boolean>
   clearCredential: (provider: CredentialProvider) => Promise<boolean>
   onSyncCompleted: (callback: (result: SyncResult) => void) => () => void
+  onSyncProgress: (callback: (progress: SyncProgressUpdate) => void) => () => void
   onChecklistChanged: (callback: () => void) => () => void
 }

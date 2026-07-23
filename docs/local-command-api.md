@@ -17,6 +17,7 @@ node out/main/local-mcp-server-cli.js
 - `write_gacha_checklists`：用于批量写入等高级命令的通用入口；同样不会绕过确认保护。
 - `register_gacha_schedule_agent`：登记具备联网搜索能力的 AI Agent，并刷新五分钟有效的连接心跳。
 - `claim_gacha_schedule_job`：领取用户点击“同步清单”后创建的公开资料任务。
+- `update_gacha_schedule_job_progress`：把检索、交叉核验、结构化、重试与写入阶段及当前/总数实时回传桌面端。
 - `apply_gacha_public_schedule`：提交交叉验证后的结构化排期，并通过同步合并器写入。
 - `fail_gacha_schedule_job`：报告检索失败，保留已有清单和上次成功数据。
 
@@ -42,7 +43,7 @@ CLI 与 MCP 在打开旧版磁盘数据库时会先创建迁移前一致性备�
 
 1. 桌面端点击“同步清单”创建公开资料任务。
 2. Codex 登记 Agent 并领取同一任务。
-3. Codex 联网检索官方 HoYoLAB 和交叉验证来源。
+3. Codex 持续回传当前阶段和计数，再联网检索官方资料并交叉验证来源。
 4. 专用 MCP 工具向原神清单新增 4 条排期，桌面端约 2 秒后自动显示成功。
 
 随后新版中文证据协议又完成两次真实验证：星铁新增 9 条中文排期；原神 4 条既有英文排期在不改变 `remoteKey` 和时间窗的情况下原位更新为中文正式名称。后一次快路径只补充搜索 1 次，MCP 合并结果为新增 0、更新 4。
