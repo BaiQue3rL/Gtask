@@ -87,11 +87,12 @@ describe('Star Rail personal parsing', () => {
       expect.objectContaining({
         remoteKey: 'event:miyoushe:5001',
         category: 'limited_event',
-        title: '折纸小鸟对对碰',
-        progressPercent: 60,
-        completed: false
+        title: '折纸小鸟对对碰'
       })
     ]))
+    const event = items.find((item) => item.remoteKey === 'event:miyoushe:5001')!
+    expect(event).not.toHaveProperty('completed')
+    expect(event).not.toHaveProperty('progressPercent')
   })
 
   it('accepts numeric-string event timestamps and preserves events without a usable window', () => {
@@ -123,13 +124,15 @@ describe('Star Rail personal parsing', () => {
       }),
       expect.objectContaining({
         remoteKey: 'event:miyoushe:6002',
-        completed: true,
         startsAt: undefined,
         endsAt: undefined,
         periodKey: 'star-rail:event:6002',
         scheduleKind: undefined
       })
     ]))
+    const untimed = items.find((item) => item.remoteKey === 'event:miyoushe:6002')!
+    expect(untimed).not.toHaveProperty('completed')
+    expect(untimed).not.toHaveProperty('progressPercent')
   })
 
   it('does not reuse explicit or numeric completion for an event that has not started', () => {
@@ -147,10 +150,28 @@ describe('Star Rail personal parsing', () => {
       }
     }, new Date('2026-07-23T00:00:00.000Z'))
 
-    expect(items[0]).toMatchObject({
-      completed: false,
-      progressPercent: undefined
-    })
+    expect(items[0]).not.toHaveProperty('completed')
+    expect(items[0]).not.toHaveProperty('progressPercent')
+  })
+
+  it('does not treat ambiguous calendar finish fields as player completion', () => {
+    const items = parseStarRailPersonalData({
+      eventCalendar: {
+        act_list: [{
+          id: 6011,
+          name: '反贪「砖」家',
+          time_info: { start_ts: 1783905600, end_ts: 1787673540 },
+          all_finished: true,
+          act_status: 'OtherActStatusFinish',
+          current_progress: 10,
+          total_progress: 10
+        }]
+      }
+    }, new Date('2026-07-23T00:00:00.000Z'))
+
+    expect(items[0]).toMatchObject({ title: '反贪「砖」家' })
+    expect(items[0]).not.toHaveProperty('completed')
+    expect(items[0]).not.toHaveProperty('progressPercent')
   })
 
   it('treats full stars as completed when the endpoint omits a parseable last-floor marker', () => {

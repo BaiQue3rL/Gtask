@@ -115,6 +115,7 @@ export class AppDatabase {
       this.consolidateFixedWeeklyItems()
       this.archivePersonalSectionConflicts()
       this.archiveUntimedPersonalEvents()
+      this.normalizeSyncedProgressSafety()
       this.normalizeWeeklySchedules()
       this.resetDueWeeklyItems()
       this.markStaleSyncStates()
@@ -383,6 +384,18 @@ export class AppDatabase {
     if (allowedCategories) {
       const invalid = items.find((item) => !allowedCategories.includes(item.category))
       if (invalid) throw new Error(`当前任务只允许回写“${job.target}”版块数据`)
+    }
+    const invalidEventWindow = items.find((item) =>
+      item.category === 'limited_event' &&
+      (
+        !item.startsAt ||
+        !item.endsAt ||
+        !/(?:Z|[+-]\d{2}:?\d{2})$/i.test(item.startsAt) ||
+        !/(?:Z|[+-]\d{2}:?\d{2})$/i.test(item.endsAt)
+      )
+    )
+    if (invalidEventWindow) {
+      throw new Error(`限时活动“${invalidEventWindow.title}”缺少带时区的完整起止时间`)
     }
     const includesCycles = job.target === 'all' || job.target === 'cycles'
     if (includesCycles) {
@@ -823,6 +836,10 @@ export class AppDatabase {
         const remoteKey = item.remoteKey.trim()
         if (!remoteKey || remoteKey.length > 200) throw new Error('远端事项标识格式不正确')
         this.assertTimeWindow(item.startsAt ?? null, item.endsAt ?? null)
+        const startsInFuture =
+          item.category === 'limited_event' &&
+          Boolean(item.startsAt) &&
+          Date.parse(item.startsAt!) > Date.parse(syncedAt)
         if (seenRemoteKeys.has(remoteKey)) throw new Error(`同步数据包含重复标识：${remoteKey}`)
         seenRemoteKeys.add(remoteKey)
 
@@ -847,7 +864,8 @@ export class AppDatabase {
           const inferredCompletion = item.category === 'exploration' && item.progressPercent !== undefined
             ? item.progressPercent === 100
             : item.completed
-          const remoteCompleted = source === 'personal_sync' && inferredCompletion === true
+          const safeCompletion = startsInFuture ? false : inferredCompletion
+          const remoteCompleted = source === 'personal_sync' && safeCompletion === true
           this.database
             .prepare(`
               INSERT INTO checklist_items(
@@ -863,11 +881,11 @@ export class AppDatabase {
               item.category,
               item.title,
               remoteCompleted ? 1 : 0,
-              source === 'personal_sync'
-                ? item.progressPercent ?? null
-                : item.category === 'exploration'
-                  ? 0
-                  : null,
+              item.category === 'exploration'
+                ? source === 'personal_sync'
+                  ? item.progressPercent ?? null
+                  : 0
+                : null,
               item.parentTitle ?? null,
               item.startsAt ?? null,
               item.endsAt ?? null,
@@ -893,6 +911,7 @@ export class AppDatabase {
         const current = this.getChecklistItem(identity.id)
         const preservePublicSchedule =
           source === 'personal_sync' && current.source === 'public_schedule'
+        const resolvedCategory = preservePublicSchedule ? current.category : item.category
         const resolvedSource =
           source === 'public_schedule' || current.source === 'public_schedule'
             ? 'public_schedule'
@@ -903,13 +922,14 @@ export class AppDatabase {
         const inferredCompletion = item.category === 'exploration' && item.progressPercent !== undefined
           ? item.progressPercent === 100
           : item.completed
-        const acceptsRemoteCompletion = source === 'personal_sync' && inferredCompletion !== undefined
+        const safeCompletion = startsInFuture ? false : inferredCompletion
+        const acceptsRemoteCompletion = source === 'personal_sync' && safeCompletion !== undefined
         const completionProtected =
-          acceptsRemoteCompletion && inferredCompletion === false && manualCompletionLocked
+          acceptsRemoteCompletion && safeCompletion === false && manualCompletionLocked
         const completed = completionProtected
           ? currentCompleted
           : acceptsRemoteCompletion
-            ? inferredCompletion!
+            ? safeCompletion!
             : currentCompleted
         const completedAt = completed
           ? currentCompletedAt ?? syncedAt
@@ -948,12 +968,14 @@ export class AppDatabase {
             WHERE id = ? AND archived = 0
           `)
           .run(
-            preservePublicSchedule ? current.category : item.category,
+            resolvedCategory,
             preservePublicSchedule ? current.title : item.title,
             completed ? 1 : 0,
-            source === 'public_schedule' || item.progressPercent === undefined
-              ? current.progressPercent
-              : item.progressPercent,
+            resolvedCategory === 'exploration'
+              ? source === 'public_schedule' || item.progressPercent === undefined
+                ? current.progressPercent
+                : item.progressPercent
+              : null,
             item.parentTitle === undefined ? current.parentTitle : item.parentTitle,
             startsAt,
             endsAt,
@@ -1712,6 +1734,27 @@ export class AppDatabase {
         AND archived = 0
         AND (starts_at IS NULL OR ends_at IS NULL)
     `).run(new Date().toISOString())
+  }
+
+  private normalizeSyncedProgressSafety(reference = new Date()): void {
+    const now = reference.toISOString()
+    this.database.prepare(`
+      UPDATE checklist_items
+      SET completed = 0, completed_at = NULL, updated_at = ?
+      WHERE category = 'limited_event'
+        AND manual_completion_locked = 0
+        AND completed = 1
+        AND (
+          game_id = 'star-rail'
+          OR (starts_at IS NOT NULL AND julianday(starts_at) > julianday(?))
+        )
+    `).run(now, now)
+    this.database.prepare(`
+      UPDATE checklist_items
+      SET progress_percent = NULL, updated_at = ?
+      WHERE category <> 'exploration'
+        AND progress_percent IS NOT NULL
+    `).run(now)
   }
 
   private isPersistentChecklistId(id: string): boolean {

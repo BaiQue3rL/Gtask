@@ -82,23 +82,10 @@ export function parseStarRailEvents(value: unknown, reference = new Date()): Nor
     )
     const startsAt = hasValidWindow ? parsedStartsAt : undefined
     const endsAt = hasValidWindow ? parsedEndsAt : undefined
-    const current = finiteNumber(event.current_progress)
-    const total = finiteNumber(event.total_progress)
-    const hasStarted = !startsAt || Date.parse(startsAt) <= reference.getTime()
-    const progressPercent = hasStarted && current !== null && total !== null && total > 0
-      ? clampPercentage((current / total) * 100)
-      : undefined
-    const status = requiredOptionalString(event.act_status) ?? ''
-    const completed = hasStarted && (
-      event.all_finished === true ||
-      status === 'OtherActStatusFinish'
-    )
     return [{
       remoteKey: `event:miyoushe:${id}`,
       category: 'limited_event' as const,
       title: title.replaceAll('\\n', ' '),
-      completed,
-      progressPercent,
       startsAt,
       endsAt,
       periodKey: startsAt ? `star-rail:event:${id}:${startsAt}` : `star-rail:event:${id}`,

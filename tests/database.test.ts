@@ -397,7 +397,7 @@ describe('AppDatabase', () => {
       source: 'public_schedule',
       title: '深境螺旋',
       completed: true,
-      progressPercent: 100,
+      progressPercent: null,
       startsAt: '2026-07-16T20:00:00.000Z',
       sourceUrl: 'https://example.com/genshin/abyss',
       modeKey: 'abyss'
@@ -431,7 +431,7 @@ describe('AppDatabase', () => {
     expect(matches[0]).toMatchObject({
       title: '折纸小鸟对对碰',
       completed: true,
-      progressPercent: 100,
+      progressPercent: null,
       source: 'public_schedule',
       remoteKey: 'event:public:paper-bird'
     })
@@ -525,6 +525,73 @@ describe('AppDatabase', () => {
       expect(database.listChecklistItems(gameId)
         .filter((item) => item.category === 'limited_event')).toHaveLength(0)
     }
+  })
+
+  it('四款游戏的未来活动都不能被个人数据提前标记完成', () => {
+    database = new AppDatabase(':memory:')
+    const gameIds = ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const
+
+    for (const gameId of gameIds) {
+      database.mergeSyncedItems(gameId, 'personal_sync', [{
+        remoteKey: `event:future:${gameId}`,
+        category: 'limited_event',
+        title: `${gameId} 未来活动`,
+        startsAt: '2026-08-01T10:00:00+08:00',
+        endsAt: '2026-08-10T03:59:00+08:00',
+        completed: true,
+        progressPercent: 100
+      }], '2026-07-23T12:00:00.000Z')
+
+      expect(database.listChecklistItems(gameId)
+        .find((item) => item.remoteKey === `event:future:${gameId}`)).toMatchObject({
+          completed: false,
+          progressPercent: null
+        })
+    }
+  })
+
+  it('启动时清除星铁活动的自动误完成，但保留用户手动完成', () => {
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-task-manager-star-rail-completion-'))
+    const databasePath = join(temporaryDirectory, 'test.sqlite')
+    database = new AppDatabase(databasePath)
+    database.mergeSyncedItems('star-rail', 'public_schedule', [{
+      remoteKey: 'event:public:auto-wrong',
+      category: 'limited_event',
+      title: '接口误完成活动',
+      startsAt: '2026-07-15T11:00:00+08:00',
+      endsAt: '2026-08-26T03:59:00+08:00'
+    }])
+    database.mergeSyncedItems('star-rail', 'personal_sync', [{
+      remoteKey: 'event:personal:auto-wrong',
+      category: 'limited_event',
+      title: '接口误完成活动',
+      startsAt: '2026-07-15T11:00:00+08:00',
+      endsAt: '2026-08-26T03:59:00+08:00',
+      completed: true,
+      progressPercent: 100
+    }], '2026-07-23T12:00:00.000Z')
+    const automatic = database.listChecklistItems('star-rail')
+      .find((item) => item.title === '接口误完成活动')!
+    const manual = database.createChecklistItem({
+      gameId: 'star-rail',
+      category: 'limited_event',
+      title: '用户手动完成活动'
+    })
+    database.updateChecklistItem({ id: manual.id, completed: true })
+    database.close()
+
+    database = new AppDatabase(databasePath)
+    expect(database.listChecklistItems('star-rail')
+      .find((item) => item.id === automatic.id)).toMatchObject({
+        completed: false,
+        progressPercent: null,
+        manualCompletionLocked: false
+      })
+    expect(database.listChecklistItems('star-rail')
+      .find((item) => item.id === manual.id)).toMatchObject({
+        completed: true,
+        manualCompletionLocked: true
+      })
   })
 
   it('无时间个人条目只能补充公开资料已有活动并保留公开时间', () => {
@@ -694,7 +761,7 @@ describe('AppDatabase', () => {
       source: 'public_schedule',
       title: '式舆防卫战',
       completed: false,
-      progressPercent: 90,
+      progressPercent: null,
       startsAt: '2026-07-16T20:00:00.000Z',
       endsAt: '2026-08-01T19:59:59.999Z',
       sourceUrl: 'https://example.com/zenless/shiyu'
@@ -890,7 +957,9 @@ describe('AppDatabase', () => {
       [{
         remoteKey: 'event:test-public',
         category: 'limited_event',
-        title: '公开活动'
+        title: '公开活动',
+        startsAt: '2026-07-20T10:00:00+08:00',
+        endsAt: '2026-08-01T03:59:00+08:00'
       }],
       []
     )
@@ -920,6 +989,32 @@ describe('AppDatabase', () => {
       [{ remoteKey: 'map:natlan', category: 'exploration', title: '纳塔' }],
       []
     )).toThrow('只允许回写“events”版块')
+  })
+
+  it('AI 活动回写必须提供带时区的完整起止时间', () => {
+    database = new AppDatabase(':memory:')
+    database.registerAiScheduleAgent('agent-event-time', '活动时间测试 Agent')
+    const queued = database.createAiScheduleJob(
+      'star-rail',
+      'public_schedule',
+      new Date('2026-07-23T12:00:00.000Z'),
+      false,
+      'events'
+    )
+    database.claimAiScheduleJob('agent-event-time', new Date('2026-07-23T12:01:00.000Z'))
+
+    expect(() => database!.applyAiScheduleJob(
+      queued.id,
+      'agent-event-time',
+      [{
+        remoteKey: 'event:missing-timezone',
+        category: 'limited_event',
+        title: '时间不完整活动',
+        startsAt: '2026-07-24T10:00:00',
+        endsAt: '2026-08-03T03:59:00+08:00'
+      }],
+      []
+    )).toThrow('缺少带时区的完整起止时间')
   })
 
   it('原神周期同步必须同时包含三种挑战并自动补齐周常', () => {
@@ -1063,7 +1158,7 @@ describe('AppDatabase', () => {
       title: '幽境危战',
       source: 'public_schedule',
       completed: true,
-      progressPercent: 100,
+      progressPercent: null,
       remoteKey: 'official:hard-challenge:202607'
     })
   })
