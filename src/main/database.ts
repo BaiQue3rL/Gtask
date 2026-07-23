@@ -734,7 +734,8 @@ export class AppDatabase {
       SET status = 'pending', agent_id = NULL, claimed_at = NULL,
           progress_phase = 'queued', progress_current = NULL, progress_total = NULL,
           progress_updated_at = ?, message = 'Codex 超时，任务已重新排队', updated_at = ?
-      WHERE status = 'claimed' AND claimed_at < ?
+      WHERE status = 'claimed'
+        AND COALESCE(progress_updated_at, claimed_at) < ?
     `).run(now, now, threshold)
     return Number(result.changes)
   }

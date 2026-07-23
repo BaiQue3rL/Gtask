@@ -1019,6 +1019,50 @@ describe('AppDatabase', () => {
     expect(database.getSyncSettings('genshin').lastScope).toBe('public_and_personal')
   })
 
+  it('持续上报进度的 Codex 任务不会按最初接单时间误判超时', () => {
+    database = new AppDatabase(':memory:')
+    const queuedAt = new Date('2026-07-23T10:00:00.000Z')
+    database.registerAiScheduleAgent('long-running-agent', '长任务 Agent', queuedAt)
+    const queued = database.createAiScheduleJob(
+      'genshin',
+      'public_schedule',
+      queuedAt,
+      false,
+      'events'
+    )
+    database.claimAiScheduleJob('long-running-agent', queuedAt)
+    database.updateAiScheduleJobProgress(
+      queued.id,
+      'long-running-agent',
+      'verifying',
+      '仍在交叉核验来源',
+      4,
+      5,
+      new Date('2026-07-23T10:14:00.000Z')
+    )
+
+    expect(database.claimAiScheduleJob(
+      'long-running-agent',
+      new Date('2026-07-23T10:16:00.000Z')
+    )).toBeNull()
+    expect(database.getActiveAiScheduleJob('genshin')).toMatchObject({
+      id: queued.id,
+      status: 'claimed',
+      progressPhase: 'verifying',
+      progressCurrent: 4
+    })
+
+    expect(database.claimAiScheduleJob(
+      'long-running-agent',
+      new Date('2026-07-23T10:31:00.000Z')
+    )).toMatchObject({
+      id: queued.id,
+      status: 'claimed',
+      progressPhase: 'searching',
+      progressCurrent: 0
+    })
+  })
+
   it('公开排期回写后保留同轮个人数据需要验证的状态', () => {
     database = new AppDatabase(':memory:')
     database.registerAiScheduleAgent('agent-personal-state', '测试 Agent')
