@@ -11,7 +11,13 @@ const CATALOGS: Record<GameId, readonly CatalogEntry[]> = {
     entry('genshin:region:sumeru', '须弥', 'region-sumeru', 'https://ys.mihoyo.com/main/m/map'),
     entry('genshin:region:fontaine', '枫丹', 'region-fontaine', 'https://ys.mihoyo.com/main/m/map'),
     entry('genshin:region:natlan', '纳塔', 'region-natlan', 'https://ys.mihoyo.com/main/m/map'),
-    entry('genshin:region:nod-krai', '挪德卡莱', 'region-nod-krai', 'https://ys.mihoyo.com/main/m/map')
+    entry('genshin:region:nod-krai', '挪德卡莱', 'region-nod-krai', 'https://ys.mihoyo.com/main/m/map'),
+    entry('genshin:map:enkanomiya', '渊下宫', 'independent-map-enkanomiya', 'https://api-takumi.mihoyo.com/common/map_user/ys_obc/v1/map/list?app_sn=ys_obc', '稻妻'),
+    entry('genshin:map:chasm-underground', '层岩巨渊·地下矿区', 'independent-map-chasm-underground', 'https://api-takumi.mihoyo.com/common/map_user/ys_obc/v1/map/list?app_sn=ys_obc', '璃月'),
+    entry('genshin:map:sea-of-bygone-eras', '旧日之海', 'independent-map-sea-of-bygone-eras', 'https://api-takumi.mihoyo.com/common/map_user/ys_obc/v1/map/list?app_sn=ys_obc', '枫丹'),
+    entry('genshin:map:ancient-sacred-mountain', '远古圣山', 'independent-map-ancient-sacred-mountain', 'https://api-takumi.mihoyo.com/common/map_user/ys_obc/v1/map/list?app_sn=ys_obc', '纳塔'),
+    entry('genshin:map:celestial-temple', '空之神殿', 'independent-map-celestial-temple', 'https://api-takumi.mihoyo.com/common/map_user/ys_obc/v1/map/list?app_sn=ys_obc', '挪德卡莱'),
+    entry('genshin:map:frostmoon', '霜月', 'independent-map-frostmoon', 'https://api-takumi.mihoyo.com/common/map_user/ys_obc/v1/map/list?app_sn=ys_obc', '挪德卡莱')
   ],
   'star-rail': [
     entry('star-rail:destination:herta-space-station', '空间站「黑塔」', 'destination-herta-space-station', 'https://sr.mihoyo.com/main?nav=world'),

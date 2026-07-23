@@ -83,6 +83,65 @@ describe('Genshin personal parsing', () => {
     ]))
   })
 
+  it('按 parent_id 建立地图父子关系，并只在全部子区域满探索时修正零值父项', () => {
+    const items = parseGenshinPersonalData({
+      profile: {
+        world_explorations: [
+          {
+            id: 10,
+            parent_id: 0,
+            name: '沉玉谷',
+            exploration_percentage: 0,
+            area_exploration_list: [
+              { name: '遗珑埠', exploration_percentage: 1000 }
+            ]
+          },
+          { id: 11, parent_id: 10, name: '来歆山', exploration_percentage: 1000 },
+          { id: 12, parent_id: 10, name: '沉玉谷·南陵', exploration_percentage: 1000 },
+          { id: 13, parent_id: 10, name: '沉玉谷·上谷', exploration_percentage: 1000 }
+        ]
+      }
+    })
+
+    expect(items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        remoteKey: 'exploration:world:10',
+        title: '沉玉谷',
+        progressPercent: 100,
+        completed: true,
+        parentTitle: '世界探索'
+      }),
+      expect.objectContaining({
+        remoteKey: 'exploration:world:11',
+        title: '来歆山',
+        progressPercent: 100,
+        parentTitle: '沉玉谷'
+      }),
+      expect.objectContaining({
+        title: '遗珑埠',
+        progressPercent: 100,
+        parentTitle: '沉玉谷'
+      })
+    ]))
+  })
+
+  it('父区域零值且子区域未全满时不伪造平均探索度', () => {
+    const items = parseGenshinPersonalData({
+      profile: {
+        world_explorations: [
+          { id: 20, parent_id: 0, name: '测试父区域', exploration_percentage: 0 },
+          { id: 21, parent_id: 20, name: '测试子区域甲', exploration_percentage: 1000 },
+          { id: 22, parent_id: 20, name: '测试子区域乙', exploration_percentage: 500 }
+        ]
+      }
+    })
+
+    expect(items.find((item) => item.remoteKey === 'exploration:world:20')).toMatchObject({
+      progressPercent: null,
+      completed: false
+    })
+  })
+
   it('活动时间兼容数字字符串，并在无效时保留进度但不写错误倒计时', () => {
     const items = parseGenshinPersonalData({
       eventCalendar: {

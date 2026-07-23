@@ -22,6 +22,18 @@ describe('bundled exploration catalog', () => {
     }
   })
 
+  it('原神基础目录覆盖官方互动地图当前独立地图层', () => {
+    const titles = getBundledExplorationCatalog('genshin').map((item) => item.title)
+    expect(titles).toEqual(expect.arrayContaining([
+      '渊下宫',
+      '层岩巨渊·地下矿区',
+      '旧日之海',
+      '远古圣山',
+      '空之神殿',
+      '霜月'
+    ]))
+  })
+
   it('initializes regions once and remains append/update safe on repeated refresh', () => {
     const database = new AppDatabase(':memory:')
     databases.push(database)
@@ -52,5 +64,16 @@ describe('bundled exploration catalog', () => {
     database.mergeSyncedItems('genshin', 'public_schedule', catalog)
     expect(database.listChecklistItems('genshin').find((item) => item.title === '蒙德'))
       .toMatchObject({ progressPercent: 65, completed: false })
+
+    database.mergeSyncedItems('genshin', 'personal_sync', [{
+      remoteKey: 'exploration:world:14',
+      category: 'exploration',
+      title: '旧日之海',
+      modeKey: 'world-exploration-14',
+      progressPercent: 100
+    }])
+    database.mergeSyncedItems('genshin', 'public_schedule', catalog)
+    expect(database.listChecklistItems('genshin').filter((item) => item.title === '旧日之海'))
+      .toEqual([expect.objectContaining({ progressPercent: 100, completed: true })])
   })
 })

@@ -82,21 +82,79 @@ export function parseExplorations(value: unknown): NormalizedSyncItem[] {
   const explorations = Array.isArray(root.world_explorations)
     ? root.world_explorations.filter(isRecord)
     : []
-  return explorations.map((exploration) => {
+  const parsed = explorations.map((exploration) => {
     const id = requiredIdentifier(exploration.id, '探索区域 id')
     const title = requiredString(exploration.name, '探索区域名称')
     const rawProgress = requiredNumber(exploration.exploration_percentage, `${title} 探索度`)
-    const progressPercent = clampPercentage(rawProgress / 10)
+    const parentId = optionalIdentifier(exploration.parent_id)
+    const areas = Array.isArray(exploration.area_exploration_list)
+      ? exploration.area_exploration_list.filter(isRecord)
+      : []
+    return { id, title, rawProgress, parentId, areas }
+  })
+  const byId = new Map(parsed.map((exploration) => [exploration.id, exploration]))
+  const childrenByParent = new Map<string, typeof parsed>()
+  for (const exploration of parsed) {
+    if (!exploration.parentId || !byId.has(exploration.parentId)) continue
+    const children = childrenByParent.get(exploration.parentId) ?? []
+    children.push(exploration)
+    childrenByParent.set(exploration.parentId, children)
+  }
+
+  const items = parsed.map((exploration): NormalizedSyncItem => {
+    const children = childrenByParent.get(exploration.id) ?? []
+    const progressPercent = resolveExplorationProgress(exploration.rawProgress, children)
+    const parent = exploration.parentId ? byId.get(exploration.parentId) : undefined
     return {
-      remoteKey: `exploration:world:${id}`,
+      remoteKey: `exploration:world:${exploration.id}`,
       category: 'exploration',
-      title,
-      completed: progressPercent >= 100,
+      title: exploration.title,
+      completed: progressPercent === 100,
       progressPercent,
-      parentTitle: '世界探索',
-      modeKey: `world-exploration-${id}`
+      parentTitle: parent?.title ?? '世界探索',
+      modeKey: `world-exploration-${exploration.id}`
     }
   })
+
+  const worldTitles = new Set(parsed.map((exploration) => normalizeExplorationTitle(exploration.title)))
+  for (const exploration of parsed) {
+    for (const area of exploration.areas) {
+      const title = requiredString(area.name, `${exploration.title}子区域名称`)
+      const normalizedTitle = normalizeExplorationTitle(title)
+      if (worldTitles.has(normalizedTitle)) continue
+      const rawProgress = requiredNumber(
+        area.exploration_percentage,
+        `${exploration.title}·${title} 探索度`
+      )
+      const progressPercent = clampPercentage(rawProgress / 10)
+      items.push({
+        remoteKey: `exploration:world:${exploration.id}:area:${encodeURIComponent(normalizedTitle)}`,
+        category: 'exploration',
+        title,
+        completed: progressPercent === 100,
+        progressPercent,
+        parentTitle: exploration.title,
+        modeKey: `world-exploration-${exploration.id}-area-${encodeURIComponent(normalizedTitle)}`
+      })
+      worldTitles.add(normalizedTitle)
+    }
+  }
+  return items
+}
+
+function resolveExplorationProgress(
+  rawProgress: number,
+  children: Array<{ rawProgress: number }>
+): number | null {
+  const directProgress = clampPercentage(rawProgress / 10)
+  if (directProgress > 0 || children.length === 0) return directProgress
+  if (children.every((child) => clampPercentage(child.rawProgress / 10) === 100)) return 100
+  if (children.some((child) => clampPercentage(child.rawProgress / 10) > 0)) return null
+  return 0
+}
+
+function normalizeExplorationTitle(value: string): string {
+  return value.normalize('NFKC').trim().replace(/\s+/g, '')
 }
 
 export function parseSpiralAbyss(value: unknown): NormalizedSyncItem {
@@ -226,6 +284,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function requiredIdentifier(value: unknown, field: string): string {
   if ((typeof value !== 'string' && typeof value !== 'number') || !String(value).trim()) {
     throw new Error(`原神个人数据缺少 ${field}`)
+  }
+  return String(value)
+}
+
+function optionalIdentifier(value: unknown): string | null {
+  if ((typeof value !== 'string' && typeof value !== 'number') || !String(value).trim()) {
+    return null
   }
   return String(value)
 }
