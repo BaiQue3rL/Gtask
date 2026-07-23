@@ -123,7 +123,6 @@ const saving = ref(false)
 const errorMessage = ref('')
 const selectedGameId = ref<GameId>('genshin')
 const showIncompleteOnly = ref(false)
-const refreshMenuOpen = ref(false)
 const sectionSyncMenuOpen = ref<ChecklistSection | null>(null)
 const syncing = ref(false)
 const syncSettings = ref<SyncSettings | null>(null)
@@ -292,7 +291,6 @@ function handleGlobalKeydown(event: KeyboardEvent): void {
     void closeMiyousheLogin()
     return
   }
-  refreshMenuOpen.value = false
   sectionSyncMenuOpen.value = null
   editorOpen.value = false
   recycleBinOpen.value = false
@@ -301,7 +299,6 @@ function handleGlobalKeydown(event: KeyboardEvent): void {
 
 watch(selectedGameId, () => {
   syncNotice.value = null
-  refreshMenuOpen.value = false
   sectionSyncMenuOpen.value = null
   recycleBinOpen.value = false
   void Promise.all([
@@ -544,7 +541,6 @@ async function openCodexPlugin(): Promise<void> {
 
 async function runSync(scope: SyncScope, target: SyncTarget = 'all'): Promise<void> {
   const gameId = selectedGameId.value
-  refreshMenuOpen.value = false
   sectionSyncMenuOpen.value = null
   syncing.value = true
   syncNotice.value = null
@@ -563,7 +559,6 @@ async function runSync(scope: SyncScope, target: SyncTarget = 'all'): Promise<vo
 
 async function runPersonalSync(target: SyncTarget = 'all'): Promise<void> {
   const gameId = selectedGameId.value
-  refreshMenuOpen.value = false
   sectionSyncMenuOpen.value = null
   syncing.value = true
   syncNotice.value = null
@@ -782,7 +777,7 @@ function showError(error: unknown): void {
 </script>
 
 <template>
-  <main class="app-shell" @click="refreshMenuOpen = false">
+  <main class="app-shell" @click="sectionSyncMenuOpen = null">
     <aside class="sidebar">
       <div class="brand"><span class="brand-mark">✦</span>幻游清单</div>
       <button class="overview active" type="button"><span>▦</span>总览</button>
@@ -823,26 +818,19 @@ function showError(error: unknown): void {
           >
             ◇ 只看未完成
           </button>
-          <div class="dropdown" @click.stop>
-            <button
-              class="toolbar-button"
-              type="button"
-                :disabled="syncing"
-                :title="aiScheduleAgent?.connected
-                  ? `已连接 ${aiScheduleAgent.name}`
-                  : aiScheduleAgent?.codexPluginInstalled
-                    ? '已安装 Codex 插件；同步清单后请在 Codex 处理资料任务'
-                    : '同步清单需要连接 Codex/MCP'"
-              aria-haspopup="menu"
-              :aria-expanded="refreshMenuOpen"
-              @click="refreshMenuOpen = !refreshMenuOpen"
-            >
-                {{ syncing ? '同步中…' : aiScheduleAvailable ? '↻ 刷新清单' : '↻ 未连接 AI' }} ▾
-            </button>
-            <div v-if="refreshMenuOpen" class="dropdown-menu" role="menu">
-              <button role="menuitem" type="button" :disabled="!aiScheduleAvailable" @click="runSync('public_schedule')">同步清单</button>
-            </div>
-          </div>
+          <button
+            class="toolbar-button"
+            type="button"
+            :disabled="syncing || !aiScheduleAvailable"
+            :title="aiScheduleAgent?.connected
+              ? `已连接 ${aiScheduleAgent.name}`
+              : aiScheduleAgent?.codexPluginInstalled
+                ? '已安装 Codex 插件；点击后在 Codex 处理资料任务'
+                : '刷新清单需要连接 Codex/MCP'"
+            @click="runSync('public_schedule')"
+          >
+            {{ syncing ? '同步中…' : aiScheduleAvailable ? '↻ 刷新清单' : '↻ 未连接 AI' }}
+          </button>
           <span
             class="sync-indicator"
             :class="{ synced: Boolean(globalSyncState?.lastSuccessAt) }"

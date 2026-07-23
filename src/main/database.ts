@@ -530,9 +530,15 @@ export class AppDatabase {
         ORDER BY
           completed ASC,
           CASE
-            WHEN completed = 0
-              AND ends_at IS NOT NULL
-              AND julianday(ends_at) BETWEEN julianday('now') AND julianday('now', '+1 day')
+            WHEN completed = 1 THEN 5
+            WHEN starts_at IS NOT NULL
+              AND julianday(starts_at) > julianday('now')
+            THEN 3
+            WHEN ends_at IS NOT NULL
+              AND julianday(ends_at) <= julianday('now')
+            THEN 4
+            WHEN ends_at IS NOT NULL
+              AND julianday(ends_at) <= julianday('now', '+1 day')
             THEN 0
             ELSE 1
           END,
@@ -546,8 +552,14 @@ export class AppDatabase {
             WHEN 'exploration' THEN 70
             ELSE 80
           END,
-          CASE WHEN ends_at IS NULL THEN 1 ELSE 0 END,
-          ends_at ASC,
+          CASE
+            WHEN starts_at IS NOT NULL AND julianday(starts_at) > julianday('now')
+            THEN starts_at
+          END ASC,
+          CASE
+            WHEN starts_at IS NULL OR julianday(starts_at) <= julianday('now')
+            THEN ends_at
+          END ASC,
           created_at ASC
       `)
       .all(gameId) as unknown[]

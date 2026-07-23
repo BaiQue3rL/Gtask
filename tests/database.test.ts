@@ -191,12 +191,19 @@ describe('AppDatabase', () => {
       title: '未完成的最后一天活动',
       endsAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString()
     })
+    const upcoming = database.createChecklistItem({
+      gameId: 'genshin',
+      category: 'limited_event',
+      title: '即将开始但尚未开放的活动',
+      startsAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      endsAt: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString()
+    })
 
     const eventIds = database
       .listChecklistItems('genshin')
       .filter((item) => item.category === 'limited_event' || item.category === 'permanent_event')
       .map((item) => item.id)
-    expect(eventIds).toEqual([pendingUrgent.id, normal.id, urgent.id])
+    expect(eventIds).toEqual([pendingUrgent.id, normal.id, upcoming.id, urgent.id])
   })
 
   it('挑战事项到期后不再自动重置完成状态', () => {
