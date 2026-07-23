@@ -2,4 +2,3 @@ allowBuilds:
   electron: true
   electron-winstaller: true
   esbuild: true
-  tesseract.js: true

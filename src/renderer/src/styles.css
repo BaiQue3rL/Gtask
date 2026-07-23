@@ -159,22 +159,6 @@ h2 { margin: 0; font-size: 19px; }
 .modal-actions button { padding: 9px 15px; border-radius: 7px; cursor: pointer; }
 .danger-button { border: 1px solid #874945; color: #ff9388; background: transparent; }
 .danger-button.compact { padding: 7px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; }
-.image-import-modal { width: min(820px, 100%); max-height: calc(100vh - 50px); overflow-y: auto; }
-.local-import-target-modal { width: min(440px, 100%); }
-.local-import-targets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.local-import-targets button { padding: 12px 10px; border-radius: 7px; cursor: pointer; }
-.image-import-hint { margin: -6px 0 14px; color: #8198b5; font-size: 12px; line-height: 1.6; }
-.image-import-timezone { display: grid; grid-template-columns: minmax(0, 1fr) 180px; gap: 16px; align-items: end; margin-bottom: 14px; }
-.image-import-timezone .image-import-hint { margin: 0; }
-.image-import-timezone label { margin: 0; }
-.image-import-list { display: grid; gap: 10px; }
-.image-import-row { padding: 12px; border: 1px solid #2e4b6d; border-radius: 9px; background: rgba(11, 33, 61, 0.66); }
-.image-import-row-head { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
-.image-import-row .form-grid label { margin-top: 10px; }
-.image-import-warning { margin: 8px 0 0; color: #d6ad55; font-size: 11px; }
-.ocr-raw-text { margin-top: 14px; color: #8ca3bf; font-size: 12px; }
-.ocr-raw-text summary { cursor: pointer; }
-.ocr-raw-text textarea { width: 100%; margin-top: 8px; padding: 10px; resize: vertical; border: 1px solid #304e70; border-radius: 7px; color: #aebfd3; background: #07172c; font: 12px/1.6 Consolas, monospace; }
 .secondary-button { border: 1px solid #3d5878; color: #b3c2d5; background: transparent; }
 .primary-button { border: 1px solid #5b91d5; color: white; background: #245eaa; }
 .primary-button:disabled { cursor: not-allowed; opacity: 0.45; }
