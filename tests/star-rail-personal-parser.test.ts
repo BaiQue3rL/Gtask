@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { StarRailPersonalAdapter } from '../src/main/sync/star-rail-personal-adapter'
-import { parseStarRailPersonalData } from '../src/main/sync/star-rail-personal-parser'
+import {
+  extractStarRailEventReviewCandidates,
+  parseStarRailPersonalData
+} from '../src/main/sync/star-rail-personal-parser'
 
 const season = (scheduleId: number, name: string) => ({
   schedule_id: scheduleId,
@@ -174,6 +177,38 @@ describe('Star Rail personal parsing', () => {
     expect(items[0]).not.toHaveProperty('progressPercent')
   })
 
+  it('只把活动必要字段脱敏后送入 Codex 核验候选', () => {
+    const candidates = extractStarRailEventReviewCandidates({
+      uid: '不应读取',
+      act_list: [{
+        id: 6011,
+        name: '反贪「砖」家',
+        time_info: { start_ts: 1783905600, end_ts: 1787673540 },
+        all_finished: true,
+        act_status: 'OtherActStatusFinish',
+        current_progress: 10,
+        total_progress: 10
+      }]
+    })
+
+    expect(candidates).toEqual([expect.objectContaining({
+      target: 'events',
+      kind: 'personal-item-semantics',
+      payload: expect.objectContaining({
+        officialEventId: '6011',
+        title: '反贪「砖」家',
+        observedStatus: {
+          allFinished: true,
+          actStatus: 'OtherActStatusFinish',
+          currentProgress: 10,
+          totalProgress: 10
+        }
+      })
+    })])
+    expect(JSON.stringify(candidates)).not.toContain('不应读取')
+    expect(JSON.stringify(candidates)).not.toContain('uid')
+  })
+
   it('treats full stars as completed when the endpoint omits a parseable last-floor marker', () => {
     const items = parseStarRailPersonalData({
       pureFiction: {
@@ -204,13 +239,15 @@ describe('Star Rail personal parsing', () => {
     const adapter = new StarRailPersonalAdapter(client)
 
     const result = await adapter.sync('star-rail')
-    expect(order).toEqual(['memory', 'fiction', 'shadow', 'arbitration'])
+    expect(order).toEqual(['memory', 'fiction', 'shadow', 'arbitration', 'events'])
     expect(result.items).toHaveLength(4)
+    expect(result.reviewCandidates).toHaveLength(1)
     order.length = 0
     const eventsOnly = await adapter.sync('star-rail', 'events')
-    expect(order).toEqual([])
+    expect(order).toEqual(['events'])
     expect(eventsOnly.items).toEqual([])
-    expect(eventsOnly.message).toContain('已跳过')
+    expect(eventsOnly.reviewCandidates).toHaveLength(1)
+    expect(eventsOnly.message).toContain('等待 Codex 核验')
     order.length = 0
     const exploration = await adapter.sync('star-rail', 'exploration')
     expect(order).toEqual([])

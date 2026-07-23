@@ -2,7 +2,7 @@ import type { GameId, PersonalSyncTarget } from '../../shared/contracts'
 
 const PERSONAL_SYNC_TARGETS: Record<GameId, readonly PersonalSyncTarget[]> = {
   genshin: ['events', 'cycles', 'exploration'],
-  'star-rail': ['cycles'],
+  'star-rail': ['events', 'cycles'],
   zenless: ['events', 'cycles'],
   'wuthering-waves': []
 }

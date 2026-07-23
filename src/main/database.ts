@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { backup, DatabaseSync } from 'node:sqlite'
 import { getWeeklyPeriod } from './periods'
 import type {
@@ -12,6 +12,8 @@ import type {
   CreateChecklistItemInput,
   GameId,
   GameSummary,
+  PersonalSyncTarget,
+  SemanticReviewCandidate,
   SyncScope,
   SyncTarget,
   SyncTargetState,
@@ -19,7 +21,7 @@ import type {
   SyncStatus,
   UpdateChecklistItemInput
 } from '../shared/contracts'
-import type { NormalizedSyncItem, SyncMergeResult } from './sync/types'
+import type { NormalizedSyncItem, SemanticReviewDraft, SyncMergeResult } from './sync/types'
 
 const DEFAULT_GAMES: GameSummary[] = [
   {
@@ -56,10 +58,38 @@ const DEFAULT_GAMES: GameSummary[] = [
   }
 ]
 
-export const CURRENT_SCHEMA_VERSION = 11
+export const CURRENT_SCHEMA_VERSION = 12
 
 const AI_AGENT_MAX_AGE_MS = 5 * 60 * 1000
 const AI_JOB_CLAIM_MAX_AGE_MS = 15 * 60 * 1000
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${stableJson(entry)}`)
+      .join(',')}}`
+  }
+  return JSON.stringify(value) ?? 'null'
+}
+
+function assertSanitizedSemanticPayload(value: unknown, path = 'payload'): void {
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => assertSanitizedSemanticPayload(entry, `${path}[${index}]`))
+    return
+  }
+  if (!value || typeof value !== 'object') return
+  const forbidden = new Set([
+    'cookie', 'token', 'authorization', 'password', 'secret', 'uid',
+    'roleid', 'accountid', 'phone', 'email'
+  ])
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    const normalizedKey = key.toLocaleLowerCase('en-US').replace(/[^a-z0-9]/g, '')
+    if (forbidden.has(normalizedKey)) throw new Error(`语义核验数据禁止包含敏感字段：${path}.${key}`)
+    assertSanitizedSemanticPayload(entry, `${path}.${key}`)
+  }
+}
 
 function normalizeSyncedEventTitle(title: string): string {
   return title.normalize('NFKC').toLocaleLowerCase('zh-CN').replace(/[\s\p{P}\p{S}]+/gu, '')
@@ -291,6 +321,174 @@ export class AppDatabase {
       name: null,
       lastSeenAt: null
     }
+  }
+
+  queueSemanticReviewCandidates(
+    gameId: GameId,
+    source: 'public_schedule' | 'personal_sync',
+    drafts: SemanticReviewDraft[],
+    reference = new Date()
+  ): { queued: number; pending: number } {
+    if (drafts.length > 200) throw new Error('单次语义核验候选不能超过 200 条')
+    const now = reference.toISOString()
+    const fingerprints: string[] = []
+    let queued = 0
+    this.runTransaction(() => {
+      for (const draft of drafts) {
+        if (!['events', 'cycles', 'exploration'].includes(draft.target)) {
+          throw new Error('语义核验候选版块不受支持')
+        }
+        if (!draft.kind.trim() || draft.kind.length > 100) throw new Error('语义核验类型格式不正确')
+        assertSanitizedSemanticPayload(draft.payload)
+        const payloadJson = stableJson(draft.payload)
+        if (payloadJson.length > 20_000) throw new Error('语义核验候选内容过大')
+        const fingerprint = createHash('sha256')
+          .update(`${gameId}|${source}|${draft.target}|${draft.kind}|${payloadJson}`)
+          .digest('hex')
+        fingerprints.push(fingerprint)
+        const result = this.database.prepare(`
+          INSERT OR IGNORE INTO semantic_review_candidates(
+            id, fingerprint, game_id, source, target, kind, status,
+            payload_json, requested_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+        `).run(
+          randomUUID(),
+          fingerprint,
+          gameId,
+          source,
+          draft.target,
+          draft.kind.trim(),
+          payloadJson,
+          now,
+          now
+        )
+        queued += Number(result.changes)
+      }
+    })
+    if (fingerprints.length === 0) return { queued: 0, pending: 0 }
+    const placeholders = fingerprints.map(() => '?').join(', ')
+    const row = this.database.prepare(`
+      SELECT COUNT(*) AS count
+      FROM semantic_review_candidates
+      WHERE fingerprint IN (${placeholders})
+        AND status IN ('pending', 'claimed')
+    `).get(...fingerprints) as { count: number }
+    return { queued, pending: Number(row.count) }
+  }
+
+  claimSemanticReviewCandidate(
+    agentId: string,
+    reference = new Date()
+  ): SemanticReviewCandidate | null {
+    return this.runTransaction(() => {
+      const agent = this.database.prepare('SELECT name FROM ai_schedule_agents WHERE id = ?').get(agentId)
+      if (!agent) throw new Error('AI 资料 Agent 尚未登记')
+      const now = reference.toISOString()
+      this.database.prepare(`
+        UPDATE ai_schedule_agents SET last_seen_at = ?, updated_at = ? WHERE id = ?
+      `).run(now, now, agentId)
+      const staleBefore = new Date(reference.getTime() - AI_JOB_CLAIM_MAX_AGE_MS).toISOString()
+      this.database.prepare(`
+        UPDATE semantic_review_candidates
+        SET status = 'pending', agent_id = NULL, claimed_at = NULL,
+            message = 'Agent 超时，候选已重新排队', updated_at = ?
+        WHERE status = 'claimed' AND claimed_at < ?
+      `).run(now, staleBefore)
+      const pending = this.database.prepare(`
+        SELECT id FROM semantic_review_candidates
+        WHERE status = 'pending'
+        ORDER BY requested_at ASC
+        LIMIT 1
+      `).get() as { id: string } | undefined
+      if (!pending) return null
+      this.database.prepare(`
+        UPDATE semantic_review_candidates
+        SET status = 'claimed', agent_id = ?, claimed_at = ?, updated_at = ?
+        WHERE id = ? AND status = 'pending'
+      `).run(agentId, now, now, pending.id)
+      return this.getSemanticReviewCandidate(pending.id)
+    })
+  }
+
+  approveSemanticReviewCandidate(
+    id: string,
+    agentId: string,
+    item: NormalizedSyncItem,
+    confidence: number,
+    evidence: unknown,
+    reference = new Date()
+  ): { candidate: SemanticReviewCandidate; merge: SyncMergeResult } {
+    if (confidence < 0.9 || confidence > 1) throw new Error('语义核验置信度不足，不能写入正式清单')
+    const candidate = this.getSemanticReviewCandidate(id)
+    if (candidate.status !== 'claimed' || candidate.agentId !== agentId) {
+      throw new Error('语义核验候选未由当前 Agent 领取或已经结束')
+    }
+    const allowedCategories: Record<PersonalSyncTarget, ChecklistCategory[]> = {
+      events: ['limited_event', 'permanent_event'],
+      cycles: ['weekly', 'endgame'],
+      exploration: ['exploration']
+    }
+    if (!allowedCategories[candidate.target].includes(item.category)) {
+      throw new Error('Codex 核验结果与候选版块不一致')
+    }
+    return this.runTransaction(() => {
+      const merge = this.mergeSyncedItems(
+        candidate.gameId,
+        candidate.source,
+        [item],
+        reference.toISOString(),
+        false
+      )
+      const now = reference.toISOString()
+      this.database.prepare(`
+        UPDATE semantic_review_candidates
+        SET status = 'approved', completed_at = ?, decision_json = ?,
+            evidence_json = ?, message = 'Codex 核验通过并已安全写入', updated_at = ?
+        WHERE id = ? AND status = 'claimed' AND agent_id = ?
+      `).run(
+        now,
+        JSON.stringify({ item, confidence }),
+        JSON.stringify(evidence),
+        now,
+        id,
+        agentId
+      )
+      return { candidate: this.getSemanticReviewCandidate(id), merge }
+    })
+  }
+
+  rejectSemanticReviewCandidate(
+    id: string,
+    agentId: string,
+    message: string,
+    evidence: unknown,
+    reference = new Date()
+  ): SemanticReviewCandidate {
+    if (!message.trim()) throw new Error('拒绝原因不能为空')
+    const now = reference.toISOString()
+    const result = this.database.prepare(`
+      UPDATE semantic_review_candidates
+      SET status = 'rejected', completed_at = ?, evidence_json = ?,
+          message = ?, updated_at = ?
+      WHERE id = ? AND status = 'claimed' AND agent_id = ?
+    `).run(now, JSON.stringify(evidence), message.trim(), now, id, agentId)
+    if (result.changes === 0) throw new Error('语义核验候选未由当前 Agent 领取或已经结束')
+    return this.getSemanticReviewCandidate(id)
+  }
+
+  private getSemanticReviewCandidate(id: string): SemanticReviewCandidate {
+    const row = this.database.prepare(`
+      SELECT c.id, c.game_id AS gameId, c.source, c.target, c.kind, c.status,
+        c.payload_json AS payloadJson, c.requested_at AS requestedAt,
+        c.claimed_at AS claimedAt, c.completed_at AS completedAt,
+        c.agent_id AS agentId, a.name AS agentName, c.message
+      FROM semantic_review_candidates c
+      LEFT JOIN ai_schedule_agents a ON a.id = c.agent_id
+      WHERE c.id = ?
+    `).get(id) as (Omit<SemanticReviewCandidate, 'payload'> & { payloadJson: string }) | undefined
+    if (!row) throw new Error('语义核验候选不存在')
+    const { payloadJson, ...candidate } = row
+    return { ...candidate, payload: JSON.parse(payloadJson) as Record<string, unknown> }
   }
 
   createAiScheduleJob(
@@ -821,12 +1019,13 @@ export class AppDatabase {
     gameId: GameId,
     source: Exclude<ChecklistSource, 'manual'>,
     items: NormalizedSyncItem[],
-    syncedAt = new Date().toISOString()
+    syncedAt = new Date().toISOString(),
+    manageTransaction = true
   ): SyncMergeResult {
     const result: SyncMergeResult = { added: 0, updated: 0, preserved: 0 }
     const seenRemoteKeys = new Set<string>()
 
-    this.database.exec('BEGIN IMMEDIATE')
+    if (manageTransaction) this.database.exec('BEGIN IMMEDIATE')
     try {
       for (const item of items) {
         if (source === 'personal_sync' && isPersonalSectionConflict(gameId, item)) {
@@ -1025,10 +1224,10 @@ export class AppDatabase {
         }
         if (completionProtected) result.preserved += 1
       }
-      this.database.exec('COMMIT')
+      if (manageTransaction) this.database.exec('COMMIT')
       return result
     } catch (error) {
-      this.database.exec('ROLLBACK')
+      if (manageTransaction) this.database.exec('ROLLBACK')
       throw error
     }
   }
@@ -1585,6 +1784,38 @@ export class AppDatabase {
           WHERE status = 'completed' AND target IN ('all', 'exploration') AND completed_at IS NOT NULL
           GROUP BY game_id;
         INSERT INTO schema_migrations(version) VALUES (11);
+        COMMIT;
+      `)
+    }
+
+    const migration12 = this.database
+      .prepare('SELECT version FROM schema_migrations WHERE version = 12')
+      .get()
+
+    if (!migration12) {
+      this.database.exec(`
+        BEGIN;
+        CREATE TABLE semantic_review_candidates (
+          id TEXT PRIMARY KEY,
+          fingerprint TEXT NOT NULL UNIQUE,
+          game_id TEXT NOT NULL REFERENCES games(id) ON DELETE RESTRICT,
+          source TEXT NOT NULL CHECK (source IN ('public_schedule', 'personal_sync')),
+          target TEXT NOT NULL CHECK (target IN ('events', 'cycles', 'exploration')),
+          kind TEXT NOT NULL,
+          status TEXT NOT NULL CHECK (status IN ('pending', 'claimed', 'approved', 'rejected')),
+          payload_json TEXT NOT NULL,
+          decision_json TEXT,
+          evidence_json TEXT,
+          requested_at TEXT NOT NULL,
+          claimed_at TEXT,
+          completed_at TEXT,
+          agent_id TEXT REFERENCES ai_schedule_agents(id) ON DELETE SET NULL,
+          message TEXT,
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX semantic_review_candidates_pending
+          ON semantic_review_candidates(status, requested_at);
+        INSERT INTO schema_migrations(version) VALUES (12);
         COMMIT;
       `)
     }

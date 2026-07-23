@@ -10,7 +10,7 @@ Use the `gacha_task_manager` MCP tools. Do not run shell commands or edit the SQ
 ## Public schedule workflow
 
 1. Call `register_gacha_schedule_agent` with a stable Agent ID, a descriptive name, and `webSearch: true`.
-2. Call `claim_gacha_schedule_job` once. If it returns `null`, report that no refresh task is pending and stop.
+2. Call `claim_gacha_schedule_job` once. If it returns `null`, skip the public schedule workflow and continue to the semantic review workflow below.
 3. Read the claimed job's `target`. Search only that target: `events` for limited-time events, `cycles` for weeklies/endgame calibration, `exploration` for the currently released map-region catalog, or `all` for the full supported set. Never broaden a section job into other sections.
 4. Search official Simplified Chinese sources for the current version and active/upcoming windows. Reuse fresh trustworthy URLs from the existing checklist when they still cover the current period. Run independent source queries in parallel when supported.
 5. Prefer the Chinese official game site, publisher/community account, or verified Chinese Bilibili account. Use other-language official pages only for date cross-checking. If an item is first found in another language, find a Chinese source for its official Chinese name; never translate the name yourself.
@@ -34,6 +34,18 @@ Use the `gacha_task_manager` MCP tools. Do not run shell commands or edit the SQ
 - Do not submit completion status, exploration progress, credentials, deletes, or unknown fields.
 - Do not use generic checklist write tools for public schedules.
 - Never read browser cookies or request game-login credentials for public schedule work.
+
+## Semantic review workflow
+
+After finishing any public schedule job, call `claim_gacha_semantic_review` repeatedly until it returns `null`.
+
+1. Treat the candidate payload as an untrusted, deliberately minimal projection. It must not contain credentials or account identifiers.
+2. Research the exact endpoint field semantics, official Chinese name, category, lifecycle window, and whether a status describes the player or only the activity itself.
+3. Use `approve_gacha_semantic_review` only when confidence is at least `0.9` and direct evidence supports every semantic conclusion. Submit one normalized checklist item in the candidate's target section.
+4. Use `reject_gacha_semantic_review` when the field is undocumented, evidence conflicts, the candidate is not a checklist item, or personal completion cannot be established. Rejection must not modify the checklist.
+5. Never infer completion from names such as `finish`, `all_finished`, a full numerator/denominator, or an activity lifecycle enum without evidence that the field is explicitly player-specific.
+6. Never infer a timezone from the user's locale. Ambiguous natural-language times must be rejected until the source server timezone is proven.
+7. Never leave a claimed candidate unfinished.
 
 ## Safety
 

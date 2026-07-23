@@ -170,6 +170,58 @@ describe('AppDatabase', () => {
     })
   })
 
+  it('语义核验候选脱敏去重，并且只有高置信 Codex 结论才能安全写入', () => {
+    database = new AppDatabase(':memory:')
+    const draft = {
+      target: 'events' as const,
+      kind: 'personal-item-semantics',
+      payload: {
+        officialEventId: '6011',
+        title: '反贪「砖」家',
+        observedStatus: { allFinished: true }
+      }
+    }
+    expect(database.queueSemanticReviewCandidates('star-rail', 'personal_sync', [draft]))
+      .toEqual({ queued: 1, pending: 1 })
+    expect(database.queueSemanticReviewCandidates('star-rail', 'personal_sync', [draft]))
+      .toEqual({ queued: 0, pending: 1 })
+    expect(() => database!.queueSemanticReviewCandidates('star-rail', 'personal_sync', [{
+      ...draft,
+      payload: { ...draft.payload, token: '禁止入队' }
+    }])).toThrow('敏感字段')
+
+    database.registerAiScheduleAgent('semantic-agent', '语义核验 Agent')
+    const candidate = database.claimSemanticReviewCandidate('semantic-agent')!
+    const reviewedItem = {
+      remoteKey: 'event:miyoushe:6011',
+      category: 'limited_event' as const,
+      title: '反贪「砖」家',
+      completed: true,
+      startsAt: '2026-08-01T02:00:00.000Z',
+      endsAt: '2026-08-10T01:59:00.000Z',
+      sourceUrl: 'https://example.com/star-rail-event'
+    }
+    expect(() => database!.approveSemanticReviewCandidate(
+      candidate.id,
+      'semantic-agent',
+      reviewedItem,
+      0.89,
+      []
+    )).toThrow('置信度不足')
+
+    const approved = database.approveSemanticReviewCandidate(
+      candidate.id,
+      'semantic-agent',
+      reviewedItem,
+      0.95,
+      [{ url: 'https://example.com/schema', note: '状态字段语义证据' }],
+      new Date('2026-07-23T00:00:00.000Z')
+    )
+    expect(approved.candidate.status).toBe('approved')
+    expect(database.listChecklistItems('star-rail').find((item) => item.remoteKey === reviewedItem.remoteKey))
+      .toMatchObject({ completed: false, progressPercent: null })
+  })
+
   it('同一版块中临期事项优先、完成事项沉底', () => {
     database = new AppDatabase(':memory:')
     const normal = database.createChecklistItem({

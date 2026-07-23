@@ -86,6 +86,24 @@ export interface AiScheduleJob {
   message: string | null
 }
 
+export type SemanticReviewStatus = 'pending' | 'claimed' | 'approved' | 'rejected'
+
+export interface SemanticReviewCandidate {
+  id: string
+  gameId: GameId
+  source: 'public_schedule' | 'personal_sync'
+  target: PersonalSyncTarget
+  kind: string
+  status: SemanticReviewStatus
+  payload: Record<string, unknown>
+  requestedAt: string
+  claimedAt: string | null
+  completedAt: string | null
+  agentId: string | null
+  agentName: string | null
+  message: string | null
+}
+
 export interface GameSummary {
   id: GameId
   name: string
@@ -189,6 +207,7 @@ export interface SyncSourceResult {
   added: number
   updated: number
   preserved: number
+  pendingReview?: number
 }
 
 export interface SyncResult {

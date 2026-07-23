@@ -1,4 +1,4 @@
-import type { NormalizedSyncItem } from './types'
+import type { NormalizedSyncItem, SemanticReviewDraft } from './types'
 
 export interface StarRailPersonalPayload {
   memoryOfChaos?: unknown
@@ -92,6 +92,42 @@ export function parseStarRailEvents(value: unknown, reference = new Date()): Nor
       scheduleKind: startsAt ? 'fixed_window' as const : undefined,
       modeKey: `official-event-${id}`
     }]
+  })
+}
+
+export function extractStarRailEventReviewCandidates(value: unknown): SemanticReviewDraft[] {
+  const root = requiredRecord(value, '活动日历')
+  const events = Array.isArray(root.act_list) ? root.act_list.filter(isRecord) : []
+  return events.map((event) => {
+    const timeInfo = isRecord(event.time_info) ? event.time_info : {}
+    const id = requiredIdentifier(event.id, '活动 id')
+    const title = requiredOptionalString(event.name)
+    if (!title) throw new Error('星铁个人数据缺少活动名称')
+    const startsAt = optionalIsoDate(
+      timeInfo.start_ts ?? timeInfo.start_time ?? timeInfo.start,
+      `${title}开始时间`
+    ) ?? null
+    const endsAt = optionalIsoDate(
+      timeInfo.end_ts ?? timeInfo.end_time ?? timeInfo.end,
+      `${title}结束时间`
+    ) ?? null
+    return {
+      target: 'events',
+      kind: 'personal-item-semantics',
+      payload: {
+        sourceContext: 'miyoushe-star-rail-event-calendar',
+        officialEventId: id,
+        title: title.replaceAll('\\n', ' '),
+        startsAt,
+        endsAt,
+        observedStatus: {
+          allFinished: typeof event.all_finished === 'boolean' ? event.all_finished : null,
+          actStatus: requiredOptionalString(event.act_status) ?? null,
+          currentProgress: finiteNumber(event.current_progress),
+          totalProgress: finiteNumber(event.total_progress)
+        }
+      }
+    }
   })
 }
 

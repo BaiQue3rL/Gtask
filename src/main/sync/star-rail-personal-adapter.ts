@@ -1,5 +1,8 @@
 import type { GameId, SyncTarget } from '../../shared/contracts'
-import { parseStarRailPersonalData } from './star-rail-personal-parser'
+import {
+  extractStarRailEventReviewCandidates,
+  parseStarRailPersonalData
+} from './star-rail-personal-parser'
 import {
   assertAnyPersonalRequestSucceeded,
   capturePersonalRequest,
@@ -25,7 +28,17 @@ export class StarRailPersonalAdapter implements SyncAdapter {
       return { items: [], message: '米游社暂不提供星铁区域探索百分比，已保留公开地图清单' }
     }
     if (target === 'events') {
-      return { items: [], message: '星铁活动状态语义尚未可靠验证，已跳过活动进度写入' }
+      const outcomes: PersonalRequestOutcome[] = []
+      const eventCalendar = await capturePersonalRequest(
+        () => this.client.getEventCalendar(),
+        outcomes
+      )
+      assertAnyPersonalRequestSucceeded(outcomes)
+      return {
+        items: [],
+        reviewCandidates: extractStarRailEventReviewCandidates(eventCalendar),
+        message: '星铁活动原始状态已脱敏，等待 Codex 核验'
+      }
     }
     // 保持顺序请求，降低短时间并发触发米游社风控的概率。
     const outcomes: PersonalRequestOutcome[] = []
@@ -41,6 +54,9 @@ export class StarRailPersonalAdapter implements SyncAdapter {
     const anomalyArbitration = ['all', 'cycles'].includes(target)
       ? await capturePersonalRequest(() => this.client.getAnomalyArbitration(), outcomes)
       : undefined
+    const eventCalendar = target === 'all'
+      ? await capturePersonalRequest(() => this.client.getEventCalendar(), outcomes)
+      : undefined
     assertAnyPersonalRequestSucceeded(outcomes)
     const suffix = personalPartialSuffix(outcomes)
     return {
@@ -50,6 +66,9 @@ export class StarRailPersonalAdapter implements SyncAdapter {
         apocalypticShadow,
         anomalyArbitration
       }),
+      reviewCandidates: eventCalendar === undefined
+        ? []
+        : extractStarRailEventReviewCandidates(eventCalendar),
       message: '星铁四种周期战绩已同步' + suffix
     }
   }

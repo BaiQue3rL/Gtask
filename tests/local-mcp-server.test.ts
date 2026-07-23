@@ -51,6 +51,9 @@ describe('本地 MCP server', () => {
       'archive_completed_gacha_section',
       'register_gacha_schedule_agent',
       'claim_gacha_schedule_job',
+      'claim_gacha_semantic_review',
+      'approve_gacha_semantic_review',
+      'reject_gacha_semantic_review',
       'apply_gacha_public_schedule',
       'fail_gacha_schedule_job'
     ])
@@ -357,5 +360,76 @@ describe('本地 MCP server', () => {
     expect(result.isError).not.toBe(true)
     expect(database!.listChecklistItems('genshin').find((item) => item.title === '枫丹'))
       .toMatchObject({ category: 'exploration', progressPercent: 0, completed: false })
+  })
+
+  it('Codex 可领取脱敏语义候选，并通过专用工具安全写回', async () => {
+    const connected = await connect()
+    await connected.callTool({
+      name: 'register_gacha_schedule_agent',
+      arguments: { agentId: 'semantic-agent', name: '语义核验 Agent', webSearch: true }
+    })
+    database!.queueSemanticReviewCandidates('star-rail', 'personal_sync', [{
+      target: 'events',
+      kind: 'personal-item-semantics',
+      payload: {
+        officialEventId: '6011',
+        title: '反贪「砖」家',
+        observedStatus: { allFinished: true, actStatus: 'OtherActStatusFinish' }
+      }
+    }])
+
+    const claimed = await connected.callTool({
+      name: 'claim_gacha_semantic_review',
+      arguments: { agentId: 'semantic-agent' }
+    })
+    expect(claimed.isError).not.toBe(true)
+    expect(claimed.structuredContent).toMatchObject({
+      command: 'claim_semantic_review',
+      candidate: {
+        gameId: 'star-rail',
+        source: 'personal_sync',
+        target: 'events',
+        status: 'claimed',
+        payload: { title: '反贪「砖」家' }
+      }
+    })
+    const candidateId = (claimed.structuredContent as {
+      candidate: { id: string }
+    }).candidate.id
+
+    const approved = await connected.callTool({
+      name: 'approve_gacha_semantic_review',
+      arguments: {
+        agentId: 'semantic-agent',
+        candidateId,
+        confidence: 0.95,
+        item: {
+          remoteKey: 'event:miyoushe:6011',
+          category: 'limited_event',
+          title: '反贪「砖」家',
+          completed: false,
+          startsAt: '2026-07-20T02:00:00.000Z',
+          endsAt: '2026-08-10T01:59:00.000Z',
+          sourceUrl: 'https://example.com/star-rail-event'
+        },
+        evidence: [{
+          url: 'https://example.com/star-rail-schema',
+          note: '字段仅代表活动生命周期，不代表玩家已完成'
+        }]
+      }
+    })
+    expect(approved.isError).not.toBe(true)
+    expect(approved.structuredContent).toMatchObject({
+      command: 'approve_semantic_review',
+      candidate: { status: 'approved' },
+      merge: { added: 1 }
+    })
+    expect(database!.listChecklistItems('star-rail')).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        title: '反贪「砖」家',
+        completed: false,
+        source: 'personal_sync'
+      })
+    ]))
   })
 })

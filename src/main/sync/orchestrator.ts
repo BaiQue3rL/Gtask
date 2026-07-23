@@ -67,8 +67,13 @@ export class SyncOrchestrator {
     }
 
     const successCount = sources.filter((source) => source.status === 'success').length
+    const hasPendingReview = sources.some((source) => (source.pendingReview ?? 0) > 0)
     const status: SyncResult['status'] =
-      successCount === sources.length ? 'success' : successCount > 0 ? 'partial' : 'error'
+      successCount === sources.length && !hasPendingReview
+        ? 'success'
+        : successCount > 0
+          ? 'partial'
+          : 'error'
     const message = sources.map((source) => source.message).join('；')
     const databaseStatus: SyncStatus = sources.some(
       (source) => source.status === 'verification_required'
@@ -80,7 +85,7 @@ export class SyncOrchestrator {
           ? 'stale'
           : 'error'
     this.database.recordSyncOutcome(gameId, databaseStatus, message, successCount > 0)
-    if (sources[0]?.status === 'success') {
+    if (sources[0]?.status === 'success' && !sources[0].pendingReview) {
       this.database.recordSyncTargetSuccess(gameId, target, new Date(), true)
     }
 
@@ -100,19 +105,22 @@ export class SyncOrchestrator {
     const startedAt = new Date().toISOString()
     this.database.recordPersonalSyncAttempt(gameId)
     const personal = await this.syncPersonalData(gameId, target)
-    const status: SyncResult['status'] = personal.status === 'success' ? 'success' : 'error'
+    const hasPendingReview = (personal.pendingReview ?? 0) > 0
+    const status: SyncResult['status'] = personal.status === 'success'
+      ? hasPendingReview ? 'partial' : 'success'
+      : 'error'
     const databaseStatus: SyncStatus = personal.status === 'verification_required'
       ? 'verification_required'
       : personal.status === 'success'
-        ? 'success'
+        ? hasPendingReview ? 'stale' : 'success'
         : 'error'
     this.database.recordSyncOutcome(
       gameId,
       databaseStatus,
       personal.message,
-      personal.status === 'success'
+      personal.status === 'success' && (personal.added + personal.updated) > 0
     )
-    if (personal.status === 'success') {
+    if (personal.status === 'success' && !hasPendingReview) {
       this.database.recordSyncTargetSuccess(gameId, target)
     }
     return {
@@ -180,15 +188,24 @@ export class SyncOrchestrator {
         checklistSource,
         normalizedItems
       )
+      const review = this.database.queueSemanticReviewCandidates(
+        gameId,
+        checklistSource,
+        result.reviewCandidates ?? []
+      )
       const changes = merge.added + merge.updated
       const changeMessage = changes > 0
         ? `新增 ${merge.added}，更新 ${merge.updated}`
         : '无清单变更'
       const preservedMessage = merge.preserved > 0 ? `，保护 ${merge.preserved}` : ''
+      const reviewMessage = review.pending > 0
+        ? `；${review.pending} 项待 Codex 核验`
+        : ''
       return {
         source,
         status: 'success',
-        message: `${result.message}（${changeMessage}${preservedMessage}）`,
+        message: `${result.message}（${changeMessage}${preservedMessage}）${reviewMessage}`,
+        pendingReview: review.pending,
         ...merge
       }
     } catch (error) {

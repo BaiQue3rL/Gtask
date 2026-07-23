@@ -31,8 +31,15 @@ export interface SyncMergeResult {
   preserved: number
 }
 
+export interface SemanticReviewDraft {
+  target: Exclude<SyncTarget, 'all' | 'tasks'>
+  kind: string
+  payload: Record<string, unknown>
+}
+
 export interface SyncAdapterOutput {
   items: NormalizedSyncItem[]
+  reviewCandidates?: SemanticReviewDraft[]
   message: string
 }
 

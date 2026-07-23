@@ -291,6 +291,110 @@ export function createLocalMcpServer(
   )
 
   server.registerTool(
+    'claim_gacha_semantic_review',
+    {
+      title: '领取同步语义核验候选',
+      description: '领取一条已脱敏的清单或个人进度候选。只包含判断所需字段，不包含 Cookie、Token、UID 或账号信息。',
+      inputSchema: { agentId: z.string().min(1).max(100) },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true }
+    },
+    async ({ agentId }) => {
+      try {
+        return toolResult({
+          command: 'claim_semantic_review',
+          candidate: database.claimSemanticReviewCandidate(agentId)
+        })
+      } catch (error) {
+        return toolError(error)
+      }
+    }
+  )
+
+  server.registerTool(
+    'approve_gacha_semantic_review',
+    {
+      title: '通过同步语义核验',
+      description: '提交 Codex 对名称、分类、时间或个人状态含义的核验结果。置信度低于 0.9、跨版块或违反数据库安全规则时拒绝写入。',
+      inputSchema: {
+        agentId: z.string().min(1).max(100),
+        candidateId: z.string().uuid(),
+        confidence: z.number().min(0.9).max(1),
+        item: z.object({
+          remoteKey: z.string().min(1).max(200),
+          category: categorySchema,
+          title: chineseScheduleTitleSchema,
+          completed: z.boolean().optional(),
+          parentTitle: nullableTextSchema,
+          startsAt: isoDateSchema.nullable().optional(),
+          endsAt: isoDateSchema.nullable().optional(),
+          resetRule: nullableTextSchema,
+          periodKey: nullableTextSchema,
+          scheduleKind: scheduleKindSchema.nullable().optional(),
+          resetWeekday: z.number().int().min(1).max(7).nullable().optional(),
+          timeZone: nullableTextSchema,
+          modeKey: nullableTextSchema,
+          recurrenceRule: recurrenceRuleSchema,
+          sourceUrl: httpUrlSchema.nullable().optional()
+        }).strict(),
+        evidence: z.array(z.object({
+          url: httpUrlSchema,
+          note: z.string().min(1).max(500)
+        }).strict()).min(1).max(20)
+      },
+      annotations: { destructiveHint: false, openWorldHint: true }
+    },
+    async ({ agentId, candidateId, confidence, item, evidence }) => {
+      try {
+        return toolResult({
+          command: 'approve_semantic_review',
+          ...database.approveSemanticReviewCandidate(
+            candidateId,
+            agentId,
+            item as NormalizedSyncItem,
+            confidence,
+            evidence
+          )
+        })
+      } catch (error) {
+        return toolError(error)
+      }
+    }
+  )
+
+  server.registerTool(
+    'reject_gacha_semantic_review',
+    {
+      title: '拒绝同步语义核验候选',
+      description: '当字段含义无法证实、资料冲突或不应写入清单时结束候选，保留现有清单不变。',
+      inputSchema: {
+        agentId: z.string().min(1).max(100),
+        candidateId: z.string().uuid(),
+        message: z.string().min(1).max(500),
+        evidence: z.array(z.object({
+          url: httpUrlSchema,
+          note: z.string().min(1).max(500)
+        }).strict()).max(20).default([])
+      },
+      annotations: { destructiveHint: false, openWorldHint: true }
+    },
+    async ({ agentId, candidateId, message, evidence }) => {
+      try {
+        return toolResult({
+          command: 'reject_semantic_review',
+          candidate: database.rejectSemanticReviewCandidate(
+            candidateId,
+            agentId,
+            message,
+            evidence
+          )
+        })
+      } catch (error) {
+        return toolError(error)
+      }
+    }
+  )
+
+  server.registerTool(
     'apply_gacha_public_schedule',
     {
       title: '提交已验证的公开资料',

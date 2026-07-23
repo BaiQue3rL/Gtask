@@ -121,6 +121,7 @@ describe('createDailyBackup', () => {
 
     const oldDatabase = new DatabaseSync(databasePath)
     oldDatabase.exec(`
+      DROP TABLE semantic_review_candidates;
       DROP TABLE ai_schedule_jobs;
       DROP TABLE ai_schedule_agents;
       ALTER TABLE checklist_items DROP COLUMN source_url;

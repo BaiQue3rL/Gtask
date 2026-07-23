@@ -219,4 +219,38 @@ describe('SyncOrchestrator', () => {
       lastScope: null
     })
   })
+
+  it('模糊个人数据只进入 Codex 核验队列，不直接写入或冒充同步成功', async () => {
+    database = new AppDatabase(':memory:')
+    const orchestrator = new SyncOrchestrator(database, {
+      publicSchedule: {},
+      personalData: {
+        'star-rail': {
+          sync: async () => ({
+            items: [],
+            reviewCandidates: [{
+              target: 'events',
+              kind: 'personal-item-semantics',
+              payload: {
+                officialEventId: '6011',
+                title: '反贪「砖」家',
+                observedStatus: { allFinished: true }
+              }
+            }],
+            message: '原始状态已脱敏'
+          })
+        }
+      }
+    })
+
+    const result = await orchestrator.syncPersonalOnly('star-rail', 'events')
+
+    expect(result).toMatchObject({
+      status: 'partial',
+      sources: [expect.objectContaining({ pendingReview: 1 })]
+    })
+    expect(result.message).toContain('待 Codex 核验')
+    expect(database.listChecklistItems('star-rail').some((item) => item.title === '反贪「砖」家'))
+      .toBe(false)
+  })
 })
