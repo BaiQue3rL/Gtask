@@ -61,7 +61,7 @@ function percentage(value: number, maximum: number): number | null {
   return Math.round(Math.min(100, Math.max(0, (value / maximum) * 100)) * 100) / 100
 }
 
-export function parseZenlessEvents(value: unknown): NormalizedSyncItem[] {
+export function parseZenlessEvents(value: unknown, reference = new Date()): NormalizedSyncItem[] {
   const root = requiredRecord(value, '活动日历')
   const events = Array.isArray(root.activity_list) ? root.activity_list.filter(isRecord) : []
   return events.map((event) => {
@@ -73,7 +73,8 @@ export function parseZenlessEvents(value: unknown): NormalizedSyncItem[] {
     if (!startsAt || !endsAt) throw new Error(`绝区零个人数据缺少 ${title} 排期时间`)
     const obtained = finiteNumber(event.monochrome_got_cnt ?? event.obtained_monochromes)
     const maximum = finiteNumber(event.monochrome_cnt ?? event.max_monochromes)
-    const progressPercent = obtained !== null && maximum !== null
+    const hasStarted = Date.parse(startsAt) <= reference.getTime()
+    const progressPercent = hasStarted && obtained !== null && maximum !== null
       ? percentage(obtained, maximum) ?? undefined
       : undefined
     const state = typeof (event.state ?? event.status) === 'string'
@@ -83,8 +84,7 @@ export function parseZenlessEvents(value: unknown): NormalizedSyncItem[] {
       remoteKey: `event:miyoushe:${id}`,
       category: 'limited_event',
       title,
-      completed: state === 'STATE_COMPLETED' ||
-        (obtained !== null && maximum !== null && maximum > 0 && obtained >= maximum),
+      completed: hasStarted && state === 'STATE_COMPLETED',
       progressPercent,
       startsAt,
       endsAt,
@@ -151,11 +151,13 @@ export function parseZenlessPersonalData(input: {
   shiyuDefense?: unknown
   deadlyAssault?: unknown
   eventCalendar?: unknown
-}): NormalizedSyncItem[] {
+}, reference = new Date()): NormalizedSyncItem[] {
   const items: NormalizedSyncItem[] = []
   if (input.shiyuDefense !== undefined) items.push(parseZenlessShiyuDefense(input.shiyuDefense))
   if (input.deadlyAssault !== undefined) items.push(parseZenlessDeadlyAssault(input.deadlyAssault))
-  if (input.eventCalendar !== undefined) items.push(...parseZenlessEvents(input.eventCalendar))
+  if (input.eventCalendar !== undefined) {
+    items.push(...parseZenlessEvents(input.eventCalendar, reference))
+  }
   if (items.length === 0) throw new Error('绝区零个人数据没有可识别的周期玩法')
   return items
 }

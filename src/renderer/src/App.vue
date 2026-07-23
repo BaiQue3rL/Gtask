@@ -1103,7 +1103,9 @@ function showError(error: unknown): void {
                     <span class="item-details">
                       <b>{{ categoryLabels[item.category] }}</b>
                       <span v-if="item.parentTitle">{{ item.parentTitle }}</span>
-                      <span v-if="item.progressPercent !== null">{{ item.progressPercent }}%</span>
+                      <span v-if="item.category === 'exploration' && item.progressPercent !== null">
+                        {{ item.progressPercent }}%
+                      </span>
                       <span v-if="item.resetRule" class="reset-detail">{{ item.resetRule }}</span>
                       <span
                         v-if="item.source !== 'manual' && item.lastSyncedAt"

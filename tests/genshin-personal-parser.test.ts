@@ -83,6 +83,77 @@ describe('Genshin personal parsing', () => {
     ]))
   })
 
+  it('活动时间兼容数字字符串，并在无效时保留进度但不写错误倒计时', () => {
+    const items = parseGenshinPersonalData({
+      eventCalendar: {
+        act_list: [
+          {
+            id: 9002,
+            name: '数字时间活动',
+            start_timestamp: '1784505600',
+            end_timestamp: '1787183999',
+            is_finished: true
+          },
+          {
+            id: 9003,
+            name: '特殊时间活动',
+            start_timestamp: '0',
+            end_timestamp: 'not-a-time',
+            explore_detail: { explore_percent: 50 }
+          }
+        ]
+      }
+    })
+
+    expect(items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        title: '数字时间活动',
+        startsAt: '2026-07-20T00:00:00.000Z',
+        endsAt: '2026-08-19T23:59:59.000Z',
+        completed: true
+      }),
+      expect.objectContaining({
+        title: '特殊时间活动',
+        progressPercent: 50,
+        startsAt: undefined,
+        endsAt: undefined,
+        periodKey: 'genshin:event:9003'
+      })
+    ]))
+  })
+
+  it('活动同步排除挑战模式，并且未来活动不能继承完成状态', () => {
+    const items = parseGenshinPersonalData({
+      eventCalendar: {
+        act_list: [
+          {
+            id: 9010,
+            name: '幽境危战·栗烈之役',
+            start_timestamp: 1784505600,
+            end_timestamp: 1787183999,
+            is_finished: true
+          },
+          {
+            id: 9011,
+            name: '未来普通活动',
+            start_timestamp: 1785110400,
+            end_timestamp: 1787183999,
+            is_finished: true,
+            explore_detail: { explore_percent: 100, is_finished: true }
+          }
+        ]
+      }
+    }, new Date('2026-07-23T00:00:00.000Z'))
+
+    expect(items).toEqual([
+      expect.objectContaining({
+        remoteKey: 'event:miyoushe:9011',
+        completed: false,
+        progressPercent: undefined
+      })
+    ])
+  })
+
   it('the adapter requests each source sequentially and rejects other games', async () => {
     const order: string[] = []
     const client = {

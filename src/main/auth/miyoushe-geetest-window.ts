@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, screen } from 'electron'
 import type {
   MiyousheGeetestChallenge,
   MiyousheGeetestResult
@@ -60,7 +60,20 @@ export async function solveMiyousheGeetest(
       settled = true
       verificationWindow.close()
     })
-    verificationWindow.once('ready-to-show', () => verificationWindow.show())
+    verificationWindow.once('ready-to-show', () => {
+      const windowBounds = verificationWindow.getBounds()
+      const anchorBounds = parent && !parent.isDestroyed()
+        ? parent.getBounds()
+        : screen.getPrimaryDisplay().workArea
+      const workArea = screen.getDisplayMatching(anchorBounds).workArea
+      const unclampedX = Math.round(anchorBounds.x + (anchorBounds.width - windowBounds.width) / 2)
+      const unclampedY = Math.round(anchorBounds.y + (anchorBounds.height - windowBounds.height) / 2)
+      verificationWindow.setPosition(
+        Math.min(Math.max(unclampedX, workArea.x), workArea.x + workArea.width - windowBounds.width),
+        Math.min(Math.max(unclampedY, workArea.y), workArea.y + workArea.height - windowBounds.height)
+      )
+      verificationWindow.show()
+    })
 
     const html = buildVerificationPage(challenge)
     void verificationWindow.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(html)}`).catch((error) => {

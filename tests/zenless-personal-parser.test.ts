@@ -91,6 +91,25 @@ describe('绝区零个人战绩解析', () => {
     ])
   })
 
+  it('活动未开始时不继承完成状态或领取进度', () => {
+    const items = parseZenlessEvents({
+      activity_list: [{
+        activity_id: 7002,
+        name: '未来活动',
+        state: 'STATE_COMPLETED',
+        monochrome_got_cnt: 300,
+        monochrome_cnt: 300,
+        start_ts: 1785110400,
+        end_ts: 1787183999
+      }]
+    }, new Date('2026-07-23T00:00:00.000Z'))
+
+    expect(items[0]).toMatchObject({
+      completed: false,
+      progressPercent: undefined
+    })
+  })
+
   it('个人接口省略排期时间时仍保留完成状态并交由公开排期补时', () => {
     expect(parseZenlessShiyuDefense({
       schedule_id: 62053,

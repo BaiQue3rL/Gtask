@@ -16,7 +16,10 @@ interface ChallengeModeDefinition {
   expectedStars: number
 }
 
-export function parseStarRailPersonalData(input: StarRailPersonalPayload): NormalizedSyncItem[] {
+export function parseStarRailPersonalData(
+  input: StarRailPersonalPayload,
+  reference = new Date()
+): NormalizedSyncItem[] {
   const items: NormalizedSyncItem[] = []
   const modes: ChallengeModeDefinition[] = [
     {
@@ -48,12 +51,14 @@ export function parseStarRailPersonalData(input: StarRailPersonalPayload): Norma
     const arbitration = parseAnomalyArbitration(input.anomalyArbitration)
     if (arbitration) items.push(arbitration)
   }
-  if (input.eventCalendar !== undefined) items.push(...parseStarRailEvents(input.eventCalendar))
+  if (input.eventCalendar !== undefined) {
+    items.push(...parseStarRailEvents(input.eventCalendar, reference))
+  }
   if (items.length === 0) throw new Error('星铁个人数据没有可识别的周期玩法')
   return items
 }
 
-export function parseStarRailEvents(value: unknown): NormalizedSyncItem[] {
+export function parseStarRailEvents(value: unknown, reference = new Date()): NormalizedSyncItem[] {
   const root = requiredRecord(value, '活动日历')
   const events = Array.isArray(root.act_list) ? root.act_list.filter(isRecord) : []
   return events.flatMap((event) => {
@@ -62,23 +67,32 @@ export function parseStarRailEvents(value: unknown): NormalizedSyncItem[] {
     const id = requiredIdentifier(event.id, '活动 id')
     const title = requiredOptionalString(event.name)
     if (!title) throw new Error('星铁个人数据缺少活动名称')
-    const startsAt = toIsoDate(
+    const parsedStartsAt = optionalIsoDate(
       timeInfo.start_ts ?? timeInfo.start_time ?? timeInfo.start,
       `${title}开始时间`
     )
-    const endsAt = toIsoDate(
+    const parsedEndsAt = optionalIsoDate(
       timeInfo.end_ts ?? timeInfo.end_time ?? timeInfo.end,
       `${title}结束时间`
     )
+    const hasValidWindow = Boolean(
+      parsedStartsAt &&
+      parsedEndsAt &&
+      new Date(parsedStartsAt).getTime() < new Date(parsedEndsAt).getTime()
+    )
+    const startsAt = hasValidWindow ? parsedStartsAt : undefined
+    const endsAt = hasValidWindow ? parsedEndsAt : undefined
     const current = finiteNumber(event.current_progress)
     const total = finiteNumber(event.total_progress)
-    const progressPercent = current !== null && total !== null && total > 0
+    const hasStarted = !startsAt || Date.parse(startsAt) <= reference.getTime()
+    const progressPercent = hasStarted && current !== null && total !== null && total > 0
       ? clampPercentage((current / total) * 100)
       : undefined
     const status = requiredOptionalString(event.act_status) ?? ''
-    const completed = event.all_finished === true ||
-      status === 'OtherActStatusFinish' ||
-      (current !== null && total !== null && total > 0 && current >= total)
+    const completed = hasStarted && (
+      event.all_finished === true ||
+      status === 'OtherActStatusFinish'
+    )
     return [{
       remoteKey: `event:miyoushe:${id}`,
       category: 'limited_event' as const,
@@ -87,8 +101,8 @@ export function parseStarRailEvents(value: unknown): NormalizedSyncItem[] {
       progressPercent,
       startsAt,
       endsAt,
-      periodKey: `star-rail:event:${id}:${startsAt}`,
-      scheduleKind: 'fixed_window' as const,
+      periodKey: startsAt ? `star-rail:event:${id}:${startsAt}` : `star-rail:event:${id}`,
+      scheduleKind: startsAt ? 'fixed_window' as const : undefined,
       modeKey: `official-event-${id}`
     }]
   })
@@ -110,13 +124,14 @@ function parseChallengeMode(definition: ChallengeModeDefinition): NormalizedSync
     return floorNumber >= definition.expectedLastFloor && hasFloorRecord(floor)
   })
   const hasData = root.has_data !== false && (root.has_data === true || stars > 0 || floors.length > 0)
+  const completed = hasData && (reachedLastFloor || stars >= definition.expectedStars)
   const startsAt = toIsoDate(root.begin_time ?? season?.begin_time, `${definition.label}开始时间`)
   const endsAt = toIsoDate(root.end_time ?? season?.end_time, `${definition.label}结束时间`)
   return {
     remoteKey: `endgame:${definition.modeKey}`,
     category: 'endgame',
     title: definition.label,
-    completed: hasData && reachedLastFloor,
+    completed,
     progressPercent: clampPercentage((stars / definition.expectedStars) * 100),
     startsAt,
     endsAt,
@@ -197,6 +212,17 @@ function toIsoDate(value: unknown, field: string): string {
   }
   if (Number.isNaN(date.getTime())) throw new Error(`星铁个人数据的 ${field} 不是有效时间`)
   return date.toISOString()
+}
+
+function optionalIsoDate(value: unknown, field: string): string | null {
+  if (value === undefined || value === null || value === '') return null
+  const numeric = finiteNumber(value)
+  if (numeric !== null && numeric <= 0) return null
+  try {
+    return toIsoDate(numeric ?? value, field)
+  } catch {
+    return null
+  }
 }
 
 function requiredRecord(value: unknown, field: string): Record<string, unknown> {

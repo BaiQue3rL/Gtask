@@ -60,6 +60,24 @@ export const CURRENT_SCHEMA_VERSION = 11
 
 const AI_AGENT_MAX_AGE_MS = 5 * 60 * 1000
 const AI_JOB_CLAIM_MAX_AGE_MS = 15 * 60 * 1000
+
+function normalizeSyncedEventTitle(title: string): string {
+  return title.normalize('NFKC').toLocaleLowerCase('zh-CN').replace(/[\s\p{P}\p{S}]+/gu, '')
+}
+
+function eventTitlesEquivalent(left: string, right: string): boolean {
+  const normalizedLeft = normalizeSyncedEventTitle(left)
+  const normalizedRight = normalizeSyncedEventTitle(right)
+  if (normalizedLeft === normalizedRight) return true
+  if (Math.min(normalizedLeft.length, normalizedRight.length) < 6) return false
+  return normalizedLeft.includes(normalizedRight) || normalizedRight.includes(normalizedLeft)
+}
+
+function isPersonalSectionConflict(gameId: GameId, item: NormalizedSyncItem): boolean {
+  return item.category === 'limited_event' &&
+    REQUIRED_ENDGAME_MODES[gameId].some(([, title]) => item.title.includes(title))
+}
+
 const REQUIRED_ENDGAME_MODES: Record<GameId, ReadonlyArray<readonly [string, string]>> = {
   genshin: [
     ['spiral-abyss', '深境螺旋'],
@@ -94,6 +112,9 @@ export class AppDatabase {
       this.seedGames()
       this.seedQuestChecklists()
       this.ensureWeeklyForInitializedGames()
+      this.consolidateFixedWeeklyItems()
+      this.archivePersonalSectionConflicts()
+      this.archiveUntimedPersonalEvents()
       this.normalizeWeeklySchedules()
       this.resetDueWeeklyItems()
       this.markStaleSyncStates()
@@ -783,7 +804,13 @@ export class AppDatabase {
     this.database.exec('BEGIN IMMEDIATE')
     try {
       for (const item of items) {
+        if (source === 'personal_sync' && isPersonalSectionConflict(gameId, item)) {
+          result.preserved += 1
+          continue
+        }
         if (item.category === 'weekly') {
+          item.remoteKey = `weekly:${gameId}`
+          item.title = '周常'
           const weeklyPeriod = getWeeklyPeriod(new Date(syncedAt), 1, 'Asia/Shanghai')
           item.scheduleKind = 'weekly'
           item.resetWeekday = 1
@@ -800,6 +827,15 @@ export class AppDatabase {
         seenRemoteKeys.add(remoteKey)
 
         const identity = this.findSyncIdentity(gameId, source, item, remoteKey, syncedAt)
+
+        const isUntimedPersonalEvent =
+          source === 'personal_sync' &&
+          item.category === 'limited_event' &&
+          (!item.startsAt || !item.endsAt)
+        if (isUntimedPersonalEvent && identity?.source !== 'public_schedule') {
+          result.preserved += 1
+          continue
+        }
 
         if (identity?.archived) {
           result.preserved += 1
@@ -941,6 +977,18 @@ export class AppDatabase {
             current.id
           )
         result.updated += 1
+        if (
+          item.category === 'limited_event' &&
+          source === 'personal_sync' &&
+          current.source === 'public_schedule'
+        ) {
+          this.archiveEquivalentPersonalEventDuplicates(
+            gameId,
+            current.id,
+            item,
+            syncedAt
+          )
+        }
         if (completionProtected) result.preserved += 1
       }
       this.database.exec('COMMIT')
@@ -988,8 +1036,9 @@ export class AppDatabase {
     }
 
     if (item.category === 'limited_event') {
-      return this.database.prepare(`
-        SELECT id, archived, source
+      const rows = this.database.prepare(`
+        SELECT id, archived, source, remote_key AS remoteKey,
+          mode_key AS modeKey, title
         FROM checklist_items
         WHERE game_id = ?
           AND category = 'limited_event'
@@ -997,20 +1046,15 @@ export class AppDatabase {
           AND (
             remote_key = ?
             OR (? IS NOT NULL AND mode_key = ?)
+            OR title = ?
             OR (
-              title = ?
-              AND starts_at IS NOT NULL AND ends_at IS NOT NULL
+              starts_at IS NOT NULL AND ends_at IS NOT NULL
               AND ? IS NOT NULL AND ? IS NOT NULL
               AND julianday(starts_at) <= julianday(?)
               AND julianday(ends_at) >= julianday(?)
             )
           )
-        ORDER BY CASE WHEN remote_key = ? THEN 0 ELSE 1 END,
-          CASE WHEN ? IS NOT NULL AND mode_key = ? THEN 0 ELSE 1 END,
-          CASE WHEN source = 'public_schedule' THEN 0 ELSE 1 END,
-          updated_at DESC
-        LIMIT 1
-      `).get(
+      `).all(
         gameId,
         remoteKey,
         item.modeKey ?? null,
@@ -1019,11 +1063,35 @@ export class AppDatabase {
         item.startsAt ?? null,
         item.endsAt ?? null,
         item.endsAt ?? null,
-        item.startsAt ?? null,
-        remoteKey,
-        item.modeKey ?? null,
-        item.modeKey ?? null
-      ) as { id: string; archived: number; source: ChecklistSource } | undefined
+        item.startsAt ?? null
+      ) as Array<{
+        id: string
+        archived: number
+        source: ChecklistSource
+        remoteKey: string | null
+        modeKey: string | null
+        title: string
+      }>
+      return rows
+        .filter((row) =>
+          row.remoteKey === remoteKey ||
+          (item.modeKey !== undefined && item.modeKey !== null && row.modeKey === item.modeKey) ||
+          eventTitlesEquivalent(row.title, item.title)
+        )
+        .sort((left, right) => {
+          const score = (row: typeof left): number => {
+            if (
+              source === 'personal_sync' &&
+              row.source === 'public_schedule' &&
+              eventTitlesEquivalent(row.title, item.title)
+            ) return 0
+            if (row.remoteKey === remoteKey) return 1
+            if (item.modeKey && row.modeKey === item.modeKey) return 2
+            if (row.title === item.title) return 3
+            return 4
+          }
+          return score(left) - score(right)
+        })[0]
     }
 
     if (item.category === 'endgame' && source === 'public_schedule') {
@@ -1114,6 +1182,53 @@ export class AppDatabase {
       item.periodKey ?? null,
       source
     ) as { id: string; archived: number; source: ChecklistSource } | undefined
+  }
+
+  private archiveEquivalentPersonalEventDuplicates(
+    gameId: GameId,
+    preservedId: string,
+    item: NormalizedSyncItem,
+    syncedAt: string
+  ): void {
+    const candidates = this.database.prepare(`
+      SELECT id, title
+      FROM checklist_items
+      WHERE game_id = ?
+        AND id <> ?
+        AND category = 'limited_event'
+        AND source = 'personal_sync'
+        AND archived = 0
+        AND (
+          remote_key = ?
+          OR (? IS NOT NULL AND mode_key = ?)
+          OR (
+            starts_at IS NOT NULL AND ends_at IS NOT NULL
+            AND ? IS NOT NULL AND ? IS NOT NULL
+            AND julianday(starts_at) <= julianday(?)
+            AND julianday(ends_at) >= julianday(?)
+          )
+        )
+    `).all(
+      gameId,
+      preservedId,
+      item.remoteKey,
+      item.modeKey ?? null,
+      item.modeKey ?? null,
+      item.startsAt ?? null,
+      item.endsAt ?? null,
+      item.endsAt ?? null,
+      item.startsAt ?? null
+    ) as Array<{ id: string; title: string }>
+    const ids = candidates
+      .filter((candidate) => eventTitlesEquivalent(candidate.title, item.title))
+      .map((candidate) => candidate.id)
+    if (ids.length === 0) return
+    const statement = this.database.prepare(`
+      UPDATE checklist_items
+      SET archived = 1, updated_at = ?
+      WHERE id = ? AND source = 'personal_sync' AND archived = 0
+    `)
+    for (const id of ids) statement.run(syncedAt, id)
   }
 
   resetDueWeeklyItems(reference = new Date()): number {
@@ -1531,6 +1646,72 @@ export class AppDatabase {
         now
       )
     }
+  }
+
+  private consolidateFixedWeeklyItems(): void {
+    const now = new Date().toISOString()
+    const completedExtras = this.database.prepare(`
+      SELECT game_id AS gameId, MAX(completed) AS completed
+      FROM checklist_items
+      WHERE category = 'weekly'
+        AND archived = 0
+        AND id <> game_id || ':weekly'
+      GROUP BY game_id
+    `).all() as Array<{ gameId: GameId; completed: number }>
+
+    const completeCanonical = this.database.prepare(`
+      UPDATE checklist_items
+      SET completed = 1,
+          completed_at = COALESCE(completed_at, ?),
+          updated_at = ?
+      WHERE id = ?
+        AND archived = 0
+        AND completed = 0
+    `)
+    for (const extra of completedExtras) {
+      if (Boolean(extra.completed)) {
+        completeCanonical.run(now, now, `${extra.gameId}:weekly`)
+      }
+    }
+
+    this.database.prepare(`
+      UPDATE checklist_items
+      SET archived = 1, updated_at = ?
+      WHERE category = 'weekly'
+        AND archived = 0
+        AND id <> game_id || ':weekly'
+    `).run(now)
+  }
+
+  private archivePersonalSectionConflicts(): void {
+    const conflicts = this.database.prepare(`
+      SELECT id, game_id AS gameId, title
+      FROM checklist_items
+      WHERE category = 'limited_event'
+        AND source = 'personal_sync'
+        AND archived = 0
+    `).all() as Array<{ id: string; gameId: GameId; title: string }>
+    const archive = this.database.prepare(`
+      UPDATE checklist_items SET archived = 1, updated_at = ? WHERE id = ? AND archived = 0
+    `)
+    const now = new Date().toISOString()
+    for (const conflict of conflicts) {
+      if (REQUIRED_ENDGAME_MODES[conflict.gameId]
+        .some(([, title]) => conflict.title.includes(title))) {
+        archive.run(now, conflict.id)
+      }
+    }
+  }
+
+  private archiveUntimedPersonalEvents(): void {
+    this.database.prepare(`
+      UPDATE checklist_items
+      SET archived = 1, updated_at = ?
+      WHERE category = 'limited_event'
+        AND source = 'personal_sync'
+        AND archived = 0
+        AND (starts_at IS NULL OR ends_at IS NULL)
+    `).run(new Date().toISOString())
   }
 
   private isPersistentChecklistId(id: string): boolean {

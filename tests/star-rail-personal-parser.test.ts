@@ -94,6 +94,83 @@ describe('Star Rail personal parsing', () => {
     ]))
   })
 
+  it('accepts numeric-string event timestamps and preserves events without a usable window', () => {
+    const items = parseStarRailPersonalData({
+      eventCalendar: {
+        act_list: [
+          {
+            id: 6001,
+            name: '货币战争•零和博弈',
+            time_info: { start_ts: '1784505600', end_ts: '1787183999' },
+            all_finished: false
+          },
+          {
+            id: 6002,
+            name: '无有效排期的活动',
+            time_info: { start_ts: '0', end_ts: '0' },
+            all_finished: true
+          }
+        ]
+      }
+    })
+
+    expect(items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        remoteKey: 'event:miyoushe:6001',
+        startsAt: '2026-07-20T00:00:00.000Z',
+        endsAt: '2026-08-19T23:59:59.000Z',
+        scheduleKind: 'fixed_window'
+      }),
+      expect.objectContaining({
+        remoteKey: 'event:miyoushe:6002',
+        completed: true,
+        startsAt: undefined,
+        endsAt: undefined,
+        periodKey: 'star-rail:event:6002',
+        scheduleKind: undefined
+      })
+    ]))
+  })
+
+  it('does not reuse explicit or numeric completion for an event that has not started', () => {
+    const items = parseStarRailPersonalData({
+      eventCalendar: {
+        act_list: [{
+          id: 6010,
+          name: '未来活动',
+          time_info: { start_ts: 1785110400, end_ts: 1787183999 },
+          all_finished: true,
+          act_status: 'OtherActStatusFinish',
+          current_progress: 10,
+          total_progress: 10
+        }]
+      }
+    }, new Date('2026-07-23T00:00:00.000Z'))
+
+    expect(items[0]).toMatchObject({
+      completed: false,
+      progressPercent: undefined
+    })
+  })
+
+  it('treats full stars as completed when the endpoint omits a parseable last-floor marker', () => {
+    const items = parseStarRailPersonalData({
+      pureFiction: {
+        star_num: 12,
+        max_floor: '',
+        has_data: true,
+        all_floor_detail: [],
+        groups: [season(202, '虚构叙事')]
+      }
+    })
+
+    expect(items[0]).toMatchObject({
+      modeKey: 'pure-fiction',
+      progressPercent: 100,
+      completed: true
+    })
+  })
+
   it('the adapter requests each source sequentially and rejects other games', async () => {
     const order: string[] = []
     const client = {

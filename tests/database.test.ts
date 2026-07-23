@@ -146,6 +146,30 @@ describe('AppDatabase', () => {
     })
   })
 
+  it('同步来源提供的周常会归并到每个游戏唯一的固定周常', () => {
+    database = new AppDatabase(':memory:')
+    database!.mergeSyncedItems('star-rail', 'public_schedule', [{
+      remoteKey: 'star-rail:weekly:simulated-universe',
+      category: 'weekly',
+      title: '货币战争&模拟宇宙周期积分'
+    }])
+    database!.mergeSyncedItems('star-rail', 'public_schedule', [{
+      remoteKey: 'star-rail:weekly:another-source',
+      category: 'weekly',
+      title: '其他周常名称'
+    }])
+
+    const weeklyItems = database!.listChecklistItems('star-rail')
+      .filter((item) => item.category === 'weekly')
+    expect(weeklyItems).toHaveLength(1)
+    expect(weeklyItems[0]).toMatchObject({
+      id: 'star-rail:weekly',
+      title: '周常',
+      remoteKey: 'weekly:star-rail',
+      scheduleKind: 'weekly'
+    })
+  })
+
   it('同一版块中临期事项优先、完成事项沉底', () => {
     database = new AppDatabase(':memory:')
     const normal = database.createChecklistItem({
@@ -411,6 +435,189 @@ describe('AppDatabase', () => {
       source: 'public_schedule',
       remoteKey: 'event:public:paper-bird'
     })
+  })
+
+  it('个人活动标题是公开标题子串时合并，并归档历史重复记录', () => {
+    database = new AppDatabase(':memory:')
+    const startsAt = '2026-07-18T02:00:00.000Z'
+    const endsAt = '2026-08-02T19:59:59.000Z'
+    database.mergeSyncedItems('genshin', 'public_schedule', [{
+      remoteKey: 'event:public:heated-battle',
+      category: 'limited_event',
+      title: '「七圣召唤」热斗模式：自行巧局',
+      startsAt,
+      endsAt
+    }])
+    database.mergeSyncedItems('genshin', 'personal_sync', [{
+      remoteKey: 'event:miyoushe:336',
+      category: 'limited_event',
+      title: '活动日历内部标题',
+      startsAt,
+      endsAt,
+      completed: false
+    }])
+    const duplicate = database.listChecklistItems('genshin')
+      .find((item) => item.remoteKey === 'event:miyoushe:336')!
+    database.updateChecklistItem({ id: duplicate.id, title: '热斗模式：自行巧局' })
+
+    database.mergeSyncedItems('genshin', 'personal_sync', [{
+      remoteKey: 'event:miyoushe:336',
+      category: 'limited_event',
+      title: '热斗模式：自行巧局',
+      startsAt,
+      endsAt,
+      completed: true
+    }])
+
+    const active = database.listChecklistItems('genshin')
+      .filter((item) => item.category === 'limited_event')
+    expect(active).toHaveLength(1)
+    expect(active[0]).toMatchObject({
+      title: '「七圣召唤」热斗模式：自行巧局',
+      source: 'public_schedule',
+      completed: true
+    })
+    expect(database.listArchivedChecklistItems('genshin')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: duplicate.id, source: 'personal_sync' })
+      ])
+    )
+  })
+
+  it('四款游戏的无时间个人条目都不能凭空创建为活动', () => {
+    database = new AppDatabase(':memory:')
+    const gameIds = ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const
+
+    for (const gameId of gameIds) {
+      const result = database.mergeSyncedItems(gameId, 'personal_sync', [{
+        remoteKey: `event:personal:untimed:${gameId}`,
+        category: 'limited_event',
+        title: `${gameId} 无时间功能条目`,
+        completed: true
+      }])
+
+      expect(result).toEqual({ added: 0, updated: 0, preserved: 1 })
+      expect(database.listChecklistItems(gameId)
+        .filter((item) => item.category === 'limited_event')).toHaveLength(0)
+    }
+  })
+
+  it('四款游戏的挑战玩法都不能被个人活动接口写入活动版块', () => {
+    database = new AppDatabase(':memory:')
+    const cases = [
+      ['genshin', '幽境危战·本期'],
+      ['star-rail', '虚构叙事·本期'],
+      ['zenless', '危局强袭战·本期'],
+      ['wuthering-waves', '逆境深塔·本期']
+    ] as const
+
+    for (const [gameId, title] of cases) {
+      const result = database.mergeSyncedItems(gameId, 'personal_sync', [{
+        remoteKey: `event:personal:misclassified:${gameId}`,
+        category: 'limited_event',
+        title,
+        startsAt: '2026-07-20T02:00:00.000Z',
+        endsAt: '2026-07-27T01:59:59.000Z',
+        completed: true
+      }])
+
+      expect(result).toEqual({ added: 0, updated: 0, preserved: 1 })
+      expect(database.listChecklistItems(gameId)
+        .filter((item) => item.category === 'limited_event')).toHaveLength(0)
+    }
+  })
+
+  it('无时间个人条目只能补充公开资料已有活动并保留公开时间', () => {
+    database = new AppDatabase(':memory:')
+    database.mergeSyncedItems('wuthering-waves', 'public_schedule', [{
+      remoteKey: 'event:public:double-drop',
+      category: 'limited_event',
+      title: '材料双倍活动',
+      startsAt: '2026-07-20T02:00:00.000Z',
+      endsAt: '2026-07-27T01:59:59.000Z'
+    }])
+
+    const result = database.mergeSyncedItems('wuthering-waves', 'personal_sync', [{
+      remoteKey: 'event:personal:double-drop',
+      category: 'limited_event',
+      title: '材料双倍活动',
+      completed: true
+    }])
+
+    expect(result).toEqual({ added: 0, updated: 1, preserved: 0 })
+    expect(database.listChecklistItems('wuthering-waves')
+      .filter((item) => item.category === 'limited_event')).toEqual([
+        expect.objectContaining({
+          title: '材料双倍活动',
+          source: 'public_schedule',
+          completed: true,
+          startsAt: '2026-07-20T02:00:00.000Z',
+          endsAt: '2026-07-27T01:59:59.000Z',
+          remoteKey: 'event:public:double-drop'
+        })
+      ])
+  })
+
+  it('历史遗留的各游戏无时间个人活动在启动时统一归档', () => {
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-task-manager-untimed-cleanup-'))
+    const databasePath = join(temporaryDirectory, 'test.sqlite')
+    database = new AppDatabase(databasePath)
+    database.close()
+    database = null
+
+    const raw = new DatabaseSync(databasePath)
+    const insert = raw.prepare(`
+      INSERT INTO checklist_items(
+        id, game_id, category, title, source, remote_key, created_at, updated_at
+      ) VALUES (?, ?, 'limited_event', ?, 'personal_sync', ?, ?, ?)
+    `)
+    for (const gameId of ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const) {
+      insert.run(
+        `untimed-${gameId}`,
+        gameId,
+        `${gameId} 历史无时间条目`,
+        `event:personal:legacy:${gameId}`,
+        '2026-07-23T00:00:00.000Z',
+        '2026-07-23T00:00:00.000Z'
+      )
+    }
+    raw.close()
+
+    database = new AppDatabase(databasePath)
+    for (const gameId of ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const) {
+      expect(database.listChecklistItems(gameId)
+        .some((item) => item.id === `untimed-${gameId}`)).toBe(false)
+      expect(database.listArchivedChecklistItems(gameId)
+        .some((item) => item.id === `untimed-${gameId}`)).toBe(true)
+    }
+  })
+
+  it('历史个人活动中的原神挑战模式会从活动版块归档', () => {
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-task-manager-section-cleanup-'))
+    const databasePath = join(temporaryDirectory, 'test.sqlite')
+    database = new AppDatabase(databasePath)
+    database.close()
+    database = null
+
+    const raw = new DatabaseSync(databasePath)
+    raw.prepare(`
+      INSERT INTO checklist_items(
+        id, game_id, category, title, source, remote_key, created_at, updated_at
+      ) VALUES (?, 'genshin', 'limited_event', ?, 'personal_sync', ?, ?, ?)
+    `).run(
+      'misclassified-stygian',
+      '幽境危战·栗烈之役',
+      'event:miyoushe:333',
+      '2026-07-23T00:00:00.000Z',
+      '2026-07-23T00:00:00.000Z'
+    )
+    raw.close()
+
+    database = new AppDatabase(databasePath)
+    expect(database.listChecklistItems('genshin')
+      .some((item) => item.id === 'misclassified-stygian')).toBe(false)
+    expect(database.listArchivedChecklistItems('genshin')
+      .some((item) => item.id === 'misclassified-stygian')).toBe(true)
   })
 
   it('公开地图先建 0% 清单，再按区域中文名回填个人探索度', () => {
