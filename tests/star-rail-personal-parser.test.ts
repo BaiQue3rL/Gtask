@@ -204,12 +204,13 @@ describe('Star Rail personal parsing', () => {
     const adapter = new StarRailPersonalAdapter(client)
 
     const result = await adapter.sync('star-rail')
-    expect(order).toEqual(['memory', 'fiction', 'shadow', 'arbitration', 'events'])
-    expect(result.items).toHaveLength(5)
+    expect(order).toEqual(['memory', 'fiction', 'shadow', 'arbitration'])
+    expect(result.items).toHaveLength(4)
     order.length = 0
     const eventsOnly = await adapter.sync('star-rail', 'events')
-    expect(order).toEqual(['events'])
-    expect(eventsOnly.items).toHaveLength(1)
+    expect(order).toEqual([])
+    expect(eventsOnly.items).toEqual([])
+    expect(eventsOnly.message).toContain('已跳过')
     order.length = 0
     const exploration = await adapter.sync('star-rail', 'exploration')
     expect(order).toEqual([])
