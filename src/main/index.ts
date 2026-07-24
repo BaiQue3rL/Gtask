@@ -14,6 +14,8 @@ import { detectCodexPlugin } from './ai/codex-plugin'
 import { prepareCodexPluginMarketplace } from './ai/codex-plugin-installer'
 import { MiyousheQrLoginService } from './auth/miyoushe-qr-login'
 import { solveMiyousheGeetest } from './auth/miyoushe-geetest-window'
+import { KuroCommunityLoginService } from './auth/kuro-community-login'
+import { requestKuroCommunityWebToken } from './auth/kuro-community-web-login'
 import { createElectronNetFetcher } from './sync/electron-net-fetcher'
 import { CredentialBackedAdapter } from './sync/credential-backed-adapter'
 import {
@@ -21,6 +23,8 @@ import {
   createMiyousheStarRailPersonalAdapter,
   createMiyousheZenlessPersonalAdapter
 } from './sync/miyoushe-chronicle-client'
+import { createKuroCommunityPersonalAdapter } from './sync/kuro-community-client'
+import { encodeKuroCommunityCredential } from './sync/kuro-community-credential'
 import { SyncOrchestrator } from './sync/orchestrator'
 import { restoreRelaunchOptions } from './relaunch'
 import { normalizeSyncItems } from './sync/normalization'
@@ -67,6 +71,7 @@ let aiJobProgressTimer: ReturnType<typeof setInterval> | null = null
 const aiJobProgressSignatures = new Map<GameId, string>()
 let credentialVault: CredentialVault | null = null
 let miyousheQrLogin: MiyousheQrLoginService | null = null
+let kuroCommunityLogin: KuroCommunityLoginService | null = null
 let appBackupDirectory: string | null = null
 let appDatabasePath: string | null = null
 
@@ -467,6 +472,32 @@ function registerIpcHandlers(): void {
     if (!miyousheQrLogin) throw new Error('米游社登录服务尚未初始化')
     return miyousheQrLogin.cancel(parseQrLoginSessionId(value))
   })
+  ipcMain.handle('kuro-login:request-sms', async (_event, phone: unknown) => {
+    if (!kuroCommunityLogin) throw new Error('库街区登录服务尚未初始化')
+    if (typeof phone !== 'string') throw new Error('手机号格式不正确')
+    return await kuroCommunityLogin.requestSmsCode(phone)
+  })
+  ipcMain.handle('kuro-login:complete', async (_event, phone: unknown, code: unknown) => {
+    if (!kuroCommunityLogin || !credentialVault) throw new Error('库街区登录服务尚未初始化')
+    if (typeof phone !== 'string' || typeof code !== 'string') {
+      throw new Error('库街区短信登录参数格式不正确')
+    }
+    const credential = await kuroCommunityLogin.completeLogin(phone, code)
+    return credentialVault.store(
+      'kuro-community',
+      encodeKuroCommunityCredential(credential)
+    )
+  })
+  ipcMain.handle('kuro-login:web', async () => {
+    if (!kuroCommunityLogin || !credentialVault) throw new Error('库街区登录服务尚未初始化')
+    const token = await requestKuroCommunityWebToken(mainWindow)
+    if (!token) throw new Error('已取消库街区网页登录')
+    const credential = await kuroCommunityLogin.completeWebLogin(token)
+    return credentialVault.store(
+      'kuro-community',
+      encodeKuroCommunityCredential(credential)
+    )
+  })
   ipcMain.handle('credentials:clear', (_event, provider: unknown) => {
     if (!credentialVault) throw new Error('安全凭据存储尚未初始化')
     return credentialVault.clear(parseCredentialProvider(provider))
@@ -516,6 +547,35 @@ if (!app.requestSingleInstanceLock()) {
       unprotect: (encrypted) => safeStorage.decryptString(encrypted)
     })
     miyousheQrLogin = new MiyousheQrLoginService(createElectronNetFetcher(net.fetch))
+    kuroCommunityLogin = new KuroCommunityLoginService(
+      createElectronNetFetcher(net.fetch),
+      async (captchaId) => {
+        const result = await solveMiyousheGeetest(
+          mainWindow,
+          {
+            version: 4,
+            gt: captchaId,
+            riskType: 'slide',
+            sessionId: 'kuro-community-sms'
+          },
+          {
+            title: '库街区安全验证',
+            heading: '库街区安全验证',
+            description: '请完成官方滑块后获取短信验证码。应用只接收本次验证票据。',
+            includeSessionUserInfo: false,
+            showMethod: 'showBox'
+          }
+        )
+        if (!result || !('version' in result) || result.version !== 4) return null
+        return {
+          captcha_id: result.captcha_id,
+          lot_number: result.lot_number,
+          pass_token: result.pass_token,
+          gen_time: result.gen_time,
+          captcha_output: result.captcha_output
+        }
+      }
+    )
     try {
       await createDailyBackup(appDatabase, backupDirectory)
       pruneDailyBackups(backupDirectory)
@@ -565,6 +625,7 @@ app.on('before-quit', () => {
   syncOrchestrator = null
   credentialVault = null
   miyousheQrLogin = null
+  kuroCommunityLogin = null
   appBackupDirectory = null
   appDatabasePath = null
 })
@@ -612,6 +673,15 @@ function createAppSyncOrchestrator(database: AppDatabase): SyncOrchestrator {
           credential,
           fetcher,
           (challenge) => solveMiyousheGeetest(mainWindow, challenge),
+          onProgress
+        )
+      ),
+      'wuthering-waves': new CredentialBackedAdapter(
+        'kuro-community',
+        credentialVault,
+        (credential, onProgress) => createKuroCommunityPersonalAdapter(
+          credential,
+          fetcher,
           onProgress
         )
       )

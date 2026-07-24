@@ -141,6 +141,14 @@ const miyousheLoginOpen = ref(false)
 const miyousheLoginState = ref<MiyousheQrLoginState | null>(null)
 const startingMiyousheLogin = ref(false)
 const pollingMiyousheLogin = ref(false)
+const kuroLoginOpen = ref(false)
+const kuroPhone = ref('')
+const kuroCode = ref('')
+const kuroCodeSent = ref(false)
+const kuroLoginMessage = ref('')
+const requestingKuroCode = ref(false)
+const completingKuroLogin = ref(false)
+const startingKuroWebLogin = ref(false)
 const credentialStatuses = ref<CredentialStatus[]>([])
 const backups = ref<BackupSummary[]>([])
 const backingUp = ref(false)
@@ -658,6 +666,75 @@ async function closeMiyousheLogin(): Promise<void> {
 function stopMiyousheLoginPolling(): void {
   if (miyousheLoginTimer !== null) window.clearInterval(miyousheLoginTimer)
   miyousheLoginTimer = null
+}
+
+async function startKuroWebLogin(): Promise<void> {
+  if (startingKuroWebLogin.value) return
+  startingKuroWebLogin.value = true
+  try {
+    await window.gacha.loginWithKuroWeb()
+    credentialStatuses.value = await window.gacha.listCredentialStatuses()
+    syncNotice.value = {
+      status: 'success',
+      message: '库街区网页登录成功，鸣潮个人进度已可同步。'
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '库街区网页登录失败'
+    if (!message.includes('已取消')) showError(error)
+  } finally {
+    startingKuroWebLogin.value = false
+  }
+}
+
+function openKuroLogin(): void {
+  kuroPhone.value = ''
+  kuroCode.value = ''
+  kuroCodeSent.value = false
+  kuroLoginMessage.value = ''
+  kuroLoginOpen.value = true
+}
+
+function closeKuroLogin(): void {
+  if (requestingKuroCode.value || completingKuroLogin.value) return
+  kuroLoginOpen.value = false
+  kuroPhone.value = ''
+  kuroCode.value = ''
+  kuroCodeSent.value = false
+  kuroLoginMessage.value = ''
+}
+
+async function requestKuroSmsCode(): Promise<void> {
+  if (requestingKuroCode.value || completingKuroLogin.value) return
+  requestingKuroCode.value = true
+  kuroLoginMessage.value = '正在打开库街区官方安全验证…'
+  try {
+    const result = await window.gacha.requestKuroSmsCode(kuroPhone.value)
+    kuroCodeSent.value = true
+    kuroLoginMessage.value = `${result.message}（${result.phoneMasked}）`
+  } catch (error) {
+    kuroLoginMessage.value = error instanceof Error ? error.message : '获取短信验证码失败'
+  } finally {
+    requestingKuroCode.value = false
+  }
+}
+
+async function completeKuroLogin(): Promise<void> {
+  if (!kuroCodeSent.value || completingKuroLogin.value || requestingKuroCode.value) return
+  completingKuroLogin.value = true
+  kuroLoginMessage.value = '正在验证账号并读取鸣潮角色…'
+  try {
+    await window.gacha.completeKuroSmsLogin(kuroPhone.value, kuroCode.value)
+    credentialStatuses.value = await window.gacha.listCredentialStatuses()
+    kuroLoginOpen.value = false
+    kuroPhone.value = ''
+    kuroCode.value = ''
+    kuroCodeSent.value = false
+    kuroLoginMessage.value = ''
+  } catch (error) {
+    kuroLoginMessage.value = error instanceof Error ? error.message : '库街区登录失败'
+  } finally {
+    completingKuroLogin.value = false
+  }
 }
 
 async function openDataDirectory(): Promise<void> {
@@ -1397,7 +1474,20 @@ function showError(error: unknown): void {
                 :disabled="startingMiyousheLogin"
                 @click="startMiyousheLogin"
               >{{ startingMiyousheLogin ? '获取中…' : status.stored ? '重新登录' : '扫码登录' }}</button>
-              <button v-else class="secondary-button" type="button" disabled>登录开发中</button>
+              <button
+                v-else
+                class="secondary-button"
+                type="button"
+                :disabled="startingKuroWebLogin"
+                @click="startKuroWebLogin"
+              >{{ startingKuroWebLogin ? '等待官网登录…' : status.stored ? '重新登录' : '网页登录' }}</button>
+              <button
+                v-if="status.provider === 'kuro-community'"
+                class="secondary-button"
+                type="button"
+                :disabled="startingKuroWebLogin"
+                @click="openKuroLogin"
+              >短信备用</button>
               <button
                 class="danger-button"
                 type="button"
@@ -1432,7 +1522,7 @@ function showError(error: unknown): void {
           </div>
           <p v-if="backups.length === 0" class="empty-text">尚无备份</p>
         </div>
-        <p class="settings-note">米游社二维码登录已启用；库街区登录与风控验证窗口继续开发中。手动清单与公开资料同步始终不依赖登录。</p>
+        <p class="settings-note">米游社使用二维码登录；库街区优先使用官方网页登录，短信接口仅作备用。凭据只在本机加密保存，手动清单与公开资料同步始终不依赖登录。</p>
       </section>
     </div>
     <div v-if="miyousheLoginOpen" class="modal-backdrop login-backdrop" @click.self="closeMiyousheLogin">
@@ -1470,6 +1560,61 @@ function showError(error: unknown): void {
           </button>
         </div>
       </section>
+    </div>
+    <div v-if="kuroLoginOpen" class="modal-backdrop login-backdrop" @click.self="closeKuroLogin">
+      <form
+        class="editor-modal login-modal kuro-login-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="库街区短信登录"
+        @submit.prevent="kuroCodeSent ? completeKuroLogin() : requestKuroSmsCode()"
+      >
+        <div class="modal-header">
+          <div><h2>库街区短信登录</h2><p>Token、DID 与角色信息仅经 Windows DPAPI 加密保存在本机</p></div>
+          <button class="close-button" type="button" aria-label="关闭库街区登录" @click="closeKuroLogin">×</button>
+        </div>
+        <label>
+          手机号
+          <input
+            v-model="kuroPhone"
+            type="tel"
+            inputmode="numeric"
+            autocomplete="tel"
+            maxlength="11"
+            placeholder="请输入库街区绑定手机号"
+            :disabled="kuroCodeSent || requestingKuroCode || completingKuroLogin"
+          >
+        </label>
+        <label v-if="kuroCodeSent">
+          短信验证码
+          <input
+            v-model="kuroCode"
+            type="text"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="8"
+            placeholder="请输入短信验证码"
+            :disabled="completingKuroLogin"
+          >
+        </label>
+        <p v-if="kuroLoginMessage" class="kuro-login-status">{{ kuroLoginMessage }}</p>
+        <p class="recycle-hint">获取验证码时会弹出库街区官方滑块；登录完成后，短期 BAT 数据令牌由软件按需刷新，不长期保存。</p>
+        <div class="login-actions">
+          <button
+            v-if="!kuroCodeSent"
+            class="primary-button"
+            type="submit"
+            :disabled="requestingKuroCode || kuroPhone.length !== 11"
+          >{{ requestingKuroCode ? '验证中…' : '获取验证码' }}</button>
+          <button
+            v-else
+            class="primary-button"
+            type="submit"
+            :disabled="completingKuroLogin || kuroCode.length < 4"
+          >{{ completingKuroLogin ? '登录中…' : '完成登录' }}</button>
+          <button class="secondary-button" type="button" @click="closeKuroLogin">关闭</button>
+        </div>
+      </form>
     </div>
   </main>
 </template>

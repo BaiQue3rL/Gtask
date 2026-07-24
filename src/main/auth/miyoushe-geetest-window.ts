@@ -7,16 +7,35 @@ import type {
 
 const COMPLETION_URL = 'gacha-verification://complete/'
 
+export interface GeetestWindowCopy {
+  title: string
+  heading: string
+  description: string
+  apiServers?: string[]
+  includeSessionUserInfo?: boolean
+  showMethod?: 'showCaptcha' | 'showBox'
+}
+
+const MIYOUSHE_COPY: GeetestWindowCopy = {
+  title: '米游社安全验证',
+  heading: '米游社安全验证',
+  description: '请手动完成官方滑块。应用只接收本次验证票据，不保存滑块内容。',
+  apiServers: ['gcaptcha4.captchami.com'],
+  includeSessionUserInfo: true,
+  showMethod: 'showCaptcha'
+}
+
 export async function solveMiyousheGeetest(
   parent: BrowserWindow | null,
-  challenge: MiyousheGeetestChallenge
+  challenge: MiyousheGeetestChallenge,
+  copy: GeetestWindowCopy = MIYOUSHE_COPY
 ): Promise<MiyousheGeetestResult | null> {
   const verificationWindow = new BrowserWindow({
     width: 480,
     height: 620,
     minWidth: 420,
     minHeight: 540,
-    title: '米游社安全验证',
+    title: copy.title,
     parent: parent ?? undefined,
     modal: Boolean(parent),
     autoHideMenuBar: true,
@@ -75,7 +94,7 @@ export async function solveMiyousheGeetest(
       verificationWindow.show()
     })
 
-    const html = buildVerificationPage(challenge)
+    const html = buildVerificationPage(challenge, copy)
     void verificationWindow.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(html)}`).catch((error) => {
       if (settled) return
       settled = true
@@ -85,9 +104,13 @@ export async function solveMiyousheGeetest(
   })
 }
 
-function buildVerificationPage(challenge: MiyousheGeetestChallenge): string {
+function buildVerificationPage(
+  challenge: MiyousheGeetestChallenge,
+  copy: GeetestWindowCopy
+): string {
   const nonce = randomBytes(16).toString('base64')
   const challengeJson = JSON.stringify(challenge).replaceAll('<', '\\u003c')
+  const copyJson = JSON.stringify(copy).replaceAll('<', '\\u003c')
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -95,32 +118,64 @@ function buildVerificationPage(challenge: MiyousheGeetestChallenge): string {
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}' https://*.geetest.com https://*.geevisit.com https://*.gsensebot.com; connect-src https://*.geetest.com https://*.geevisit.com https://*.gsensebot.com https://*.captchami.com; img-src data: https://*.geetest.com https://*.geevisit.com https://*.gsensebot.com https://*.captchami.com; style-src 'unsafe-inline' https://*.geetest.com https://*.geevisit.com https://*.gsensebot.com; frame-src https://*.geetest.com https://*.geevisit.com https://*.gsensebot.com https://*.captchami.com">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>米游社安全验证</title>
+  <title>${escapeHtml(copy.title)}</title>
   <style>
     *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:28px;color:#dce9f8;background:linear-gradient(145deg,#0c213d,#07172e);font:14px/1.6 system-ui,"Microsoft YaHei",sans-serif}.card{width:min(390px,100%);padding:24px;border:1px solid #36577d;border-radius:14px;background:rgba(7,23,46,.9);box-shadow:0 20px 60px rgba(0,0,0,.35)}h1{margin:0 0 8px;font-size:20px}p{margin:0 0 18px;color:#8da4bf}.status{margin-top:16px;color:#78acd9;font-size:12px}#captcha{min-height:44px}
   </style>
-  <script src="${challenge.version === 4 ? 'https://static.geetest.com/v4/gt4.js' : 'https://static.geetest.com/static/js/gt.0.5.0.js'}"></script>
 </head>
 <body>
   <main class="card">
-    <h1>米游社安全验证</h1>
-    <p>请手动完成官方滑块。应用只接收本次验证票据，不保存滑块内容。</p>
+    <h1>${escapeHtml(copy.heading)}</h1>
+    <p>${escapeHtml(copy.description)}</p>
     <div id="captcha"></div>
     <div id="status" class="status">正在加载官方验证组件…</div>
   </main>
   <script nonce="${nonce}">
     const challenge = ${challengeJson};
+    const copy = ${copyJson};
     const status = document.getElementById('status');
     const isV4 = challenge.version === 4;
-    const initializer = isV4 ? window.initGeetest4 : window.initGeetest;
-    if (typeof initializer !== 'function') {
-      status.textContent = '验证组件加载失败，请关闭窗口后重试。';
-    } else {
+    const scriptSources = isV4
+      ? ['https://static.geetest.com/v4/gt4.js', 'https://static.geevisit.com/v4/gt4.js']
+      : ['https://static.geetest.com/static/js/gt.0.5.0.js'];
+    const loadInitializer = () => new Promise((resolve, reject) => {
+      let index = 0;
+      const next = () => {
+        const current = isV4 ? window.initGeetest4 : window.initGeetest;
+        if (typeof current === 'function') return resolve(current);
+        if (index >= scriptSources.length) return reject(new Error('all sources failed'));
+        const script = document.createElement('script');
+        let finished = false;
+        const finishAttempt = (loaded) => {
+          if (finished) return;
+          finished = true;
+          window.clearTimeout(timeout);
+          if (loaded) {
+            const initializer = isV4 ? window.initGeetest4 : window.initGeetest;
+            if (typeof initializer === 'function') return resolve(initializer);
+          }
+          script.remove();
+          next();
+        };
+        script.src = scriptSources[index++];
+        script.async = true;
+        script.onload = () => finishAttempt(true);
+        script.onerror = () => finishAttempt(false);
+        const timeout = window.setTimeout(() => finishAttempt(false), 4000);
+        document.head.appendChild(script);
+      };
+      next();
+    });
+    loadInitializer().then((initializer) => {
       const options = isV4 ? {
         captchaId: challenge.gt,
         riskType: challenge.riskType,
-        userInfo: JSON.stringify({ mmt_key: challenge.sessionId }),
-        apiServers: ['gcaptcha4.captchami.com'],
+        ...(copy.includeSessionUserInfo
+          ? { userInfo: JSON.stringify({ mmt_key: challenge.sessionId }) }
+          : {}),
+        ...(Array.isArray(copy.apiServers) && copy.apiServers.length
+          ? { apiServers: copy.apiServers }
+          : {}),
         product: 'bind',
         language: 'zh-cn'
       } : {
@@ -137,7 +192,17 @@ function buildVerificationPage(challenge: MiyousheGeetestChallenge): string {
         if (!isV4) captcha.appendTo('#captcha');
         captcha.onReady(() => {
           status.textContent = '请完成上方验证';
-          isV4 ? captcha.showCaptcha() : captcha.verify();
+          if (!isV4) {
+            captcha.verify();
+          } else if (copy.showMethod === 'showBox' && typeof captcha.showBox === 'function') {
+            captcha.showBox();
+          } else if (typeof captcha.showCaptcha === 'function') {
+            captcha.showCaptcha();
+          } else if (typeof captcha.showBox === 'function') {
+            captcha.showBox();
+          } else {
+            status.textContent = '官方验证组件没有提供可用的显示方法，请重试。';
+          }
         });
         captcha.onSuccess(() => {
           const result = captcha.getValidate();
@@ -153,10 +218,21 @@ function buildVerificationPage(challenge: MiyousheGeetestChallenge): string {
         });
         captcha.onError(() => { status.textContent = '验证加载失败，请关闭窗口后重试。'; });
       });
-    }
+    }).catch(() => {
+      status.textContent = '官方验证组件加载失败，请检查网络或代理后重试。';
+    });
   </script>
 </body>
 </html>`
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
 }
 
 function parseResult(value: unknown): MiyousheGeetestResult {
