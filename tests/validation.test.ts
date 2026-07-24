@@ -88,4 +88,22 @@ describe('清单 IPC 参数校验', () => {
     expect(() => parseExternalUrl('file:///C:/secret.txt')).toThrow('HTTP/HTTPS')
     expect(() => parseExternalUrl('javascript:alert(1)')).toThrow('HTTP/HTTPS')
   })
+
+  it('清理活动玩法标签、去重并限制数量', () => {
+    expect(
+      parseCreateChecklistItem({
+        gameId: 'genshin',
+        category: 'limited_event',
+        title: '玩法标签测试',
+        activityTags: [' 战斗 ', '跑酷', '战斗']
+      }).activityTags
+    ).toEqual(['战斗', '跑酷'])
+
+    expect(() =>
+      parseUpdateChecklistItem({
+        id: 'event-id',
+        activityTags: ['签到', '战斗', '跑酷', '解谜', '经营', '音游']
+      })
+    ).toThrow('活动玩法标签')
+  })
 })

@@ -77,6 +77,29 @@ describe('AppDatabase', () => {
     expect(database.listChecklistItems('genshin').some((item) => item.id === created.id)).toBe(true)
   })
 
+  it('活动玩法标签可编辑，切出活动分类后自动清空', () => {
+    database = new AppDatabase(':memory:')
+    const created = database.createChecklistItem({
+      gameId: 'genshin',
+      category: 'limited_event',
+      title: '玩法标签活动',
+      activityTags: ['战斗', '跑酷']
+    })
+    expect(created.activityTags).toEqual(['战斗', '跑酷'])
+
+    const updated = database.updateChecklistItem({
+      id: created.id,
+      activityTags: ['解谜']
+    })
+    expect(updated.activityTags).toEqual(['解谜'])
+
+    const moved = database.updateChecklistItem({
+      id: created.id,
+      category: 'custom'
+    })
+    expect(moved.activityTags).toEqual([])
+  })
+
   it('关闭并重新打开数据库后保留数据且迁移可重复执行', () => {
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-task-manager-test-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')

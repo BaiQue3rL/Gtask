@@ -125,6 +125,7 @@ const saving = ref(false)
 const errorMessage = ref('')
 const selectedGameId = ref<GameId>('genshin')
 const showIncompleteOnly = ref(false)
+const activityTagFilter = ref('')
 const sectionSyncMenuOpen = ref<ChecklistSection | null>(null)
 const syncing = ref(false)
 const syncSettings = ref<SyncSettings | null>(null)
@@ -152,6 +153,7 @@ let miyousheLoginTimer: number | null = null
 const form = reactive({
   category: 'custom' as ChecklistCategory,
   title: '',
+  activityTags: '',
   progressPercent: null as number | null,
   parentTitle: '',
   startsAt: '',
@@ -222,6 +224,11 @@ const completedCount = computed(() => {
   const weekStart = startOfCurrentWeek()
   return items.value.filter((item) => item.completedAt && new Date(item.completedAt) >= weekStart).length
 })
+const activityTagOptions = computed(() => [...new Set(
+  items.value
+    .filter((item) => ['limited_event', 'permanent_event'].includes(item.category))
+    .flatMap((item) => item.activityTags)
+)].sort((left, right) => left.localeCompare(right, 'zh-CN')))
 const expiringCount = computed(() => {
   const now = Date.now()
   const threshold = now + 3 * 24 * 60 * 60 * 1000
@@ -356,6 +363,7 @@ watch(selectedGameId, () => {
   activeAiJob.value = null
   sectionSyncMenuOpen.value = null
   recycleBinOpen.value = false
+  activityTagFilter.value = ''
   void Promise.all([
     loadItems(),
     loadArchivedItems(),
@@ -702,7 +710,14 @@ async function runPersonalSync(target: SyncTarget = 'all'): Promise<void> {
 
 function itemsFor(categories: ChecklistCategory[]): ChecklistItem[] {
   return items.value.filter(
-    (item) => categories.includes(item.category) && (!showIncompleteOnly.value || !item.completed)
+    (item) =>
+      categories.includes(item.category) &&
+      (!showIncompleteOnly.value || !item.completed) &&
+      (
+        !activityTagFilter.value ||
+        !['limited_event', 'permanent_event'].includes(item.category) ||
+        item.activityTags.includes(activityTagFilter.value)
+      )
   )
 }
 
@@ -718,6 +733,7 @@ function openCreate(category: ChecklistCategory): void {
   editingItem.value = null
   form.category = category
   form.title = ''
+  form.activityTags = ''
   form.progressPercent = null
   form.parentTitle = ''
   form.startsAt = ''
@@ -732,6 +748,7 @@ function openEdit(item: ChecklistItem): void {
   editingItem.value = item
   form.category = item.category
   form.title = item.title
+  form.activityTags = item.activityTags.join('、')
   form.progressPercent = item.progressPercent
   form.parentTitle = item.parentTitle ?? ''
   form.startsAt = toLocalDateTime(item.startsAt)
@@ -749,19 +766,25 @@ async function saveItem(): Promise<void> {
   try {
     const isTimed = ['limited_event', 'endgame'].includes(form.category)
     const isWeekly = form.category === 'weekly'
+    const isVersionTask = ['main_quest', 'side_quest'].includes(form.category)
     const common: Omit<CreateChecklistItemInput, 'gameId'> = {
       category: form.category,
       title: form.title,
+      activityTags: ['limited_event', 'permanent_event'].includes(form.category)
+        ? parseActivityTags(form.activityTags)
+        : [],
       progressPercent: form.category === 'exploration' ? normalizeProgress(form.progressPercent) : null,
       parentTitle: form.category === 'exploration' ? form.parentTitle.trim() || null : null,
-      startsAt: isWeekly ? undefined : isTimed ? toIsoOrNull(form.startsAt) : null,
-      endsAt: isWeekly ? undefined : isTimed ? toIsoOrNull(form.endsAt) : null,
+      startsAt: isWeekly || isVersionTask ? undefined : isTimed ? toIsoOrNull(form.startsAt) : null,
+      endsAt: isWeekly || isVersionTask ? undefined : isTimed ? toIsoOrNull(form.endsAt) : null,
       resetRule: isWeekly
         ? `每${weekdayLabels[form.resetWeekday]}重置`
         : form.category === 'endgame'
           ? form.resetRule.trim() || null
           : null,
-      scheduleKind: isWeekly
+      scheduleKind: isVersionTask
+        ? undefined
+        : isWeekly
         ? 'weekly'
         : form.category === 'limited_event'
           ? 'fixed_window'
@@ -769,7 +792,7 @@ async function saveItem(): Promise<void> {
             ? 'remote_schedule'
             : null,
       resetWeekday: isWeekly ? 1 : null,
-      timeZone: isWeekly ? 'Asia/Shanghai' : null,
+      timeZone: isVersionTask ? undefined : isWeekly ? 'Asia/Shanghai' : null,
       modeKey: form.category === 'endgame' ? form.modeKey.trim() || null : null,
       recurrenceRule: null
     }
@@ -841,6 +864,14 @@ async function restoreItem(item: ChecklistItem): Promise<void> {
 function normalizeProgress(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null
   return Math.min(100, Math.max(0, Number(value)))
+}
+
+function parseActivityTags(value: string): string[] {
+  return [...new Set(value
+    .split(/[、,，]/)
+    .map((tag) => tag.trim())
+    .filter(Boolean))]
+    .slice(0, 5)
 }
 
 function toLocalDateTime(value: string | null): string {
@@ -1111,6 +1142,13 @@ function showError(error: unknown): void {
                   {{ syncProgressCount(progressForTarget(panel.syncTarget)!) }}
                 </b>
               </div>
+              <label v-if="panel.section === 'events' && activityTagOptions.length > 0" class="activity-tag-filter">
+                <span>玩法筛选</span>
+                <select v-model="activityTagFilter">
+                  <option value="">全部玩法</option>
+                  <option v-for="tag in activityTagOptions" :key="tag" :value="tag">{{ tag }}</option>
+                </select>
+              </label>
               <div class="item-list">
                 <div
                   v-for="item in itemsFor(panel.categories)"
@@ -1125,6 +1163,11 @@ function showError(error: unknown): void {
                     <span class="item-title">{{ item.title }}</span>
                     <span class="item-details">
                       <b>{{ categoryLabels[item.category] }}</b>
+                      <span
+                        v-for="tag in item.activityTags"
+                        :key="tag"
+                        class="activity-tag"
+                      >{{ tag }}</span>
                       <span v-if="item.parentTitle">{{ item.parentTitle }}</span>
                       <span v-if="item.category === 'exploration' && item.progressPercent !== null">
                         {{ item.progressPercent }}%
@@ -1203,6 +1246,14 @@ function showError(error: unknown): void {
           <select v-model="form.category" :disabled="editingItem ? ['main_quest', 'side_quest'].includes(editingItem.category) || isPersistentItem(editingItem) : false">
             <option v-for="[category, label] in editorCategories" :key="category" :value="category">{{ label }}</option>
           </select>
+        </label>
+        <label v-if="['limited_event', 'permanent_event'].includes(form.category)">
+          玩法标签（最多5个）
+          <input
+            v-model="form.activityTags"
+            maxlength="120"
+            placeholder="例如：战斗、跑酷、解谜"
+          />
         </label>
         <template v-if="form.category === 'exploration'">
           <div class="form-grid">

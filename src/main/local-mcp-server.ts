@@ -48,6 +48,7 @@ const httpUrlSchema = z.string().max(500).url().refine((value) => {
 const checklistFields = {
   category: categorySchema,
   title: z.string().min(1).max(100),
+  activityTags: z.array(z.string().min(1).max(20)).max(5).optional(),
   progressPercent: nullableProgressSchema,
   parentTitle: nullableTextSchema,
   startsAt: nullableDateSchema,
@@ -366,6 +367,7 @@ export function createLocalMcpServer(
           remoteKey: z.string().min(1).max(200),
           category: categorySchema,
           title: chineseScheduleTitleSchema,
+          activityTags: z.array(z.string().min(1).max(20)).max(5).optional(),
           completed: z.boolean().optional(),
           parentTitle: nullableTextSchema,
           startsAt: isoDateSchema.nullable().optional(),
@@ -451,6 +453,7 @@ export function createLocalMcpServer(
           category: publicScheduleCategorySchema,
           title: chineseScheduleTitleSchema,
           titleSourceUrl: httpUrlSchema,
+          activityTags: z.array(z.string().min(1).max(20)).max(5).optional(),
           parentTitle: z.string().max(200).nullable().optional(),
           startsAt: isoDateSchema.nullable().optional(),
           endsAt: isoDateSchema.nullable().optional(),

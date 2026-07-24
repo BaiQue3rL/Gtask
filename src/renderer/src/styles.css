@@ -123,6 +123,9 @@ h2 { margin: 0; font-size: 19px; }
 .item-title { grid-area: title; min-width: 0; line-height: 1.4; overflow-wrap: anywhere; white-space: normal; }
 .item-details { display: flex; grid-area: details; align-items: center; flex-wrap: wrap; gap: 6px 8px; min-width: 0; color: #86a0c1; font-size: 12px; }
 .item-details b { padding: 3px 7px; border: 1px solid #345e8c; border-radius: 4px; color: #8db8ed; font-weight: 400; }
+.item-details .activity-tag { padding: 2px 7px; border: 1px solid #5b4f87; border-radius: 999px; color: #c4b1ef; background: rgba(80, 56, 126, 0.2); }
+.activity-tag-filter { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin: 0 0 8px; color: #8198b6; font-size: 12px; }
+.activity-tag-filter select { min-width: 120px; padding: 4px 24px 4px 8px; }
 .item-timing { grid-area: timing; align-self: start; padding-top: 2px; font-size: 12px; white-space: nowrap; }
 .deadline { color: #f0b63a; }
 .deadline.upcoming { color: #78aae8; }

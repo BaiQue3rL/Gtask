@@ -270,6 +270,7 @@ describe('本地 MCP server', () => {
           startsAt: '2026-07-21T02:00:00.000Z',
           endsAt: '2026-08-01T19:59:00.000Z',
           scheduleKind: 'fixed_window',
+          activityTags: ['战斗', '跑酷'],
           sourceUrl: 'https://example.com/official-event',
           confidence: 0.98
         }],
@@ -295,6 +296,7 @@ describe('本地 MCP server', () => {
           title: 'AI 交叉验证活动',
           source: 'public_schedule',
           sourceUrl: 'https://example.com/official-event',
+          activityTags: ['战斗', '跑酷'],
           completed: false
         })
       ])

@@ -40,6 +40,13 @@ function nullableHttpUrl(value: unknown): string | null | undefined {
   return url.toString()
 }
 
+function optionalActivityTags(value: unknown): string[] | undefined {
+  if (value === undefined) return undefined
+  if (!Array.isArray(value) || value.length > 5) throw new Error('活动玩法标签格式不正确')
+  const tags = value.map((entry) => requiredString(entry, '活动玩法标签', 20))
+  return [...new Set(tags)]
+}
+
 export function normalizeSyncItem(value: unknown): NormalizedSyncItem {
   if (!isRecord(value)) throw new Error('同步事项格式不正确')
   if (
@@ -91,6 +98,7 @@ export function normalizeSyncItem(value: unknown): NormalizedSyncItem {
     sourceUrl: nullableHttpUrl(value.sourceUrl),
     category: value.category as NormalizedSyncItem['category'],
     title: requiredString(value.title, '同步事项名称', 100),
+    activityTags: optionalActivityTags(value.activityTags),
     completed: value.completed as boolean | undefined,
     progressPercent: value.progressPercent as number | null | undefined,
     parentTitle: nullableString(value.parentTitle, '同步上级区域'),

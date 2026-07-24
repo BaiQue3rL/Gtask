@@ -45,6 +45,18 @@ function parseTitle(value: unknown): string {
   return title
 }
 
+function parseActivityTags(value: unknown): string[] | undefined {
+  if (value === undefined) return undefined
+  if (!Array.isArray(value) || value.length > 5) throw new Error('活动玩法标签格式不正确')
+  const tags = value.map((entry) => {
+    if (typeof entry !== 'string') throw new Error('活动玩法标签格式不正确')
+    const tag = entry.trim()
+    if (!tag || tag.length > 20) throw new Error('活动玩法标签须为 1 到 20 个字符')
+    return tag
+  })
+  return [...new Set(tags)]
+}
+
 function parseNullableString(value: unknown, fieldName: string): string | null | undefined {
   if (value === undefined) return undefined
   if (value === null || value === '') return null
@@ -112,6 +124,7 @@ export function parseCreateChecklistItem(value: unknown): CreateChecklistItemInp
     gameId: parseGameId(value.gameId),
     category: parseChecklistCategory(value.category),
     title: parseTitle(value.title),
+    activityTags: parseActivityTags(value.activityTags),
     progressPercent: parseProgress(value.progressPercent),
     parentTitle: parseNullableString(value.parentTitle, '上级区域'),
     startsAt,
@@ -141,6 +154,7 @@ export function parseUpdateChecklistItem(value: unknown): UpdateChecklistItemInp
     id: parseItemId(value.id),
     category: value.category === undefined ? undefined : parseChecklistCategory(value.category),
     title: value.title === undefined ? undefined : parseTitle(value.title),
+    activityTags: parseActivityTags(value.activityTags),
     completed: value.completed,
     progressPercent: parseProgress(value.progressPercent),
     parentTitle: parseNullableString(value.parentTitle, '上级区域'),

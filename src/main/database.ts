@@ -59,7 +59,7 @@ const DEFAULT_GAMES: GameSummary[] = [
   }
 ]
 
-export const CURRENT_SCHEMA_VERSION = 14
+export const CURRENT_SCHEMA_VERSION = 15
 
 const AI_AGENT_MAX_AGE_MS = 5 * 60 * 1000
 const AI_JOB_CLAIM_MAX_AGE_MS = 15 * 60 * 1000
@@ -770,6 +770,7 @@ export class AppDatabase {
           game_id AS gameId,
           category,
           title,
+          activity_tags_json AS activityTagsJson,
           completed,
           progress_percent AS progressPercent,
           parent_title AS parentTitle,
@@ -840,6 +841,7 @@ export class AppDatabase {
           game_id AS gameId,
           category,
           title,
+          activity_tags_json AS activityTagsJson,
           completed,
           progress_percent AS progressPercent,
           parent_title AS parentTitle,
@@ -887,16 +889,21 @@ export class AppDatabase {
     this.database
       .prepare(`
         INSERT INTO checklist_items(
-          id, game_id, category, title, progress_percent, parent_title, starts_at, ends_at,
+          id, game_id, category, title, activity_tags_json, progress_percent, parent_title, starts_at, ends_at,
           reset_rule, period_key, schedule_kind, reset_weekday, timezone, mode_key,
           recurrence_rule, source, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?)
       `)
       .run(
         id,
         input.gameId,
         input.category,
         input.title,
+        JSON.stringify(
+          ['limited_event', 'permanent_event'].includes(input.category)
+            ? input.activityTags ?? []
+            : []
+        ),
         input.progressPercent ?? null,
         input.parentTitle ?? null,
         startsAt,
@@ -945,6 +952,11 @@ export class AppDatabase {
       throw new Error('不能把其他事项改为主线或支线状态项')
     }
     const categoryChanged = category !== current.category
+    const activityTags = ['limited_event', 'permanent_event'].includes(category)
+      ? input.activityTags === undefined
+        ? categoryChanged ? [] : current.activityTags
+        : input.activityTags
+      : []
     const scheduleKind =
       input.scheduleKind === undefined
         ? categoryChanged
@@ -981,6 +993,7 @@ export class AppDatabase {
         UPDATE checklist_items SET
           category = ?,
           title = ?,
+          activity_tags_json = ?,
           completed = ?,
           progress_percent = ?,
           parent_title = ?,
@@ -1001,6 +1014,7 @@ export class AppDatabase {
       .run(
         category,
         input.title ?? current.title,
+        JSON.stringify(activityTags),
         completed ? 1 : 0,
         input.progressPercent === undefined ? current.progressPercent : input.progressPercent,
         input.parentTitle === undefined ? current.parentTitle : input.parentTitle,
@@ -1164,17 +1178,22 @@ export class AppDatabase {
           this.database
             .prepare(`
               INSERT INTO checklist_items(
-                id, game_id, category, title, completed, progress_percent, parent_title,
+                id, game_id, category, title, activity_tags_json, completed, progress_percent, parent_title,
                 starts_at, ends_at, reset_rule, period_key, schedule_kind,
                 reset_weekday, timezone, mode_key, recurrence_rule, source, remote_key,
                 source_url, completed_at, last_synced_at, created_at, updated_at
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `)
             .run(
               id,
               gameId,
               item.category,
               item.title,
+              JSON.stringify(
+                ['limited_event', 'permanent_event'].includes(item.category)
+                  ? item.activityTags ?? []
+                  : []
+              ),
               remoteCompleted ? 1 : 0,
               item.category === 'exploration'
                 ? source === 'personal_sync'
@@ -1211,6 +1230,11 @@ export class AppDatabase {
           source === 'public_schedule' || current.source === 'public_schedule'
             ? 'public_schedule'
             : 'personal_sync'
+        const resolvedActivityTags = ['limited_event', 'permanent_event'].includes(resolvedCategory)
+          ? preservePublicSchedule || item.activityTags === undefined
+            ? current.activityTags
+            : item.activityTags
+          : []
         const currentCompleted = current.completed
         const currentCompletedAt = current.completedAt
         const manualCompletionLocked = current.manualCompletionLocked
@@ -1242,6 +1266,7 @@ export class AppDatabase {
             UPDATE checklist_items SET
               category = ?,
               title = ?,
+              activity_tags_json = ?,
               completed = ?,
               progress_percent = ?,
               parent_title = ?,
@@ -1265,6 +1290,7 @@ export class AppDatabase {
           .run(
             resolvedCategory,
             preservePublicSchedule ? current.title : item.title,
+            JSON.stringify(resolvedActivityTags),
             completed ? 1 : 0,
             resolvedCategory === 'exploration'
               ? source === 'public_schedule' || item.progressPercent === undefined
@@ -2049,6 +2075,25 @@ export class AppDatabase {
       `)
     }
 
+    const migration15 = this.database
+      .prepare('SELECT version FROM schema_migrations WHERE version = 15')
+      .get()
+
+    if (!migration15) {
+      const hasActivityTags = (this.database.prepare('PRAGMA table_info(checklist_items)').all() as Array<{
+        name: string
+      }>).some((column) => column.name === 'activity_tags_json')
+      this.database.exec(hasActivityTags
+        ? `INSERT INTO schema_migrations(version) VALUES (15);`
+        : `
+          BEGIN;
+          ALTER TABLE checklist_items
+            ADD COLUMN activity_tags_json TEXT NOT NULL DEFAULT '[]';
+          INSERT INTO schema_migrations(version) VALUES (15);
+          COMMIT;
+        `)
+    }
+
     const versionRow = this.database
       .prepare('SELECT MAX(version) AS version FROM schema_migrations')
       .get() as { version: number | null }
@@ -2242,6 +2287,7 @@ export class AppDatabase {
           game_id AS gameId,
           category,
           title,
+          activity_tags_json AS activityTagsJson,
           completed,
           progress_percent AS progressPercent,
           parent_title AS parentTitle,
@@ -2272,13 +2318,25 @@ export class AppDatabase {
   }
 
   private mapChecklistItem(row: unknown): ChecklistItem {
-    const item = row as Omit<ChecklistItem, 'completed' | 'manualCompletionLocked'> & {
+    const item = row as Omit<ChecklistItem, 'activityTags' | 'completed' | 'manualCompletionLocked'> & {
+      activityTagsJson: string
       completed: number
       manualCompletionLocked: number
     }
+    let activityTags: string[] = []
+    try {
+      const parsed = JSON.parse(item.activityTagsJson)
+      if (Array.isArray(parsed)) {
+        activityTags = parsed.filter((tag): tag is string => typeof tag === 'string')
+      }
+    } catch {
+      activityTags = []
+    }
+    const { activityTagsJson: _activityTagsJson, ...rest } = item
 
     return {
-      ...item,
+      ...rest,
+      activityTags,
       completed: Boolean(item.completed),
       manualCompletionLocked: Boolean(item.manualCompletionLocked)
     }

@@ -45,4 +45,24 @@ describe('normalizeSyncItem', () => {
       }).startsAt
     ).toBe('2026-07-20T00:00:00.000Z')
   })
+
+  it('规范化 AI 提供的活动玩法标签', () => {
+    expect(
+      normalizeSyncItem({
+        remoteKey: 'event:tagged',
+        category: 'limited_event',
+        title: '玩法活动',
+        activityTags: [' 战斗 ', '解谜', '战斗']
+      }).activityTags
+    ).toEqual(['战斗', '解谜'])
+
+    expect(() =>
+      normalizeSyncItem({
+        remoteKey: 'event:too-many-tags',
+        category: 'limited_event',
+        title: '标签过多',
+        activityTags: ['签到', '战斗', '跑酷', '解谜', '经营', '音游']
+      })
+    ).toThrow('活动玩法标签')
+  })
 })

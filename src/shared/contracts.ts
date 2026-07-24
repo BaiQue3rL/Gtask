@@ -159,6 +159,7 @@ export interface ChecklistItem {
   gameId: GameId
   category: ChecklistCategory
   title: string
+  activityTags: string[]
   completed: boolean
   progressPercent: number | null
   parentTitle: string | null
@@ -185,6 +186,7 @@ export interface CreateChecklistItemInput {
   gameId: GameId
   category: ChecklistCategory
   title: string
+  activityTags?: string[]
   progressPercent?: number | null
   parentTitle?: string | null
   startsAt?: string | null
@@ -201,6 +203,7 @@ export interface UpdateChecklistItemInput {
   id: string
   category?: ChecklistCategory
   title?: string
+  activityTags?: string[]
   completed?: boolean
   progressPercent?: number | null
   parentTitle?: string | null

@@ -13,6 +13,7 @@ export interface NormalizedSyncItem {
   sourceUrl?: string | null
   category: ChecklistCategory
   title: string
+  activityTags?: string[]
   completed?: boolean
   progressPercent?: number | null
   parentTitle?: string | null
