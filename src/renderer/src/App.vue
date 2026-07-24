@@ -1501,7 +1501,7 @@ function showError(error: unknown): void {
         <div class="recycle-list">
           <div v-for="status in gameCredentialStatuses" :key="status.provider" class="recycle-row">
             <div>
-              <strong>{{ status.provider === 'miyoushe' ? '米游社' : '库街区（鸣潮）' }}</strong>
+              <strong>{{ status.provider === 'miyoushe' ? '米游社' : '库街区' }}</strong>
               <span>{{ status.stored ? `已安全保存 · ${formatLocalTime(status.updatedAt!)}` : '未登录' }}</span>
             </div>
             <div class="credential-actions">
