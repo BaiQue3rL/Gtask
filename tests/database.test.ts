@@ -298,6 +298,7 @@ describe('AppDatabase', () => {
     database = new AppDatabase(':memory:')
     expect(database.getSyncTargetStates('genshin')).toEqual([
       { gameId: 'genshin', target: 'all', lastSuccessAt: null },
+      { gameId: 'genshin', target: 'tasks', lastSuccessAt: null },
       { gameId: 'genshin', target: 'events', lastSuccessAt: null },
       { gameId: 'genshin', target: 'cycles', lastSuccessAt: null },
       { gameId: 'genshin', target: 'exploration', lastSuccessAt: null }
@@ -315,6 +316,83 @@ describe('AppDatabase', () => {
     expect(database.getSyncTargetStates('genshin').every(
       (state) => state.lastSuccessAt === '2026-07-22T13:00:00.000Z'
     )).toBe(true)
+  })
+
+  it('版更校时只更新时间，同版本保留状态，新版本和到期时重置任务', () => {
+    database = new AppDatabase(':memory:')
+    const quest = (category: 'main_quest' | 'side_quest') =>
+      database!.listChecklistItems('genshin').find((item) => item.category === category)!
+    const versionItems = (periodKey: string, startsAt: string, endsAt: string) => [
+      {
+        remoteKey: 'version:main',
+        category: 'main_quest' as const,
+        title: '主线任务',
+        periodKey,
+        startsAt,
+        endsAt,
+        scheduleKind: 'fixed_window' as const,
+        timeZone: 'Asia/Shanghai',
+        sourceUrl: 'https://example.com/version'
+      },
+      {
+        remoteKey: 'version:side',
+        category: 'side_quest' as const,
+        title: '支线任务',
+        periodKey,
+        startsAt,
+        endsAt,
+        scheduleKind: 'fixed_window' as const,
+        timeZone: 'Asia/Shanghai',
+        sourceUrl: 'https://example.com/version'
+      }
+    ]
+
+    database.updateChecklistItem({ id: 'genshin:main_quest', completed: true })
+    database.mergeSyncedItems(
+      'genshin',
+      'public_schedule',
+      versionItems('genshin:version:6.0', '2026-07-01T02:00:00.000Z', '2026-08-01T02:00:00.000Z'),
+      '2026-07-24T12:00:00.000Z'
+    )
+    expect(quest('main_quest')).toMatchObject({
+      completed: true,
+      endsAt: '2026-08-01T02:00:00.000Z',
+      periodKey: 'genshin:version:6.0'
+    })
+
+    database.mergeSyncedItems(
+      'genshin',
+      'public_schedule',
+      versionItems('genshin:version:6.0', '2026-07-01T02:00:00.000Z', '2026-08-05T02:00:00.000Z'),
+      '2026-07-25T12:00:00.000Z'
+    )
+    expect(quest('main_quest')).toMatchObject({
+      completed: true,
+      endsAt: '2026-08-05T02:00:00.000Z'
+    })
+
+    database.mergeSyncedItems(
+      'genshin',
+      'public_schedule',
+      versionItems('genshin:version:6.1', '2026-08-05T02:00:00.000Z', '2026-09-16T02:00:00.000Z'),
+      '2026-08-05T03:00:00.000Z'
+    )
+    expect(quest('main_quest')).toMatchObject({
+      completed: false,
+      completedAt: null,
+      manualCompletionLocked: false,
+      periodKey: 'genshin:version:6.1'
+    })
+
+    database.updateChecklistItem({ id: 'genshin:main_quest', completed: true })
+    database.updateChecklistItem({ id: 'genshin:side_quest', completed: true })
+    expect(database.resetDueQuestItems(new Date('2026-09-16T02:00:01.000Z'))).toBe(2)
+    expect(quest('main_quest')).toMatchObject({
+      completed: false,
+      startsAt: null,
+      endsAt: null,
+      resetRule: '待同步新版本时间'
+    })
   })
 
   it('周常跨周期后自动重置完成状态和手动完成锁', () => {

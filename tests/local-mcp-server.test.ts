@@ -390,6 +390,96 @@ describe('本地 MCP server', () => {
       .toMatchObject({ category: 'exploration', progressPercent: 0, completed: false })
   })
 
+  it('公开资料 MCP 通过“版更校时”统一校正固定任务时间且不改完成状态', async () => {
+    const connected = await connect()
+    await connected.callTool({
+      name: 'register_gacha_schedule_agent',
+      arguments: { agentId: 'version-agent', name: '版本校时 Agent', webSearch: true }
+    })
+    database!.updateChecklistItem({ id: 'genshin:main_quest', completed: true })
+    const queued = database!.createAiScheduleJob(
+      'genshin',
+      'public_schedule',
+      new Date(),
+      false,
+      'tasks'
+    )
+    await connected.callTool({
+      name: 'claim_gacha_schedule_job',
+      arguments: { agentId: 'version-agent' }
+    })
+    const now = Date.now()
+    const startsAt = new Date(now - 24 * 60 * 60 * 1_000).toISOString()
+    const endsAt = new Date(now + 40 * 24 * 60 * 60 * 1_000).toISOString()
+    const sourceUrl = 'https://example.com/genshin-version-cn'
+    const result = await connected.callTool({
+      name: 'apply_gacha_public_schedule',
+      arguments: {
+        agentId: 'version-agent',
+        jobId: queued.id,
+        retrievedAt: new Date(now).toISOString(),
+        items: [
+          {
+            remoteKey: 'version:genshin:main',
+            category: 'main_quest',
+            title: '主线任务',
+            titleSourceUrl: sourceUrl,
+            startsAt,
+            endsAt,
+            periodKey: 'genshin:version:test-current',
+            scheduleKind: 'fixed_window',
+            timeZone: 'Asia/Shanghai',
+            modeKey: 'game-version',
+            sourceUrl,
+            confidence: 0.99
+          },
+          {
+            remoteKey: 'version:genshin:side',
+            category: 'side_quest',
+            title: '支线任务',
+            titleSourceUrl: sourceUrl,
+            startsAt,
+            endsAt,
+            periodKey: 'genshin:version:test-current',
+            scheduleKind: 'fixed_window',
+            timeZone: 'Asia/Shanghai',
+            modeKey: 'game-version',
+            sourceUrl,
+            confidence: 0.99
+          }
+        ],
+        evidence: [{
+          url: sourceUrl,
+          platform: '官方平台',
+          publisher: '原神官方',
+          official: true,
+          language: 'zh-CN'
+        }]
+      }
+    })
+
+    expect(result.isError).not.toBe(true)
+    expect(database!.listChecklistItems('genshin').filter(
+      (item) => item.category === 'main_quest' || item.category === 'side_quest'
+    )).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        category: 'main_quest',
+        completed: true,
+        endsAt,
+        periodKey: 'genshin:version:test-current'
+      }),
+      expect.objectContaining({
+        category: 'side_quest',
+        completed: false,
+        endsAt,
+        periodKey: 'genshin:version:test-current'
+      })
+    ]))
+    expect(database!.getSyncTargetStates('genshin')).toContainEqual(
+      expect.objectContaining({ target: 'tasks', lastSuccessAt: expect.any(String) })
+    )
+  })
+
   it('Codex 可领取脱敏语义候选，并通过专用工具安全写回', async () => {
     const connected = await connect()
     await connected.callTool({

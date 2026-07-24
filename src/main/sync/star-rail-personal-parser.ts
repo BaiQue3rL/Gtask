@@ -13,8 +13,6 @@ interface ChallengeModeDefinition {
   input: unknown
   label: string
   modeKey: string
-  expectedLastFloor: number
-  expectedStars: number
 }
 
 export function parseStarRailPersonalData(
@@ -26,23 +24,17 @@ export function parseStarRailPersonalData(
     {
       input: input.memoryOfChaos,
       label: '混沌回忆',
-      modeKey: 'memory-of-chaos',
-      expectedLastFloor: 12,
-      expectedStars: 36
+      modeKey: 'memory-of-chaos'
     },
     {
       input: input.pureFiction,
       label: '虚构叙事',
-      modeKey: 'pure-fiction',
-      expectedLastFloor: 4,
-      expectedStars: 12
+      modeKey: 'pure-fiction'
     },
     {
       input: input.apocalypticShadow,
       label: '末日幻影',
-      modeKey: 'apocalyptic-shadow',
-      expectedLastFloor: 4,
-      expectedStars: 12
+      modeKey: 'apocalyptic-shadow'
     }
   ]
   for (const mode of modes) {
@@ -143,12 +135,11 @@ function parseChallengeMode(definition: ChallengeModeDefinition): NormalizedSync
   const stars = Math.max(0, (finiteNumber(root.star_num) ?? 0) + (finiteNumber(root.extra_star_num) ?? 0))
   const floors = Array.isArray(root.all_floor_detail) ? root.all_floor_detail.filter(isRecord) : []
   const maxFloor = parseFloorNumber(root.max_floor)
-  const reachedLastFloor = maxFloor >= definition.expectedLastFloor || floors.some((floor) => {
-    const floorNumber = parseFloorNumber(floor.name) || finiteNumber(floor.index) || 0
-    return floorNumber >= definition.expectedLastFloor && hasFloorRecord(floor)
-  })
-  const hasData = root.has_data !== false && (root.has_data === true || stars > 0 || floors.length > 0)
-  const completed = hasData && (reachedLastFloor || stars >= definition.expectedStars)
+  const completed =
+    root.has_data === true ||
+    stars > 0 ||
+    maxFloor > 0 ||
+    floors.some(hasFloorRecord)
   const startsAt = toIsoDate(root.begin_time ?? season?.begin_time, `${definition.label}开始时间`)
   const endsAt = toIsoDate(root.end_time ?? season?.end_time, `${definition.label}结束时间`)
   return {
@@ -156,7 +147,6 @@ function parseChallengeMode(definition: ChallengeModeDefinition): NormalizedSync
     category: 'endgame',
     title: definition.label,
     completed,
-    progressPercent: clampPercentage((stars / definition.expectedStars) * 100),
     startsAt,
     endsAt,
     periodKey: `star-rail:${definition.modeKey}:${scheduleId}`,
@@ -179,21 +169,19 @@ function parseAnomalyArbitration(value: unknown): NormalizedSyncItem | null {
   const groupId = requiredIdentifier(group.group_id, '异相仲裁 group_id')
   const bossRecord = isRecord(record.boss_record) ? record.boss_record : null
   const miniBossRecords = Array.isArray(record.mob_records) ? record.mob_records.filter(isRecord) : []
-  const miniBossesCompleted = miniBossRecords.length > 0 && miniBossRecords.every(
-    (candidate) => candidate.has_challenge_record === true
-  )
-  const bossCompleted = bossRecord?.has_challenge_record === true
-  const hasData = record.has_challenge_record === true || bossCompleted || miniBossRecords.length > 0
   const bossStars = Math.max(0, finiteNumber(record.boss_stars) ?? 0)
   const miniBossStars = Math.max(0, finiteNumber(record.mob_stars) ?? 0)
-  const achievedStars = bossStars + miniBossStars
-  const expectedStars = Math.max(achievedStars, (miniBossRecords.length + 1) * 3)
+  const hasData =
+    record.has_challenge_record === true ||
+    bossRecord?.has_challenge_record === true ||
+    miniBossRecords.some((candidate) => candidate.has_challenge_record === true) ||
+    bossStars > 0 ||
+    miniBossStars > 0
   return {
     remoteKey: 'endgame:anomaly-arbitration',
     category: 'endgame',
     title: requiredOptionalString(group.name_mi18n) ?? '异相仲裁',
-    completed: hasData && bossCompleted && miniBossesCompleted,
-    progressPercent: expectedStars > 0 ? clampPercentage((achievedStars / expectedStars) * 100) : 0,
+    completed: hasData,
     startsAt: toIsoDate(group.begin_time, '异相仲裁开始时间'),
     endsAt: toIsoDate(group.end_time, '异相仲裁结束时间'),
     periodKey: `star-rail:anomaly-arbitration:${groupId}`,
@@ -273,8 +261,4 @@ function requiredNumber(value: unknown, field: string): number {
   const number = finiteNumber(value)
   if (number === null) throw new Error(`星铁个人数据缺少 ${field}`)
   return number
-}
-
-function clampPercentage(value: number): number {
-  return Math.round(Math.min(100, Math.max(0, value)) * 100) / 100
 }

@@ -24,7 +24,14 @@ const recurrenceRuleSchema = z.string().max(200).refine(
     /^monthly-days:[\d,]+@\d{2}:\d{2}\[Asia\/Shanghai\]$/.test(value),
   '自动周期规则格式不正确'
 ).nullable().optional()
-const publicScheduleCategorySchema = z.enum(['limited_event', 'weekly', 'endgame', 'exploration'])
+const publicScheduleCategorySchema = z.enum([
+  'main_quest',
+  'side_quest',
+  'limited_event',
+  'weekly',
+  'endgame',
+  'exploration'
+])
 const syncProgressPhaseSchema = z.enum(SYNC_PROGRESS_PHASES)
 const chineseScheduleTitleSchema = z.string().min(1).max(100).regex(
   /\p{Script=Han}/u,
@@ -434,7 +441,7 @@ export function createLocalMcpServer(
     'apply_gacha_public_schedule',
     {
       title: '提交已验证的公开资料',
-      description: '把联网检索并交叉验证后的活动、周期排期或地图区域目录提交给已领取任务。每个名称必须来自中文来源并包含中文，不能提交个人探索度、完成状态或删除操作。',
+      description: '把联网检索并交叉验证后的当前版本时间、活动、周期排期或地图区域目录提交给已领取任务。每个名称必须来自中文来源并包含中文，不能提交个人探索度、完成状态或删除操作。',
       inputSchema: {
         agentId: z.string().min(1).max(100),
         jobId: z.string().uuid(),

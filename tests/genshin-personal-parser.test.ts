@@ -68,19 +68,19 @@ describe('Genshin personal parsing', () => {
       expect.objectContaining({
         modeKey: 'spiral-abyss',
         periodKey: 'genshin:spiral-abyss:123',
-        progressPercent: 91.67,
         completed: true
       }),
       expect.objectContaining({ modeKey: 'imaginarium-theater', completed: true }),
-      expect.objectContaining({ modeKey: 'stygian-onslaught', progressPercent: 83.33, completed: true }),
+      expect.objectContaining({ modeKey: 'stygian-onslaught', completed: true }),
       expect.objectContaining({
         remoteKey: 'event:miyoushe:9001',
         category: 'limited_event',
         title: '砺行修远',
-        progressPercent: 85.5,
         completed: false
       })
     ]))
+    expect(items.filter((item) => item.category !== 'exploration')
+      .every((item) => !Object.hasOwn(item, 'progressPercent'))).toBe(true)
   })
 
   it('兼容米游社把剧诗轮数和幽境难度返回为数字字符串', () => {
@@ -179,7 +179,7 @@ describe('Genshin personal parsing', () => {
     })
   })
 
-  it('活动时间兼容数字字符串，并在无效时保留进度但不写错误倒计时', () => {
+  it('活动时间兼容数字字符串，并在无效时保留状态但不写错误倒计时', () => {
     const items = parseGenshinPersonalData({
       eventCalendar: {
         act_list: [
@@ -210,12 +210,12 @@ describe('Genshin personal parsing', () => {
       }),
       expect.objectContaining({
         title: '特殊时间活动',
-        progressPercent: 50,
         startsAt: undefined,
         endsAt: undefined,
         periodKey: 'genshin:event:9003'
       })
     ]))
+    expect(items.every((item) => !Object.hasOwn(item, 'progressPercent'))).toBe(true)
   })
 
   it('活动同步排除挑战模式，并且未来活动不能继承完成状态', () => {
@@ -244,10 +244,52 @@ describe('Genshin personal parsing', () => {
     expect(items).toEqual([
       expect.objectContaining({
         remoteKey: 'event:miyoushe:9011',
-        completed: false,
-        progressPercent: undefined
+        completed: false
       })
     ])
+    expect(items[0]).not.toHaveProperty('progressPercent')
+  })
+
+  it('挑战模式只要本期存在战绩就完成，完全没有记录才未完成', () => {
+    const items = parseGenshinPersonalData({
+      spiralAbyss: {
+        schedule_id: 1001,
+        start_time: 1784505600,
+        end_time: 1785715199,
+        max_floor: '9-1',
+        total_star: 1,
+        floors: []
+      },
+      imaginariumTheater: {
+        is_unlock: true,
+        data: [{
+          has_data: true,
+          schedule: { schedule_id: 1002, start_time: 1784505600, end_time: 1787183999 },
+          stat: { max_round_id: 1, get_medal_round_list: [true, false, false] }
+        }]
+      },
+      stygianOnslaught: {
+        data: [{
+          schedule: { schedule_id: 1003, start_time: 1784505600, end_time: 1787183999 },
+          single: { has_data: true, best: { difficulty: 1 } }
+        }]
+      }
+    })
+
+    expect(items.every((item) => item.completed)).toBe(true)
+    expect(items.every((item) => !Object.hasOwn(item, 'progressPercent'))).toBe(true)
+
+    expect(parseGenshinPersonalData({
+      spiralAbyss: {
+        schedule_id: 1004,
+        start_time: 1784505600,
+        end_time: 1785715199,
+        has_data: false,
+        max_floor: '',
+        total_star: 0,
+        floors: []
+      }
+    })[0]).toMatchObject({ completed: false })
   })
 
   it('the adapter requests each source sequentially and rejects other games', async () => {

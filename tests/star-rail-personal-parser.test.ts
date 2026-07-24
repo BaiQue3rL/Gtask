@@ -80,13 +80,12 @@ describe('Star Rail personal parsing', () => {
       expect.objectContaining({
         modeKey: 'memory-of-chaos',
         periodKey: 'star-rail:memory-of-chaos:101',
-        progressPercent: 91.67,
         completed: true,
         startsAt: '2026-07-19T20:00:00.000Z'
       }),
-      expect.objectContaining({ modeKey: 'pure-fiction', progressPercent: 75, completed: false }),
-      expect.objectContaining({ modeKey: 'apocalyptic-shadow', progressPercent: 100, completed: true }),
-      expect.objectContaining({ modeKey: 'anomaly-arbitration', progressPercent: 100, completed: true }),
+      expect.objectContaining({ modeKey: 'pure-fiction', completed: true }),
+      expect.objectContaining({ modeKey: 'apocalyptic-shadow', completed: true }),
+      expect.objectContaining({ modeKey: 'anomaly-arbitration', completed: true }),
       expect.objectContaining({
         remoteKey: 'event:miyoushe:5001',
         category: 'limited_event',
@@ -96,6 +95,8 @@ describe('Star Rail personal parsing', () => {
     const event = items.find((item) => item.remoteKey === 'event:miyoushe:5001')!
     expect(event).not.toHaveProperty('completed')
     expect(event).not.toHaveProperty('progressPercent')
+    expect(items.filter((item) => item.category === 'endgame')
+      .every((item) => !Object.hasOwn(item, 'progressPercent'))).toBe(true)
   })
 
   it('accepts numeric-string event timestamps and preserves events without a usable window', () => {
@@ -209,7 +210,7 @@ describe('Star Rail personal parsing', () => {
     expect(JSON.stringify(candidates)).not.toContain('uid')
   })
 
-  it('treats full stars as completed when the endpoint omits a parseable last-floor marker', () => {
+  it('treats any current-period record as completed without requiring a last-floor marker', () => {
     const items = parseStarRailPersonalData({
       pureFiction: {
         star_num: 12,
@@ -222,9 +223,39 @@ describe('Star Rail personal parsing', () => {
 
     expect(items[0]).toMatchObject({
       modeKey: 'pure-fiction',
-      progressPercent: 100,
       completed: true
     })
+    expect(items[0]).not.toHaveProperty('progressPercent')
+  })
+
+  it('only marks a challenge incomplete when the current period has no record', () => {
+    const items = parseStarRailPersonalData({
+      pureFiction: {
+        star_num: 0,
+        max_floor: '',
+        has_data: false,
+        all_floor_detail: [],
+        groups: [season(203, '虚构叙事')]
+      },
+      anomalyArbitration: {
+        challenge_peak_records: [{
+          group: {
+            ...season(204, '异相仲裁'),
+            group_id: 204
+          },
+          has_challenge_record: false,
+          boss_record: { has_challenge_record: false },
+          mob_records: [{ has_challenge_record: false }],
+          boss_stars: 0,
+          mob_stars: 0
+        }]
+      }
+    })
+
+    expect(items).toEqual([
+      expect.objectContaining({ modeKey: 'pure-fiction', completed: false }),
+      expect.objectContaining({ modeKey: 'anomaly-arbitration', completed: false })
+    ])
   })
 
   it('the adapter requests each source sequentially and rejects other games', async () => {

@@ -71,7 +71,7 @@ describe('公开排期文档', () => {
         { ...document, items: [{ remoteKey: 'custom:1', category: 'custom', title: '事项' }] },
         'genshin'
       )
-    ).toThrow('只允许限时活动、周期挑战和地图区域')
+    ).toThrow('只允许版本时间、限时活动、周期挑战和地图区域')
   })
 
   it('拒绝没有经中文来源核对的纯英文名称', () => {

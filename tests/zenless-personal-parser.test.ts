@@ -8,7 +8,7 @@ import {
 import { ZenlessPersonalAdapter } from '../src/main/sync/zenless-personal-adapter'
 
 describe('绝区零个人战绩解析', () => {
-  it('把式舆防卫战映射为稳定模式标识、周期和完成度', () => {
+  it('把式舆防卫战映射为稳定模式标识、周期和战绩状态', () => {
     expect(
       parseZenlessShiyuDefense({
         schedule_id: 62052,
@@ -22,7 +22,6 @@ describe('绝区零个人战绩解析', () => {
       category: 'endgame',
       title: '式舆防卫战',
       completed: true,
-      progressPercent: 74.09,
       startsAt: '2026-07-09T20:00:00.000Z',
       endsAt: '2026-07-23T19:59:59.000Z',
       periodKey: 'zenless:shiyu-defense:62052',
@@ -31,7 +30,7 @@ describe('绝区零个人战绩解析', () => {
     })
   })
 
-  it('用各挑战满星判断危局强袭战完成，并按中国时区解释无偏移时间', () => {
+  it('有危局强袭战记录即完成，并按中国时区解释无偏移时间', () => {
     expect(
       parseZenlessDeadlyAssault({
         id: 69041,
@@ -48,7 +47,6 @@ describe('绝区零个人战绩解析', () => {
     ).toMatchObject({
       remoteKey: 'endgame:deadly-assault',
       completed: true,
-      progressPercent: 100,
       startsAt: '2026-07-16T20:00:00.000Z',
       endsAt: '2026-07-28T19:59:59.000Z',
       periodKey: 'zenless:deadly-assault:69041'
@@ -68,8 +66,7 @@ describe('绝区零个人战绩解析', () => {
         { star: '3', total_star: '3' }
       ]
     })).toMatchObject({
-      completed: true,
-      progressPercent: 100
+      completed: true
     })
   })
 
@@ -87,8 +84,8 @@ describe('绝区零个人战绩解析', () => {
     expect(() => parseZenlessPersonalData({})).toThrow('没有可识别')
   })
 
-  it('把活动状态和菲林领取进度映射到活动清单', () => {
-    expect(parseZenlessEvents({
+  it('把活动状态映射到活动清单但不写百分比', () => {
+    const items = parseZenlessEvents({
       activity_list: [{
         activity_id: 7001,
         name: '嗯呢从天降',
@@ -98,15 +95,16 @@ describe('绝区零个人战绩解析', () => {
         start_ts: 1784505600,
         end_ts: 1787183999
       }]
-    })).toEqual([
+    })
+    expect(items).toEqual([
       expect.objectContaining({
         remoteKey: 'event:miyoushe:7001',
         category: 'limited_event',
         title: '嗯呢从天降',
-        progressPercent: 80,
         completed: false
       })
     ])
+    expect(items[0]).not.toHaveProperty('progressPercent')
   })
 
   it('活动未开始时不继承完成状态或领取进度', () => {
@@ -122,10 +120,8 @@ describe('绝区零个人战绩解析', () => {
       }]
     }, new Date('2026-07-23T00:00:00.000Z'))
 
-    expect(items[0]).toMatchObject({
-      completed: false,
-      progressPercent: undefined
-    })
+    expect(items[0]).toMatchObject({ completed: false })
+    expect(items[0]).not.toHaveProperty('progressPercent')
   })
 
   it('个人接口省略排期时间时仍保留完成状态并交由公开排期补时', () => {
@@ -137,8 +133,7 @@ describe('绝区零个人战绩解析', () => {
       remoteKey: 'endgame:shiyu-defense',
       category: 'endgame',
       title: '式舆防卫战',
-      completed: false,
-      progressPercent: 50,
+      completed: true,
       startsAt: undefined,
       endsAt: undefined,
       periodKey: 'zenless:shiyu-defense:62053',
@@ -156,6 +151,21 @@ describe('绝区零个人战绩解析', () => {
       startsAt: '2026-07-09T20:00:00.000Z',
       endsAt: '2026-07-23T19:59:59.000Z'
     })
+  })
+
+  it('只在本期完全没有挑战记录时保持未完成', () => {
+    expect(parseZenlessShiyuDefense({
+      schedule_id: 62055,
+      passed_fifth_floor: false,
+      brief_info: { score: 0, max_score: 150000 }
+    })).toMatchObject({ completed: false })
+
+    expect(parseZenlessDeadlyAssault({
+      id: 69045,
+      has_data: false,
+      total_star: 0,
+      challenges: []
+    })).toMatchObject({ completed: false })
   })
 
   it('正式适配器顺序请求两个已验证接口并拒绝用于其他游戏', async () => {

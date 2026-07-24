@@ -59,7 +59,7 @@ const DEFAULT_GAMES: GameSummary[] = [
   }
 ]
 
-export const CURRENT_SCHEMA_VERSION = 13
+export const CURRENT_SCHEMA_VERSION = 14
 
 const AI_AGENT_MAX_AGE_MS = 5 * 60 * 1000
 const AI_JOB_CLAIM_MAX_AGE_MS = 15 * 60 * 1000
@@ -149,6 +149,7 @@ export class AppDatabase {
       this.normalizeSyncedProgressSafety()
       this.normalizeWeeklySchedules()
       this.resetDueWeeklyItems()
+      this.resetDueQuestItems()
       this.markStaleSyncStates()
     } catch (error) {
       this.database.close()
@@ -219,7 +220,7 @@ export class AppDatabase {
       WHERE game_id = ?
     `).all(gameId) as Array<{ target: SyncTargetState['target']; lastSuccessAt: string }>
     const timestamps = new Map(rows.map((row) => [row.target, row.lastSuccessAt]))
-    return (['all', 'events', 'cycles', 'exploration'] as const).map((target) => ({
+    return (['all', 'tasks', 'events', 'cycles', 'exploration'] as const).map((target) => ({
       gameId,
       target,
       lastSuccessAt: timestamps.get(target) ?? null
@@ -232,11 +233,10 @@ export class AppDatabase {
     reference = new Date(),
     includeGlobal = false
   ): void {
-    if (target === 'tasks') return
     const targets = target === 'all'
       ? includeGlobal
-        ? (['all', 'events', 'cycles', 'exploration'] as const)
-        : (['events', 'cycles', 'exploration'] as const)
+        ? (['all', 'tasks', 'events', 'cycles', 'exploration'] as const)
+        : (['tasks', 'events', 'cycles', 'exploration'] as const)
       : [target]
     const timestamp = reference.toISOString()
     const statement = this.database.prepare(`
@@ -627,12 +627,18 @@ export class AppDatabase {
       events: ['limited_event'],
       cycles: ['weekly', 'endgame'],
       exploration: ['exploration'],
-      tasks: []
+      tasks: ['main_quest', 'side_quest']
     }
     const allowedCategories = targetCategories[job.target]
     if (allowedCategories) {
       const invalid = items.find((item) => !allowedCategories.includes(item.category))
       if (invalid) throw new Error(`当前任务只允许回写“${job.target}”版块数据`)
+    }
+    const versionItems = items.filter(
+      (item) => item.category === 'main_quest' || item.category === 'side_quest'
+    )
+    if (job.target === 'tasks' || versionItems.length > 0) {
+      this.validateVersionScheduleItems(versionItems, reference)
     }
     const invalidEventWindow = items.find((item) =>
       item.category === 'limited_event' &&
@@ -1085,12 +1091,29 @@ export class AppDatabase {
   ): SyncMergeResult {
     const result: SyncMergeResult = { added: 0, updated: 0, preserved: 0 }
     const seenRemoteKeys = new Set<string>()
+    const versionItems = items.filter(
+      (item) => item.category === 'main_quest' || item.category === 'side_quest'
+    )
+    if (versionItems.length > 0) {
+      if (source !== 'public_schedule') {
+        throw new Error('主线和支线的版本时间只能由公开资料校时')
+      }
+      this.validateVersionScheduleItems(versionItems, new Date(syncedAt))
+    }
 
     if (manageTransaction) this.database.exec('BEGIN IMMEDIATE')
     try {
       for (const item of items) {
         if (source === 'personal_sync' && isPersonalSectionConflict(gameId, item)) {
           result.preserved += 1
+          continue
+        }
+        if (item.category === 'main_quest' || item.category === 'side_quest') {
+          if (source !== 'public_schedule') {
+            throw new Error('主线和支线的版本时间只能由公开资料校时')
+          }
+          this.mergeVersionScheduleItem(gameId, item, syncedAt)
+          result.updated += 1
           continue
         }
         if (item.category === 'weekly') {
@@ -1558,6 +1581,101 @@ export class AppDatabase {
     return changes
   }
 
+  resetDueQuestItems(reference = new Date()): number {
+    const now = reference.toISOString()
+    const result = this.database.prepare(`
+      UPDATE checklist_items
+      SET completed = 0,
+          completed_at = NULL,
+          manual_completion_locked = 0,
+          starts_at = NULL,
+          ends_at = NULL,
+          reset_rule = '待同步新版本时间',
+          updated_at = ?
+      WHERE category IN ('main_quest', 'side_quest')
+        AND archived = 0
+        AND ends_at IS NOT NULL
+        AND julianday(ends_at) <= julianday(?)
+    `).run(now, now)
+    return Number(result.changes)
+  }
+
+  private validateVersionScheduleItems(items: NormalizedSyncItem[], reference: Date): void {
+    if (items.length !== 2) throw new Error('版更校时必须同时提交主线任务和支线任务')
+    const main = items.find((item) => item.category === 'main_quest')
+    const side = items.find((item) => item.category === 'side_quest')
+    if (!main || !side) throw new Error('版更校时缺少主线任务或支线任务')
+    if (main.title !== '主线任务' || side.title !== '支线任务') {
+      throw new Error('版更校时不能修改固定任务名称')
+    }
+    for (const item of items) {
+      if (!item.periodKey?.trim()) throw new Error('版更校时缺少当前版本标识')
+      if (!item.startsAt || !item.endsAt) throw new Error('版更校时缺少完整版本起止时间')
+      if (!item.timeZone?.trim()) throw new Error('版更校时缺少官方服务器时区')
+      if (item.scheduleKind !== 'fixed_window') throw new Error('版更校时必须使用固定时间窗口')
+      if (Date.parse(item.startsAt) > reference.getTime()) {
+        throw new Error('版更校时只能提交当前已经开始的游戏版本')
+      }
+      if (Date.parse(item.endsAt) <= reference.getTime()) {
+        throw new Error('版更校时不能提交已经结束的游戏版本')
+      }
+    }
+    if (
+      main.periodKey !== side.periodKey ||
+      main.startsAt !== side.startsAt ||
+      main.endsAt !== side.endsAt ||
+      main.timeZone !== side.timeZone
+    ) {
+      throw new Error('主线任务和支线任务必须共享同一版本时间')
+    }
+  }
+
+  private mergeVersionScheduleItem(
+    gameId: GameId,
+    item: NormalizedSyncItem,
+    syncedAt: string
+  ): void {
+    const id = `${gameId}:${item.category}`
+    const current = this.getChecklistItem(id)
+    const periodChanged = Boolean(
+      current.periodKey &&
+      item.periodKey &&
+      current.periodKey !== item.periodKey
+    )
+    this.database.prepare(`
+      UPDATE checklist_items
+      SET completed = CASE WHEN ? THEN 0 ELSE completed END,
+          completed_at = CASE WHEN ? THEN NULL ELSE completed_at END,
+          manual_completion_locked = CASE WHEN ? THEN 0 ELSE manual_completion_locked END,
+          starts_at = ?,
+          ends_at = ?,
+          reset_rule = NULL,
+          period_key = ?,
+          schedule_kind = 'fixed_window',
+          timezone = ?,
+          mode_key = 'game-version',
+          source = 'public_schedule',
+          remote_key = ?,
+          source_url = ?,
+          last_synced_at = ?,
+          updated_at = ?
+      WHERE id = ? AND archived = 0
+    `).run(
+      periodChanged ? 1 : 0,
+      periodChanged ? 1 : 0,
+      periodChanged ? 1 : 0,
+      item.startsAt ?? null,
+      item.endsAt ?? null,
+      item.periodKey ?? null,
+      item.timeZone ?? null,
+      `version:${gameId}:${item.category}`,
+      item.sourceUrl ?? null,
+      syncedAt,
+      syncedAt,
+      id
+    )
+  }
+
   private normalizeWeeklySchedules(): void {
     this.database
       .prepare(`
@@ -1909,6 +2027,28 @@ export class AppDatabase {
       `)
     }
 
+    const migration14 = this.database
+      .prepare('SELECT version FROM schema_migrations WHERE version = 14')
+      .get()
+
+    if (!migration14) {
+      this.database.exec(`
+        BEGIN;
+        ALTER TABLE sync_target_states RENAME TO sync_target_states_v13;
+        CREATE TABLE sync_target_states (
+          game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+          target TEXT NOT NULL CHECK (target IN ('all', 'tasks', 'events', 'cycles', 'exploration')),
+          last_success_at TEXT NOT NULL,
+          PRIMARY KEY(game_id, target)
+        );
+        INSERT INTO sync_target_states(game_id, target, last_success_at)
+          SELECT game_id, target, last_success_at FROM sync_target_states_v13;
+        DROP TABLE sync_target_states_v13;
+        INSERT INTO schema_migrations(version) VALUES (14);
+        COMMIT;
+      `)
+    }
+
     const versionRow = this.database
       .prepare('SELECT MAX(version) AS version FROM schema_migrations')
       .get() as { version: number | null }
@@ -1961,7 +2101,6 @@ export class AppDatabase {
       ON CONFLICT(id) DO UPDATE SET
         archived = 0,
         category = excluded.category,
-        source = 'manual',
         updated_at = excluded.updated_at
     `)
     const now = new Date().toISOString()

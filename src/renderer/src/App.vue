@@ -32,11 +32,11 @@ interface ChecklistPanel {
   defaultCategory: ChecklistCategory
   allowCreate?: boolean
   allowClear?: boolean
-  syncTarget?: Exclude<SyncTarget, 'all' | 'tasks'>
+  syncTarget?: Exclude<SyncTarget, 'all'>
 }
 
 const panels: ChecklistPanel[] = [
-  { title: '任务', icon: '▣', section: 'tasks', categories: ['main_quest', 'side_quest'], defaultCategory: 'side_quest', allowCreate: false, allowClear: false },
+  { title: '任务', icon: '▣', section: 'tasks', categories: ['main_quest', 'side_quest'], defaultCategory: 'side_quest', allowCreate: false, allowClear: false, syncTarget: 'tasks' },
   { title: '活动', icon: '♧', section: 'events', categories: ['limited_event', 'permanent_event'], defaultCategory: 'limited_event', syncTarget: 'events' },
   { title: '周期事项', icon: '◴', section: 'cycles', categories: ['weekly', 'endgame'], defaultCategory: 'endgame', syncTarget: 'cycles' },
   { title: '地图探索', icon: '◇', section: 'exploration', categories: ['exploration'], defaultCategory: 'exploration', syncTarget: 'exploration' }
@@ -456,7 +456,8 @@ const syncProgressPhaseLabels: Record<SyncProgressUpdate['phase'], string> = {
 }
 
 function syncProgressTitle(progress: SyncProgressUpdate): string {
-  return progress.source === 'public_schedule' ? 'Codex 公开资料同步' : `${personalPlatform.value}进度同步`
+  if (progress.source !== 'public_schedule') return `${personalPlatform.value}进度同步`
+  return progress.target === 'tasks' ? 'Codex 版更校时' : 'Codex 公开资料同步'
 }
 
 function syncProgressCount(progress: SyncProgressUpdate): string | null {
@@ -868,6 +869,11 @@ function isExpired(value: string): boolean {
   return new Date(value).getTime() <= clockNow.value
 }
 
+function isUrgentDeadline(value: string): boolean {
+  const remaining = new Date(value).getTime() - clockNow.value
+  return remaining > 0 && remaining < 72 * 60 * 60 * 1_000
+}
+
 function isUpcoming(value: string): boolean {
   return new Date(value).getTime() > clockNow.value
 }
@@ -1058,7 +1064,14 @@ function showError(error: unknown): void {
                   </span>
                 </div>
                 <div class="section-actions">
-                  <div v-if="panel.syncTarget" class="dropdown" @click.stop>
+                  <button
+                    v-if="panel.syncTarget === 'tasks'"
+                    class="section-sync-button"
+                    type="button"
+                    :disabled="syncing || !aiScheduleAvailable || hasActivePublicSync"
+                    @click="runSync('public_schedule', 'tasks')"
+                  >↻ 版更校时</button>
+                  <div v-else-if="panel.syncTarget" class="dropdown" @click.stop>
                     <button
                       class="section-sync-button"
                       type="button"
@@ -1126,7 +1139,11 @@ function showError(error: unknown): void {
                       </span>
                     </span>
                     <span v-if="item.startsAt && isUpcoming(item.startsAt)" class="item-timing deadline upcoming">{{ countdown(item.startsAt, '距离开始') }}</span>
-                    <span v-else-if="item.endsAt" class="item-timing deadline" :class="{ expired: isExpired(item.endsAt) }">{{ countdown(item.endsAt) }}</span>
+                    <span
+                      v-else-if="item.endsAt"
+                      class="item-timing deadline"
+                      :class="{ expired: isExpired(item.endsAt), urgent: isUrgentDeadline(item.endsAt) }"
+                    >{{ countdown(item.endsAt) }}</span>
                   </button>
                   <button class="more-button" type="button" aria-label="编辑" @click="openEdit(item)">⋮</button>
                 </div>

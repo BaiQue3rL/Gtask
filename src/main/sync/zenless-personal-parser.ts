@@ -53,11 +53,6 @@ function optionalChinaDateTime(value: unknown, field: string): string | undefine
   return parsed.toISOString()
 }
 
-function percentage(value: number, maximum: number): number | null {
-  if (maximum <= 0) return null
-  return Math.round(Math.min(100, Math.max(0, (value / maximum) * 100)) * 100) / 100
-}
-
 export function parseZenlessEvents(value: unknown, reference = new Date()): NormalizedSyncItem[] {
   const root = requiredRecord(value, '活动日历')
   const events = Array.isArray(root.activity_list) ? root.activity_list.filter(isRecord) : []
@@ -68,12 +63,7 @@ export function parseZenlessEvents(value: unknown, reference = new Date()): Norm
     const startsAt = optionalChinaDateTime(event.start_ts ?? event.start, `${title}开始时间`)
     const endsAt = optionalChinaDateTime(event.end_ts ?? event.end, `${title}结束时间`)
     if (!startsAt || !endsAt) throw new Error(`绝区零个人数据缺少 ${title} 排期时间`)
-    const obtained = finiteNumber(event.monochrome_got_cnt ?? event.obtained_monochromes)
-    const maximum = finiteNumber(event.monochrome_cnt ?? event.max_monochromes)
     const hasStarted = Date.parse(startsAt) <= reference.getTime()
-    const progressPercent = hasStarted && obtained !== null && maximum !== null
-      ? percentage(obtained, maximum) ?? undefined
-      : undefined
     const state = typeof (event.state ?? event.status) === 'string'
       ? String(event.state ?? event.status)
       : ''
@@ -82,7 +72,6 @@ export function parseZenlessEvents(value: unknown, reference = new Date()): Norm
       category: 'limited_event',
       title,
       completed: hasStarted && state === 'STATE_COMPLETED',
-      progressPercent,
       startsAt,
       endsAt,
       periodKey: `zenless:event:${id}:${startsAt}`,
@@ -97,14 +86,17 @@ export function parseZenlessShiyuDefense(value: unknown): NormalizedSyncItem {
   const scheduleId = requiredIdentifier(data.schedule_id, '式舆防卫战 schedule_id')
   const brief = isRecord(data.brief_info) ? data.brief_info : {}
   const score = finiteNumber(brief.score)
-  const maximumScore = finiteNumber(brief.max_score)
+  const hasChallengeRecord =
+    data.has_data === true ||
+    data.has_challenge_record === true ||
+    data.passed_fifth_floor === true ||
+    (score ?? 0) > 0
 
   return {
     remoteKey: 'endgame:shiyu-defense',
     category: 'endgame',
     title: '式舆防卫战',
-    completed: data.passed_fifth_floor === true,
-    progressPercent: score !== null && maximumScore !== null ? percentage(score, maximumScore) : null,
+    completed: hasChallengeRecord,
     startsAt: optionalChinaDateTime(data.begin_time, '式舆防卫战开始时间'),
     endsAt: optionalChinaDateTime(data.end_time, '式舆防卫战结束时间'),
     periodKey: `zenless:shiyu-defense:${scheduleId}`,
@@ -118,24 +110,20 @@ export function parseZenlessDeadlyAssault(value: unknown): NormalizedSyncItem {
   const scheduleId = requiredIdentifier(data.id, '危局强袭战 id')
   const challenges = Array.isArray(data.challenges) ? data.challenges.filter(isRecord) : []
   const earnedStars = finiteNumber(data.total_star) ?? 0
-  const maximumStars = challenges.reduce((total, challenge) => {
-    return total + (finiteNumber(challenge.total_star) ?? 0)
-  }, 0)
   const completed =
-    data.has_data === true &&
-    challenges.length > 0 &&
-    challenges.every((challenge) => {
-      const earned = finiteNumber(challenge.star)
-      const maximum = finiteNumber(challenge.total_star)
-      return earned !== null && maximum !== null && earned >= maximum
-    })
+    data.has_data === true ||
+    earnedStars > 0 ||
+    challenges.some((challenge) =>
+      challenge.has_data === true ||
+      (finiteNumber(challenge.star) ?? 0) > 0 ||
+      (finiteNumber(challenge.score) ?? 0) > 0
+    )
 
   return {
     remoteKey: 'endgame:deadly-assault',
     category: 'endgame',
     title: '危局强袭战',
     completed,
-    progressPercent: percentage(earnedStars, maximumStars),
     startsAt: optionalChinaDateTime(data.start_time, '危局强袭战开始时间'),
     endsAt: optionalChinaDateTime(data.end_time, '危局强袭战结束时间'),
     periodKey: `zenless:deadly-assault:${scheduleId}`,

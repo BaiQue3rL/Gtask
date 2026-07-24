@@ -54,17 +54,12 @@ export function parseGenshinEvents(value: unknown, reference = new Date()): Norm
     const startsAt = hasValidWindow ? parsedStartsAt : undefined
     const endsAt = hasValidWindow ? parsedEndsAt : undefined
     const exploration = isRecord(event.explore_detail) ? event.explore_detail : null
-    const rawProgress = exploration ? finiteNumber(exploration.explore_percent) : null
     const hasStarted = !startsAt || Date.parse(startsAt) <= reference.getTime()
-    const progressPercent = !hasStarted || rawProgress === null
-      ? undefined
-      : clampPercentage(rawProgress > 100 ? rawProgress / 10 : rawProgress)
     return [{
       remoteKey: `event:miyoushe:${id}`,
       category: 'limited_event' as const,
       title,
       completed: hasStarted && (event.is_finished === true || exploration?.is_finished === true),
-      progressPercent,
       startsAt,
       endsAt,
       periodKey: startsAt ? `genshin:event:${id}:${startsAt}` : `genshin:event:${id}`,
@@ -164,17 +159,17 @@ export function parseSpiralAbyss(value: unknown): NormalizedSyncItem {
   const totalStars = finiteNumber(data.total_star) ?? 0
   const maxFloor = typeof data.max_floor === 'string' ? data.max_floor.replaceAll(' ', '') : ''
   const floors = Array.isArray(data.floors) ? data.floors.filter(isRecord) : []
-  const clearedLastChamber = floors.some((floor) => {
-    if (Number(floor.index) !== 12) return false
+  const hasChallengeRecord = data.has_data === true || totalStars > 0 || (
+    Boolean(maxFloor) && maxFloor !== '0' && maxFloor !== '0-0'
+  ) || floors.some((floor) => {
     const levels = Array.isArray(floor.levels) ? floor.levels.filter(isRecord) : []
-    return levels.some((level) => Number(level.index) >= 3 && Number(level.star) >= 0)
+    return levels.length > 0 || (finiteNumber(floor.star) ?? 0) > 0
   })
   return {
     remoteKey: 'endgame:spiral-abyss',
     category: 'endgame',
     title: '深境螺旋',
-    completed: maxFloor === '12-3' || clearedLastChamber,
-    progressPercent: clampPercentage((totalStars / 36) * 100),
+    completed: hasChallengeRecord,
     startsAt: toIsoDate(data.start_time, '深境螺旋开始时间'),
     endsAt: toIsoDate(data.end_time, '深境螺旋结束时间'),
     periodKey: `genshin:spiral-abyss:${scheduleId}`,
@@ -196,19 +191,12 @@ export function parseImaginariumTheater(value: unknown): NormalizedSyncItem | nu
   const medalStates = Array.isArray(stats.get_medal_round_list)
     ? stats.get_medal_round_list.filter((value): value is boolean => typeof value === 'boolean')
     : []
-  const obtainedMedals = medalStates.filter(Boolean).length
-  const completed =
-    data.has_data === true &&
-    medalStates.length > 0 &&
-    obtainedMedals === medalStates.length
+  const completed = data.has_data === true || bestRecord > 0 || medalStates.some(Boolean)
   return {
     remoteKey: 'endgame:imaginarium-theater',
     category: 'endgame',
     title: '幻想真境剧诗',
     completed,
-    progressPercent: medalStates.length > 0
-      ? clampPercentage((obtainedMedals / medalStates.length) * 100)
-      : clampPercentage((bestRecord / 10) * 100),
     startsAt: toIsoDate(schedule.start_time ?? schedule.start_date_time, '幻想真境剧诗开始时间'),
     endsAt: toIsoDate(schedule.end_time ?? schedule.end_date_time, '幻想真境剧诗结束时间'),
     periodKey: `genshin:imaginarium-theater:${scheduleId}`,
@@ -232,10 +220,7 @@ export function parseStygianOnslaught(value: unknown): NormalizedSyncItem | null
     remoteKey: 'endgame:stygian-onslaught',
     category: 'endgame',
     title: requiredOptionalString(schedule.name) ?? '幽境危战',
-    // 难度 5 已包含本期全部常规资源奖励；难度 6 是额外极限/外观目标，
-    // 不应阻塞任务清单中的“已完成”。
-    completed: single.has_data === true && difficulty >= 5,
-    progressPercent: clampPercentage((difficulty / 6) * 100),
+    completed: single.has_data === true || difficulty > 0,
     startsAt: toIsoDate(schedule.start_time ?? schedule.start_date_time, '幽境危战开始时间'),
     endsAt: toIsoDate(schedule.end_time ?? schedule.end_date_time, '幽境危战结束时间'),
     periodKey: `genshin:stygian-onslaught:${scheduleId}`,

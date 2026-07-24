@@ -126,7 +126,7 @@ h2 { margin: 0; font-size: 19px; }
 .item-timing { grid-area: timing; align-self: start; padding-top: 2px; font-size: 12px; white-space: nowrap; }
 .deadline { color: #f0b63a; }
 .deadline.upcoming { color: #78aae8; }
-.deadline.expired { color: #ef7e73; }
+.deadline.expired, .deadline.urgent { color: #ef5f56; font-weight: 600; }
 .item-details .source-detail { color: #7089a8; }
 .item-details .reset-detail { color: #a7b8cd; }
 .completed .item-title { color: #70d9aa; }

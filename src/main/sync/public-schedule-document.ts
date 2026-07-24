@@ -51,12 +51,12 @@ export function parsePublicScheduleDocument(
     if (!/\p{Script=Han}/u.test(normalized.title)) {
       throw new Error('公开资料名称必须使用经中文来源核对的中文正式名称')
     }
-    if (!['limited_event', 'endgame', 'exploration'].includes(normalized.category)) {
-      throw new Error('公开资料同步只允许限时活动、周期挑战和地图区域')
+    if (!['main_quest', 'side_quest', 'limited_event', 'endgame', 'exploration'].includes(normalized.category)) {
+      throw new Error('公开资料同步只允许版本时间、限时活动、周期挑战和地图区域')
     }
     return {
       ...normalized,
-      scheduleKind: normalized.category === 'limited_event'
+      scheduleKind: ['main_quest', 'side_quest', 'limited_event'].includes(normalized.category)
         ? 'fixed_window'
         : normalized.category === 'endgame'
           ? 'remote_schedule'
