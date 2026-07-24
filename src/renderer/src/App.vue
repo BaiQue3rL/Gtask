@@ -1108,7 +1108,6 @@ function showError(error: unknown): void {
       <div v-if="needsInitialSync" class="onboarding-banner">
         <div>
           <strong>先完成一次初始全局同步</strong>
-          <span>将按你的系统时区建立活动、周期事项和地图目录；周期与地图之后会在本地长期维护。</span>
         </div>
         <button type="button" :disabled="syncing || hasActivePublicSync" @click="aiScheduleAvailable ? runSync('public_schedule', 'all') : settingsOpen = true">
           {{ aiScheduleAvailable ? '开始初始同步' : '配置 Codex/MCP' }}
