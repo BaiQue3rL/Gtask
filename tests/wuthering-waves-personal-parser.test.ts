@@ -92,6 +92,7 @@ describe('鸣潮个人进度解析', () => {
 
   it('适配器按版块请求数据并保留部分成功结果', async () => {
     const order: string[] = []
+    const progress: Array<{ message: string; current?: number | null; total?: number | null }> = []
     const adapter = new WutheringWavesPersonalAdapter({
       getExploration: async () => {
         order.push('exploration')
@@ -111,13 +112,22 @@ describe('鸣潮个人进度解析', () => {
       }
     })
 
-    const output = await adapter.sync('wuthering-waves', 'cycles')
+    const output = await adapter.sync(
+      'wuthering-waves',
+      'cycles',
+      (update) => progress.push(update)
+    )
     expect(order).toEqual(['tower', 'slash', 'matrix'])
     expect(output.items).toEqual(expect.arrayContaining([
       expect.objectContaining({ modeKey: 'tower' }),
       expect.objectContaining({ modeKey: 'matrix' })
     ]))
     expect(output.message).toContain('部分成功 2/3')
+    expect(progress).toEqual(expect.arrayContaining([
+      expect.objectContaining({ message: '正在读取逆境深塔战绩', current: 1, total: 3 }),
+      expect.objectContaining({ message: '冥歌海墟战绩读取失败，继续下一项', current: 2, total: 3 }),
+      expect.objectContaining({ message: '正在读取终焉矩阵战绩', current: 3, total: 3 })
+    ]))
     await expect(adapter.sync('genshin')).rejects.toThrow('不能用于其他游戏')
   })
 

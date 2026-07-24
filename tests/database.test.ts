@@ -1140,6 +1140,62 @@ describe('AppDatabase', () => {
     expect(database.getSyncSettings('genshin').lastScope).toBe('public_and_personal')
   })
 
+  it('Codex 五分钟未接单时结束任务并给出可重试的失败状态', () => {
+    database = new AppDatabase(':memory:')
+    const queuedAt = new Date('2026-07-24T10:00:00.000Z')
+    const queued = database.createAiScheduleJob(
+      'wuthering-waves',
+      'public_schedule',
+      queuedAt,
+      true,
+      'tasks',
+      'Asia/Shanghai'
+    )
+
+    expect(database.expireUnclaimedAiScheduleJobs(
+      new Date('2026-07-24T10:04:59.999Z')
+    )).toBe(0)
+    expect(database.getActiveAiScheduleJob('wuthering-waves')?.id).toBe(queued.id)
+
+    expect(database.expireUnclaimedAiScheduleJobs(
+      new Date('2026-07-24T10:05:00.001Z')
+    )).toBe(1)
+    expect(database.getActiveAiScheduleJob('wuthering-waves')).toBeNull()
+    expect(database.getSyncSettings('wuthering-waves')).toMatchObject({
+      status: 'error',
+      message: expect.stringContaining('5 分钟内接单')
+    })
+  })
+
+  it('Codex 接单后十五分钟无进度时重新排队并重新计算等待超时', () => {
+    database = new AppDatabase(':memory:')
+    const startedAt = new Date('2026-07-24T10:00:00.000Z')
+    database.registerAiScheduleAgent('stale-agent', '掉线 Agent', startedAt)
+    const queued = database.createAiScheduleJob(
+      'genshin',
+      'public_schedule',
+      startedAt,
+      false,
+      'events'
+    )
+    database.claimAiScheduleJob('stale-agent', startedAt)
+
+    expect(database.maintainAiScheduleJobs(
+      new Date('2026-07-24T10:15:00.001Z')
+    )).toEqual({ requeued: 1, expired: 0 })
+    expect(database.getActiveAiScheduleJob('genshin')).toMatchObject({
+      id: queued.id,
+      status: 'pending',
+      progressPhase: 'queued',
+      message: 'Codex 超时，任务已重新排队'
+    })
+
+    expect(database.maintainAiScheduleJobs(
+      new Date('2026-07-24T10:20:00.002Z')
+    )).toEqual({ requeued: 0, expired: 1 })
+    expect(database.getActiveAiScheduleJob('genshin')).toBeNull()
+  })
+
   it('持续上报进度的 Codex 任务不会按最初接单时间误判超时', () => {
     database = new AppDatabase(':memory:')
     const queuedAt = new Date('2026-07-23T10:00:00.000Z')

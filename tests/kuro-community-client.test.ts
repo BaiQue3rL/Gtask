@@ -65,15 +65,22 @@ describe('KuroCommunityClient', () => {
       .mockResolvedValueOnce(response({ code: 10903, msg: '数据令牌失效' }))
       .mockResolvedValueOnce(response({ code: 200, data: { accessToken: 'bat-2' } }))
       .mockResolvedValueOnce(response({ code: 200, data: { exploreList: [] } }))
+    const reportProgress = vi.fn()
     const client = new KuroCommunityClient({
       token: 'long-token',
       did: 'DEVICE-ID',
       roleId: '123456789',
       serverId: 'server-cn'
-    }, fetcher, undefined, undefined, resolveIosDevCode)
+    }, fetcher, reportProgress, undefined, resolveIosDevCode)
 
     await expect(client.getExploration()).resolves.toEqual({ exploreList: [] })
     expect(new Headers(fetcher.mock.calls[4][1]?.headers).get('b-at')).toBe('bat-2')
+    expect(reportProgress).toHaveBeenCalledWith({
+      phase: 'retrying',
+      message: '库街区数据令牌已失效，正在刷新后重试（1/1）',
+      current: 1,
+      total: 1
+    })
   })
 
   it('长期 Token 过期时要求重新登录', async () => {

@@ -78,12 +78,12 @@ export class GenshinPersonalAdapter implements SyncAdapter {
         ? []
         : extractGenshinEventReviewCandidates(eventCalendar),
       message: (target === 'events'
-        ? '原神活动原始状态已脱敏，等待 Codex 核验'
+        ? '原神活动进度已读取'
         : target === 'exploration'
           ? '原神地图探索度已同步'
           : target === 'cycles'
             ? '原神周期战绩已同步'
-            : '原神地图探索和周期战绩已同步；活动原始状态等待 Codex 核验') + suffix
+            : '原神地图探索和周期战绩已同步；活动进度已读取') + suffix
     }
   }
 }

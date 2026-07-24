@@ -67,10 +67,10 @@ export class ZenlessPersonalAdapter implements SyncAdapter {
         ? []
         : extractZenlessEventReviewCandidates(eventCalendar),
       message: (target === 'events'
-        ? '绝区零活动原始状态已脱敏，等待 Codex 核验'
+        ? '绝区零活动进度已读取'
         : target === 'cycles'
           ? '绝区零式舆防卫战和危局强袭战已同步'
-          : '绝区零两种周期战绩已同步；活动原始状态等待 Codex 核验') + suffix
+          : '绝区零两种周期战绩已同步；活动进度已读取') + suffix
     }
   }
 }

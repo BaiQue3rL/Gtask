@@ -462,9 +462,20 @@ const syncProgressPhaseLabels: Record<SyncProgressUpdate['phase'], string> = {
   failed: '同步失败'
 }
 
+const syncProgressTargetLabels: Record<SyncTarget, string> = {
+  all: '全局',
+  tasks: '任务',
+  events: '活动',
+  cycles: '周期事项',
+  exploration: '地图探索'
+}
+
 function syncProgressTitle(progress: SyncProgressUpdate): string {
-  if (progress.source !== 'public_schedule') return `${personalPlatform.value}进度同步`
-  return progress.target === 'tasks' ? 'Codex 版更校时' : 'Codex 公开资料同步'
+  if (progress.source !== 'public_schedule') {
+    return `${personalPlatform.value}${syncProgressTargetLabels[progress.target]}进度同步`
+  }
+  if (progress.target === 'tasks') return 'Codex 版更校时'
+  return `Codex ${syncProgressTargetLabels[progress.target]}清单同步`
 }
 
 function syncProgressCount(progress: SyncProgressUpdate): string | null {
@@ -478,13 +489,15 @@ function syncProgressPercent(progress: SyncProgressUpdate): number | null {
 }
 
 function syncProgressStalled(progress: SyncProgressUpdate): boolean {
-  return progress.status === 'running' &&
-    clockNow.value - new Date(progress.updatedAt).getTime() > 30_000
+  const elapsed = clockNow.value - new Date(progress.updatedAt).getTime()
+  return (progress.status === 'waiting' && elapsed > 60_000) ||
+    (progress.status === 'running' && elapsed > 30_000)
 }
 
 function syncProgressAge(progress: SyncProgressUpdate): string {
   const seconds = Math.max(0, Math.floor((clockNow.value - new Date(progress.updatedAt).getTime()) / 1_000))
-  return seconds < 60 ? `${seconds} 秒前更新` : `${Math.floor(seconds / 60)} 分钟前更新`
+  const elapsed = seconds < 60 ? `${seconds} 秒` : `${Math.floor(seconds / 60)} 分钟`
+  return progress.status === 'waiting' ? `已等待 ${elapsed}` : `${elapsed}前更新`
 }
 
 function syncProgressMessage(progress: SyncProgressUpdate): string {
@@ -496,9 +509,12 @@ function syncProgressMessage(progress: SyncProgressUpdate): string {
     return progress.message
   }
   const waitingMs = clockNow.value - new Date(progress.updatedAt).getTime()
-  if (waitingMs < 10_000) return '等待 Codex 启动并领取同步任务'
-  if (waitingMs < 30_000) return 'Codex 尚未接单，可能正在启动或建立网络连接'
-  return 'Codex 仍在启动或连接；接单前的内部重试次数暂不可见'
+  if (progress.message.includes('重新排队')) {
+    return '上次处理长时间没有进度，已重新排队等待 Codex 接单'
+  }
+  if (waitingMs < 10_000) return '同步任务已提交，正在等待 Codex 接单'
+  if (waitingMs < 60_000) return 'Codex 尚未接单；请打开 Codex 中的“幻游清单”插件'
+  return '等待接单时间较长；请打开 Codex 接单，5 分钟后仍未接单将自动停止'
 }
 
 function progressForTarget(target: SyncTarget): SyncProgressUpdate | null {
@@ -1131,7 +1147,9 @@ function showError(error: unknown): void {
               <i :style="{ width: `${syncProgressPercent(progress)}%` }"></i>
             </div>
             <small :class="{ warning: syncProgressStalled(progress) }">
-              {{ syncProgressStalled(progress) ? `进度暂未变化 · ${syncProgressAge(progress)}` : syncProgressAge(progress) }}
+              {{ syncProgressStalled(progress) && progress.status === 'running'
+                ? `进度暂未变化 · ${syncProgressAge(progress)}`
+                : syncProgressAge(progress) }}
             </small>
           </div>
           <button

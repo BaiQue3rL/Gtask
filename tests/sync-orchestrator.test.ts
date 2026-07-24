@@ -190,6 +190,7 @@ describe('SyncOrchestrator', () => {
 
   it('同步进度只运行个人适配器并记录独立结果', async () => {
     database = new AppDatabase(':memory:')
+    const progress: Array<{ phase: string; status: string; message: string }> = []
     const publicSync = vi.fn(async () => ({ items: [], message: '不应运行' }))
     const personalSync = vi.fn(async () => ({
       items: [{
@@ -203,7 +204,11 @@ describe('SyncOrchestrator', () => {
     const orchestrator = new SyncOrchestrator(database, {
       publicSchedule: { genshin: { sync: publicSync } },
       personalData: { genshin: { sync: personalSync } }
-    })
+    }, (update) => progress.push({
+      phase: update.phase,
+      status: update.status,
+      message: update.message
+    }))
 
     const result = await orchestrator.syncPersonalOnly('genshin', 'exploration')
 
@@ -218,10 +223,21 @@ describe('SyncOrchestrator', () => {
       status: 'success',
       lastScope: null
     })
+    expect(progress.map((update) => update.phase)).toEqual([
+      'fetching',
+      'structuring',
+      'merging',
+      'completed'
+    ])
+    expect(progress.at(-1)).toMatchObject({
+      status: 'completed',
+      message: '同步完成'
+    })
   })
 
   it('模糊个人数据只进入 Codex 核验队列，不直接写入或冒充同步成功', async () => {
     database = new AppDatabase(':memory:')
+    const progress: Array<{ phase: string; status: string; message: string }> = []
     const orchestrator = new SyncOrchestrator(database, {
       publicSchedule: {},
       personalData: {
@@ -241,7 +257,11 @@ describe('SyncOrchestrator', () => {
           })
         }
       }
-    })
+    }, (update) => progress.push({
+      phase: update.phase,
+      status: update.status,
+      message: update.message
+    }))
 
     const result = await orchestrator.syncPersonalOnly('star-rail', 'events')
 
@@ -249,7 +269,12 @@ describe('SyncOrchestrator', () => {
       status: 'partial',
       sources: [expect.objectContaining({ pendingReview: 1 })]
     })
-    expect(result.message).toContain('待 Codex 核验')
+    expect(result.message).toContain('部分状态暂无法确认，已保留原清单')
+    expect(progress.at(-1)).toMatchObject({
+      phase: 'completed',
+      status: 'completed',
+      message: '进度读取完成；无法确认的状态已安全保留'
+    })
     expect(database.listChecklistItems('star-rail').some((item) => item.title === '反贪「砖」家'))
       .toBe(false)
   })

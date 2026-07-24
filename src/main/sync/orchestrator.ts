@@ -189,10 +189,10 @@ export class SyncOrchestrator {
       })
       const result = await adapter.sync(gameId, target, reportProgress)
       reportProgress({
-        phase: 'merging',
-        message: '数据读取完成，正在安全合并清单',
-        current: 1,
-        total: 1
+        phase: 'structuring',
+        message: '数据读取完成，正在整理可写入内容',
+        current: null,
+        total: null
       })
       const checklistSource = source === 'public_schedule' ? 'public_schedule' : 'personal_sync'
       const targetCategories: Partial<Record<SyncTarget, ChecklistCategory[]>> = {
@@ -205,6 +205,12 @@ export class SyncOrchestrator {
       const normalizedItems = normalizeSyncItems(result.items).filter(
         (item) => !categories || categories.includes(item.category)
       )
+      reportProgress({
+        phase: 'merging',
+        message: '内容整理完成，正在安全合并清单',
+        current: 1,
+        total: 1
+      })
       const merge = this.database.mergeSyncedItems(
         gameId,
         checklistSource,
@@ -221,13 +227,13 @@ export class SyncOrchestrator {
         : '无清单变更'
       const preservedMessage = merge.preserved > 0 ? `，保护 ${merge.preserved}` : ''
       const reviewMessage = review.pending > 0
-        ? `；${review.pending} 项待 Codex 核验`
+        ? '；部分状态暂无法确认，已保留原清单'
         : ''
       reportProgress({
         phase: 'completed',
-        status: review.pending > 0 ? 'waiting' : 'completed',
+        status: 'completed',
         message: review.pending > 0
-          ? `${review.pending} 项数据等待 Codex 语义核验`
+          ? '进度读取完成；无法确认的状态已安全保留'
           : '同步完成',
         current: 1,
         total: 1

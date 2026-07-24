@@ -149,6 +149,12 @@ export class KuroCommunityClient {
           ? 200
           : -1
       if (code === 10903 && options.retryBat && !isBatRetry) {
+        this.reportProgress?.({
+          phase: 'retrying',
+          message: '库街区数据令牌已失效，正在刷新后重试（1/1）',
+          current: 1,
+          total: 1
+        })
         await this.refreshBat()
         return await this.request(path, body, options, true, attempt)
       }

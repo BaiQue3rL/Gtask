@@ -64,6 +64,7 @@ const DEFAULT_GAMES: GameSummary[] = [
 export const CURRENT_SCHEMA_VERSION = 15
 
 const AI_AGENT_MAX_AGE_MS = 5 * 60 * 1000
+const AI_JOB_PENDING_MAX_AGE_MS = 5 * 60 * 1000
 const AI_JOB_CLAIM_MAX_AGE_MS = 15 * 60 * 1000
 
 function stableJson(value: unknown): string {
@@ -275,9 +276,10 @@ export class AppDatabase {
     gameId: string,
     status: SyncStatus,
     message: string,
-    successfulDataReceived = status === 'success'
+    successfulDataReceived = status === 'success',
+    reference = new Date()
   ): void {
-    const now = new Date().toISOString()
+    const now = reference.toISOString()
     const lastSuccessAt = successfulDataReceived ? now : null
     this.database
       .prepare(`
@@ -599,6 +601,41 @@ export class AppDatabase {
       ORDER BY requested_at ASC LIMIT 1
     `).get(gameId) as { id: string } | undefined
     return row ? this.getAiScheduleJob(row.id) : null
+  }
+
+  expireUnclaimedAiScheduleJobs(reference = new Date()): number {
+    const threshold = new Date(reference.getTime() - AI_JOB_PENDING_MAX_AGE_MS).toISOString()
+    const now = reference.toISOString()
+    const message = 'Codex 未在 5 分钟内接单，本次同步已停止；请打开 Codex 后重新同步'
+    const staleJobs = this.database.prepare(`
+      SELECT id, game_id AS gameId
+      FROM ai_schedule_jobs
+      WHERE status = 'pending' AND COALESCE(progress_updated_at, requested_at) < ?
+    `).all(threshold) as Array<{ id: string; gameId: GameId }>
+    if (staleJobs.length === 0) return 0
+
+    this.runTransaction(() => {
+      const expire = this.database.prepare(`
+        UPDATE ai_schedule_jobs
+        SET status = 'failed', completed_at = ?, message = ?,
+            progress_phase = 'failed', progress_current = NULL,
+            progress_total = NULL, progress_updated_at = ?, updated_at = ?
+        WHERE id = ? AND status = 'pending'
+      `)
+      for (const job of staleJobs) {
+        const result = expire.run(now, message, now, now, job.id)
+        if (result.changes > 0) {
+          this.recordSyncOutcome(job.gameId, 'error', message, false, reference)
+        }
+      }
+    })
+    return staleJobs.length
+  }
+
+  maintainAiScheduleJobs(reference = new Date()): { requeued: number; expired: number } {
+    const requeued = this.requeueStaleAiScheduleJobs(reference)
+    const expired = this.expireUnclaimedAiScheduleJobs(reference)
+    return { requeued, expired }
   }
 
   updateAiScheduleJobProgress(

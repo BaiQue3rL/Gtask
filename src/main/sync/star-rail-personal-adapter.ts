@@ -35,7 +35,7 @@ export class StarRailPersonalAdapter implements SyncAdapter {
       const outcomes: PersonalRequestOutcome[] = []
       reportProgress?.({
         phase: 'fetching',
-        message: '正在读取星铁活动原始状态',
+        message: '正在读取星铁活动进度',
         current: 1,
         total: 1
       })
@@ -47,7 +47,7 @@ export class StarRailPersonalAdapter implements SyncAdapter {
       return {
         items: [],
         reviewCandidates: extractStarRailEventReviewCandidates(eventCalendar),
-        message: '星铁活动原始状态已脱敏，等待 Codex 核验'
+        message: '星铁活动进度已读取'
       }
     }
     // 保持顺序请求，降低短时间并发触发米游社风控的概率。
@@ -81,7 +81,7 @@ export class StarRailPersonalAdapter implements SyncAdapter {
       ? await request('正在读取异相仲裁战绩', () => this.client.getAnomalyArbitration())
       : undefined
     const eventCalendar = target === 'all'
-      ? await request('正在读取星铁活动原始状态', () => this.client.getEventCalendar())
+      ? await request('正在读取星铁活动进度', () => this.client.getEventCalendar())
       : undefined
     assertAnyPersonalRequestSucceeded(outcomes)
     const suffix = personalPartialSuffix(outcomes)

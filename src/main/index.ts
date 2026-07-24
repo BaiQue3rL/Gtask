@@ -194,6 +194,10 @@ function sendAiJobProgress(job: AiScheduleJob): void {
 
 function pollAiJobProgress(): void {
   if (!appDatabase) return
+  const maintenance = appDatabase.maintainAiScheduleJobs()
+  if (maintenance.requeued > 0 || maintenance.expired > 0) {
+    mainWindow?.webContents.send('checklist:changed')
+  }
   for (const gameId of SUPPORTED_GAME_IDS) {
     const job = appDatabase.getActiveAiScheduleJob(gameId)
     const previousSignature = aiJobProgressSignatures.get(gameId)

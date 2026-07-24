@@ -188,7 +188,7 @@ describe('Star Rail personal parsing', () => {
     const result = await adapter.sync('star-rail', 'all', (update) => progress.push(update))
     expect(order).toEqual(['memory', 'fiction', 'shadow', 'arbitration', 'events'])
     expect(progress.at(-1)).toMatchObject({
-      message: '正在读取星铁活动原始状态',
+      message: '正在读取星铁活动进度',
       current: 5,
       total: 5
     })
@@ -199,7 +199,7 @@ describe('Star Rail personal parsing', () => {
     expect(order).toEqual(['events'])
     expect(eventsOnly.items).toEqual([])
     expect(eventsOnly.reviewCandidates).toHaveLength(1)
-    expect(eventsOnly.message).toContain('等待 Codex 核验')
+    expect(eventsOnly.message).toBe('星铁活动进度已读取')
     order.length = 0
     const exploration = await adapter.sync('star-rail', 'exploration')
     expect(order).toEqual([])
