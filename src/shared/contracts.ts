@@ -54,11 +54,6 @@ export interface MiyousheQrLoginState {
   expiresAt: string
 }
 
-export interface KuroSmsCodeState {
-  message: string
-  phoneMasked: string
-}
-
 export interface BackupSummary {
   fileName: string
   sizeBytes: number
@@ -309,9 +304,6 @@ export interface GachaApi {
   startMiyousheQrLogin: () => Promise<MiyousheQrLoginState>
   pollMiyousheQrLogin: (sessionId: string) => Promise<MiyousheQrLoginState>
   cancelMiyousheQrLogin: (sessionId: string) => Promise<boolean>
-  requestKuroSmsCode: (phone: string) => Promise<KuroSmsCodeState>
-  completeKuroSmsLogin: (phone: string, code: string) => Promise<CredentialStatus>
-  loginWithKuroWeb: () => Promise<CredentialStatus>
   clearCredential: (provider: CredentialProvider) => Promise<boolean>
   onSyncCompleted: (callback: (result: SyncResult) => void) => () => void
   onSyncProgress: (callback: (progress: SyncProgressUpdate) => void) => () => void

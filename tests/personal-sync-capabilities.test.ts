@@ -14,5 +14,7 @@ describe('个人进度同步能力', () => {
     expect(supportsPersonalSyncTarget('star-rail', 'events')).toBe(true)
     expect(supportsPersonalSyncTarget('genshin', 'exploration')).toBe(true)
     expect(supportsPersonalSyncTarget('wuthering-waves', 'events')).toBe(false)
+    expect(supportsPersonalSyncTarget('wuthering-waves', 'cycles')).toBe(true)
+    expect(supportsPersonalSyncTarget('wuthering-waves', 'exploration')).toBe(true)
   })
 })
