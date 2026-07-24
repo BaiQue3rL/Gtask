@@ -213,7 +213,7 @@ function buildVerificationPage(
           status.textContent = '验证成功，正在继续同步…';
           window.location.href = '${COMPLETION_URL}#' + encodeURIComponent(JSON.stringify({
             ...result,
-            ...(isV4 && { version: 4 })
+            ...(isV4 && { captcha_id: result.captcha_id || challenge.gt, version: 4 })
           }));
         });
         captcha.onError(() => { status.textContent = '验证加载失败，请关闭窗口后重试。'; });

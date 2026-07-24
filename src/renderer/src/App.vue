@@ -143,8 +143,10 @@ const miyousheLoginState = ref<MiyousheQrLoginState | null>(null)
 const startingMiyousheLogin = ref(false)
 const pollingMiyousheLogin = ref(false)
 const kuroCredentialOpen = ref(false)
-const kuroCredentialToken = ref('')
-const kuroCredentialDid = ref('')
+const kuroLoginPhone = ref('')
+const kuroLoginCode = ref('')
+const kuroLoginSessionId = ref('')
+const kuroLoginPhase = ref<'phone' | 'code' | 'role'>('phone')
 const kuroCredentialRoles = ref<KuroCommunityRole[]>([])
 const kuroSelectedRoleKey = ref('')
 const kuroCredentialBusy = ref(false)
@@ -357,7 +359,7 @@ function handleGlobalKeydown(event: KeyboardEvent): void {
     return
   }
   if (kuroCredentialOpen.value) {
-    closeKuroCredentialImport()
+    void closeKuroCommunityLogin()
     return
   }
   sectionSyncMenuOpen.value = null
@@ -672,53 +674,82 @@ function stopMiyousheLoginPolling(): void {
   miyousheLoginTimer = null
 }
 
-function openKuroCredentialImport(): void {
-  kuroCredentialToken.value = ''
-  kuroCredentialDid.value = ''
+function openKuroCommunityLogin(): void {
+  kuroLoginPhone.value = ''
+  kuroLoginCode.value = ''
+  kuroLoginSessionId.value = ''
+  kuroLoginPhase.value = 'phone'
   kuroCredentialRoles.value = []
   kuroSelectedRoleKey.value = ''
   kuroCredentialMessage.value = ''
   kuroCredentialOpen.value = true
 }
 
-function closeKuroCredentialImport(): void {
+async function closeKuroCommunityLogin(): Promise<void> {
   if (kuroCredentialBusy.value) return
+  const sessionId = kuroLoginSessionId.value
   kuroCredentialOpen.value = false
-  kuroCredentialToken.value = ''
-  kuroCredentialDid.value = ''
+  kuroLoginPhone.value = ''
+  kuroLoginCode.value = ''
+  kuroLoginSessionId.value = ''
+  kuroLoginPhase.value = 'phone'
   kuroCredentialRoles.value = []
   kuroSelectedRoleKey.value = ''
   kuroCredentialMessage.value = ''
+  if (sessionId) {
+    try {
+      await window.gacha.cancelKuroCommunityLogin(sessionId)
+    } catch {
+      // The server-side session may already have been consumed or expired.
+    }
+  }
 }
 
 function kuroRoleKey(role: KuroCommunityRole): string {
   return `${role.serverId}\u0000${role.roleId}`
 }
 
-async function loadKuroCommunityRoles(): Promise<void> {
+async function sendKuroCommunitySms(): Promise<void> {
   if (kuroCredentialBusy.value) return
   kuroCredentialBusy.value = true
-  kuroCredentialMessage.value = ''
-  kuroCredentialRoles.value = []
-  kuroSelectedRoleKey.value = ''
+  kuroCredentialMessage.value = '请在弹出的窗口中完成官方滑块验证…'
   try {
-    const roles = await window.gacha.listKuroCommunityRoles(
-      kuroCredentialToken.value,
-      kuroCredentialDid.value
-    )
-    kuroCredentialRoles.value = roles
-    kuroSelectedRoleKey.value = roles.length === 1 ? kuroRoleKey(roles[0]) : ''
-    kuroCredentialMessage.value = roles.length === 1
-      ? '已读取角色，请验证并保存'
-      : `已读取 ${roles.length} 个角色，请选择要同步的角色`
+    const state = await window.gacha.sendKuroCommunitySms(kuroLoginPhone.value)
+    kuroLoginSessionId.value = state.sessionId
+    kuroLoginPhase.value = 'code'
+    kuroCredentialMessage.value = state.message
   } catch (error) {
+    kuroCredentialMessage.value = ''
     showError(error)
   } finally {
     kuroCredentialBusy.value = false
   }
 }
 
-async function saveKuroCommunityCredential(): Promise<void> {
+async function completeKuroCommunityLogin(): Promise<void> {
+  if (kuroCredentialBusy.value || !kuroLoginSessionId.value) return
+  kuroCredentialBusy.value = true
+  kuroCredentialMessage.value = '正在登录库街区并读取鸣潮角色…'
+  try {
+    const result = await window.gacha.completeKuroCommunityLogin(
+      kuroLoginSessionId.value,
+      kuroLoginCode.value
+    )
+    kuroCredentialRoles.value = result.roles
+    kuroSelectedRoleKey.value = result.roles.length === 1 ? kuroRoleKey(result.roles[0]) : ''
+    kuroLoginPhase.value = 'role'
+    kuroCredentialMessage.value = result.roles.length === 1
+      ? '已读取角色，正在等待保存'
+      : `已读取 ${result.roles.length} 个角色，请选择要同步的角色`
+  } catch (error) {
+    kuroCredentialMessage.value = ''
+    showError(error)
+  } finally {
+    kuroCredentialBusy.value = false
+  }
+}
+
+async function saveKuroCommunityLogin(): Promise<void> {
   if (kuroCredentialBusy.value) return
   const role = kuroCredentialRoles.value.find(
     (candidate) => kuroRoleKey(candidate) === kuroSelectedRoleKey.value
@@ -730,16 +761,14 @@ async function saveKuroCommunityCredential(): Promise<void> {
   kuroCredentialBusy.value = true
   kuroCredentialMessage.value = '正在向库街区校验角色数据权限…'
   try {
-    await window.gacha.storeKuroCommunityCredential({
-      token: kuroCredentialToken.value,
-      did: kuroCredentialDid.value,
-      roleId: role.roleId,
-      serverId: role.serverId,
-      roleName: role.roleName
-    })
+    await window.gacha.storeKuroCommunityLogin(
+      kuroLoginSessionId.value,
+      role.roleId,
+      role.serverId
+    )
     credentialStatuses.value = await window.gacha.listCredentialStatuses()
     kuroCredentialBusy.value = false
-    closeKuroCredentialImport()
+    await closeKuroCommunityLogin()
   } catch (error) {
     kuroCredentialMessage.value = ''
     showError(error)
@@ -1488,8 +1517,8 @@ function showError(error: unknown): void {
                 v-else
                 class="secondary-button"
                 type="button"
-                @click="openKuroCredentialImport"
-              >{{ status.stored ? '重新导入' : '导入 App 凭据' }}</button>
+                @click="openKuroCommunityLogin"
+              >{{ status.stored ? '重新登录' : '手机号登录' }}</button>
               <button
                 class="danger-button"
                 type="button"
@@ -1524,7 +1553,7 @@ function showError(error: unknown): void {
           </div>
           <p v-if="backups.length === 0" class="empty-text">尚无备份</p>
         </div>
-        <p class="settings-note">米游社使用二维码登录；鸣潮支持导入库街区 App Token 与 DID。凭据只在本机加密保存，手动清单与公开资料同步始终不依赖登录。</p>
+        <p class="settings-note">米游社使用二维码登录；鸣潮在应用内完成库街区手机号、滑块和短信验证。Token 与 DID 均由应用自动取得并只在本机加密保存。</p>
       </section>
     </div>
     <div v-if="miyousheLoginOpen" class="modal-backdrop login-backdrop" @click.self="closeMiyousheLogin">
@@ -1563,49 +1592,60 @@ function showError(error: unknown): void {
         </div>
       </section>
     </div>
-    <div v-if="kuroCredentialOpen" class="modal-backdrop login-backdrop" @click.self="closeKuroCredentialImport">
-      <section class="editor-modal kuro-credential-modal" role="dialog" aria-modal="true" aria-label="导入库街区 App 凭据">
+    <div v-if="kuroCredentialOpen" class="modal-backdrop login-backdrop" @click.self="closeKuroCommunityLogin">
+      <section class="editor-modal kuro-credential-modal" role="dialog" aria-modal="true" aria-label="登录库街区">
         <div class="modal-header">
-          <div><h2>导入库街区 App 凭据</h2><p>用于同步鸣潮挑战与地图探索进度</p></div>
+          <div><h2>登录库街区</h2><p>登录后可同步鸣潮挑战与地图探索进度</p></div>
           <button
             class="close-button"
             type="button"
-            aria-label="关闭库街区凭据导入"
+            aria-label="关闭库街区登录"
             :disabled="kuroCredentialBusy"
-            @click="closeKuroCredentialImport"
+            @click="closeKuroCommunityLogin"
           >×</button>
         </div>
         <div class="kuro-credential-form">
-          <label>
-            App Token
+          <label v-if="kuroLoginPhase === 'phone'">
+            手机号
             <input
-              v-model="kuroCredentialToken"
-              type="password"
-              maxlength="16384"
-              autocomplete="off"
+              v-model="kuroLoginPhone"
+              type="tel"
+              inputmode="numeric"
+              maxlength="11"
+              autocomplete="tel"
               spellcheck="false"
-              placeholder="粘贴从库街区 App 登录环境导出的 Token"
-              :disabled="kuroCredentialBusy"
-            >
-          </label>
-          <label>
-            DID
-            <input
-              v-model="kuroCredentialDid"
-              maxlength="512"
-              autocomplete="off"
-              spellcheck="false"
-              placeholder="粘贴与 Token 对应的设备标识"
+              placeholder="请输入库街区绑定的手机号"
               :disabled="kuroCredentialBusy"
             >
           </label>
           <button
-            class="secondary-button"
+            v-if="kuroLoginPhase === 'phone'"
+            class="primary-button"
             type="button"
-            :disabled="kuroCredentialBusy || !kuroCredentialToken.trim() || !kuroCredentialDid.trim()"
-            @click="loadKuroCommunityRoles"
-          >{{ kuroCredentialBusy && kuroCredentialRoles.length === 0 ? '读取中…' : '读取鸣潮角色' }}</button>
-          <label v-if="kuroCredentialRoles.length > 0">
+            :disabled="kuroCredentialBusy || !/^1\d{10}$/.test(kuroLoginPhone.trim())"
+            @click="sendKuroCommunitySms"
+          >{{ kuroCredentialBusy ? '等待验证…' : '验证并发送短信' }}</button>
+          <label v-if="kuroLoginPhase === 'code'">
+            短信验证码
+            <input
+              v-model="kuroLoginCode"
+              type="text"
+              inputmode="numeric"
+              maxlength="6"
+              autocomplete="one-time-code"
+              spellcheck="false"
+              placeholder="请输入 6 位验证码"
+              :disabled="kuroCredentialBusy"
+            >
+          </label>
+          <button
+            v-if="kuroLoginPhase === 'code'"
+            class="primary-button"
+            type="button"
+            :disabled="kuroCredentialBusy || !/^\d{6}$/.test(kuroLoginCode.trim())"
+            @click="completeKuroCommunityLogin"
+          >{{ kuroCredentialBusy ? '登录中…' : '登录并读取角色' }}</button>
+          <label v-if="kuroLoginPhase === 'role'">
             同步角色
             <select v-model="kuroSelectedRoleKey" :disabled="kuroCredentialBusy">
               <option value="" disabled>请选择角色</option>
@@ -1617,20 +1657,21 @@ function showError(error: unknown): void {
             </select>
           </label>
           <p v-if="kuroCredentialMessage" class="credential-import-message">{{ kuroCredentialMessage }}</p>
-          <p class="recycle-hint">应用只连接库街区官方接口；验证成功后才会通过 Windows DPAPI 加密保存，不会把凭据发送给 Codex 或第三方机器人。</p>
+          <p class="recycle-hint">DID 由应用自动生成，Token 不会显示或进入剪贴板；角色数据权限验证成功后才会通过 Windows DPAPI 加密保存。</p>
         </div>
         <div class="login-actions">
           <button
+            v-if="kuroLoginPhase === 'role'"
             class="primary-button"
             type="button"
             :disabled="kuroCredentialBusy || !kuroSelectedRoleKey"
-            @click="saveKuroCommunityCredential"
-          >{{ kuroCredentialBusy && kuroCredentialRoles.length > 0 ? '验证中…' : '验证并保存' }}</button>
+            @click="saveKuroCommunityLogin"
+          >{{ kuroCredentialBusy ? '验证中…' : '验证并保存' }}</button>
           <button
             class="secondary-button"
             type="button"
             :disabled="kuroCredentialBusy"
-            @click="closeKuroCredentialImport"
+            @click="closeKuroCommunityLogin"
           >取消</button>
         </div>
       </section>

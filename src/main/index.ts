@@ -14,7 +14,11 @@ import { detectCodexPlugin } from './ai/codex-plugin'
 import { prepareCodexPluginMarketplace } from './ai/codex-plugin-installer'
 import { MiyousheQrLoginService } from './auth/miyoushe-qr-login'
 import { solveMiyousheGeetest } from './auth/miyoushe-geetest-window'
-import { KuroCommunityTokenImportService } from './auth/kuro-community-token-import'
+import { KuroCommunityCredentialService } from './auth/kuro-community-credential'
+import {
+  KURO_COMMUNITY_CAPTCHA_ID,
+  KuroCommunityLoginService
+} from './auth/kuro-community-login'
 import { createElectronNetFetcher } from './sync/electron-net-fetcher'
 import { CredentialBackedAdapter } from './sync/credential-backed-adapter'
 import {
@@ -70,7 +74,8 @@ let aiJobProgressTimer: ReturnType<typeof setInterval> | null = null
 const aiJobProgressSignatures = new Map<GameId, string>()
 let credentialVault: CredentialVault | null = null
 let miyousheQrLogin: MiyousheQrLoginService | null = null
-let kuroCommunityTokenImport: KuroCommunityTokenImportService | null = null
+let kuroCommunityCredential: KuroCommunityCredentialService | null = null
+let kuroCommunityLogin: KuroCommunityLoginService | null = null
 let appBackupDirectory: string | null = null
 let appDatabasePath: string | null = null
 
@@ -471,22 +476,51 @@ function registerIpcHandlers(): void {
     if (!miyousheQrLogin) throw new Error('米游社登录服务尚未初始化')
     return miyousheQrLogin.cancel(parseQrLoginSessionId(value))
   })
+  ipcMain.handle('kuro-login:send-sms', async (_event, phone: unknown) => {
+    if (!kuroCommunityLogin) throw new Error('库街区登录服务尚未初始化')
+    const verification = await solveMiyousheGeetest(
+      mainWindow,
+      {
+        gt: KURO_COMMUNITY_CAPTCHA_ID,
+        riskType: '',
+        sessionId: '',
+        version: 4
+      },
+      {
+        title: '库街区安全验证',
+        heading: '库街区安全验证',
+        description: '请手动完成官方滑块。应用只接收本次验证票据，不保存滑块内容。',
+        includeSessionUserInfo: false,
+        showMethod: 'showBox'
+      }
+    )
+    if (!verification) throw new Error('已取消库街区安全验证')
+    if (verification.version !== 4) throw new Error('库街区安全验证结果格式不正确')
+    return await kuroCommunityLogin.sendSms(phone, verification)
+  })
   ipcMain.handle(
-    'kuro-credential:list-roles',
-    async (_event, token: unknown, did: unknown) => {
-      if (!kuroCommunityTokenImport) throw new Error('库街区凭据服务尚未初始化')
-      return await kuroCommunityTokenImport.listRoles(token, did)
+    'kuro-login:complete',
+    async (_event, sessionId: unknown, code: unknown) => {
+      if (!kuroCommunityLogin) throw new Error('库街区登录服务尚未初始化')
+      return await kuroCommunityLogin.complete(sessionId, code)
     }
   )
-  ipcMain.handle('kuro-credential:store', async (_event, input: unknown) => {
-    if (!kuroCommunityTokenImport || !credentialVault) {
-      throw new Error('库街区凭据服务尚未初始化')
+  ipcMain.handle(
+    'kuro-login:store',
+    async (_event, sessionId: unknown, roleId: unknown, serverId: unknown) => {
+      if (!kuroCommunityLogin || !credentialVault) {
+        throw new Error('库街区登录服务尚未初始化')
+      }
+      const credential = await kuroCommunityLogin.finish(sessionId, roleId, serverId)
+      return credentialVault.store(
+        'kuro-community',
+        encodeKuroCommunityCredential(credential)
+      )
     }
-    const credential = await kuroCommunityTokenImport.validateCredential(input)
-    return credentialVault.store(
-      'kuro-community',
-      encodeKuroCommunityCredential(credential)
-    )
+  )
+  ipcMain.handle('kuro-login:cancel', (_event, sessionId: unknown) => {
+    if (!kuroCommunityLogin) throw new Error('库街区登录服务尚未初始化')
+    return kuroCommunityLogin.cancel(sessionId)
   })
   ipcMain.handle('credentials:clear', (_event, provider: unknown) => {
     if (!credentialVault) throw new Error('安全凭据存储尚未初始化')
@@ -538,7 +572,11 @@ if (!app.requestSingleInstanceLock()) {
     })
     const fetcher = createElectronNetFetcher(net.fetch)
     miyousheQrLogin = new MiyousheQrLoginService(fetcher)
-    kuroCommunityTokenImport = new KuroCommunityTokenImportService(fetcher)
+    kuroCommunityCredential = new KuroCommunityCredentialService(fetcher)
+    kuroCommunityLogin = new KuroCommunityLoginService(
+      kuroCommunityCredential,
+      fetcher
+    )
     try {
       await createDailyBackup(appDatabase, backupDirectory)
       pruneDailyBackups(backupDirectory)
@@ -588,7 +626,8 @@ app.on('before-quit', () => {
   syncOrchestrator = null
   credentialVault = null
   miyousheQrLogin = null
-  kuroCommunityTokenImport = null
+  kuroCommunityCredential = null
+  kuroCommunityLogin = null
   appBackupDirectory = null
   appDatabasePath = null
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { KuroCommunityTokenImportService } from '../src/main/auth/kuro-community-token-import'
+import { KuroCommunityCredentialService } from '../src/main/auth/kuro-community-credential'
 
 function response(data: unknown): Response {
   return new Response(JSON.stringify(data), {
@@ -8,7 +8,7 @@ function response(data: unknown): Response {
   })
 }
 
-describe('KuroCommunityTokenImportService', () => {
+describe('KuroCommunityCredentialService', () => {
   it('从官方角色列表只读取鸣潮角色', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response({
       code: 200,
@@ -29,7 +29,7 @@ describe('KuroCommunityTokenImportService', () => {
         }
       ]
     }))
-    const service = new KuroCommunityTokenImportService(fetcher)
+    const service = new KuroCommunityCredentialService(fetcher)
 
     await expect(service.listRoles('app-token', 'DEVICE-ID')).resolves.toEqual([
       {
@@ -50,7 +50,7 @@ describe('KuroCommunityTokenImportService', () => {
       code: 200,
       data: { accessToken: 'short-lived-bat' }
     }))
-    const service = new KuroCommunityTokenImportService(fetcher)
+    const service = new KuroCommunityCredentialService(fetcher)
 
     await expect(service.validateCredential({
       token: 'app-token',
@@ -78,7 +78,7 @@ describe('KuroCommunityTokenImportService', () => {
       data: []
     }))
     await expect(
-      new KuroCommunityTokenImportService(noRoleFetcher).listRoles('token', 'did')
+      new KuroCommunityCredentialService(noRoleFetcher).listRoles('token', 'did')
     ).rejects.toThrow('没有找到已绑定的鸣潮角色')
 
     const noBatFetcher = vi.fn<typeof fetch>().mockResolvedValue(response({
@@ -86,7 +86,7 @@ describe('KuroCommunityTokenImportService', () => {
       data: {}
     }))
     await expect(
-      new KuroCommunityTokenImportService(noBatFetcher).validateCredential({
+      new KuroCommunityCredentialService(noBatFetcher).validateCredential({
         token: 'token',
         did: 'did',
         roleId: '123',
@@ -100,7 +100,7 @@ describe('KuroCommunityTokenImportService', () => {
       code: 220,
       msg: '登录已过期'
     }))
-    const service = new KuroCommunityTokenImportService(fetcher)
+    const service = new KuroCommunityCredentialService(fetcher)
 
     await expect(service.listRoles('expired-token', 'DEVICE-ID'))
       .rejects.toThrow('App Token 已过期')

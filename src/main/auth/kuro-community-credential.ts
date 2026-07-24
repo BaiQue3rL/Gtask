@@ -1,7 +1,4 @@
-import type {
-  KuroCommunityCredentialInput,
-  KuroCommunityRole
-} from '../../shared/contracts'
+import type { KuroCommunityRole } from '../../shared/contracts'
 import type { KuroCommunityCredential } from '../sync/kuro-community-credential'
 
 const BASE_URL = 'https://api.kurobbs.com'
@@ -16,7 +13,15 @@ interface KuroEnvelope {
   data?: unknown
 }
 
-export class KuroCommunityTokenImportService {
+interface KuroCommunityCredentialInput {
+  token: string
+  did: string
+  roleId: string
+  serverId: string
+  roleName?: string
+}
+
+export class KuroCommunityCredentialService {
   constructor(private readonly fetcher: typeof fetch = fetch) {}
 
   async listRoles(token: unknown, did: unknown): Promise<KuroCommunityRole[]> {

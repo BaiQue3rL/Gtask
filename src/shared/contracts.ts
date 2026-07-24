@@ -47,12 +47,15 @@ export interface KuroCommunityRole {
   serverName: string | null
 }
 
-export interface KuroCommunityCredentialInput {
-  token: string
-  did: string
-  roleId: string
-  serverId: string
-  roleName?: string
+export interface KuroCommunitySmsState {
+  sessionId: string
+  expiresAt: string
+  message: string
+}
+
+export interface KuroCommunityLoginResult {
+  sessionId: string
+  roles: KuroCommunityRole[]
 }
 
 export type MiyousheQrLoginStatus =
@@ -319,10 +322,17 @@ export interface GachaApi {
   startMiyousheQrLogin: () => Promise<MiyousheQrLoginState>
   pollMiyousheQrLogin: (sessionId: string) => Promise<MiyousheQrLoginState>
   cancelMiyousheQrLogin: (sessionId: string) => Promise<boolean>
-  listKuroCommunityRoles: (token: string, did: string) => Promise<KuroCommunityRole[]>
-  storeKuroCommunityCredential: (
-    input: KuroCommunityCredentialInput
+  sendKuroCommunitySms: (phone: string) => Promise<KuroCommunitySmsState>
+  completeKuroCommunityLogin: (
+    sessionId: string,
+    code: string
+  ) => Promise<KuroCommunityLoginResult>
+  storeKuroCommunityLogin: (
+    sessionId: string,
+    roleId: string,
+    serverId: string
   ) => Promise<CredentialStatus>
+  cancelKuroCommunityLogin: (sessionId: string) => Promise<boolean>
   clearCredential: (provider: CredentialProvider) => Promise<boolean>
   onSyncCompleted: (callback: (result: SyncResult) => void) => () => void
   onSyncProgress: (callback: (progress: SyncProgressUpdate) => void) => () => void
