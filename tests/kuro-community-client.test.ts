@@ -9,6 +9,7 @@ function response(data: unknown): Response {
     headers: { 'content-type': 'application/json' }
   })
 }
+const resolveIosDevCode = async (): Promise<string> => '203.0.113.8, KuroGameBox/Test'
 
 describe('KuroCommunityClient', () => {
   it('刷新短期 BAT 后顺序读取鸣潮探索与三类挑战', async () => {
@@ -24,7 +25,7 @@ describe('KuroCommunityClient', () => {
       did: 'DEVICE-ID',
       roleId: '123456789',
       serverId: 'server-cn'
-    }, fetcher)
+    }, fetcher, undefined, undefined, resolveIosDevCode)
 
     await expect(client.getExploration()).resolves.toEqual({ exploreList: [] })
     await expect(client.getTower()).resolves.toEqual({ difficultyList: [] })
@@ -49,7 +50,7 @@ describe('KuroCommunityClient', () => {
       did: 'DEVICE-ID',
       roleId: '123456789',
       serverId: 'server-cn'
-    }, fetcher)
+    }, fetcher, undefined, undefined, resolveIosDevCode)
 
     await expect(client.getExploration()).resolves.toEqual({ exploreList: [] })
     expect(new Headers(fetcher.mock.calls[4][1]?.headers).get('b-at')).toBe('bat-2')
@@ -63,7 +64,7 @@ describe('KuroCommunityClient', () => {
       did: 'DEVICE-ID',
       roleId: '123456789',
       serverId: 'server-cn'
-    }, fetcher)
+    }, fetcher, undefined, undefined, resolveIosDevCode)
     await expect(client.getTower()).rejects.toMatchObject({
       name: 'SyncVerificationRequiredError'
     })
@@ -83,7 +84,7 @@ describe('KuroCommunityClient', () => {
       did: 'DEVICE-ID',
       roleId: '123456789',
       serverId: 'server-cn'
-    }, fetcher, reportProgress, wait)
+    }, fetcher, reportProgress, wait, resolveIosDevCode)
 
     await expect(client.getTower()).resolves.toEqual({ difficultyList: [] })
     expect(wait).toHaveBeenCalledTimes(2)
@@ -108,7 +109,7 @@ describe('KuroCommunityClient', () => {
       did: 'DEVICE-ID',
       roleId: '123456789',
       serverId: 'server-cn'
-    }, fetcher, undefined, wait)
+    }, fetcher, undefined, wait, resolveIosDevCode)
 
     await expect(client.getExploration()).rejects.toMatchObject({
       name: 'SyncVerificationRequiredError'

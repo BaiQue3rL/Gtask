@@ -1,10 +1,11 @@
 import type { KuroCommunityRole } from '../../shared/contracts'
 import type { KuroCommunityCredential } from '../sync/kuro-community-credential'
+import {
+  KURO_IOS_USER_AGENT,
+  resolveKuroIosDevCode
+} from './kuro-community-device'
 
 const BASE_URL = 'https://api.kurobbs.com'
-const IOS_USER_AGENT =
-  'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) ' +
-  'AppleWebKit/605.1.15 (KHTML, like Gecko) KuroGameBox/3.1.3'
 
 interface KuroEnvelope {
   code?: number
@@ -22,7 +23,11 @@ interface KuroCommunityCredentialInput {
 }
 
 export class KuroCommunityCredentialService {
-  constructor(private readonly fetcher: typeof fetch = fetch) {}
+  constructor(
+    private readonly fetcher: typeof fetch = fetch,
+    private readonly resolveIosDevCode: () => Promise<string> =
+      () => resolveKuroIosDevCode(fetcher)
+  ) {}
 
   async listRoles(token: unknown, did: unknown): Promise<KuroCommunityRole[]> {
     const normalizedToken = requiredSecret(token, '库街区 App Token', 16_384)
@@ -58,7 +63,9 @@ export class KuroCommunityCredentialService {
       roleId: credential.roleId
     }, credential.token, credential.did, true)
     if (!isRecord(data) || !optionalText(data.accessToken, 16_384)) {
-      throw new Error('库街区未返回有效的数据令牌，凭据未保存')
+      throw new Error(
+        `库街区未返回有效的数据令牌，凭据未保存（${describeResponseShape(data)}）`
+      )
     }
     return credential
   }
@@ -74,8 +81,8 @@ export class KuroCommunityCredentialService {
       source: 'ios',
       version: '3.1.3',
       'content-type': 'application/x-www-form-urlencoded; charset=utf-8',
-      'user-agent': IOS_USER_AGENT,
-      devCode: did,
+      'user-agent': KURO_IOS_USER_AGENT,
+      devCode: includeEmptyBat ? await this.resolveIosDevCode() : did,
       token
     }
     if (includeEmptyBat) {
@@ -146,4 +153,16 @@ function optionalText(value: unknown, maxLength: number): string | null {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function describeResponseShape(value: unknown): string {
+  if (value === null || value === undefined) return '返回数据为空'
+  if (Array.isArray(value)) return `返回了数组，长度 ${value.length}`
+  if (isRecord(value)) {
+    const keys = Object.keys(value).filter((key) => /^[a-zA-Z0-9_-]{1,64}$/.test(key))
+    return keys.length > 0
+      ? `返回字段：${keys.slice(0, 12).join('、')}`
+      : '返回了空对象'
+  }
+  return `返回类型：${typeof value}`
 }

@@ -1,4 +1,8 @@
 import type { CredentialPayload } from '../credential-vault'
+import {
+  KURO_IOS_USER_AGENT,
+  resolveKuroIosDevCode
+} from '../auth/kuro-community-device'
 import { decodeKuroCommunityCredential, type KuroCommunityCredential } from './kuro-community-credential'
 import { SyncVerificationRequiredError, type SyncProgressReporter } from './types'
 import {
@@ -6,9 +10,6 @@ import {
 } from './wuthering-waves-personal-adapter'
 
 const BASE_URL = 'https://api.kurobbs.com'
-const IOS_USER_AGENT =
-  'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) ' +
-  'AppleWebKit/605.1.15 (KHTML, like Gecko) KuroGameBox/3.1.3'
 const MAX_ATTEMPTS = 3
 const RETRYABLE_CODES = new Set([102, 1005, 429, 500, 502, 503, 504])
 
@@ -27,7 +28,9 @@ export class KuroCommunityClient {
     private readonly credential: KuroCommunityCredential,
     private readonly fetcher: typeof fetch = fetch,
     private readonly reportProgress?: SyncProgressReporter,
-    private readonly wait: (milliseconds: number) => Promise<void> = delay
+    private readonly wait: (milliseconds: number) => Promise<void> = delay,
+    private readonly resolveIosDevCode: () => Promise<string> =
+      () => resolveKuroIosDevCode(fetcher)
   ) {}
 
   async getExploration(): Promise<unknown> {
@@ -110,8 +113,8 @@ export class KuroCommunityClient {
       source: 'ios',
       version: '3.1.3',
       'content-type': 'application/x-www-form-urlencoded; charset=utf-8',
-      'user-agent': IOS_USER_AGENT,
-      devCode: this.credential.did
+      'user-agent': KURO_IOS_USER_AGENT,
+      devCode: await this.resolveIosDevCode()
     }
     if (options.includeToken) headers.token = this.credential.token
     if (options.includeDid) headers.did = this.credential.did

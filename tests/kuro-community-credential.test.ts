@@ -7,6 +7,7 @@ function response(data: unknown): Response {
     headers: { 'content-type': 'application/json' }
   })
 }
+const resolveIosDevCode = async (): Promise<string> => '203.0.113.8, KuroGameBox/Test'
 
 describe('KuroCommunityCredentialService', () => {
   it('从官方角色列表只读取鸣潮角色', async () => {
@@ -29,7 +30,7 @@ describe('KuroCommunityCredentialService', () => {
         }
       ]
     }))
-    const service = new KuroCommunityCredentialService(fetcher)
+    const service = new KuroCommunityCredentialService(fetcher, resolveIosDevCode)
 
     await expect(service.listRoles('app-token', 'DEVICE-ID')).resolves.toEqual([
       {
@@ -50,7 +51,7 @@ describe('KuroCommunityCredentialService', () => {
       code: 200,
       data: { accessToken: 'short-lived-bat' }
     }))
-    const service = new KuroCommunityCredentialService(fetcher)
+    const service = new KuroCommunityCredentialService(fetcher, resolveIosDevCode)
 
     await expect(service.validateCredential({
       token: 'app-token',
@@ -69,6 +70,7 @@ describe('KuroCommunityCredentialService', () => {
     const headers = new Headers(fetcher.mock.calls[0][1]?.headers)
     expect(headers.get('did')).toBe('DEVICE-ID')
     expect(headers.get('b-at')).toBe('')
+    expect(headers.get('devCode')).toBe('203.0.113.8, KuroGameBox/Test')
     expect(String(fetcher.mock.calls[0][1]?.body)).toContain('roleId=123456789')
   })
 
@@ -78,7 +80,8 @@ describe('KuroCommunityCredentialService', () => {
       data: []
     }))
     await expect(
-      new KuroCommunityCredentialService(noRoleFetcher).listRoles('token', 'did')
+      new KuroCommunityCredentialService(noRoleFetcher, resolveIosDevCode)
+        .listRoles('token', 'did')
     ).rejects.toThrow('没有找到已绑定的鸣潮角色')
 
     const noBatFetcher = vi.fn<typeof fetch>().mockResolvedValue(response({
@@ -86,7 +89,8 @@ describe('KuroCommunityCredentialService', () => {
       data: {}
     }))
     await expect(
-      new KuroCommunityCredentialService(noBatFetcher).validateCredential({
+      new KuroCommunityCredentialService(noBatFetcher, resolveIosDevCode)
+        .validateCredential({
         token: 'token',
         did: 'did',
         roleId: '123',
@@ -100,7 +104,7 @@ describe('KuroCommunityCredentialService', () => {
       code: 220,
       msg: '登录已过期'
     }))
-    const service = new KuroCommunityCredentialService(fetcher)
+    const service = new KuroCommunityCredentialService(fetcher, resolveIosDevCode)
 
     await expect(service.listRoles('expired-token', 'DEVICE-ID'))
       .rejects.toThrow('App Token 已过期')

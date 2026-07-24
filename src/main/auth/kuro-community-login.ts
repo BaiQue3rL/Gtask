@@ -7,12 +7,13 @@ import type {
 import type { MiyousheGeetestV4Result } from '../sync/miyoushe-chronicle-client'
 import type { KuroCommunityCredential } from '../sync/kuro-community-credential'
 import { KuroCommunityCredentialService } from './kuro-community-credential'
+import {
+  KURO_IOS_USER_AGENT,
+  resolveKuroIosDevCode
+} from './kuro-community-device'
 
 const BASE_URL = 'https://api.kurobbs.com'
 const SESSION_TTL_MS = 5 * 60 * 1000
-const IOS_USER_AGENT =
-  'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) ' +
-  'AppleWebKit/605.1.15 (KHTML, like Gecko) KuroGameBox/3.1.3'
 
 export const KURO_COMMUNITY_CAPTCHA_ID = 'ec4aa4174277d822d73f2442a165a2cd'
 
@@ -37,7 +38,9 @@ export class KuroCommunityLoginService {
   constructor(
     private readonly credentialService: KuroCommunityCredentialService,
     private readonly fetcher: typeof fetch = fetch,
-    private readonly now: () => number = Date.now
+    private readonly now: () => number = Date.now,
+    private readonly resolveIosDevCode: () => Promise<string> =
+      () => resolveKuroIosDevCode(fetcher)
   ) {}
 
   async sendSms(
@@ -84,7 +87,8 @@ export class KuroCommunityLoginService {
         devCode: session.did
       },
       session.did,
-      'ios'
+      'ios',
+      await this.resolveIosDevCode()
     )
     if (!isRecord(data) || typeof data.token !== 'string' || !data.token.trim()) {
       throw new Error('库街区登录成功，但未返回有效凭据，请重试')
@@ -152,7 +156,8 @@ export class KuroCommunityLoginService {
     path: string,
     body: Record<string, string>,
     did: string,
-    source: 'h5' | 'ios'
+    source: 'h5' | 'ios',
+    headerDevCode: string = did
   ): Promise<unknown> {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 15_000)
@@ -164,9 +169,9 @@ export class KuroCommunityLoginService {
         headers: {
           source,
           version: '3.1.3',
-          devCode: did,
+          devCode: headerDevCode,
           'content-type': 'application/x-www-form-urlencoded; charset=utf-8',
-          'user-agent': IOS_USER_AGENT
+          'user-agent': KURO_IOS_USER_AGENT
         },
         body: new URLSearchParams(body).toString()
       })

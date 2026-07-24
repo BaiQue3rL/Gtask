@@ -17,6 +17,7 @@ const geetest = {
   captcha_output: 'captcha-output',
   version: 4 as const
 }
+const resolveIosDevCode = async (): Promise<string> => '203.0.113.8, KuroGameBox/Test'
 
 describe('KuroCommunityLoginService', () => {
   it('自动生成 DID 并用同一设备标识完成短信登录', async () => {
@@ -40,7 +41,8 @@ describe('KuroCommunityLoginService', () => {
     const service = new KuroCommunityLoginService(
       credentialService,
       fetcher,
-      () => Date.parse('2026-07-24T12:00:00.000Z')
+      () => Date.parse('2026-07-24T12:00:00.000Z'),
+      resolveIosDevCode
     )
 
     const sms = await service.sendSms('13800138000', geetest)
@@ -58,7 +60,7 @@ describe('KuroCommunityLoginService', () => {
     expect(smsHeaders.get('source')).toBe('h5')
     expect(loginHeaders.get('source')).toBe('ios')
     expect(smsHeaders.get('devCode')).toMatch(/^[0-9A-F-]{36}$/)
-    expect(loginHeaders.get('devCode')).toBe(smsHeaders.get('devCode'))
+    expect(loginHeaders.get('devCode')).toBe('203.0.113.8, KuroGameBox/Test')
     expect(fetcher.mock.calls[0][1]?.body).toContain('geeTestData=')
     expect(fetcher.mock.calls[1][1]?.body).toContain('code=123456')
     expect(credentialService.listRoles).toHaveBeenCalledWith(
@@ -88,7 +90,12 @@ describe('KuroCommunityLoginService', () => {
       ]),
       validateCredential: vi.fn()
     } as unknown as KuroCommunityCredentialService
-    const service = new KuroCommunityLoginService(credentialService, fetcher)
+    const service = new KuroCommunityLoginService(
+      credentialService,
+      fetcher,
+      Date.now,
+      resolveIosDevCode
+    )
     const sms = await service.sendSms('13800138000', geetest)
     await service.complete(sms.sessionId, '123456')
 
@@ -109,7 +116,9 @@ describe('KuroCommunityLoginService', () => {
       .mockResolvedValueOnce(response({ code: 130, msg: '验证码错误' }))
     const wrongCodeService = new KuroCommunityLoginService(
       credentialService,
-      wrongCodeFetcher
+      wrongCodeFetcher,
+      Date.now,
+      resolveIosDevCode
     )
     const wrongCodeSms = await wrongCodeService.sendSms('13800138000', geetest)
     await expect(
@@ -121,7 +130,9 @@ describe('KuroCommunityLoginService', () => {
       .mockResolvedValueOnce(response({ code: 132, msg: '验证码已过期' }))
     const expiredService = new KuroCommunityLoginService(
       credentialService,
-      expiredFetcher
+      expiredFetcher,
+      Date.now,
+      resolveIosDevCode
     )
     const expiredSms = await expiredService.sendSms('13800138000', geetest)
     await expect(
