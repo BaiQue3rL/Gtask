@@ -140,6 +140,22 @@ export interface SemanticReviewCandidate {
   message: string | null
 }
 
+export interface SemanticReviewDecisionSummary {
+  id: string
+  gameId: GameId
+  target: PersonalSyncTarget
+  status: Extract<SemanticReviewStatus, 'approved' | 'rejected'>
+  completedAt: string
+  message: string | null
+}
+
+export interface SemanticReviewSummary {
+  gameId: GameId
+  pendingCount: number
+  claimedCount: number
+  latestDecision: SemanticReviewDecisionSummary | null
+}
+
 export interface GameSummary {
   id: GameId
   name: string
@@ -269,6 +285,7 @@ export interface GachaApi {
   restoreBackup: (fileName: string) => Promise<boolean>
   getAiScheduleAgentStatus: () => Promise<AiScheduleAgentStatus>
   getActiveAiScheduleJob: (gameId: GameId) => Promise<AiScheduleJob | null>
+  getSemanticReviewSummary: (gameId: GameId) => Promise<SemanticReviewSummary>
   openCodexPlugin: () => Promise<void>
   listGames: () => Promise<GameSummary[]>
   listChecklistItems: (gameId: GameId) => Promise<ChecklistItem[]>

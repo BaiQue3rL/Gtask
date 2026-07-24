@@ -349,6 +349,10 @@ function registerIpcHandlers(): void {
     if (!appDatabase) throw new Error('数据库尚未初始化')
     return appDatabase.getActiveAiScheduleJob(parseGameId(gameId))
   })
+  ipcMain.handle('semantic-review:get-summary', (_event, gameId: unknown) => {
+    if (!appDatabase) throw new Error('数据库尚未初始化')
+    return appDatabase.getSemanticReviewSummary(parseGameId(gameId))
+  })
   ipcMain.handle('codex-plugin:open', async () => {
     const integrationDirectory = join(app.getPath('userData'), 'codex-integration')
     const appMarketplacePath = join(integrationDirectory, 'marketplace.json')

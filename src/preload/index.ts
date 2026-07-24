@@ -10,6 +10,7 @@ const gachaApi: GachaApi = {
   restoreBackup: (fileName) => ipcRenderer.invoke('backups:restore', fileName),
   getAiScheduleAgentStatus: () => ipcRenderer.invoke('ai-schedule:get-agent-status'),
   getActiveAiScheduleJob: (gameId) => ipcRenderer.invoke('ai-schedule:get-active-job', gameId),
+  getSemanticReviewSummary: (gameId) => ipcRenderer.invoke('semantic-review:get-summary', gameId),
   openCodexPlugin: () => ipcRenderer.invoke('codex-plugin:open'),
   listGames: () => ipcRenderer.invoke('games:list'),
   listChecklistItems: (gameId) => ipcRenderer.invoke('checklist:list', gameId),

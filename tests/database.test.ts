@@ -206,6 +206,11 @@ describe('AppDatabase', () => {
     }
     expect(database.queueSemanticReviewCandidates('star-rail', 'personal_sync', [draft]))
       .toEqual({ queued: 1, pending: 1 })
+    expect(database.getSemanticReviewSummary('star-rail')).toMatchObject({
+      pendingCount: 1,
+      claimedCount: 0,
+      latestDecision: null
+    })
     expect(database.queueSemanticReviewCandidates('star-rail', 'personal_sync', [draft]))
       .toEqual({ queued: 0, pending: 1 })
     expect(() => database!.queueSemanticReviewCandidates('star-rail', 'personal_sync', [{
@@ -215,6 +220,10 @@ describe('AppDatabase', () => {
 
     database.registerAiScheduleAgent('semantic-agent', '语义核验 Agent')
     const candidate = database.claimSemanticReviewCandidate('semantic-agent')!
+    expect(database.getSemanticReviewSummary('star-rail')).toMatchObject({
+      pendingCount: 0,
+      claimedCount: 1
+    })
     const reviewedItem = {
       remoteKey: 'event:miyoushe:6011',
       category: 'limited_event' as const,
@@ -241,6 +250,17 @@ describe('AppDatabase', () => {
       new Date('2026-07-23T00:00:00.000Z')
     )
     expect(approved.candidate.status).toBe('approved')
+    expect(database.getSemanticReviewSummary('star-rail')).toMatchObject({
+      pendingCount: 0,
+      claimedCount: 0,
+      latestDecision: {
+        id: candidate.id,
+        target: 'events',
+        status: 'approved',
+        completedAt: '2026-07-23T00:00:00.000Z',
+        message: 'Codex 核验通过并已安全写入'
+      }
+    })
     expect(database.listChecklistItems('star-rail').find((item) => item.remoteKey === reviewedItem.remoteKey))
       .toMatchObject({ completed: false, progressPercent: null })
   })

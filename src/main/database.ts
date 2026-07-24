@@ -14,6 +14,8 @@ import type {
   GameSummary,
   PersonalSyncTarget,
   SemanticReviewCandidate,
+  SemanticReviewDecisionSummary,
+  SemanticReviewSummary,
   SyncProgressPhase,
   SyncScope,
   SyncTarget,
@@ -375,6 +377,29 @@ export class AppDatabase {
         AND status IN ('pending', 'claimed')
     `).get(...fingerprints) as { count: number }
     return { queued, pending: Number(row.count) }
+  }
+
+  getSemanticReviewSummary(gameId: GameId): SemanticReviewSummary {
+    const counts = this.database.prepare(`
+      SELECT
+        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pendingCount,
+        SUM(CASE WHEN status = 'claimed' THEN 1 ELSE 0 END) AS claimedCount
+      FROM semantic_review_candidates
+      WHERE game_id = ?
+    `).get(gameId) as { pendingCount: number | null; claimedCount: number | null }
+    const latestDecision = this.database.prepare(`
+      SELECT id, game_id AS gameId, target, status, completed_at AS completedAt, message
+      FROM semantic_review_candidates
+      WHERE game_id = ? AND status IN ('approved', 'rejected') AND completed_at IS NOT NULL
+      ORDER BY completed_at DESC, updated_at DESC
+      LIMIT 1
+    `).get(gameId) as SemanticReviewDecisionSummary | undefined
+    return {
+      gameId,
+      pendingCount: Number(counts.pendingCount ?? 0),
+      claimedCount: Number(counts.claimedCount ?? 0),
+      latestDecision: latestDecision ?? null
+    }
   }
 
   claimSemanticReviewCandidate(

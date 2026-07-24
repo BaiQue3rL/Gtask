@@ -15,6 +15,7 @@ import type {
   GameSummary,
   MiyousheQrLoginState,
   PersonalSyncTarget,
+  SemanticReviewSummary,
   SyncResult,
   SyncProgressUpdate,
   SyncScope,
@@ -147,6 +148,7 @@ const restoringBackup = ref<string | null>(null)
 const aiScheduleAgent = ref<AiScheduleAgentStatus | null>(null)
 const activeAiJob = ref<AiScheduleJob | null>(null)
 const personalSyncProgress = ref<SyncProgressUpdate | null>(null)
+const semanticReviewSummary = ref<SemanticReviewSummary | null>(null)
 const editingItem = ref<ChecklistItem | null>(null)
 let miyousheLoginTimer: number | null = null
 
@@ -220,6 +222,10 @@ const personalPlatform = computed(() =>
 const incompleteCount = computed(() => items.value.filter((item) => !item.completed).length)
 const globalSyncState = computed(() => syncTargetStates.value.find((state) => state.target === 'all'))
 const needsInitialSync = computed(() => !globalSyncState.value?.lastSuccessAt)
+const semanticReviewCount = computed(() =>
+  (semanticReviewSummary.value?.pendingCount ?? 0) +
+  (semanticReviewSummary.value?.claimedCount ?? 0)
+)
 const completedCount = computed(() => {
   const weekStart = startOfCurrentWeek()
   return items.value.filter((item) => item.completedAt && new Date(item.completedAt) >= weekStart).length
@@ -238,26 +244,6 @@ const expiringCount = computed(() => {
     return end >= now && end <= threshold
   }).length
 })
-const syncStatusText = computed(() => {
-  if (!syncSettings.value) return '同步状态读取中'
-  const statusLabels: Record<SyncSettings['status'], string> = {
-    idle: '尚未同步',
-    success: '同步成功',
-    error: '同步失败',
-    stale: '部分同步，数据可能过期',
-    verification_required: '需要登录或验证'
-  }
-  const successText = syncSettings.value.lastSuccessAt
-    ? ` · 上次成功 ${formatLocalTime(syncSettings.value.lastSuccessAt)}`
-    : ''
-  const scopeText = syncSettings.value.lastScope
-    ? syncSettings.value.lastScope === 'public_schedule'
-      ? '同步清单'
-      : '清单和进度'
-    : ''
-  return `${statusLabels[syncSettings.value.status]}${scopeText ? ` · ${scopeText}` : ''}${successText}`
-})
-
 function displaySyncMessage(message: string): string {
   return message
     .replaceAll('公开排期', '公开资料')
@@ -281,7 +267,8 @@ onMounted(async () => {
       loadSyncSettings(),
       loadSyncTargetStates(),
       loadPersonalSyncTargets(),
-      loadActiveAiJob()
+      loadActiveAiJob(),
+      loadSemanticReviewSummary()
     ])
   } catch (error) {
     showError(error)
@@ -293,7 +280,12 @@ onMounted(async () => {
 const removeSyncListener = window.gacha.onSyncCompleted((result) => {
   if (result.gameId !== selectedGameId.value) return
   syncNotice.value = { status: result.status, message: displaySyncMessage(result.message) }
-  void Promise.all([loadItems(), loadSyncSettings(), loadSyncTargetStates()])
+  void Promise.all([
+    loadItems(),
+    loadSyncSettings(),
+    loadSyncTargetStates(),
+    loadSemanticReviewSummary()
+  ])
 })
 const removeChecklistListener = window.gacha.onChecklistChanged(() => {
   void Promise.all([
@@ -302,7 +294,8 @@ const removeChecklistListener = window.gacha.onChecklistChanged(() => {
     loadSyncSettings(),
     loadSyncTargetStates(),
     loadAiScheduleAgentStatus(),
-    loadActiveAiJob()
+    loadActiveAiJob(),
+    loadSemanticReviewSummary()
   ])
     .then(() => {
       const settings = syncSettings.value
@@ -333,6 +326,9 @@ const agentTimer = window.setInterval(() => {
 const progressTimer = window.setInterval(() => {
   if (activeAiJob.value) void loadActiveAiJob()
 }, 2_000)
+const semanticReviewTimer = window.setInterval(() => {
+  void loadSemanticReviewSummary()
+}, 4_000)
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
@@ -342,6 +338,7 @@ onUnmounted(() => {
   window.clearInterval(clockTimer)
   window.clearInterval(agentTimer)
   window.clearInterval(progressTimer)
+  window.clearInterval(semanticReviewTimer)
   stopMiyousheLoginPolling()
 })
 
@@ -370,7 +367,8 @@ watch(selectedGameId, () => {
     loadSyncSettings(),
     loadSyncTargetStates(),
     loadPersonalSyncTargets(),
-    loadActiveAiJob()
+    loadActiveAiJob(),
+    loadSemanticReviewSummary()
   ])
 })
 
@@ -447,6 +445,22 @@ async function loadActiveAiJob(): Promise<void> {
   } catch (error) {
     if (selectedGameId.value === gameId) showError(error)
   }
+}
+
+async function loadSemanticReviewSummary(): Promise<void> {
+  const gameId = selectedGameId.value
+  try {
+    const summary = await window.gacha.getSemanticReviewSummary(gameId)
+    if (selectedGameId.value === gameId) semanticReviewSummary.value = summary
+  } catch (error) {
+    if (selectedGameId.value === gameId) showError(error)
+  }
+}
+
+const semanticTargetLabels: Record<PersonalSyncTarget, string> = {
+  events: '活动',
+  cycles: '周期事项',
+  exploration: '地图探索'
 }
 
 const syncProgressPhaseLabels: Record<SyncProgressUpdate['phase'], string> = {
@@ -999,14 +1013,9 @@ function showError(error: unknown): void {
               ? `最后全局同步：${new Date(globalSyncState.lastSuccessAt).toLocaleString()}`
               : '尚未完成全局同步'"
           >
-            <strong>{{ globalSyncState?.lastSuccessAt ? '已同步' : '未同步' }}</strong>
+            <strong>全局清单 · {{ globalSyncState?.lastSuccessAt ? '已同步' : '未同步' }}</strong>
             <time v-if="globalSyncState?.lastSuccessAt">{{ formatSyncTimestamp(globalSyncState.lastSuccessAt) }}</time>
           </span>
-          <span
-            class="sync-status"
-            :class="syncSettings?.status"
-            :title="syncSettings?.message ? displaySyncMessage(syncSettings.message) : syncStatusText"
-          >{{ syncStatusText }}</span>
         </div>
       </header>
 
@@ -1056,6 +1065,31 @@ function showError(error: unknown): void {
           @click="openCodexPlugin"
         >打开 Codex 处理</button>
       </div>
+      <aside
+        v-if="semanticReviewCount > 0 || semanticReviewSummary?.latestDecision"
+        class="semantic-review-banner"
+        aria-live="polite"
+      >
+        <div>
+          <strong v-if="semanticReviewCount > 0">
+            待 Codex 语义核验 {{ semanticReviewCount }} 项
+            <small v-if="semanticReviewSummary?.claimedCount">
+              （处理中 {{ semanticReviewSummary.claimedCount }} 项）
+            </small>
+          </strong>
+          <span v-if="semanticReviewSummary?.latestDecision">
+            最近结论：{{ semanticReviewSummary.latestDecision.status === 'approved' ? '已通过' : '已拒绝' }}
+            · {{ semanticTargetLabels[semanticReviewSummary.latestDecision.target] }}
+            · {{ formatSyncTimestamp(semanticReviewSummary.latestDecision.completedAt) }}
+            <template v-if="semanticReviewSummary.latestDecision.message">
+              · {{ semanticReviewSummary.latestDecision.message }}
+            </template>
+          </span>
+        </div>
+        <button v-if="semanticReviewCount > 0" type="button" @click="openCodexPlugin">
+          打开 Codex 处理
+        </button>
+      </aside>
 
       <section class="summary-grid">
         <article class="summary-card">
