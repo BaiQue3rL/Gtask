@@ -14,6 +14,7 @@ import { detectCodexPlugin } from './ai/codex-plugin'
 import { prepareCodexPluginMarketplace } from './ai/codex-plugin-installer'
 import { MiyousheQrLoginService } from './auth/miyoushe-qr-login'
 import { solveMiyousheGeetest } from './auth/miyoushe-geetest-window'
+import { KuroCommunityTokenImportService } from './auth/kuro-community-token-import'
 import { createElectronNetFetcher } from './sync/electron-net-fetcher'
 import { CredentialBackedAdapter } from './sync/credential-backed-adapter'
 import {
@@ -22,6 +23,7 @@ import {
   createMiyousheZenlessPersonalAdapter
 } from './sync/miyoushe-chronicle-client'
 import { createKuroCommunityPersonalAdapter } from './sync/kuro-community-client'
+import { encodeKuroCommunityCredential } from './sync/kuro-community-credential'
 import { SyncOrchestrator } from './sync/orchestrator'
 import { restoreRelaunchOptions } from './relaunch'
 import { normalizeSyncItems } from './sync/normalization'
@@ -68,6 +70,7 @@ let aiJobProgressTimer: ReturnType<typeof setInterval> | null = null
 const aiJobProgressSignatures = new Map<GameId, string>()
 let credentialVault: CredentialVault | null = null
 let miyousheQrLogin: MiyousheQrLoginService | null = null
+let kuroCommunityTokenImport: KuroCommunityTokenImportService | null = null
 let appBackupDirectory: string | null = null
 let appDatabasePath: string | null = null
 
@@ -468,6 +471,23 @@ function registerIpcHandlers(): void {
     if (!miyousheQrLogin) throw new Error('米游社登录服务尚未初始化')
     return miyousheQrLogin.cancel(parseQrLoginSessionId(value))
   })
+  ipcMain.handle(
+    'kuro-credential:list-roles',
+    async (_event, token: unknown, did: unknown) => {
+      if (!kuroCommunityTokenImport) throw new Error('库街区凭据服务尚未初始化')
+      return await kuroCommunityTokenImport.listRoles(token, did)
+    }
+  )
+  ipcMain.handle('kuro-credential:store', async (_event, input: unknown) => {
+    if (!kuroCommunityTokenImport || !credentialVault) {
+      throw new Error('库街区凭据服务尚未初始化')
+    }
+    const credential = await kuroCommunityTokenImport.validateCredential(input)
+    return credentialVault.store(
+      'kuro-community',
+      encodeKuroCommunityCredential(credential)
+    )
+  })
   ipcMain.handle('credentials:clear', (_event, provider: unknown) => {
     if (!credentialVault) throw new Error('安全凭据存储尚未初始化')
     return credentialVault.clear(parseCredentialProvider(provider))
@@ -516,7 +536,9 @@ if (!app.requestSingleInstanceLock()) {
       protect: (plainText) => safeStorage.encryptString(plainText),
       unprotect: (encrypted) => safeStorage.decryptString(encrypted)
     })
-    miyousheQrLogin = new MiyousheQrLoginService(createElectronNetFetcher(net.fetch))
+    const fetcher = createElectronNetFetcher(net.fetch)
+    miyousheQrLogin = new MiyousheQrLoginService(fetcher)
+    kuroCommunityTokenImport = new KuroCommunityTokenImportService(fetcher)
     try {
       await createDailyBackup(appDatabase, backupDirectory)
       pruneDailyBackups(backupDirectory)
@@ -566,6 +588,7 @@ app.on('before-quit', () => {
   syncOrchestrator = null
   credentialVault = null
   miyousheQrLogin = null
+  kuroCommunityTokenImport = null
   appBackupDirectory = null
   appDatabasePath = null
 })

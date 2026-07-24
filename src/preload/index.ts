@@ -29,6 +29,10 @@ const gachaApi: GachaApi = {
   startMiyousheQrLogin: () => ipcRenderer.invoke('miyoushe-login:start'),
   pollMiyousheQrLogin: (sessionId) => ipcRenderer.invoke('miyoushe-login:poll', sessionId),
   cancelMiyousheQrLogin: (sessionId) => ipcRenderer.invoke('miyoushe-login:cancel', sessionId),
+  listKuroCommunityRoles: (token, did) =>
+    ipcRenderer.invoke('kuro-credential:list-roles', token, did),
+  storeKuroCommunityCredential: (input) =>
+    ipcRenderer.invoke('kuro-credential:store', input),
   clearCredential: (provider) => ipcRenderer.invoke('credentials:clear', provider),
   onSyncCompleted: (callback) => {
     const listener = (_event: Electron.IpcRendererEvent, result: Parameters<typeof callback>[0]): void => callback(result)

@@ -40,6 +40,21 @@ export interface CredentialStatus {
   updatedAt: string | null
 }
 
+export interface KuroCommunityRole {
+  roleId: string
+  roleName: string
+  serverId: string
+  serverName: string | null
+}
+
+export interface KuroCommunityCredentialInput {
+  token: string
+  did: string
+  roleId: string
+  serverId: string
+  roleName?: string
+}
+
 export type MiyousheQrLoginStatus =
   | 'waiting_scan'
   | 'waiting_confirmation'
@@ -304,6 +319,10 @@ export interface GachaApi {
   startMiyousheQrLogin: () => Promise<MiyousheQrLoginState>
   pollMiyousheQrLogin: (sessionId: string) => Promise<MiyousheQrLoginState>
   cancelMiyousheQrLogin: (sessionId: string) => Promise<boolean>
+  listKuroCommunityRoles: (token: string, did: string) => Promise<KuroCommunityRole[]>
+  storeKuroCommunityCredential: (
+    input: KuroCommunityCredentialInput
+  ) => Promise<CredentialStatus>
   clearCredential: (provider: CredentialProvider) => Promise<boolean>
   onSyncCompleted: (callback: (result: SyncResult) => void) => () => void
   onSyncProgress: (callback: (progress: SyncProgressUpdate) => void) => () => void

@@ -247,6 +247,11 @@ h2 { margin: 0; font-size: 19px; }
 .qr-login-result { display: grid; width: 118px; height: 118px; place-items: center; border: 1px solid #46698f; border-radius: 50%; color: #e5f1ff; background: rgba(30, 73, 112, 0.45); font-size: 58px; }
 .qr-login-result.confirmed { border-color: #3e9f7a; color: #75e3b6; background: rgba(25, 111, 80, 0.25); }
 .qr-login-result.expired { border-color: #9b674d; color: #e8a47e; background: rgba(122, 65, 39, 0.25); }
+.kuro-credential-modal { width: min(560px, 100%); }
+.kuro-credential-form { display: grid; gap: 12px; }
+.kuro-credential-form label { display: grid; gap: 6px; color: #a8bad0; font-size: 12px; }
+.kuro-credential-form > button { justify-self: start; }
+.credential-import-message { margin: 0; color: #8edbb8; font-size: 12px; }
 .login-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 22px; }
 .login-actions button { padding: 9px 15px; border-radius: 7px; cursor: pointer; }
 
