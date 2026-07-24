@@ -1,5 +1,6 @@
 import type { KuroCommunityRole } from '../../shared/contracts'
 import type { KuroCommunityCredential } from '../sync/kuro-community-credential'
+import { extractKuroBatToken } from '../sync/kuro-community-bat'
 import {
   KURO_IOS_USER_AGENT,
   resolveKuroIosDevCode
@@ -62,7 +63,7 @@ export class KuroCommunityCredentialService {
       serverId: credential.serverId,
       roleId: credential.roleId
     }, credential.token, credential.did, true)
-    if (!isRecord(data) || !optionalText(data.accessToken, 16_384)) {
+    if (!extractKuroBatToken(data)) {
       throw new Error(
         `库街区未返回有效的数据令牌，凭据未保存（${describeResponseShape(data)}）`
       )

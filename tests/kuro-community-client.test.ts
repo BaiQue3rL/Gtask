@@ -38,6 +38,26 @@ describe('KuroCommunityClient', () => {
     expect(String(fetcher.mock.calls[2][1]?.body)).toContain('countryCode=1')
   })
 
+  it('使用 data 直返字符串格式的 BAT 读取个人数据', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(response({
+        code: 200,
+        data: 'eyJhbGciOiJIUzI1NiJ9.payload.signature'
+      }))
+      .mockResolvedValueOnce(response({ code: 200, data: {} }))
+      .mockResolvedValueOnce(response({ code: 200, data: { exploreList: [] } }))
+    const client = new KuroCommunityClient({
+      token: 'long-token',
+      did: 'DEVICE-ID',
+      roleId: '123456789',
+      serverId: 'server-cn'
+    }, fetcher, undefined, undefined, resolveIosDevCode)
+
+    await expect(client.getExploration()).resolves.toEqual({ exploreList: [] })
+    expect(new Headers(fetcher.mock.calls[2][1]?.headers).get('b-at'))
+      .toBe('eyJhbGciOiJIUzI1NiJ9.payload.signature')
+  })
+
   it('BAT 失效时自动刷新一次并重试原请求', async () => {
     const fetcher = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(response({ code: 200, data: { accessToken: 'bat-1' } }))

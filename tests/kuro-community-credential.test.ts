@@ -74,6 +74,24 @@ describe('KuroCommunityCredentialService', () => {
     expect(String(fetcher.mock.calls[0][1]?.body)).toContain('roleId=123456789')
   })
 
+  it('兼容库街区直接把 BAT 放在 data 字符串中的新格式', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response({
+      code: 200,
+      data: 'eyJhbGciOiJIUzI1NiJ9.payload.signature'
+    }))
+    const service = new KuroCommunityCredentialService(fetcher, resolveIosDevCode)
+
+    await expect(service.validateCredential({
+      token: 'app-token',
+      did: 'DEVICE-ID',
+      roleId: '123456789',
+      serverId: 'server-cn'
+    })).resolves.toMatchObject({
+      token: 'app-token',
+      roleId: '123456789'
+    })
+  })
+
   it('无角色或 BAT 无效时拒绝导入', async () => {
     const noRoleFetcher = vi.fn<typeof fetch>().mockResolvedValue(response({
       code: 200,

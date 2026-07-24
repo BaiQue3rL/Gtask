@@ -8,6 +8,7 @@ import { SyncVerificationRequiredError, type SyncProgressReporter } from './type
 import {
   WutheringWavesPersonalAdapter
 } from './wuthering-waves-personal-adapter'
+import { extractKuroBatToken } from './kuro-community-bat'
 
 const BASE_URL = 'https://api.kurobbs.com'
 const MAX_ATTEMPTS = 3
@@ -90,10 +91,11 @@ export class KuroCommunityClient {
       includeDid: true,
       includeEmptyBat: true
     })
-    if (!isRecord(data) || typeof data.accessToken !== 'string' || !data.accessToken.trim()) {
+    const bat = extractKuroBatToken(data)
+    if (!bat) {
       throw new SyncVerificationRequiredError('库街区未返回有效的数据令牌，请重新登录')
     }
-    this.bat = data.accessToken
+    this.bat = bat
   }
 
   private async request(
