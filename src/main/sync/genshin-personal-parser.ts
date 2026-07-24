@@ -1,4 +1,4 @@
-import type { NormalizedSyncItem } from './types'
+import type { NormalizedSyncItem, SemanticReviewDraft } from './types'
 import { finiteNumber } from './numbers'
 
 export interface GenshinPersonalPayload {
@@ -6,13 +6,9 @@ export interface GenshinPersonalPayload {
   spiralAbyss?: unknown
   imaginariumTheater?: unknown
   stygianOnslaught?: unknown
-  eventCalendar?: unknown
 }
 
-export function parseGenshinPersonalData(
-  input: GenshinPersonalPayload,
-  reference = new Date()
-): NormalizedSyncItem[] {
+export function parseGenshinPersonalData(input: GenshinPersonalPayload): NormalizedSyncItem[] {
   const items: NormalizedSyncItem[] = []
   if (input.profile !== undefined) items.push(...parseExplorations(input.profile))
   if (input.spiralAbyss !== undefined) items.push(parseSpiralAbyss(input.spiralAbyss))
@@ -24,53 +20,57 @@ export function parseGenshinPersonalData(
     const stygian = parseStygianOnslaught(input.stygianOnslaught)
     if (stygian) items.push(stygian)
   }
-  if (input.eventCalendar !== undefined) {
-    items.push(...parseGenshinEvents(input.eventCalendar, reference))
-  }
   if (items.length === 0) throw new Error('原神个人数据没有可识别的探索或周期玩法')
   return items
 }
 
-export function parseGenshinEvents(value: unknown, reference = new Date()): NormalizedSyncItem[] {
+export function extractGenshinEventReviewCandidates(value: unknown): SemanticReviewDraft[] {
   const root = requiredRecord(value, '活动日历')
   const events = Array.isArray(root.act_list) ? root.act_list.filter(isRecord) : []
-  return events.flatMap((event) => {
+  return events.map((event) => {
     const id = requiredIdentifier(event.id, '活动 id')
     const title = requiredString(event.name, '活动名称')
-    if (isGenshinEndgameTitle(title)) return []
-    const parsedStartsAt = optionalIsoDate(
-      event.start_timestamp ?? event.start_time,
-      `${title}开始时间`
-    )
-    const parsedEndsAt = optionalIsoDate(
-      event.end_timestamp ?? event.end_time,
-      `${title}结束时间`
-    )
-    const hasValidWindow = Boolean(
-      parsedStartsAt &&
-      parsedEndsAt &&
-      new Date(parsedStartsAt).getTime() < new Date(parsedEndsAt).getTime()
-    )
-    const startsAt = hasValidWindow ? parsedStartsAt : undefined
-    const endsAt = hasValidWindow ? parsedEndsAt : undefined
     const exploration = isRecord(event.explore_detail) ? event.explore_detail : null
-    const hasStarted = !startsAt || Date.parse(startsAt) <= reference.getTime()
-    return [{
-      remoteKey: `event:miyoushe:${id}`,
-      category: 'limited_event' as const,
-      title,
-      completed: hasStarted && (event.is_finished === true || exploration?.is_finished === true),
-      startsAt,
-      endsAt,
-      periodKey: startsAt ? `genshin:event:${id}:${startsAt}` : `genshin:event:${id}`,
-      scheduleKind: startsAt ? 'fixed_window' as const : undefined,
-      modeKey: `official-event-${id}`
-    }]
+    return {
+      target: 'events',
+      kind: 'personal-item-semantics',
+      payload: {
+        sourceContext: 'miyoushe-genshin-event-calendar',
+        officialEventId: id,
+        title,
+        normalizedStartAt: optionalUnixIso(event.start_timestamp),
+        normalizedEndAt: optionalUnixIso(event.end_timestamp),
+        observedTime: {
+          startTimestamp: safeObservedValue(event.start_timestamp),
+          endTimestamp: safeObservedValue(event.end_timestamp),
+          startTime: safeObservedValue(event.start_time),
+          endTime: safeObservedValue(event.end_time)
+        },
+        observedStatus: {
+          isFinished: typeof event.is_finished === 'boolean' ? event.is_finished : null,
+          explorationFinished:
+            typeof exploration?.is_finished === 'boolean' ? exploration.is_finished : null,
+          explorationPercent: finiteNumber(exploration?.explore_percent)
+        }
+      }
+    }
   })
 }
 
-function isGenshinEndgameTitle(title: string): boolean {
-  return ['深境螺旋', '幻想真境剧诗', '幽境危战'].some((name) => title.includes(name))
+function optionalUnixIso(value: unknown): string | null {
+  const timestamp = finiteNumber(value)
+  if (timestamp === null || timestamp <= 0) return null
+  const date = new Date(timestamp < 10_000_000_000 ? timestamp * 1000 : timestamp)
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
+}
+
+function safeObservedValue(value: unknown): string | number | null | Record<string, number | null> {
+  if (typeof value === 'string' || typeof value === 'number') return value
+  if (!isRecord(value)) return null
+  return Object.fromEntries(
+    ['year', 'month', 'day', 'hour', 'minute', 'second']
+      .map((key) => [key, finiteNumber(value[key])])
+  )
 }
 
 export function parseExplorations(value: unknown): NormalizedSyncItem[] {
@@ -257,15 +257,6 @@ function toIsoDate(value: unknown, field: string): string {
   }
   if (Number.isNaN(date.getTime())) throw new Error(`原神个人数据的 ${field} 不是有效时间`)
   return date.toISOString()
-}
-
-function optionalIsoDate(value: unknown, field: string): string | undefined {
-  try {
-    const timestamp = toIsoDate(value, field)
-    return new Date(timestamp).getTime() > 0 ? timestamp : undefined
-  } catch {
-    return undefined
-  }
 }
 
 function requiredRecord(value: unknown, field: string): Record<string, unknown> {

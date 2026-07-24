@@ -6,7 +6,6 @@ export interface StarRailPersonalPayload {
   pureFiction?: unknown
   apocalypticShadow?: unknown
   anomalyArbitration?: unknown
-  eventCalendar?: unknown
 }
 
 interface ChallengeModeDefinition {
@@ -16,8 +15,7 @@ interface ChallengeModeDefinition {
 }
 
 export function parseStarRailPersonalData(
-  input: StarRailPersonalPayload,
-  reference = new Date()
+  input: StarRailPersonalPayload
 ): NormalizedSyncItem[] {
   const items: NormalizedSyncItem[] = []
   const modes: ChallengeModeDefinition[] = [
@@ -44,48 +42,8 @@ export function parseStarRailPersonalData(
     const arbitration = parseAnomalyArbitration(input.anomalyArbitration)
     if (arbitration) items.push(arbitration)
   }
-  if (input.eventCalendar !== undefined) {
-    items.push(...parseStarRailEvents(input.eventCalendar, reference))
-  }
   if (items.length === 0) throw new Error('星铁个人数据没有可识别的周期玩法')
   return items
-}
-
-export function parseStarRailEvents(value: unknown, reference = new Date()): NormalizedSyncItem[] {
-  const root = requiredRecord(value, '活动日历')
-  const events = Array.isArray(root.act_list) ? root.act_list.filter(isRecord) : []
-  return events.flatMap((event) => {
-    const timeInfo = isRecord(event.time_info) ? event.time_info : null
-    if (!timeInfo) return []
-    const id = requiredIdentifier(event.id, '活动 id')
-    const title = requiredOptionalString(event.name)
-    if (!title) throw new Error('星铁个人数据缺少活动名称')
-    const parsedStartsAt = optionalIsoDate(
-      timeInfo.start_ts ?? timeInfo.start_time ?? timeInfo.start,
-      `${title}开始时间`
-    )
-    const parsedEndsAt = optionalIsoDate(
-      timeInfo.end_ts ?? timeInfo.end_time ?? timeInfo.end,
-      `${title}结束时间`
-    )
-    const hasValidWindow = Boolean(
-      parsedStartsAt &&
-      parsedEndsAt &&
-      new Date(parsedStartsAt).getTime() < new Date(parsedEndsAt).getTime()
-    )
-    const startsAt = hasValidWindow ? parsedStartsAt : undefined
-    const endsAt = hasValidWindow ? parsedEndsAt : undefined
-    return [{
-      remoteKey: `event:miyoushe:${id}`,
-      category: 'limited_event' as const,
-      title: title.replaceAll('\\n', ' '),
-      startsAt,
-      endsAt,
-      periodKey: startsAt ? `star-rail:event:${id}:${startsAt}` : `star-rail:event:${id}`,
-      scheduleKind: startsAt ? 'fixed_window' as const : undefined,
-      modeKey: `official-event-${id}`
-    }]
-  })
 }
 
 export function extractStarRailEventReviewCandidates(value: unknown): SemanticReviewDraft[] {
@@ -96,14 +54,6 @@ export function extractStarRailEventReviewCandidates(value: unknown): SemanticRe
     const id = requiredIdentifier(event.id, '活动 id')
     const title = requiredOptionalString(event.name)
     if (!title) throw new Error('星铁个人数据缺少活动名称')
-    const startsAt = optionalIsoDate(
-      timeInfo.start_ts ?? timeInfo.start_time ?? timeInfo.start,
-      `${title}开始时间`
-    ) ?? null
-    const endsAt = optionalIsoDate(
-      timeInfo.end_ts ?? timeInfo.end_time ?? timeInfo.end,
-      `${title}结束时间`
-    ) ?? null
     return {
       target: 'events',
       kind: 'personal-item-semantics',
@@ -111,8 +61,14 @@ export function extractStarRailEventReviewCandidates(value: unknown): SemanticRe
         sourceContext: 'miyoushe-star-rail-event-calendar',
         officialEventId: id,
         title: title.replaceAll('\\n', ' '),
-        startsAt,
-        endsAt,
+        normalizedStartAt: optionalUnixIso(timeInfo.start_ts),
+        normalizedEndAt: optionalUnixIso(timeInfo.end_ts),
+        observedTime: {
+          startTimestamp: safeObservedValue(timeInfo.start_ts),
+          endTimestamp: safeObservedValue(timeInfo.end_ts),
+          startTime: safeObservedValue(timeInfo.start_time ?? timeInfo.start),
+          endTime: safeObservedValue(timeInfo.end_time ?? timeInfo.end)
+        },
         observedStatus: {
           allFinished: typeof event.all_finished === 'boolean' ? event.all_finished : null,
           actStatus: requiredOptionalString(event.act_status) ?? null,
@@ -122,6 +78,22 @@ export function extractStarRailEventReviewCandidates(value: unknown): SemanticRe
       }
     }
   })
+}
+
+function optionalUnixIso(value: unknown): string | null {
+  const timestamp = finiteNumber(value)
+  if (timestamp === null || timestamp <= 0) return null
+  const date = new Date(timestamp < 10_000_000_000 ? timestamp * 1000 : timestamp)
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
+}
+
+function safeObservedValue(value: unknown): string | number | null | Record<string, number | null> {
+  if (typeof value === 'string' || typeof value === 'number') return value
+  if (!isRecord(value)) return null
+  return Object.fromEntries(
+    ['year', 'month', 'day', 'hour', 'minute', 'second']
+      .map((key) => [key, finiteNumber(value[key])])
+  )
 }
 
 function parseChallengeMode(definition: ChallengeModeDefinition): NormalizedSyncItem {
@@ -224,17 +196,6 @@ function toIsoDate(value: unknown, field: string): string {
   }
   if (Number.isNaN(date.getTime())) throw new Error(`星铁个人数据的 ${field} 不是有效时间`)
   return date.toISOString()
-}
-
-function optionalIsoDate(value: unknown, field: string): string | null {
-  if (value === undefined || value === null || value === '') return null
-  const numeric = finiteNumber(value)
-  if (numeric !== null && numeric <= 0) return null
-  try {
-    return toIsoDate(numeric ?? value, field)
-  } catch {
-    return null
-  }
 }
 
 function requiredRecord(value: unknown, field: string): Record<string, unknown> {

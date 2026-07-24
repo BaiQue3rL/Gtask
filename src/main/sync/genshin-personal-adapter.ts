@@ -1,5 +1,8 @@
 import type { GameId, SyncTarget } from '../../shared/contracts'
-import { parseGenshinPersonalData } from './genshin-personal-parser'
+import {
+  extractGenshinEventReviewCandidates,
+  parseGenshinPersonalData
+} from './genshin-personal-parser'
 import {
   assertAnyPersonalRequestSucceeded,
   capturePersonalRequest,
@@ -60,21 +63,27 @@ export class GenshinPersonalAdapter implements SyncAdapter {
       : undefined
     assertAnyPersonalRequestSucceeded(outcomes)
     const suffix = personalPartialSuffix(outcomes)
+    const hasChecklistData = [profile, spiralAbyss, imaginariumTheater, stygianOnslaught]
+      .some((value) => value !== undefined)
     return {
-      items: parseGenshinPersonalData({
-        profile,
-        spiralAbyss,
-        imaginariumTheater,
-        stygianOnslaught,
-        eventCalendar
-      }),
+      items: hasChecklistData
+        ? parseGenshinPersonalData({
+            profile,
+            spiralAbyss,
+            imaginariumTheater,
+            stygianOnslaught
+          })
+        : [],
+      reviewCandidates: eventCalendar === undefined
+        ? []
+        : extractGenshinEventReviewCandidates(eventCalendar),
       message: (target === 'events'
-        ? '原神活动进度已同步'
+        ? '原神活动原始状态已脱敏，等待 Codex 核验'
         : target === 'exploration'
           ? '原神地图探索度已同步'
           : target === 'cycles'
             ? '原神周期战绩已同步'
-            : '原神活动、地图探索和周期战绩已同步') + suffix
+            : '原神地图探索和周期战绩已同步；活动原始状态等待 Codex 核验') + suffix
     }
   }
 }

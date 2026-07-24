@@ -1,4 +1,4 @@
-import type { NormalizedSyncItem } from './types'
+import type { NormalizedSyncItem, SemanticReviewDraft } from './types'
 import { finiteNumber } from './numbers'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -53,32 +53,53 @@ function optionalChinaDateTime(value: unknown, field: string): string | undefine
   return parsed.toISOString()
 }
 
-export function parseZenlessEvents(value: unknown, reference = new Date()): NormalizedSyncItem[] {
+export function extractZenlessEventReviewCandidates(value: unknown): SemanticReviewDraft[] {
   const root = requiredRecord(value, '活动日历')
   const events = Array.isArray(root.activity_list) ? root.activity_list.filter(isRecord) : []
   return events.map((event) => {
     const id = requiredIdentifier(event.activity_id ?? event.id, '活动 id')
     const title = typeof event.name === 'string' && event.name.trim() ? event.name.trim() : null
     if (!title) throw new Error('绝区零个人数据缺少活动名称')
-    const startsAt = optionalChinaDateTime(event.start_ts ?? event.start, `${title}开始时间`)
-    const endsAt = optionalChinaDateTime(event.end_ts ?? event.end, `${title}结束时间`)
-    if (!startsAt || !endsAt) throw new Error(`绝区零个人数据缺少 ${title} 排期时间`)
-    const hasStarted = Date.parse(startsAt) <= reference.getTime()
-    const state = typeof (event.state ?? event.status) === 'string'
-      ? String(event.state ?? event.status)
-      : ''
     return {
-      remoteKey: `event:miyoushe:${id}`,
-      category: 'limited_event',
-      title,
-      completed: hasStarted && state === 'STATE_COMPLETED',
-      startsAt,
-      endsAt,
-      periodKey: `zenless:event:${id}:${startsAt}`,
-      scheduleKind: 'fixed_window',
-      modeKey: `official-event-${id}`
+      target: 'events',
+      kind: 'personal-item-semantics',
+      payload: {
+        sourceContext: 'miyoushe-zenless-event-calendar',
+        officialEventId: id,
+        title,
+        normalizedStartAt: optionalUnixIso(event.start_ts),
+        normalizedEndAt: optionalUnixIso(event.end_ts),
+        observedTime: {
+          startTimestamp: safeObservedValue(event.start_ts),
+          endTimestamp: safeObservedValue(event.end_ts),
+          startTime: safeObservedValue(event.start),
+          endTime: safeObservedValue(event.end)
+        },
+        observedStatus: {
+          state: typeof event.state === 'string' ? event.state : null,
+          status: typeof event.status === 'string' ? event.status : null,
+          obtainedCount: finiteNumber(event.monochrome_got_cnt),
+          totalCount: finiteNumber(event.monochrome_cnt)
+        }
+      }
     }
   })
+}
+
+function optionalUnixIso(value: unknown): string | null {
+  const timestamp = finiteNumber(value)
+  if (timestamp === null || timestamp <= 0) return null
+  const date = new Date(timestamp < 10_000_000_000 ? timestamp * 1000 : timestamp)
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
+}
+
+function safeObservedValue(value: unknown): string | number | null | Record<string, number | null> {
+  if (typeof value === 'string' || typeof value === 'number') return value
+  if (!isRecord(value)) return null
+  return Object.fromEntries(
+    ['year', 'month', 'day', 'hour', 'minute', 'second']
+      .map((key) => [key, finiteNumber(value[key])])
+  )
 }
 
 export function parseZenlessShiyuDefense(value: unknown): NormalizedSyncItem {
@@ -135,14 +156,10 @@ export function parseZenlessDeadlyAssault(value: unknown): NormalizedSyncItem {
 export function parseZenlessPersonalData(input: {
   shiyuDefense?: unknown
   deadlyAssault?: unknown
-  eventCalendar?: unknown
-}, reference = new Date()): NormalizedSyncItem[] {
+}): NormalizedSyncItem[] {
   const items: NormalizedSyncItem[] = []
   if (input.shiyuDefense !== undefined) items.push(parseZenlessShiyuDefense(input.shiyuDefense))
   if (input.deadlyAssault !== undefined) items.push(parseZenlessDeadlyAssault(input.deadlyAssault))
-  if (input.eventCalendar !== undefined) {
-    items.push(...parseZenlessEvents(input.eventCalendar, reference))
-  }
   if (items.length === 0) throw new Error('绝区零个人数据没有可识别的周期玩法')
   return items
 }

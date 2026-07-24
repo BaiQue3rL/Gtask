@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { GenshinPersonalAdapter } from '../src/main/sync/genshin-personal-adapter'
-import { parseGenshinPersonalData } from '../src/main/sync/genshin-personal-parser'
+import {
+  extractGenshinEventReviewCandidates,
+  parseGenshinPersonalData
+} from '../src/main/sync/genshin-personal-parser'
 
 const payload = {
   profile: {
@@ -71,13 +74,7 @@ describe('Genshin personal parsing', () => {
         completed: true
       }),
       expect.objectContaining({ modeKey: 'imaginarium-theater', completed: true }),
-      expect.objectContaining({ modeKey: 'stygian-onslaught', completed: true }),
-      expect.objectContaining({
-        remoteKey: 'event:miyoushe:9001',
-        category: 'limited_event',
-        title: '砺行修远',
-        completed: false
-      })
+      expect.objectContaining({ modeKey: 'stygian-onslaught', completed: true })
     ]))
     expect(items.filter((item) => item.category !== 'exploration')
       .every((item) => !Object.hasOwn(item, 'progressPercent'))).toBe(true)
@@ -179,75 +176,36 @@ describe('Genshin personal parsing', () => {
     })
   })
 
-  it('活动时间兼容数字字符串，并在无效时保留状态但不写错误倒计时', () => {
-    const items = parseGenshinPersonalData({
-      eventCalendar: {
-        act_list: [
-          {
-            id: 9002,
-            name: '数字时间活动',
-            start_timestamp: '1784505600',
-            end_timestamp: '1787183999',
-            is_finished: true
-          },
-          {
-            id: 9003,
-            name: '特殊时间活动',
-            start_timestamp: '0',
-            end_timestamp: 'not-a-time',
-            explore_detail: { explore_percent: 50 }
-          }
-        ]
-      }
+  it('活动只提取必要字段送入 Codex，不在本地猜分类、时间或完成状态', () => {
+    const candidates = extractGenshinEventReviewCandidates({
+      uid: '不应读取',
+      act_list: [{
+        id: 9010,
+        name: '幽境危战·栗烈之役',
+        start_timestamp: '1784505600',
+        end_timestamp: '1787183999',
+        is_finished: true,
+        explore_detail: { explore_percent: 100, is_finished: true }
+      }]
     })
 
-    expect(items).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        title: '数字时间活动',
-        startsAt: '2026-07-20T00:00:00.000Z',
-        endsAt: '2026-08-19T23:59:59.000Z',
-        completed: true
-      }),
-      expect.objectContaining({
-        title: '特殊时间活动',
-        startsAt: undefined,
-        endsAt: undefined,
-        periodKey: 'genshin:event:9003'
+    expect(candidates).toEqual([expect.objectContaining({
+      target: 'events',
+      kind: 'personal-item-semantics',
+      payload: expect.objectContaining({
+        officialEventId: '9010',
+        title: '幽境危战·栗烈之役',
+        normalizedStartAt: '2026-07-20T00:00:00.000Z',
+        normalizedEndAt: '2026-08-19T23:59:59.000Z',
+        observedStatus: {
+          isFinished: true,
+          explorationFinished: true,
+          explorationPercent: 100
+        }
       })
-    ]))
-    expect(items.every((item) => !Object.hasOwn(item, 'progressPercent'))).toBe(true)
-  })
-
-  it('活动同步排除挑战模式，并且未来活动不能继承完成状态', () => {
-    const items = parseGenshinPersonalData({
-      eventCalendar: {
-        act_list: [
-          {
-            id: 9010,
-            name: '幽境危战·栗烈之役',
-            start_timestamp: 1784505600,
-            end_timestamp: 1787183999,
-            is_finished: true
-          },
-          {
-            id: 9011,
-            name: '未来普通活动',
-            start_timestamp: 1785110400,
-            end_timestamp: 1787183999,
-            is_finished: true,
-            explore_detail: { explore_percent: 100, is_finished: true }
-          }
-        ]
-      }
-    }, new Date('2026-07-23T00:00:00.000Z'))
-
-    expect(items).toEqual([
-      expect.objectContaining({
-        remoteKey: 'event:miyoushe:9011',
-        completed: false
-      })
-    ])
-    expect(items[0]).not.toHaveProperty('progressPercent')
+    })])
+    expect(JSON.stringify(candidates)).not.toContain('uid')
+    expect(JSON.stringify(candidates)).not.toContain('不应读取')
   })
 
   it('挑战模式只要本期存在战绩就完成，完全没有记录才未完成', () => {
@@ -313,11 +271,13 @@ describe('Genshin personal parsing', () => {
       expect.objectContaining({ message: '正在读取幽境危战战绩', current: 4, total: 5 }),
       expect.objectContaining({ message: '正在读取原神活动进度', current: 5, total: 5 })
     ])
-    expect(result.items).toHaveLength(6)
+    expect(result.items).toHaveLength(5)
+    expect(result.reviewCandidates).toHaveLength(1)
     order.length = 0
     const eventsOnly = await adapter.sync('genshin', 'events')
     expect(order).toEqual(['events'])
-    expect(eventsOnly.items).toHaveLength(1)
+    expect(eventsOnly.items).toHaveLength(0)
+    expect(eventsOnly.reviewCandidates).toHaveLength(1)
     await expect(adapter.sync('zenless')).rejects.toThrow('不能用于其他游戏')
   })
 

@@ -85,97 +85,10 @@ describe('Star Rail personal parsing', () => {
       }),
       expect.objectContaining({ modeKey: 'pure-fiction', completed: true }),
       expect.objectContaining({ modeKey: 'apocalyptic-shadow', completed: true }),
-      expect.objectContaining({ modeKey: 'anomaly-arbitration', completed: true }),
-      expect.objectContaining({
-        remoteKey: 'event:miyoushe:5001',
-        category: 'limited_event',
-        title: '折纸小鸟对对碰'
-      })
+      expect.objectContaining({ modeKey: 'anomaly-arbitration', completed: true })
     ]))
-    const event = items.find((item) => item.remoteKey === 'event:miyoushe:5001')!
-    expect(event).not.toHaveProperty('completed')
-    expect(event).not.toHaveProperty('progressPercent')
     expect(items.filter((item) => item.category === 'endgame')
       .every((item) => !Object.hasOwn(item, 'progressPercent'))).toBe(true)
-  })
-
-  it('accepts numeric-string event timestamps and preserves events without a usable window', () => {
-    const items = parseStarRailPersonalData({
-      eventCalendar: {
-        act_list: [
-          {
-            id: 6001,
-            name: '货币战争•零和博弈',
-            time_info: { start_ts: '1784505600', end_ts: '1787183999' },
-            all_finished: false
-          },
-          {
-            id: 6002,
-            name: '无有效排期的活动',
-            time_info: { start_ts: '0', end_ts: '0' },
-            all_finished: true
-          }
-        ]
-      }
-    })
-
-    expect(items).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        remoteKey: 'event:miyoushe:6001',
-        startsAt: '2026-07-20T00:00:00.000Z',
-        endsAt: '2026-08-19T23:59:59.000Z',
-        scheduleKind: 'fixed_window'
-      }),
-      expect.objectContaining({
-        remoteKey: 'event:miyoushe:6002',
-        startsAt: undefined,
-        endsAt: undefined,
-        periodKey: 'star-rail:event:6002',
-        scheduleKind: undefined
-      })
-    ]))
-    const untimed = items.find((item) => item.remoteKey === 'event:miyoushe:6002')!
-    expect(untimed).not.toHaveProperty('completed')
-    expect(untimed).not.toHaveProperty('progressPercent')
-  })
-
-  it('does not reuse explicit or numeric completion for an event that has not started', () => {
-    const items = parseStarRailPersonalData({
-      eventCalendar: {
-        act_list: [{
-          id: 6010,
-          name: '未来活动',
-          time_info: { start_ts: 1785110400, end_ts: 1787183999 },
-          all_finished: true,
-          act_status: 'OtherActStatusFinish',
-          current_progress: 10,
-          total_progress: 10
-        }]
-      }
-    }, new Date('2026-07-23T00:00:00.000Z'))
-
-    expect(items[0]).not.toHaveProperty('completed')
-    expect(items[0]).not.toHaveProperty('progressPercent')
-  })
-
-  it('does not treat ambiguous calendar finish fields as player completion', () => {
-    const items = parseStarRailPersonalData({
-      eventCalendar: {
-        act_list: [{
-          id: 6011,
-          name: '反贪「砖」家',
-          time_info: { start_ts: 1783905600, end_ts: 1787673540 },
-          all_finished: true,
-          act_status: 'OtherActStatusFinish',
-          current_progress: 10,
-          total_progress: 10
-        }]
-      }
-    }, new Date('2026-07-23T00:00:00.000Z'))
-
-    expect(items[0]).toMatchObject({ title: '反贪「砖」家' })
-    expect(items[0]).not.toHaveProperty('completed')
-    expect(items[0]).not.toHaveProperty('progressPercent')
   })
 
   it('只把活动必要字段脱敏后送入 Codex 核验候选', () => {
@@ -198,6 +111,8 @@ describe('Star Rail personal parsing', () => {
       payload: expect.objectContaining({
         officialEventId: '6011',
         title: '反贪「砖」家',
+        normalizedStartAt: '2026-07-13T01:20:00.000Z',
+        normalizedEndAt: '2026-08-25T15:59:00.000Z',
         observedStatus: {
           allFinished: true,
           actStatus: 'OtherActStatusFinish',

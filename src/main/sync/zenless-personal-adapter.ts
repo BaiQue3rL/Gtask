@@ -1,5 +1,8 @@
 import type { GameId, SyncTarget } from '../../shared/contracts'
-import { parseZenlessPersonalData } from './zenless-personal-parser'
+import {
+  extractZenlessEventReviewCandidates,
+  parseZenlessPersonalData
+} from './zenless-personal-parser'
 import {
   assertAnyPersonalRequestSucceeded,
   capturePersonalRequest,
@@ -55,13 +58,19 @@ export class ZenlessPersonalAdapter implements SyncAdapter {
       : undefined
     assertAnyPersonalRequestSucceeded(outcomes)
     const suffix = personalPartialSuffix(outcomes)
+    const hasChecklistData = [shiyuDefense, deadlyAssault].some((value) => value !== undefined)
     return {
-      items: parseZenlessPersonalData({ shiyuDefense, deadlyAssault, eventCalendar }),
+      items: hasChecklistData
+        ? parseZenlessPersonalData({ shiyuDefense, deadlyAssault })
+        : [],
+      reviewCandidates: eventCalendar === undefined
+        ? []
+        : extractZenlessEventReviewCandidates(eventCalendar),
       message: (target === 'events'
-        ? '绝区零活动进度已同步'
+        ? '绝区零活动原始状态已脱敏，等待 Codex 核验'
         : target === 'cycles'
           ? '绝区零式舆防卫战和危局强袭战已同步'
-          : '绝区零活动、式舆防卫战和危局强袭战已同步') + suffix
+          : '绝区零两种周期战绩已同步；活动原始状态等待 Codex 核验') + suffix
     }
   }
 }

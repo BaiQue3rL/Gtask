@@ -49,7 +49,9 @@ After finishing any public schedule job, call `claim_gacha_semantic_review` repe
 4. Use `reject_gacha_semantic_review` when the field is undocumented, evidence conflicts, the candidate is not a checklist item, or personal completion cannot be established. Rejection must not modify the checklist.
 5. Never infer completion from names such as `finish`, `all_finished`, a full numerator/denominator, or an activity lifecycle enum without evidence that the field is explicitly player-specific.
 6. Never infer a timezone from the user's locale. Ambiguous natural-language times must be rejected until the source server timezone is proven.
-7. Never leave a claimed candidate unfinished.
+7. A candidate originating from an activity-calendar endpoint is not proof that it belongs in the activity section. Verify whether it is actually an event, an endgame/challenge mode, a notice, or another non-checklist record. Reject misplaced/non-event candidates; never classify them by title keywords.
+8. Genshin Impact, Honkai: Star Rail, and Zenless Zone Zero activity progress candidates all use this workflow. Treat mechanically normalized Unix timestamps as hints, and independently verify lifecycle windows and player-specific completion semantics before approval.
+9. Never leave a claimed candidate unfinished.
 
 ## Safety
 

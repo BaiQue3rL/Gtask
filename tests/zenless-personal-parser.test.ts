@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  extractZenlessEventReviewCandidates,
   parseZenlessDeadlyAssault,
-  parseZenlessEvents,
   parseZenlessPersonalData,
   parseZenlessShiyuDefense
 } from '../src/main/sync/zenless-personal-parser'
@@ -84,8 +84,9 @@ describe('绝区零个人战绩解析', () => {
     expect(() => parseZenlessPersonalData({})).toThrow('没有可识别')
   })
 
-  it('把活动状态映射到活动清单但不写百分比', () => {
-    const items = parseZenlessEvents({
+  it('活动状态只脱敏进入 Codex 核验，不由本地状态枚举直接判完成', () => {
+    const candidates = extractZenlessEventReviewCandidates({
+      uid: '不应读取',
       activity_list: [{
         activity_id: 7001,
         name: '嗯呢从天降',
@@ -96,32 +97,26 @@ describe('绝区零个人战绩解析', () => {
         end_ts: 1787183999
       }]
     })
-    expect(items).toEqual([
+    expect(candidates).toEqual([
       expect.objectContaining({
-        remoteKey: 'event:miyoushe:7001',
-        category: 'limited_event',
-        title: '嗯呢从天降',
-        completed: false
+        target: 'events',
+        kind: 'personal-item-semantics',
+        payload: expect.objectContaining({
+          officialEventId: '7001',
+          title: '嗯呢从天降',
+          normalizedStartAt: '2026-07-20T00:00:00.000Z',
+          normalizedEndAt: '2026-08-19T23:59:59.000Z',
+          observedStatus: {
+            state: 'STATE_IN_PROGRESS',
+            status: null,
+            obtainedCount: 240,
+            totalCount: 300
+          }
+        })
       })
     ])
-    expect(items[0]).not.toHaveProperty('progressPercent')
-  })
-
-  it('活动未开始时不继承完成状态或领取进度', () => {
-    const items = parseZenlessEvents({
-      activity_list: [{
-        activity_id: 7002,
-        name: '未来活动',
-        state: 'STATE_COMPLETED',
-        monochrome_got_cnt: 300,
-        monochrome_cnt: 300,
-        start_ts: 1785110400,
-        end_ts: 1787183999
-      }]
-    }, new Date('2026-07-23T00:00:00.000Z'))
-
-    expect(items[0]).toMatchObject({ completed: false })
-    expect(items[0]).not.toHaveProperty('progressPercent')
+    expect(JSON.stringify(candidates)).not.toContain('uid')
+    expect(JSON.stringify(candidates)).not.toContain('不应读取')
   })
 
   it('个人接口省略排期时间时仍保留完成状态并交由公开排期补时', () => {
@@ -215,11 +210,13 @@ describe('绝区零个人战绩解析', () => {
       expect.objectContaining({ message: '正在读取危局强袭战战绩', current: 2, total: 3 }),
       expect.objectContaining({ message: '正在读取绝区零活动进度', current: 3, total: 3 })
     ])
-    expect(output.items).toHaveLength(3)
+    expect(output.items).toHaveLength(2)
+    expect(output.reviewCandidates).toHaveLength(1)
     order.length = 0
     const eventsOnly = await adapter.sync('zenless', 'events')
     expect(order).toEqual(['events'])
-    expect(eventsOnly.items).toHaveLength(1)
+    expect(eventsOnly.items).toHaveLength(0)
+    expect(eventsOnly.reviewCandidates).toHaveLength(1)
     order.length = 0
     const exploration = await adapter.sync('zenless', 'exploration')
     expect(order).toEqual([])
