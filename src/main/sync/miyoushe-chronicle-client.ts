@@ -158,6 +158,7 @@ class MiyousheChronicleClient {
           'x-rpc-app_version': '2.11.1',
           'x-rpc-client_type': '5',
           'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/58.0.3029.110 Safari/537.36',
+          ...(this.deviceId ? { 'x-rpc-device_id': this.deviceId } : {}),
           ...(this.deviceFp ? { 'x-rpc-device_fp': this.deviceFp } : {}),
           ...(body ? { 'content-type': 'application/json' } : {}),
           ...(verification?.sessionId ? {

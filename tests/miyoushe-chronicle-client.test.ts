@@ -342,7 +342,7 @@ describe('MiyousheGenshinClient', () => {
     const fingerprintBody = JSON.parse(String(fetcher.mock.calls[1][1]?.body))
     expect(fingerprintBody.device_id).toMatch(/^[0-9A-F]{8}(?:-[0-9A-F]{4}){3}-[0-9A-F]{12}$/)
     const profileHeaders = new Headers(fetcher.mock.calls[2][1]?.headers)
-    expect(profileHeaders.get('x-rpc-device_id')).toBeNull()
+    expect(profileHeaders.get('x-rpc-device_id')?.toUpperCase()).toBe(fingerprintBody.device_id)
     expect(profileHeaders.get('x-rpc-device_fp')).toBe('account-device-fp')
   })
 })
