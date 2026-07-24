@@ -9,6 +9,8 @@ const BASE_URL = 'https://api.kurobbs.com'
 const IOS_USER_AGENT =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) ' +
   'AppleWebKit/605.1.15 (KHTML, like Gecko) KuroGameBox/3.1.3'
+const MAX_ATTEMPTS = 3
+const RETRYABLE_CODES = new Set([102, 1005, 429, 500, 502, 503, 504])
 
 interface KuroEnvelope {
   code?: number
@@ -23,7 +25,9 @@ export class KuroCommunityClient {
 
   constructor(
     private readonly credential: KuroCommunityCredential,
-    private readonly fetcher: typeof fetch = fetch
+    private readonly fetcher: typeof fetch = fetch,
+    private readonly reportProgress?: SyncProgressReporter,
+    private readonly wait: (milliseconds: number) => Promise<void> = delay
   ) {}
 
   async getExploration(): Promise<unknown> {
@@ -99,7 +103,8 @@ export class KuroCommunityClient {
       includeEmptyBat?: boolean
       retryBat?: boolean
     },
-    isRetry = false
+    isBatRetry = false,
+    attempt = 1
   ): Promise<unknown> {
     const headers: Record<string, string> = {
       source: 'ios',
@@ -126,16 +131,21 @@ export class KuroCommunityClient {
         headers,
         body: new URLSearchParams(body).toString()
       })
-      if (!response.ok) throw new Error(`库街区请求失败（HTTP ${response.status}）`)
+      if (!response.ok) {
+        if (RETRYABLE_CODES.has(response.status)) {
+          throw new KuroTransientError(`库街区请求暂时失败（HTTP ${response.status}）`)
+        }
+        throw new Error(`库街区请求失败（HTTP ${response.status}）`)
+      }
       const envelope = await response.json() as KuroEnvelope
       const code = typeof envelope.code === 'number'
         ? envelope.code
         : envelope.success === true
           ? 200
           : -1
-      if (code === 10903 && options.retryBat && !isRetry) {
+      if (code === 10903 && options.retryBat && !isBatRetry) {
         await this.refreshBat()
-        return await this.request(path, body, options, true)
+        return await this.request(path, body, options, true, attempt)
       }
       if (code === 220) {
         throw new SyncVerificationRequiredError('库街区登录已过期，请重新登录')
@@ -143,11 +153,28 @@ export class KuroCommunityClient {
       if (code === 270) {
         throw new SyncVerificationRequiredError('库街区判定当前网络环境存在风险，请稍后手动重试')
       }
+      if (RETRYABLE_CODES.has(code)) {
+        throw new KuroTransientError(envelope.msg?.trim() || `库街区服务暂时不可用（${code}）`)
+      }
       if (code !== 0 && code !== 200) {
         throw new Error(envelope.msg?.trim() || `库街区请求失败（${code}）`)
       }
       return envelope.data
     } catch (error) {
+      const retryable =
+        error instanceof KuroTransientError ||
+        (error instanceof Error && ['AbortError', 'TypeError'].includes(error.name))
+      if (retryable && attempt < MAX_ATTEMPTS) {
+        const nextAttempt = attempt + 1
+        this.reportProgress?.({
+          phase: 'retrying',
+          message: `${requestLabel(path)}暂时失败，正在重试 ${nextAttempt}/${MAX_ATTEMPTS}`,
+          current: nextAttempt,
+          total: MAX_ATTEMPTS
+        })
+        await this.wait(250 * 2 ** (attempt - 1))
+        return await this.request(path, body, options, isBatRetry, nextAttempt)
+      }
       if (error instanceof Error && error.name === 'AbortError') {
         throw new Error('库街区请求超时，请稍后重试')
       }
@@ -169,11 +196,36 @@ export class KuroCommunityClient {
 export function createKuroCommunityPersonalAdapter(
   credential: CredentialPayload,
   fetcher: typeof fetch,
-  _reportProgress?: SyncProgressReporter
+  reportProgress?: SyncProgressReporter
 ): WutheringWavesPersonalAdapter {
   return new WutheringWavesPersonalAdapter(
-    new KuroCommunityClient(decodeKuroCommunityCredential(credential), fetcher)
+    new KuroCommunityClient(
+      decodeKuroCommunityCredential(credential),
+      fetcher,
+      reportProgress
+    )
   )
+}
+
+class KuroTransientError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'KuroTransientError'
+  }
+}
+
+function requestLabel(path: string): string {
+  if (path.endsWith('/requestToken')) return '库街区数据令牌'
+  if (path.endsWith('/refreshData')) return '鸣潮角色数据刷新'
+  if (path.endsWith('/exploreIndex')) return '鸣潮地图探索'
+  if (path.endsWith('/towerDataDetail')) return '逆境深塔战绩'
+  if (path.endsWith('/slashDetail')) return '冥歌海墟战绩'
+  if (path.endsWith('/newTowerDetail')) return '终焉矩阵战绩'
+  return '库街区请求'
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

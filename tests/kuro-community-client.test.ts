@@ -68,4 +68,52 @@ describe('KuroCommunityClient', () => {
       name: 'SyncVerificationRequiredError'
     })
   })
+
+  it('临时服务错误会限次重试并回传真实重试进度', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(response({ code: 1005, msg: '数据准备中' }))
+      .mockResolvedValueOnce(response({ code: 200, data: { accessToken: 'short-bat' } }))
+      .mockResolvedValueOnce(response({ code: 200, data: {} }))
+      .mockResolvedValueOnce(response({ code: 503, msg: '服务繁忙' }))
+      .mockResolvedValueOnce(response({ code: 200, data: { difficultyList: [] } }))
+    const reportProgress = vi.fn()
+    const wait = vi.fn(async () => {})
+    const client = new KuroCommunityClient({
+      token: 'long-token',
+      did: 'DEVICE-ID',
+      roleId: '123456789',
+      serverId: 'server-cn'
+    }, fetcher, reportProgress, wait)
+
+    await expect(client.getTower()).resolves.toEqual({ difficultyList: [] })
+    expect(wait).toHaveBeenCalledTimes(2)
+    expect(reportProgress).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      phase: 'retrying',
+      message: '库街区数据令牌暂时失败，正在重试 2/3',
+      current: 2,
+      total: 3
+    }))
+    expect(reportProgress).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      phase: 'retrying',
+      message: '逆境深塔战绩暂时失败，正在重试 2/3'
+    }))
+  })
+
+  it('登录过期和风控错误不会进入自动重试', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValue(response({ code: 270, msg: '当前环境存在风险' }))
+    const wait = vi.fn(async () => {})
+    const client = new KuroCommunityClient({
+      token: 'long-token',
+      did: 'DEVICE-ID',
+      roleId: '123456789',
+      serverId: 'server-cn'
+    }, fetcher, undefined, wait)
+
+    await expect(client.getExploration()).rejects.toMatchObject({
+      name: 'SyncVerificationRequiredError'
+    })
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    expect(wait).not.toHaveBeenCalled()
+  })
 })
