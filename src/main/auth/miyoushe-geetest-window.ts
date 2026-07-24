@@ -104,7 +104,7 @@ export async function solveMiyousheGeetest(
   })
 }
 
-function buildVerificationPage(
+export function buildVerificationPage(
   challenge: MiyousheGeetestChallenge,
   copy: GeetestWindowCopy
 ): string {
@@ -169,7 +169,8 @@ function buildVerificationPage(
     loadInitializer().then((initializer) => {
       const options = isV4 ? {
         captchaId: challenge.gt,
-        riskType: challenge.riskType,
+        https: true,
+        ...(challenge.riskType ? { riskType: challenge.riskType } : {}),
         ...(copy.includeSessionUserInfo
           ? { userInfo: JSON.stringify({ mmt_key: challenge.sessionId }) }
           : {}),
@@ -188,7 +189,13 @@ function buildVerificationPage(
         product: 'bind',
         lang: 'zh-cn'
       };
-      initializer(options, (captcha) => {
+      status.textContent = '验证组件已加载，正在连接官方验证服务…';
+      const initializationTimeout = window.setTimeout(() => {
+        status.textContent = '官方验证服务初始化超时。请检查代理后关闭窗口重试。';
+      }, 15000);
+      try {
+        initializer(options, (captcha) => {
+        window.clearTimeout(initializationTimeout);
         if (!isV4) captcha.appendTo('#captcha');
         captcha.onReady(() => {
           status.textContent = '请完成上方验证';
@@ -217,7 +224,11 @@ function buildVerificationPage(
           }));
         });
         captcha.onError(() => { status.textContent = '验证加载失败，请关闭窗口后重试。'; });
-      });
+        });
+      } catch (error) {
+        window.clearTimeout(initializationTimeout);
+        status.textContent = '官方验证组件初始化失败，请关闭窗口后重试。';
+      }
     }).catch(() => {
       status.textContent = '官方验证组件加载失败，请检查网络或代理后重试。';
     });
