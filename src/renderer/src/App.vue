@@ -25,6 +25,7 @@ import type {
   SyncSettings
 } from '../../shared/contracts'
 import { readHiddenGameIds, writeHiddenGameIds } from './game-visibility'
+import { kuroRoleKey } from './kuro-role-key'
 
 interface ChecklistPanel {
   title: string
@@ -705,10 +706,6 @@ async function closeKuroCommunityLogin(): Promise<void> {
   }
 }
 
-function kuroRoleKey(role: KuroCommunityRole): string {
-  return `${role.serverId}\u0000${role.roleId}`
-}
-
 async function sendKuroCommunitySms(): Promise<void> {
   if (kuroCredentialBusy.value) return
   kuroCredentialBusy.value = true
@@ -755,7 +752,7 @@ async function saveKuroCommunityLogin(): Promise<void> {
     (candidate) => kuroRoleKey(candidate) === kuroSelectedRoleKey.value
   )
   if (!role) {
-    errorMessage.value = '请先读取并选择一个鸣潮角色'
+    kuroCredentialMessage.value = '角色选择状态无效，请重新登录并选择角色'
     return
   }
   kuroCredentialBusy.value = true
@@ -770,7 +767,9 @@ async function saveKuroCommunityLogin(): Promise<void> {
     kuroCredentialBusy.value = false
     await closeKuroCommunityLogin()
   } catch (error) {
-    kuroCredentialMessage.value = ''
+    kuroCredentialMessage.value = error instanceof Error
+      ? error.message
+      : '库街区凭据验证失败，请重试'
     showError(error)
     kuroCredentialBusy.value = false
   }
