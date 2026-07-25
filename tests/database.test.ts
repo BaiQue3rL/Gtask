@@ -1246,6 +1246,30 @@ describe('AppDatabase', () => {
     })
   })
 
+  it('四个唯一 Agent 可以并行领取四个游戏的独立任务', () => {
+    database = new AppDatabase(':memory:')
+    const startedAt = new Date('2026-07-24T10:00:00.000Z')
+    const gameIds = ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const
+    for (const [index, gameId] of gameIds.entries()) {
+      const agentId = `gacha-app-background-worker-${index + 1}`
+      database.registerAiScheduleAgent(agentId, `后台 Codex ${index + 1}`, startedAt)
+      database.createAiScheduleJob(gameId, 'public_schedule', startedAt, false, 'all')
+    }
+
+    const claimed = gameIds.map((_gameId, index) =>
+      database!.claimAiScheduleJob(
+        `gacha-app-background-worker-${index + 1}`,
+        new Date(startedAt.getTime() + index)
+      )
+    )
+
+    expect(claimed.map((job) => job?.gameId)).toEqual(gameIds)
+    expect(new Set(claimed.map((job) => job?.agentId)).size).toBe(4)
+    for (const gameId of gameIds) {
+      expect(database.getActiveAiScheduleJob(gameId)?.status).toBe('claimed')
+    }
+  })
+
   it('持续上报进度的 Codex 任务不会按最初接单时间误判超时', () => {
     database = new AppDatabase(':memory:')
     const queuedAt = new Date('2026-07-23T10:00:00.000Z')

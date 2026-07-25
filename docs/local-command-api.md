@@ -28,7 +28,7 @@ CLI 与 MCP 在打开旧版磁盘数据库时会先创建迁移前一致性备�
 
 ## AI 公开资料任务协议
 
-“同步清单”在以下任一条件满足时启用：最近五分钟内有 Agent 调用 `register_gacha_schedule_agent`，或本机已经安装并启用 `gacha-task-manager@personal` Codex 插件。点击同步后，桌面端会自动启动非交互 Codex CLI 并调用 `$sync-gacha-schedules` 领取任务，无需用户打开 Codex 或手动发送消息。Agent 按以下顺序工作：
+“同步清单”在以下任一条件满足时启用：最近五分钟内有 Agent 调用 `register_gacha_schedule_agent`，或本机已经安装并启用 `gacha-task-manager@personal` Codex 插件。点击同步后，桌面端会按活动任务数自动启动最多四个非交互 Codex CLI Worker；每个 Worker 使用唯一 Agent ID 调用 `$sync-gacha-schedules` 领取一项任务，无需用户打开 Codex 或手动发送消息。Agent 按以下顺序工作：
 
 1. 登记心跳并声明 `webSearch: true`。
 2. 轮询 `claim_gacha_schedule_job`；无任务时返回 `null`。

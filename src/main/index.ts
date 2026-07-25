@@ -14,7 +14,8 @@ import { detectCodexPlugin } from './ai/codex-plugin'
 import { prepareCodexPluginMarketplace } from './ai/codex-plugin-installer'
 import {
   CODEX_SCHEDULE_WORKER_AGENT_ID,
-  CodexScheduleWorker,
+  MAX_CODEX_SCHEDULE_WORKERS,
+  CodexScheduleWorkerPool,
   type CodexScheduleWorkerEvent
 } from './ai/codex-schedule-worker'
 import { MiyousheQrLoginService } from './auth/miyoushe-qr-login'
@@ -77,7 +78,7 @@ let periodTimer: ReturnType<typeof setInterval> | null = null
 let externalChangeTimer: ReturnType<typeof setInterval> | null = null
 let aiJobProgressTimer: ReturnType<typeof setInterval> | null = null
 const aiJobProgressSignatures = new Map<GameId, string>()
-let codexScheduleWorker: CodexScheduleWorker | null = null
+let codexScheduleWorkerPool: CodexScheduleWorkerPool | null = null
 let credentialVault: CredentialVault | null = null
 let miyousheQrLogin: MiyousheQrLoginService | null = null
 let kuroCommunityCredential: KuroCommunityCredentialService | null = null
@@ -103,10 +104,11 @@ async function queueAiScheduleSync(
   try {
     const plugin = detectCodexPlugin()
     const job = appDatabase.createAiScheduleJob(gameId, scope, new Date(), plugin.installed, target)
-    const launch = codexScheduleWorker?.start() ?? {
+    const launch = startCodexWorkersForActiveJobs() ?? {
       status: 'unavailable' as const,
       message: 'Codex 自动处理服务尚未初始化',
-      executablePath: null
+      started: 0,
+      running: 0
     }
     if (launch.status === 'unavailable') {
       appDatabase.failPendingAiScheduleJobs(launch.message)
@@ -195,36 +197,39 @@ function handleCodexScheduleWorkerEvent(event: CodexScheduleWorkerEvent): void {
       event.exitCode === 0 && event.message === 'Codex 自动处理进程已结束'
         ? 'Codex 自动进程已结束，但仍有同步任务未完成；请重新同步'
         : event.message
-    const failed =
-      appDatabase.failPendingAiScheduleJobs(message) +
-      appDatabase.failClaimedAiScheduleJobsByAgent(
-        CODEX_SCHEDULE_WORKER_AGENT_ID,
-        message
-      )
+    const failed = appDatabase.failClaimedAiScheduleJobsByAgent(event.agentId, message)
     if (failed > 0) mainWindow?.webContents.send('checklist:changed')
+    setTimeout(startCodexWorkersForActiveJobs, 0)
     return
   }
+  const runningWorkers = codexScheduleWorkerPool?.runningCount ?? 0
+  const message = runningWorkers > 1
+    ? `${event.message} · 并行 ${runningWorkers}/${MAX_CODEX_SCHEDULE_WORKERS}`
+    : event.message
   const changed = appDatabase.updatePendingAiScheduleJobsMessage(
-    event.message,
+    message,
     event.current ?? null,
     event.total ?? null
   )
   if (changed > 0) pollAiJobProgress()
 }
 
-function startCodexWorkerForPendingJobs(): void {
-  if (!appDatabase || !codexScheduleWorker) return
-  const hasPending = SUPPORTED_GAME_IDS.some(
-    (gameId) => appDatabase?.getActiveAiScheduleJob(gameId)?.status === 'pending'
-  )
-  if (!hasPending) return
-  const launch = codexScheduleWorker.start()
+function startCodexWorkersForActiveJobs():
+  | ReturnType<CodexScheduleWorkerPool['ensureCapacity']>
+  | null {
+  if (!appDatabase || !codexScheduleWorkerPool) return null
+  const activeJobs = SUPPORTED_GAME_IDS.filter(
+    (gameId) => appDatabase?.getActiveAiScheduleJob(gameId)
+  ).length
+  if (activeJobs === 0) return null
+  const launch = codexScheduleWorkerPool.ensureCapacity(activeJobs)
   if (launch.status === 'unavailable') {
     appDatabase.failPendingAiScheduleJobs(launch.message)
     mainWindow?.webContents.send('checklist:changed')
   } else {
     appDatabase.updatePendingAiScheduleJobsMessage(launch.message)
   }
+  return launch
 }
 
 function toAiJobProgress(job: AiScheduleJob): SyncProgressUpdate {
@@ -640,7 +645,7 @@ if (!app.requestSingleInstanceLock()) {
     } catch (error) {
       console.error('创建或整理每日数据库备份失败', error)
     }
-    codexScheduleWorker = new CodexScheduleWorker({
+    codexScheduleWorkerPool = new CodexScheduleWorkerPool({
       workingDirectory: app.getPath('userData'),
       onEvent: handleCodexScheduleWorkerEvent
     })
@@ -663,7 +668,7 @@ if (!app.requestSingleInstanceLock()) {
     }, 2_000)
     pollAiJobProgress()
     aiJobProgressTimer = setInterval(pollAiJobProgress, 2_000)
-    startCodexWorkerForPendingJobs()
+    startCodexWorkersForActiveJobs()
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -683,9 +688,14 @@ app.on('before-quit', () => {
   if (aiJobProgressTimer) clearInterval(aiJobProgressTimer)
   aiJobProgressTimer = null
   aiJobProgressSignatures.clear()
-  appDatabase?.requeueClaimedAiScheduleJobsByAgent(CODEX_SCHEDULE_WORKER_AGENT_ID)
-  codexScheduleWorker?.stop()
-  codexScheduleWorker = null
+  for (const agentId of [
+    CODEX_SCHEDULE_WORKER_AGENT_ID,
+    ...(codexScheduleWorkerPool?.agentIds ?? [])
+  ]) {
+    appDatabase?.requeueClaimedAiScheduleJobsByAgent(agentId)
+  }
+  codexScheduleWorkerPool?.stop()
+  codexScheduleWorkerPool = null
   appDatabase?.close()
   appDatabase = null
   syncOrchestrator = null

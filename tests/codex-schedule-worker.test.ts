@@ -5,6 +5,8 @@ import type { ChildProcess, spawn } from 'node:child_process'
 import {
   CODEX_SCHEDULE_WORKER_AGENT_ID,
   CodexScheduleWorker,
+  CodexScheduleWorkerPool,
+  codexScheduleWorkerAgentId,
   findCodexCli,
   parseCodexWorkerLine
 } from '../src/main/ai/codex-schedule-worker'
@@ -116,5 +118,38 @@ describe('Codex schedule worker', () => {
       message: '未找到本机 Codex CLI；请先安装或登录 Codex 后重试',
       executablePath: null
     })
+  })
+
+  it('starts up to four uniquely identified workers for parallel game jobs', () => {
+    const children: FakeChildProcess[] = []
+    const prompts: string[] = []
+    const spawnProcess = ((_command: string, args: readonly string[] = []) => {
+      const child = new FakeChildProcess()
+      children.push(child)
+      prompts.push(args.at(-1) ?? '')
+      return child as unknown as ChildProcess
+    }) as unknown as typeof spawn
+    const pool = new CodexScheduleWorkerPool({
+      workingDirectory: 'C:\\GachaData',
+      findExecutable: () => 'C:\\Codex\\codex.exe',
+      spawnProcess
+    })
+
+    expect(pool.ensureCapacity(4)).toMatchObject({
+      status: 'started',
+      started: 4,
+      running: 4
+    })
+    expect(pool.ensureCapacity(5)).toMatchObject({
+      status: 'already_running',
+      started: 0,
+      running: 4
+    })
+    expect(children).toHaveLength(4)
+    for (let slot = 1; slot <= 4; slot += 1) {
+      expect(prompts.some((prompt) =>
+        prompt.includes(codexScheduleWorkerAgentId(slot))
+      )).toBe(true)
+    }
   })
 })
