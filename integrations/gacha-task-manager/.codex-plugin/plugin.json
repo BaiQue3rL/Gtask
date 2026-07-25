@@ -1,6 +1,6 @@
 {
   "name": "gacha-task-manager",
-  "version": "0.1.0+codex.20260725122912",
+  "version": "0.1.0+codex.20260725161940",
   "description": "Connect Codex to the local Gacha Task Manager and safely synchronize verified public game data.",
   "author": {
     "name": "Gacha Task Manager contributors"

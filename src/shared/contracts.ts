@@ -271,6 +271,8 @@ export interface SyncTargetState {
   gameId: GameId
   target: SyncIndicatorTarget
   lastSuccessAt: string | null
+  lastAttemptAt: string | null
+  status: SyncStatus
 }
 
 export interface SyncSourceResult {
@@ -312,6 +314,7 @@ export interface GachaApi {
   updateChecklistItem: (input: UpdateChecklistItemInput) => Promise<ChecklistItem>
   archiveChecklistItem: (id: string) => Promise<void>
   restoreChecklistItem: (id: string) => Promise<ChecklistItem>
+  emptyRecycleBin: (gameId: GameId) => Promise<number>
   archiveCompletedSection: (input: ArchiveCompletedSectionInput) => Promise<number>
   getSyncSettings: (gameId: GameId) => Promise<SyncSettings>
   getSyncTargetStates: (gameId: GameId) => Promise<SyncTargetState[]>

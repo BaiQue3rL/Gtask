@@ -36,6 +36,7 @@ import { createKuroCommunityPersonalAdapter } from './sync/kuro-community-client
 import { encodeKuroCommunityCredential } from './sync/kuro-community-credential'
 import { SyncOrchestrator } from './sync/orchestrator'
 import { restoreRelaunchOptions } from './relaunch'
+import { migrateLegacyAppData, resolveAppDataPaths } from './data-paths'
 import { normalizeSyncItems } from './sync/normalization'
 import { getBundledExplorationCatalog } from './sync/bundled-exploration-catalog'
 import {
@@ -85,6 +86,7 @@ let kuroCommunityCredential: KuroCommunityCredentialService | null = null
 let kuroCommunityLogin: KuroCommunityLoginService | null = null
 let appBackupDirectory: string | null = null
 let appDatabasePath: string | null = null
+let appDataRoot: string | null = null
 
 async function queueAiScheduleSync(
   gameId: GameId,
@@ -129,6 +131,11 @@ async function queueAiScheduleSync(
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : '无法创建 AI 资料任务'
+    appDatabase.recordSyncTargetAttempt(
+      gameId,
+      target,
+      bundledCatalogMerge ? 'stale' : 'error'
+    )
     sources.push({
       source: 'public_schedule',
       status: bundledCatalogMerge ? 'success' : 'error',
@@ -330,10 +337,10 @@ function createWindow(): void {
 function registerIpcHandlers(): void {
   ipcMain.handle('app:get-info', () => ({
     version: app.getVersion(),
-    dataPath: app.getPath('userData')
+    dataPath: appDataRoot ?? app.getPath('documents')
   }))
   ipcMain.handle('app:open-data-directory', async () => {
-    const message = await shell.openPath(app.getPath('userData'))
+    const message = await shell.openPath(appDataRoot ?? app.getPath('documents'))
     if (message) throw new Error(message)
   })
   ipcMain.handle('app:open-external-url', async (_event, value: unknown) => {
@@ -441,7 +448,8 @@ function registerIpcHandlers(): void {
       executablePath: process.execPath,
       mcpScriptPath: app.isPackaged
         ? join(process.resourcesPath, 'app.asar', 'out', 'main', 'local-mcp-server-cli.js')
-        : join(app.getAppPath(), 'out', 'main', 'local-mcp-server-cli.js')
+        : join(app.getAppPath(), 'out', 'main', 'local-mcp-server-cli.js'),
+      databasePath: appDatabasePath ?? join(app.getPath('documents'), 'GachaTaskManager', 'data', 'gacha-task-manager.sqlite')
     })
     await shell.openExternal(prepared.deeplink)
   })
@@ -468,6 +476,27 @@ function registerIpcHandlers(): void {
   ipcMain.handle('checklist:restore', (_event, id: unknown) => {
     if (!appDatabase) throw new Error('数据库尚未初始化')
     return appDatabase.restoreChecklistItem(parseItemId(id))
+  })
+  ipcMain.handle('checklist:empty-recycle-bin', async (_event, gameId: unknown) => {
+    if (!appDatabase) throw new Error('数据库尚未初始化')
+    const resolvedGameId = parseGameId(gameId)
+    const count = appDatabase.listArchivedChecklistItems(resolvedGameId).length
+    if (count === 0) return 0
+    const gameName = appDatabase.listGames().find((game) => game.id === resolvedGameId)?.name ?? '当前游戏'
+    const confirmationOptions = {
+      type: 'warning',
+      title: '清空回收站',
+      message: `确定永久删除${gameName}回收站中的 ${count} 个事项吗？`,
+      detail: '此操作无法撤销。',
+      buttons: ['取消', '永久删除'],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true
+    } satisfies Electron.MessageBoxOptions
+    const confirmation = mainWindow
+      ? await dialog.showMessageBox(mainWindow, confirmationOptions)
+      : await dialog.showMessageBox(confirmationOptions)
+    return confirmation.response === 1 ? appDatabase.emptyRecycleBin(resolvedGameId) : 0
   })
   ipcMain.handle('checklist:archive-completed-section', (_event, input: unknown) => {
     if (!appDatabase) throw new Error('数据库尚未初始化')
@@ -601,11 +630,14 @@ if (!app.requestSingleInstanceLock()) {
   })
 
   app.whenReady().then(async () => {
-    const databasePath = join(app.getPath('userData'), 'data', 'gacha-task-manager.sqlite')
-    const backupDirectory = join(app.getPath('userData'), 'backups')
+    const dataPaths = resolveAppDataPaths(app.getPath('documents'))
+    const databasePath = dataPaths.database
+    const backupDirectory = dataPaths.backups
+    appDataRoot = dataPaths.root
     appBackupDirectory = backupDirectory
     appDatabasePath = databasePath
     try {
+      await migrateLegacyAppData(app.getPath('userData'), dataPaths)
       await createPreMigrationBackup(databasePath, backupDirectory, CURRENT_SCHEMA_VERSION)
     } catch (error) {
       dialog.showErrorBox(
@@ -705,6 +737,7 @@ app.on('before-quit', () => {
   kuroCommunityLogin = null
   appBackupDirectory = null
   appDatabasePath = null
+  appDataRoot = null
 })
 
 function parseQrLoginSessionId(value: unknown): string {

@@ -527,6 +527,7 @@ describe('本地 MCP server', () => {
           remoteKey: 'event:miyoushe:6011',
           category: 'limited_event',
           title: '反贪「砖」家',
+          activityTags: ['经营'],
           completed: false,
           startsAt: '2026-07-20T02:00:00.000Z',
           endsAt: '2026-08-10T01:59:00.000Z',

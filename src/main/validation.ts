@@ -54,7 +54,11 @@ function parseActivityTags(value: unknown): string[] | undefined {
     if (!tag || tag.length > 20) throw new Error('活动玩法标签须为 1 到 20 个字符')
     return tag
   })
-  return [...new Set(tags)]
+  const uniqueTags = [...new Set(tags)]
+  if (uniqueTags.includes('待识别')) {
+    throw new Error('活动玩法标签不能使用“待识别”，无法确认时请使用“未知”')
+  }
+  return uniqueTags
 }
 
 function parseNullableString(value: unknown, fieldName: string): string | null | undefined {

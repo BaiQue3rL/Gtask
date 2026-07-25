@@ -21,6 +21,7 @@ interface KuroCommunityCredentialInput {
   roleId: string
   serverId: string
   roleName?: string
+  bat?: string
 }
 
 export class KuroCommunityCredentialService {
@@ -63,12 +64,13 @@ export class KuroCommunityCredentialService {
       serverId: credential.serverId,
       roleId: credential.roleId
     }, credential.token, credential.did, true)
-    if (!extractKuroBatToken(data)) {
+    const bat = extractKuroBatToken(data)
+    if (!bat) {
       throw new Error(
         `库街区未返回有效的数据令牌，凭据未保存（${describeResponseShape(data)}）`
       )
     }
-    return credential
+    return { ...credential, bat }
   }
 
   private async request(

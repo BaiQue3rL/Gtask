@@ -12,6 +12,24 @@ function response(data: unknown): Response {
 const resolveIosDevCode = async (): Promise<string> => '203.0.113.8, KuroGameBox/Test'
 
 describe('KuroCommunityClient', () => {
+  it('登录刚保存的 BAT 可直接复用，避免立刻再次申请令牌', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(response({ code: 200, data: {} }))
+      .mockResolvedValueOnce(response({ code: 200, data: { exploreList: [] } }))
+    const client = new KuroCommunityClient({
+      token: 'long-token',
+      did: 'DEVICE-ID',
+      roleId: '123456789',
+      serverId: 'server-cn',
+      bat: 'fresh-login-bat'
+    }, fetcher, undefined, undefined, resolveIosDevCode)
+
+    await expect(client.getExploration()).resolves.toEqual({ exploreList: [] })
+    expect(fetcher).toHaveBeenCalledTimes(2)
+    expect(String(fetcher.mock.calls[0][0])).toContain('/refreshData')
+    expect(new Headers(fetcher.mock.calls[0][1]?.headers).get('b-at')).toBe('fresh-login-bat')
+  })
+
   it('刷新短期 BAT 后顺序读取鸣潮探索与三类挑战', async () => {
     const fetcher = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(response({ code: 200, data: { accessToken: 'short-bat' } }))

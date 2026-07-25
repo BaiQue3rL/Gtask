@@ -12,6 +12,7 @@ export interface PrepareCodexPluginOptions {
   integrationDirectory: string
   executablePath: string
   mcpScriptPath: string
+  databasePath: string
 }
 
 export function prepareCodexPluginMarketplace(
@@ -29,7 +30,7 @@ export function prepareCodexPluginMarketplace(
     mcpServers: {
       gacha_task_manager: {
         command: options.executablePath,
-        args: [options.mcpScriptPath],
+        args: [options.mcpScriptPath, '--database', options.databasePath],
         cwd: dirname(options.executablePath),
         env: { ELECTRON_RUN_AS_NODE: '1' }
       }

@@ -100,6 +100,60 @@ describe('AppDatabase', () => {
     expect(moved.activityTags).toEqual([])
   })
 
+  it('公开资料刷新会为旧个人活动补齐玩法标签，并拒绝待识别', () => {
+    database = new AppDatabase(':memory:')
+    database.mergeSyncedItems('star-rail', 'personal_sync', [{
+      remoteKey: 'personal:event:legacy',
+      category: 'limited_event',
+      title: '旧活动',
+      startsAt: '2026-07-20T02:00:00.000Z',
+      endsAt: '2026-08-10T01:59:00.000Z'
+    }])
+    expect(database.listChecklistItems('star-rail').find((item) => item.title === '旧活动'))
+      .toMatchObject({ activityTags: [] })
+
+    database.mergeSyncedItems('star-rail', 'public_schedule', [{
+      remoteKey: 'public:event:legacy',
+      category: 'limited_event',
+      title: '旧活动',
+      activityTags: ['战斗'],
+      startsAt: '2026-07-20T02:00:00.000Z',
+      endsAt: '2026-08-10T01:59:00.000Z'
+    }])
+    expect(database.listChecklistItems('star-rail').filter((item) => item.title === '旧活动'))
+      .toEqual([expect.objectContaining({ activityTags: ['战斗'] })])
+  })
+
+  it('启动时把旧限时活动的空标签和待识别统一为未知', () => {
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-activity-tags-test-'))
+    const databasePath = join(temporaryDirectory, 'test.sqlite')
+    database = new AppDatabase(databasePath)
+    const empty = database.createChecklistItem({
+      gameId: 'genshin',
+      category: 'limited_event',
+      title: '旧空标签活动'
+    })
+    const legacy = database.createChecklistItem({
+      gameId: 'genshin',
+      category: 'limited_event',
+      title: '旧待识别活动',
+      activityTags: ['未知']
+    })
+    database.close()
+    database = null
+
+    const raw = new DatabaseSync(databasePath)
+    raw.prepare('UPDATE checklist_items SET activity_tags_json = ? WHERE id = ?')
+      .run('["待识别"]', legacy.id)
+    raw.close()
+
+    database = new AppDatabase(databasePath)
+    expect(database.listChecklistItems('genshin').find((item) => item.id === empty.id))
+      .toMatchObject({ activityTags: ['未知'] })
+    expect(database.listChecklistItems('genshin').find((item) => item.id === legacy.id))
+      .toMatchObject({ activityTags: ['未知'] })
+  })
+
   it('关闭并重新打开数据库后保留数据且迁移可重复执行', () => {
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-task-manager-test-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
@@ -228,6 +282,7 @@ describe('AppDatabase', () => {
       remoteKey: 'event:miyoushe:6011',
       category: 'limited_event' as const,
       title: '反贪「砖」家',
+      activityTags: ['经营'],
       completed: true,
       startsAt: '2026-08-01T02:00:00.000Z',
       endsAt: '2026-08-10T01:59:00.000Z',
@@ -340,25 +395,63 @@ describe('AppDatabase', () => {
   it('分别记录全局和版块同步时间', () => {
     database = new AppDatabase(':memory:')
     expect(database.getSyncTargetStates('genshin')).toEqual([
-      { gameId: 'genshin', target: 'all', lastSuccessAt: null },
-      { gameId: 'genshin', target: 'tasks', lastSuccessAt: null },
-      { gameId: 'genshin', target: 'events', lastSuccessAt: null },
-      { gameId: 'genshin', target: 'cycles', lastSuccessAt: null },
-      { gameId: 'genshin', target: 'exploration', lastSuccessAt: null }
+      { gameId: 'genshin', target: 'all', lastSuccessAt: null, lastAttemptAt: null, status: 'idle' },
+      { gameId: 'genshin', target: 'tasks', lastSuccessAt: null, lastAttemptAt: null, status: 'idle' },
+      { gameId: 'genshin', target: 'events', lastSuccessAt: null, lastAttemptAt: null, status: 'idle' },
+      { gameId: 'genshin', target: 'cycles', lastSuccessAt: null, lastAttemptAt: null, status: 'idle' },
+      { gameId: 'genshin', target: 'exploration', lastSuccessAt: null, lastAttemptAt: null, status: 'idle' }
     ])
 
     database.recordSyncTargetSuccess('genshin', 'events', new Date('2026-07-22T12:00:00.000Z'))
     expect(database.getSyncTargetStates('genshin')).toEqual(
       expect.arrayContaining([
-        { gameId: 'genshin', target: 'all', lastSuccessAt: null },
-        { gameId: 'genshin', target: 'events', lastSuccessAt: '2026-07-22T12:00:00.000Z' }
+        expect.objectContaining({ gameId: 'genshin', target: 'all', lastSuccessAt: null }),
+        expect.objectContaining({
+          gameId: 'genshin',
+          target: 'events',
+          lastSuccessAt: '2026-07-22T12:00:00.000Z',
+          lastAttemptAt: '2026-07-22T12:00:00.000Z',
+          status: 'success'
+        })
       ])
     )
+
+    database.recordSyncTargetAttempt(
+      'genshin',
+      'events',
+      'error',
+      new Date('2026-07-22T12:30:00.000Z')
+    )
+    expect(database.getSyncTargetStates('genshin')).toContainEqual(expect.objectContaining({
+      target: 'events',
+      lastSuccessAt: '2026-07-22T12:00:00.000Z',
+      lastAttemptAt: '2026-07-22T12:30:00.000Z',
+      status: 'error'
+    }))
 
     database.recordSyncTargetSuccess('genshin', 'all', new Date('2026-07-22T13:00:00.000Z'), true)
     expect(database.getSyncTargetStates('genshin').every(
       (state) => state.lastSuccessAt === '2026-07-22T13:00:00.000Z'
     )).toBe(true)
+  })
+
+  it('清空回收站仅永久删除当前游戏的已归档事项', () => {
+    database = new AppDatabase(':memory:')
+    const genshin = database.createChecklistItem({
+      gameId: 'genshin',
+      category: 'custom',
+      title: '原神回收项'
+    })
+    const starRail = database.createChecklistItem({
+      gameId: 'star-rail',
+      category: 'custom',
+      title: '星铁回收项'
+    })
+    database.archiveChecklistItem(genshin.id)
+    database.archiveChecklistItem(starRail.id)
+    expect(database.emptyRecycleBin('genshin')).toBe(1)
+    expect(database.listArchivedChecklistItems('genshin')).toEqual([])
+    expect(database.listArchivedChecklistItems('star-rail')).toHaveLength(1)
   })
 
   it('版更校时只更新时间，同版本保留状态，新版本和到期时重置任务', () => {
@@ -1340,6 +1433,7 @@ describe('AppDatabase', () => {
         remoteKey: 'event:test-public',
         category: 'limited_event',
         title: '公开活动',
+        activityTags: ['战斗'],
         startsAt: '2026-07-20T10:00:00+08:00',
         endsAt: '2026-08-01T03:59:00+08:00'
       }],
@@ -1394,6 +1488,7 @@ describe('AppDatabase', () => {
           remoteKey: 'wuthering-waves:event:test',
           category: 'limited_event',
           title: '已核验限时活动',
+          activityTags: ['战斗'],
           startsAt: '2026-07-20T10:00:00+08:00',
           endsAt: '2026-08-01T03:59:59+08:00'
         }
@@ -1413,11 +1508,11 @@ describe('AppDatabase', () => {
     })
     expect(database.getSyncTargetStates('wuthering-waves')).toEqual(
       expect.arrayContaining([
-        { gameId: 'wuthering-waves', target: 'all', lastSuccessAt: null },
-        { gameId: 'wuthering-waves', target: 'tasks', lastSuccessAt: reference.toISOString() },
-        { gameId: 'wuthering-waves', target: 'events', lastSuccessAt: reference.toISOString() },
-        { gameId: 'wuthering-waves', target: 'cycles', lastSuccessAt: null },
-        { gameId: 'wuthering-waves', target: 'exploration', lastSuccessAt: null }
+        expect.objectContaining({ gameId: 'wuthering-waves', target: 'all', lastSuccessAt: null, status: 'stale' }),
+        expect.objectContaining({ gameId: 'wuthering-waves', target: 'tasks', lastSuccessAt: reference.toISOString() }),
+        expect.objectContaining({ gameId: 'wuthering-waves', target: 'events', lastSuccessAt: reference.toISOString() }),
+        expect.objectContaining({ gameId: 'wuthering-waves', target: 'cycles', lastSuccessAt: null }),
+        expect.objectContaining({ gameId: 'wuthering-waves', target: 'exploration', lastSuccessAt: null })
       ])
     )
   })

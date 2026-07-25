@@ -46,7 +46,9 @@ pnpm release:verify
 pnpm local:mcp
 ```
 
-开发版首次启动后会在 Electron 的 `userData/data` 目录创建 `gacha-task-manager.sqlite`。
+首次启动后会在 Windows 系统“文档”目录下的
+`GachaTaskManager/data` 创建 `gacha-task-manager.sqlite`，备份位于同级
+`GachaTaskManager/backups`。路径跟随系统“文档”重定向，不假定盘符。
 
 本机通用开发依赖和缓存统一放在英文路径
 `D:\Users\Administrator\Documents\Codex Project\dev-dependencies`，当前 pnpm store 位于其

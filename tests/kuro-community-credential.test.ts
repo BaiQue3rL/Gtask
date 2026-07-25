@@ -61,6 +61,7 @@ describe('KuroCommunityCredentialService', () => {
       serverId: 'server-cn'
     })).resolves.toEqual({
       token: 'app-token',
+      bat: 'short-lived-bat',
       did: 'DEVICE-ID',
       roleId: '123456789',
       roleName: '漂泊者',

@@ -128,6 +128,7 @@ const errorMessage = ref('')
 const selectedGameId = ref<GameId>('genshin')
 const showIncompleteOnly = ref(false)
 const activityTagFilter = ref('')
+const activityTagMenuOpen = ref(false)
 const sectionSyncMenuOpen = ref<ChecklistSection | null>(null)
 const syncing = ref(false)
 const syncSettings = ref<SyncSettings | null>(null)
@@ -231,7 +232,7 @@ const personalPlatform = computed(() =>
 const incompleteCount = computed(() => items.value.filter((item) => !item.completed).length)
 const globalSyncState = computed(() => syncTargetStates.value.find((state) => state.target === 'all'))
 const needsInitialSync = computed(() =>
-  !syncSettings.value?.lastAttemptAt && !globalSyncState.value?.lastSuccessAt
+  !globalSyncState.value?.lastAttemptAt && !globalSyncState.value?.lastSuccessAt
 )
 const completedCount = computed(() => {
   const weekStart = startOfCurrentWeek()
@@ -353,6 +354,7 @@ function handleGlobalKeydown(event: KeyboardEvent): void {
     return
   }
   sectionSyncMenuOpen.value = null
+  activityTagMenuOpen.value = false
   editorOpen.value = false
   recycleBinOpen.value = false
   settingsOpen.value = false
@@ -363,6 +365,7 @@ watch(selectedGameId, () => {
   personalSyncProgress.value = null
   activeAiJob.value = null
   sectionSyncMenuOpen.value = null
+  activityTagMenuOpen.value = false
   recycleBinOpen.value = false
   activityTagFilter.value = ''
   void Promise.all([
@@ -430,6 +433,23 @@ function formatSyncTimestamp(timestamp: string): string {
     hour: '2-digit',
     minute: '2-digit'
   }).format(new Date(timestamp))
+}
+
+function syncStateTimestamp(state: SyncTargetState | undefined): string | null {
+  return state?.lastAttemptAt ?? state?.lastSuccessAt ?? null
+}
+
+function syncStateLabel(state: SyncTargetState | undefined): string {
+  if (!state || (!state.lastAttemptAt && !state.lastSuccessAt)) return '未同步'
+  if (state.status === 'success') return '已同步'
+  if (state.status === 'stale') return '部分同步'
+  if (state.status === 'error') return '同步失败'
+  if (state.status === 'verification_required') return '待验证'
+  return '同步中'
+}
+
+function syncStateClass(state: SyncTargetState | undefined): string {
+  return state?.status ?? 'idle'
 }
 
 async function loadAiScheduleAgentStatus(): Promise<void> {
@@ -985,6 +1005,15 @@ async function restoreItem(item: ChecklistItem): Promise<void> {
   }
 }
 
+async function emptyRecycleBin(): Promise<void> {
+  try {
+    const deleted = await window.gacha.emptyRecycleBin(selectedGameId.value)
+    if (deleted > 0) archivedItems.value = []
+  } catch (error) {
+    showError(error)
+  }
+}
+
 function normalizeProgress(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null
   return Math.min(100, Math.max(0, Number(value)))
@@ -1062,7 +1091,7 @@ function showError(error: unknown): void {
 </script>
 
 <template>
-  <main class="app-shell" @click="sectionSyncMenuOpen = null">
+  <main class="app-shell" @click="sectionSyncMenuOpen = null; activityTagMenuOpen = false">
     <aside class="sidebar">
       <div class="brand"><span class="brand-mark">✦</span>幻游清单</div>
       <button class="overview active" type="button"><span>▦</span>总览</button>
@@ -1118,13 +1147,13 @@ function showError(error: unknown): void {
           </button>
           <span
             class="sync-indicator"
-            :class="{ synced: Boolean(globalSyncState?.lastSuccessAt) }"
-            :title="globalSyncState?.lastSuccessAt
-              ? `最后全局同步：${new Date(globalSyncState.lastSuccessAt).toLocaleString()}`
+            :class="syncStateClass(globalSyncState)"
+            :title="syncStateTimestamp(globalSyncState)
+              ? `最后全局尝试：${new Date(syncStateTimestamp(globalSyncState)!).toLocaleString()}`
               : '尚未完成全局同步'"
           >
-            <strong>全局清单 · {{ globalSyncState?.lastSuccessAt ? '已同步' : '未同步' }}</strong>
-            <time v-if="globalSyncState?.lastSuccessAt">{{ formatSyncTimestamp(globalSyncState.lastSuccessAt) }}</time>
+            <strong>全局清单 · {{ syncStateLabel(globalSyncState) }}</strong>
+            <time v-if="syncStateTimestamp(globalSyncState)">{{ formatSyncTimestamp(syncStateTimestamp(globalSyncState)!) }}</time>
           </span>
         </div>
       </header>
@@ -1168,15 +1197,23 @@ function showError(error: unknown): void {
       </div>
       <section class="summary-grid">
         <article class="summary-card">
-          <span class="summary-icon coral">□</span>
+          <span class="summary-icon coral" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5" /></svg>
+          </span>
           <div><small>未完成</small><strong>{{ incompleteCount }}<em> 项</em></strong></div>
         </article>
         <article class="summary-card">
-          <span class="summary-icon gold">⌛</span>
+          <span class="summary-icon gold" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M7 4h10M7 20h10M8 5c0 4 4 4.2 4 7s-4 3-4 7M16 5c0 4-4 4.2-4 7s4 3 4 7" />
+            </svg>
+          </span>
           <div><small>即将到期</small><strong>{{ expiringCount }}<em> 项</em></strong></div>
         </article>
         <article class="summary-card">
-          <span class="summary-icon green">✓</span>
+          <span class="summary-icon green" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="m6.5 12.5 3.5 3.5 7.5-8" /></svg>
+          </span>
           <div><small>本周完成</small><strong>{{ completedCount }}<em> 项</em></strong></div>
         </article>
       </section>
@@ -1192,14 +1229,14 @@ function showError(error: unknown): void {
                   <span
                     v-if="panel.syncTarget"
                     class="section-sync-indicator"
-                    :class="{ synced: Boolean(syncTargetState(panel.syncTarget)?.lastSuccessAt) }"
-                    :title="syncTargetState(panel.syncTarget)?.lastSuccessAt
-                      ? `最后同步：${new Date(syncTargetState(panel.syncTarget)!.lastSuccessAt!).toLocaleString()}`
+                    :class="syncStateClass(syncTargetState(panel.syncTarget))"
+                    :title="syncStateTimestamp(syncTargetState(panel.syncTarget))
+                      ? `最后同步尝试：${new Date(syncStateTimestamp(syncTargetState(panel.syncTarget))!).toLocaleString()}`
                       : '该版块尚未同步'"
                   >
-                    {{ syncTargetState(panel.syncTarget)?.lastSuccessAt ? '已同步' : '未同步' }}
-                    <time v-if="syncTargetState(panel.syncTarget)?.lastSuccessAt">
-                      {{ formatSyncTimestamp(syncTargetState(panel.syncTarget)!.lastSuccessAt!) }}
+                    {{ syncStateLabel(syncTargetState(panel.syncTarget)) }}
+                    <time v-if="syncStateTimestamp(syncTargetState(panel.syncTarget))">
+                      {{ formatSyncTimestamp(syncStateTimestamp(syncTargetState(panel.syncTarget))!) }}
                     </time>
                   </span>
                 </div>
@@ -1251,13 +1288,42 @@ function showError(error: unknown): void {
                   {{ syncProgressCount(progressForTarget(panel.syncTarget)!) }}
                 </b>
               </div>
-              <label v-if="panel.section === 'events' && activityTagOptions.length > 0" class="activity-tag-filter">
+              <div
+                v-if="panel.section === 'events' && activityTagOptions.length > 0"
+                class="activity-tag-filter"
+                @click.stop
+              >
                 <span>玩法筛选</span>
-                <select v-model="activityTagFilter">
-                  <option value="">全部玩法</option>
-                  <option v-for="tag in activityTagOptions" :key="tag" :value="tag">{{ tag }}</option>
-                </select>
-              </label>
+                <div class="dropdown activity-filter-dropdown">
+                  <button
+                    class="activity-filter-button"
+                    type="button"
+                    aria-haspopup="menu"
+                    :aria-expanded="activityTagMenuOpen"
+                    @click="activityTagMenuOpen = !activityTagMenuOpen"
+                  >
+                    <span>{{ activityTagFilter || '全部玩法' }}</span><i>⌄</i>
+                  </button>
+                  <div v-if="activityTagMenuOpen" class="dropdown-menu activity-filter-menu" role="menu">
+                    <button
+                      role="menuitemradio"
+                      type="button"
+                      :aria-checked="activityTagFilter === ''"
+                      :class="{ selected: activityTagFilter === '' }"
+                      @click="activityTagFilter = ''; activityTagMenuOpen = false"
+                    >全部玩法</button>
+                    <button
+                      v-for="tag in activityTagOptions"
+                      :key="tag"
+                      role="menuitemradio"
+                      type="button"
+                      :aria-checked="activityTagFilter === tag"
+                      :class="{ selected: activityTagFilter === tag }"
+                      @click="activityTagFilter = tag; activityTagMenuOpen = false"
+                    >{{ tag }}</button>
+                  </div>
+                </div>
+              </div>
               <div class="item-list">
                 <div
                   v-for="item in itemsFor(panel.categories)"
@@ -1401,7 +1467,15 @@ function showError(error: unknown): void {
       <section class="editor-modal recycle-modal" role="dialog" aria-modal="true" aria-label="回收站">
         <div class="modal-header">
           <div><p class="eyebrow">{{ selectedGame?.name }}</p><h2>回收站</h2></div>
-          <button class="close-button" type="button" aria-label="关闭回收站" @click="recycleBinOpen = false">×</button>
+          <div class="recycle-header-actions">
+            <button
+              class="danger-button compact"
+              type="button"
+              :disabled="archivedItems.length === 0"
+              @click="emptyRecycleBin"
+            >清空回收站</button>
+            <button class="close-button" type="button" aria-label="关闭回收站" @click="recycleBinOpen = false">×</button>
+          </div>
         </div>
         <p class="recycle-hint">已删除事项保留在本机；远端同步不会自动恢复它们。</p>
         <div class="recycle-list">
@@ -1498,7 +1572,7 @@ function showError(error: unknown): void {
           <span>{{ appInfo?.dataPath }}</span>
           <button class="secondary-button" type="button" @click="openDataDirectory">打开目录</button>
         </div>
-        <p class="recycle-hint">数据库位于 data 子目录；backups 子目录保留最近 30 份每日备份，手动与安全备份不自动清理。</p>
+        <p class="recycle-hint">本地数据位于系统“文档”目录的 GachaTaskManager；backups 子目录保留最近 30 份每日备份，手动与安全备份不自动清理。</p>
         <div class="backup-list">
           <div v-for="backup in backups" :key="backup.fileName" class="backup-row">
             <div><strong>{{ backup.fileName }}</strong><span>{{ formatLocalTime(backup.updatedAt) }}</span></div>

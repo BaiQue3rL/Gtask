@@ -44,7 +44,11 @@ function optionalActivityTags(value: unknown): string[] | undefined {
   if (value === undefined) return undefined
   if (!Array.isArray(value) || value.length > 5) throw new Error('活动玩法标签格式不正确')
   const tags = value.map((entry) => requiredString(entry, '活动玩法标签', 20))
-  return [...new Set(tags)]
+  const uniqueTags = [...new Set(tags)]
+  if (uniqueTags.includes('待识别')) {
+    throw new Error('活动玩法标签不能使用“待识别”，无法确认时请使用“未知”')
+  }
+  return uniqueTags
 }
 
 export function normalizeSyncItem(value: unknown): NormalizedSyncItem {

@@ -61,7 +61,7 @@ const DEFAULT_GAMES: GameSummary[] = [
   }
 ]
 
-export const CURRENT_SCHEMA_VERSION = 15
+export const CURRENT_SCHEMA_VERSION = 16
 
 const AI_AGENT_MAX_AGE_MS = 5 * 60 * 1000
 const AI_JOB_PENDING_MAX_AGE_MS = 5 * 60 * 1000
@@ -145,10 +145,12 @@ export class AppDatabase {
       this.migrate()
       this.seedGames()
       this.seedQuestChecklists()
+      this.reconcileSyncTargetStates()
       this.ensureWeeklyForInitializedGames()
       this.consolidateFixedWeeklyItems()
       this.archivePersonalSectionConflicts()
       this.archiveUntimedPersonalEvents()
+      this.normalizeLegacyActivityTags()
       this.normalizeSyncedProgressSafety()
       this.normalizeWeeklySchedules()
       this.resetDueWeeklyItems()
@@ -218,16 +220,35 @@ export class AppDatabase {
 
   getSyncTargetStates(gameId: GameId): SyncTargetState[] {
     const rows = this.database.prepare(`
-      SELECT target, last_success_at AS lastSuccessAt
+      SELECT target, last_success_at AS lastSuccessAt,
+        last_attempt_at AS lastAttemptAt, status
       FROM sync_target_states
       WHERE game_id = ?
-    `).all(gameId) as Array<{ target: SyncTargetState['target']; lastSuccessAt: string }>
-    const timestamps = new Map(rows.map((row) => [row.target, row.lastSuccessAt]))
+    `).all(gameId) as Array<Omit<SyncTargetState, 'gameId'>>
+    const states = new Map(rows.map((row) => [row.target, row]))
     return (['all', 'tasks', 'events', 'cycles', 'exploration'] as const).map((target) => ({
       gameId,
       target,
-      lastSuccessAt: timestamps.get(target) ?? null
+      lastSuccessAt: states.get(target)?.lastSuccessAt ?? null,
+      lastAttemptAt: states.get(target)?.lastAttemptAt ?? null,
+      status: states.get(target)?.status ?? 'idle'
     }))
+  }
+
+  recordSyncTargetAttempt(
+    gameId: GameId,
+    target: SyncTarget,
+    status: SyncStatus = 'idle',
+    reference = new Date()
+  ): void {
+    const timestamp = reference.toISOString()
+    this.database.prepare(`
+      INSERT INTO sync_target_states(game_id, target, last_success_at, last_attempt_at, status)
+      VALUES (?, ?, NULL, ?, ?)
+      ON CONFLICT(game_id, target) DO UPDATE SET
+        last_attempt_at = excluded.last_attempt_at,
+        status = excluded.status
+    `).run(gameId, target, timestamp, status)
   }
 
   recordSyncTargetSuccess(
@@ -243,11 +264,68 @@ export class AppDatabase {
       : [target]
     const timestamp = reference.toISOString()
     const statement = this.database.prepare(`
-      INSERT INTO sync_target_states(game_id, target, last_success_at)
-      VALUES (?, ?, ?)
-      ON CONFLICT(game_id, target) DO UPDATE SET last_success_at = excluded.last_success_at
+      INSERT INTO sync_target_states(
+        game_id, target, last_success_at, last_attempt_at, status
+      ) VALUES (?, ?, ?, ?, 'success')
+      ON CONFLICT(game_id, target) DO UPDATE SET
+        last_success_at = excluded.last_success_at,
+        last_attempt_at = excluded.last_attempt_at,
+        status = 'success'
     `)
-    for (const resolvedTarget of targets) statement.run(gameId, resolvedTarget, timestamp)
+    for (const resolvedTarget of targets) {
+      statement.run(gameId, resolvedTarget, timestamp, timestamp)
+    }
+  }
+
+  private reconcileSyncTargetStates(): void {
+    const latestJobs = this.database.prepare(`
+      SELECT game_id AS gameId, target, status, requested_at AS requestedAt,
+        completed_at AS completedAt
+      FROM ai_schedule_jobs jobs
+      WHERE requested_at = (
+        SELECT MAX(candidate.requested_at)
+        FROM ai_schedule_jobs candidate
+        WHERE candidate.game_id = jobs.game_id AND candidate.target = jobs.target
+      )
+    `).all() as Array<{
+      gameId: GameId
+      target: SyncTarget
+      status: AiScheduleJob['status']
+      requestedAt: string
+      completedAt: string | null
+    }>
+    const readCurrent = this.database.prepare(`
+      SELECT last_success_at AS lastSuccessAt, last_attempt_at AS lastAttemptAt
+      FROM sync_target_states WHERE game_id = ? AND target = ?
+    `)
+    const upsert = this.database.prepare(`
+      INSERT INTO sync_target_states(
+        game_id, target, last_success_at, last_attempt_at, status
+      ) VALUES (?, ?, NULL, ?, ?)
+      ON CONFLICT(game_id, target) DO UPDATE SET
+        last_attempt_at = excluded.last_attempt_at,
+        status = excluded.status
+    `)
+    for (const job of latestJobs) {
+      const current = readCurrent.get(job.gameId, job.target) as {
+        lastSuccessAt: string | null
+        lastAttemptAt: string | null
+      } | undefined
+      const attemptTimestamp = job.completedAt ?? job.requestedAt
+      if (current?.lastAttemptAt && current.lastAttemptAt >= attemptTimestamp) continue
+      const successful = Boolean(
+        job.status === 'completed' &&
+        current?.lastSuccessAt &&
+        job.completedAt &&
+        current.lastSuccessAt >= job.completedAt
+      )
+      const status: SyncStatus = job.status === 'failed'
+        ? 'error'
+        : job.status === 'completed'
+          ? successful ? 'success' : 'stale'
+          : 'idle'
+      upsert.run(job.gameId, job.target, attemptTimestamp, status)
+    }
   }
 
   recordSyncAttempt(gameId: string, scope: SyncScope): void {
@@ -459,6 +537,12 @@ export class AppDatabase {
     if (!allowedCategories[candidate.target].includes(item.category)) {
       throw new Error('Codex 核验结果与候选版块不一致')
     }
+    if (
+      item.category === 'limited_event' &&
+      (!item.activityTags?.length || item.activityTags.includes('待识别'))
+    ) {
+      throw new Error('限时活动核验结果必须提供玩法标签；无法核实时请使用“未知”')
+    }
     return this.runTransaction(() => {
       const merge = this.mergeSyncedItems(
         candidate.gameId,
@@ -567,6 +651,7 @@ export class AppDatabase {
           message = '公开资料任务已提交给 AI，等待检索', updated_at = ?
       WHERE game_id = ?
     `).run(scope, now, now, gameId)
+    this.recordSyncTargetAttempt(gameId, target, 'idle', reference)
     return this.getAiScheduleJob(id)
   }
 
@@ -633,8 +718,8 @@ export class AppDatabase {
     if (!message.trim()) throw new Error('同步失败说明不能为空')
     const now = reference.toISOString()
     const jobs = this.database.prepare(`
-      SELECT id, game_id AS gameId FROM ai_schedule_jobs WHERE status = 'pending'
-    `).all() as Array<{ id: string; gameId: GameId }>
+      SELECT id, game_id AS gameId, target FROM ai_schedule_jobs WHERE status = 'pending'
+    `).all() as Array<{ id: string; gameId: GameId; target: SyncTarget }>
     if (jobs.length === 0) return 0
     const fail = this.database.prepare(`
       UPDATE ai_schedule_jobs
@@ -648,6 +733,7 @@ export class AppDatabase {
         const result = fail.run(now, message.trim(), now, now, job.id)
         if (result.changes > 0) {
           this.recordSyncOutcome(job.gameId, 'error', message.trim(), false, reference)
+          this.recordSyncTargetAttempt(job.gameId, job.target, 'error', reference)
         }
       }
     })
@@ -685,10 +771,10 @@ export class AppDatabase {
     const now = reference.toISOString()
     const message = 'Codex 自动处理进程未在 5 分钟内接单，本次同步已停止；请重新同步'
     const staleJobs = this.database.prepare(`
-      SELECT id, game_id AS gameId
+      SELECT id, game_id AS gameId, target
       FROM ai_schedule_jobs
       WHERE status = 'pending' AND COALESCE(progress_updated_at, requested_at) < ?
-    `).all(threshold) as Array<{ id: string; gameId: GameId }>
+    `).all(threshold) as Array<{ id: string; gameId: GameId; target: SyncTarget }>
     if (staleJobs.length === 0) return 0
 
     this.runTransaction(() => {
@@ -703,6 +789,7 @@ export class AppDatabase {
         const result = expire.run(now, message, now, now, job.id)
         if (result.changes > 0) {
           this.recordSyncOutcome(job.gameId, 'error', message, false, reference)
+          this.recordSyncTargetAttempt(job.gameId, job.target, 'error', reference)
         }
       }
     })
@@ -791,6 +878,15 @@ export class AppDatabase {
     if (invalidEventWindow) {
       throw new Error(`限时活动“${invalidEventWindow.title}”缺少带时区的完整起止时间`)
     }
+    const invalidEventTags = items.find((item) =>
+      item.category === 'limited_event' &&
+      (!item.activityTags?.length || item.activityTags.includes('待识别'))
+    )
+    if (invalidEventTags) {
+      throw new Error(
+        `限时活动“${invalidEventTags.title}”必须提供玩法标签；无法核实时请使用“未知”`
+      )
+    }
     const includesCycles = job.target === 'cycles' || items.some(
       (item) => item.category === 'weekly' || item.category === 'endgame'
     )
@@ -868,6 +964,8 @@ export class AppDatabase {
       }
       if (!partialPublicResult) {
         this.recordSyncTargetSuccess(job.gameId, 'all', reference)
+      } else {
+        this.recordSyncTargetAttempt(job.gameId, 'all', 'stale', reference)
       }
     } else {
       this.recordSyncTargetSuccess(job.gameId, job.target, reference)
@@ -886,6 +984,7 @@ export class AppDatabase {
     if (result.changes === 0) throw new Error('AI 资料任务未由当前 Agent 领取或已经结束')
     const job = this.getAiScheduleJob(jobId)
     this.recordSyncOutcome(job.gameId, 'error', message, false)
+    this.recordSyncTargetAttempt(job.gameId, job.target, 'error', reference)
     return job
   }
 
@@ -1227,6 +1326,14 @@ export class AppDatabase {
       .run(new Date().toISOString(), id)
 
     if (result.changes === 0) throw new Error('清单事项不存在或已删除')
+  }
+
+  emptyRecycleBin(gameId: GameId): number {
+    const result = this.database.prepare(`
+      DELETE FROM checklist_items
+      WHERE game_id = ? AND archived = 1
+    `).run(gameId)
+    return Number(result.changes)
   }
 
   archiveChecklistItems(ids: string[]): number {
@@ -2270,6 +2377,37 @@ export class AppDatabase {
         `)
     }
 
+    const migration16 = this.database
+      .prepare('SELECT version FROM schema_migrations WHERE version = 16')
+      .get()
+
+    if (!migration16) {
+      this.database.exec(`
+        BEGIN;
+        ALTER TABLE sync_target_states RENAME TO sync_target_states_v15;
+        CREATE TABLE sync_target_states (
+          game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+          target TEXT NOT NULL CHECK (target IN ('all', 'tasks', 'events', 'cycles', 'exploration')),
+          last_success_at TEXT,
+          last_attempt_at TEXT,
+          status TEXT NOT NULL DEFAULT 'idle'
+            CHECK (status IN ('idle', 'success', 'error', 'stale', 'verification_required')),
+          PRIMARY KEY(game_id, target)
+        );
+        INSERT INTO sync_target_states(
+          game_id, target, last_success_at, last_attempt_at, status
+        )
+          SELECT game_id, target, last_success_at, last_success_at, 'success'
+          FROM sync_target_states_v15;
+        DROP TABLE sync_target_states_v15;
+        UPDATE checklist_items
+          SET activity_tags_json = REPLACE(activity_tags_json, '"待识别"', '"未知"')
+          WHERE activity_tags_json LIKE '%"待识别"%';
+        INSERT INTO schema_migrations(version) VALUES (16);
+        COMMIT;
+      `)
+    }
+
     const versionRow = this.database
       .prepare('SELECT MAX(version) AS version FROM schema_migrations')
       .get() as { version: number | null }
@@ -2426,6 +2564,37 @@ export class AppDatabase {
         AND archived = 0
         AND (starts_at IS NULL OR ends_at IS NULL)
     `).run(new Date().toISOString())
+  }
+
+  private normalizeLegacyActivityTags(): void {
+    const rows = this.database.prepare(`
+      SELECT id, activity_tags_json AS activityTagsJson
+      FROM checklist_items
+      WHERE category = 'limited_event' AND archived = 0
+    `).all() as Array<{ id: string; activityTagsJson: string }>
+    const update = this.database.prepare(`
+      UPDATE checklist_items
+      SET activity_tags_json = ?, updated_at = ?
+      WHERE id = ? AND archived = 0
+    `)
+    const now = new Date().toISOString()
+    for (const row of rows) {
+      let parsed: unknown = []
+      try {
+        parsed = JSON.parse(row.activityTagsJson)
+      } catch {
+        // Invalid legacy values use the honest fallback below.
+      }
+      const tags = Array.isArray(parsed)
+        ? [...new Set(parsed
+            .filter((tag): tag is string => typeof tag === 'string')
+            .map((tag) => tag.trim())
+            .filter(Boolean)
+            .map((tag) => tag === '待识别' ? '未知' : tag))]
+        : []
+      const serialized = JSON.stringify(tags.length > 0 ? tags : ['未知'])
+      if (serialized !== row.activityTagsJson) update.run(serialized, now, row.id)
+    }
   }
 
   private normalizeSyncedProgressSafety(reference = new Date()): void {

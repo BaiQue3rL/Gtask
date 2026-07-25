@@ -111,6 +111,7 @@ export class SyncOrchestrator {
   async syncPersonalOnly(gameId: GameId, target: SyncTarget = 'all'): Promise<SyncResult> {
     const startedAt = new Date().toISOString()
     this.database.recordPersonalSyncAttempt(gameId)
+    this.database.recordSyncTargetAttempt(gameId, target)
     const personal = await this.syncPersonalData(gameId, target)
     const hasPendingReview = (personal.pendingReview ?? 0) > 0
     const status: SyncResult['status'] = personal.status === 'success'
@@ -129,6 +130,12 @@ export class SyncOrchestrator {
     )
     if (personal.status === 'success' && !hasPendingReview) {
       this.database.recordSyncTargetSuccess(gameId, target)
+    } else {
+      this.database.recordSyncTargetAttempt(
+        gameId,
+        target,
+        personal.status === 'verification_required' ? 'verification_required' : 'error'
+      )
     }
     return {
       gameId,

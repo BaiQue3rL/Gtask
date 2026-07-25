@@ -6,6 +6,7 @@ export interface KuroCommunityCredential {
   roleId: string
   serverId: string
   roleName?: string
+  bat?: string
 }
 
 export function encodeKuroCommunityCredential(
@@ -35,7 +36,8 @@ export function decodeKuroCommunityCredential(
     did: parsed.did,
     roleId: parsed.roleId,
     serverId: parsed.serverId,
-    roleName: parsed.roleName
+    roleName: parsed.roleName,
+    bat: parsed.bat
   })
 }
 
@@ -45,13 +47,15 @@ function normalizeCredential(value: {
   roleId: unknown
   serverId: unknown
   roleName?: unknown
+  bat?: unknown
 }): KuroCommunityCredential {
   return {
     token: requiredString(value.token, '库街区 Token'),
     did: requiredString(value.did, '库街区设备标识'),
     roleId: requiredString(value.roleId, '鸣潮特征码'),
     serverId: requiredString(value.serverId, '鸣潮服务器标识'),
-    ...(optionalString(value.roleName) && { roleName: optionalString(value.roleName)! })
+    ...(optionalString(value.roleName) && { roleName: optionalString(value.roleName)! }),
+    ...(optionalString(value.bat) && { bat: optionalString(value.bat)! })
   }
 }
 

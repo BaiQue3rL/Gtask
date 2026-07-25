@@ -16,11 +16,13 @@ describe('Codex plugin installer', () => {
     temporaryDirectories.push(integrationDirectory)
     const executablePath = 'C:\\Apps\\幻游清单\\幻游清单.exe'
     const mcpScriptPath = 'C:\\Apps\\幻游清单\\resources\\app.asar\\out\\main\\local-mcp-server-cli.js'
+    const databasePath = 'D:\\Documents\\GachaTaskManager\\data\\gacha-task-manager.sqlite'
     const prepared = prepareCodexPluginMarketplace({
       sourcePluginPath: join(process.cwd(), 'integrations', 'gacha-task-manager'),
       integrationDirectory,
       executablePath,
-      mcpScriptPath
+      mcpScriptPath,
+      databasePath
     })
 
     const marketplace = JSON.parse(readFileSync(prepared.marketplacePath, 'utf8'))
@@ -35,7 +37,7 @@ describe('Codex plugin installer', () => {
     })
     expect(mcp.mcpServers.gacha_task_manager).toEqual({
       command: executablePath,
-      args: [mcpScriptPath],
+      args: [mcpScriptPath, '--database', databasePath],
       cwd: 'C:\\Apps\\幻游清单',
       env: { ELECTRON_RUN_AS_NODE: '1' }
     })

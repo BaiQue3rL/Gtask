@@ -22,7 +22,7 @@ interface KuroEnvelope {
 }
 
 export class KuroCommunityClient {
-  private bat = ''
+  private bat: string
   private preparation: Promise<void> | null = null
 
   constructor(
@@ -32,7 +32,9 @@ export class KuroCommunityClient {
     private readonly wait: (milliseconds: number) => Promise<void> = delay,
     private readonly resolveIosDevCode: () => Promise<string> =
       () => resolveKuroIosDevCode(fetcher)
-  ) {}
+  ) {
+    this.bat = credential.bat ?? ''
+  }
 
   async getExploration(): Promise<unknown> {
     await this.prepare()
@@ -58,7 +60,7 @@ export class KuroCommunityClient {
 
   private async prepare(): Promise<void> {
     this.preparation ??= (async () => {
-      await this.refreshBat()
+      if (!this.bat) await this.refreshBat()
       await this.request('/aki/roleBox/akiBox/refreshData', this.roleBody(), {
         includeBat: true,
         retryBat: true
