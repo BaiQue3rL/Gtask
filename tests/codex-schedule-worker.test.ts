@@ -123,6 +123,7 @@ describe('Codex schedule worker', () => {
   it('starts up to four uniquely identified workers for parallel game jobs', () => {
     const children: FakeChildProcess[] = []
     const prompts: string[] = []
+    const stoppedAgents: string[] = []
     const spawnProcess = ((_command: string, args: readonly string[] = []) => {
       const child = new FakeChildProcess()
       children.push(child)
@@ -132,7 +133,10 @@ describe('Codex schedule worker', () => {
     const pool = new CodexScheduleWorkerPool({
       workingDirectory: 'C:\\GachaData',
       findExecutable: () => 'C:\\Codex\\codex.exe',
-      spawnProcess
+      spawnProcess,
+      onEvent: (event) => {
+        if (event.phase === 'stopped') stoppedAgents.push(event.agentId)
+      }
     })
 
     expect(pool.ensureCapacity(4)).toMatchObject({
@@ -151,5 +155,17 @@ describe('Codex schedule worker', () => {
         prompt.includes(codexScheduleWorkerAgentId(slot))
       )).toBe(true)
     }
+
+    children[0].exitCode = 1
+    children[0].emit('exit', 1)
+    expect(stoppedAgents).toEqual([codexScheduleWorkerAgentId(1)])
+    expect(pool.runningCount).toBe(3)
+    expect(children.slice(1, 4).every((child) => child.exitCode === null)).toBe(true)
+    expect(pool.ensureCapacity(4)).toMatchObject({
+      status: 'started',
+      started: 1,
+      running: 4
+    })
+    expect(children).toHaveLength(5)
   })
 })

@@ -230,7 +230,9 @@ const personalPlatform = computed(() =>
 )
 const incompleteCount = computed(() => items.value.filter((item) => !item.completed).length)
 const globalSyncState = computed(() => syncTargetStates.value.find((state) => state.target === 'all'))
-const needsInitialSync = computed(() => !globalSyncState.value?.lastSuccessAt)
+const needsInitialSync = computed(() =>
+  !syncSettings.value?.lastAttemptAt && !globalSyncState.value?.lastSuccessAt
+)
 const completedCount = computed(() => {
   const weekStart = startOfCurrentWeek()
   return items.value.filter((item) => item.completedAt && new Date(item.completedAt) >= weekStart).length

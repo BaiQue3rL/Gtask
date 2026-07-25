@@ -1353,6 +1353,75 @@ describe('AppDatabase', () => {
     expect(database.getSyncSettings('zenless').lastSuccessAt).not.toBeNull()
   })
 
+  it('全局同步允许已核验版块部分成功且不把地图缺口扩大为整单失败', () => {
+    database = new AppDatabase(':memory:')
+    const reference = new Date('2026-07-25T12:00:00.000Z')
+    database.registerAiScheduleAgent('agent-partial-all', '部分同步 Agent', reference)
+    const queued = database.createAiScheduleJob(
+      'wuthering-waves',
+      'public_schedule',
+      reference,
+      false,
+      'all'
+    )
+    database.claimAiScheduleJob('agent-partial-all', reference)
+
+    const result = database.applyAiScheduleJob(
+      queued.id,
+      'agent-partial-all',
+      [
+        {
+          remoteKey: 'version:wuthering-waves:main',
+          category: 'main_quest',
+          title: '主线任务',
+          startsAt: '2026-07-02T10:00:00+08:00',
+          endsAt: '2026-08-13T05:59:59+08:00',
+          periodKey: 'wuthering-waves:version:3.5',
+          scheduleKind: 'fixed_window',
+          timeZone: 'Asia/Shanghai'
+        },
+        {
+          remoteKey: 'version:wuthering-waves:side',
+          category: 'side_quest',
+          title: '支线任务',
+          startsAt: '2026-07-02T10:00:00+08:00',
+          endsAt: '2026-08-13T05:59:59+08:00',
+          periodKey: 'wuthering-waves:version:3.5',
+          scheduleKind: 'fixed_window',
+          timeZone: 'Asia/Shanghai'
+        },
+        {
+          remoteKey: 'wuthering-waves:event:test',
+          category: 'limited_event',
+          title: '已核验限时活动',
+          startsAt: '2026-07-20T10:00:00+08:00',
+          endsAt: '2026-08-01T03:59:59+08:00'
+        }
+      ],
+      [],
+      reference
+    )
+
+    expect(result.job).toMatchObject({
+      status: 'completed',
+      message: expect.stringContaining('部分同步完成')
+    })
+    expect(database.getSyncSettings('wuthering-waves')).toMatchObject({
+      status: 'stale',
+      lastSuccessAt: null,
+      message: expect.stringContaining('本次未更新周期事项、地图探索')
+    })
+    expect(database.getSyncTargetStates('wuthering-waves')).toEqual(
+      expect.arrayContaining([
+        { gameId: 'wuthering-waves', target: 'all', lastSuccessAt: null },
+        { gameId: 'wuthering-waves', target: 'tasks', lastSuccessAt: reference.toISOString() },
+        { gameId: 'wuthering-waves', target: 'events', lastSuccessAt: reference.toISOString() },
+        { gameId: 'wuthering-waves', target: 'cycles', lastSuccessAt: null },
+        { gameId: 'wuthering-waves', target: 'exploration', lastSuccessAt: null }
+      ])
+    )
+  })
+
   it('版块同步任务拒绝跨版块回写', () => {
     database = new AppDatabase(':memory:')
     database.registerAiScheduleAgent('agent-section', '版块测试 Agent')

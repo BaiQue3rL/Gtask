@@ -791,7 +791,9 @@ export class AppDatabase {
     if (invalidEventWindow) {
       throw new Error(`限时活动“${invalidEventWindow.title}”缺少带时区的完整起止时间`)
     }
-    const includesCycles = job.target === 'all' || job.target === 'cycles'
+    const includesCycles = job.target === 'cycles' || items.some(
+      (item) => item.category === 'weekly' || item.category === 'endgame'
+    )
     if (includesCycles) {
       const requiredModes = REQUIRED_ENDGAME_MODES[job.gameId]
       const submittedModes = new Set(items
@@ -809,11 +811,34 @@ export class AppDatabase {
           remoteKey: `weekly:${job.gameId}`,
           category: 'weekly' as const,
           title: '周常'
-        }]
+      }]
       : items
+    const coveredTargets: Exclude<SyncTarget, 'all'>[] = job.target === 'all'
+      ? [
+          ...(versionItems.length > 0 ? ['tasks' as const] : []),
+          ...(items.some((item) => item.category === 'limited_event') ? ['events' as const] : []),
+          ...(includesCycles ? ['cycles' as const] : []),
+          ...(items.some((item) => item.category === 'exploration') ? ['exploration' as const] : [])
+        ]
+      : [job.target]
+    const allSectionTargets = ['tasks', 'events', 'cycles', 'exploration'] as const
+    const missingTargets = job.target === 'all'
+      ? allSectionTargets.filter((target) => !coveredTargets.includes(target))
+      : []
     const merge = this.mergeSyncedItems(job.gameId, 'public_schedule', mergedItems, reference.toISOString())
     const now = reference.toISOString()
-    const message = `AI 资料同步完成：新增 ${merge.added}，更新 ${merge.updated}，保护 ${merge.preserved}`
+    const targetNames: Record<Exclude<SyncTarget, 'all'>, string> = {
+      tasks: '任务',
+      events: '活动',
+      cycles: '周期事项',
+      exploration: '地图探索'
+    }
+    const mergeMessage = `新增 ${merge.added}，更新 ${merge.updated}，保护 ${merge.preserved}`
+    const message = missingTargets.length > 0
+      ? `AI 资料部分同步完成：${mergeMessage}；本次未更新${missingTargets.map(
+          (target) => targetNames[target]
+        ).join('、')}`
+      : `AI 资料同步完成：${mergeMessage}`
     this.database.prepare(`
       UPDATE ai_schedule_jobs
       SET status = 'completed', completed_at = ?, evidence_json = ?, message = ?,
@@ -825,16 +850,28 @@ export class AppDatabase {
     const current = this.getSyncSettings(job.gameId)
     const personalIssue = job.scope === 'public_and_personal' &&
       ['error', 'stale', 'verification_required'].includes(current.status)
+    const partialPublicResult = job.target === 'all' && missingTargets.length > 0
     const finalStatus = personalIssue
       ? current.status === 'verification_required'
         ? 'verification_required'
         : 'stale'
-      : 'success'
+      : partialPublicResult
+        ? 'stale'
+        : 'success'
     const finalMessage = personalIssue && current.message
       ? `${message}；${current.message}`
       : message
-    this.recordSyncOutcome(job.gameId, finalStatus, finalMessage, true)
-    this.recordSyncTargetSuccess(job.gameId, job.target, reference, true)
+    this.recordSyncOutcome(job.gameId, finalStatus, finalMessage, !partialPublicResult)
+    if (job.target === 'all') {
+      for (const coveredTarget of coveredTargets) {
+        this.recordSyncTargetSuccess(job.gameId, coveredTarget, reference)
+      }
+      if (!partialPublicResult) {
+        this.recordSyncTargetSuccess(job.gameId, 'all', reference)
+      }
+    } else {
+      this.recordSyncTargetSuccess(job.gameId, job.target, reference)
+    }
     return { job: this.getAiScheduleJob(jobId), merge }
   }
 
