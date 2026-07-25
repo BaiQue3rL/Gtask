@@ -529,7 +529,7 @@ export class AppDatabase {
   ): AiScheduleJob {
     const agent = this.getAiScheduleAgentStatus(reference)
     if (!agent.connected && !allowWithoutAgent) {
-      throw new Error('尚未连接具备联网搜索能力的 AI 资料 Agent')
+      throw new Error('Codex 自动同步尚未就绪：尚未连接可用的本地 Agent')
     }
     this.requeueStaleAiScheduleJobs(reference)
     const active = this.database.prepare(`
@@ -559,7 +559,7 @@ export class AppDatabase {
         id, game_id, scope, target, user_timezone, status, requested_at,
         progress_phase, progress_updated_at, message, updated_at
       ) VALUES (?, ?, ?, ?, ?, 'pending', ?, 'queued', ?,
-        '等待 Codex 接单', ?)
+        '正在启动本机 Codex', ?)
     `).run(id, gameId, scope, target, userTimeZone, now, now, now)
     this.database.prepare(`
       UPDATE sync_states
@@ -603,10 +603,87 @@ export class AppDatabase {
     return row ? this.getAiScheduleJob(row.id) : null
   }
 
+  updatePendingAiScheduleJobsMessage(
+    message: string,
+    current: number | null = null,
+    total: number | null = null,
+    reference = new Date()
+  ): number {
+    if (!message.trim()) throw new Error('同步进度说明不能为空')
+    if (current !== null && (!Number.isInteger(current) || current < 0)) {
+      throw new Error('同步进度当前值格式不正确')
+    }
+    if (total !== null && (!Number.isInteger(total) || total < 1)) {
+      throw new Error('同步进度总数格式不正确')
+    }
+    if (current !== null && total !== null && current > total) {
+      throw new Error('同步进度当前值不能超过总数')
+    }
+    const now = reference.toISOString()
+    const result = this.database.prepare(`
+      UPDATE ai_schedule_jobs
+      SET progress_phase = 'queued', progress_current = ?, progress_total = ?,
+          progress_updated_at = ?, message = ?, updated_at = ?
+      WHERE status = 'pending'
+    `).run(current, total, now, message.trim(), now)
+    return Number(result.changes)
+  }
+
+  failPendingAiScheduleJobs(message: string, reference = new Date()): number {
+    if (!message.trim()) throw new Error('同步失败说明不能为空')
+    const now = reference.toISOString()
+    const jobs = this.database.prepare(`
+      SELECT id, game_id AS gameId FROM ai_schedule_jobs WHERE status = 'pending'
+    `).all() as Array<{ id: string; gameId: GameId }>
+    if (jobs.length === 0) return 0
+    const fail = this.database.prepare(`
+      UPDATE ai_schedule_jobs
+      SET status = 'failed', completed_at = ?, message = ?,
+          progress_phase = 'failed', progress_current = NULL,
+          progress_total = NULL, progress_updated_at = ?, updated_at = ?
+      WHERE id = ? AND status = 'pending'
+    `)
+    this.runTransaction(() => {
+      for (const job of jobs) {
+        const result = fail.run(now, message.trim(), now, now, job.id)
+        if (result.changes > 0) {
+          this.recordSyncOutcome(job.gameId, 'error', message.trim(), false, reference)
+        }
+      }
+    })
+    return jobs.length
+  }
+
+  failClaimedAiScheduleJobsByAgent(
+    agentId: string,
+    message: string,
+    reference = new Date()
+  ): number {
+    if (!message.trim()) throw new Error('同步失败说明不能为空')
+    const jobs = this.database.prepare(`
+      SELECT id FROM ai_schedule_jobs WHERE status = 'claimed' AND agent_id = ?
+    `).all(agentId) as Array<{ id: string }>
+    for (const job of jobs) this.failAiScheduleJob(job.id, agentId, message.trim(), reference)
+    return jobs.length
+  }
+
+  requeueClaimedAiScheduleJobsByAgent(agentId: string, reference = new Date()): number {
+    const now = reference.toISOString()
+    const result = this.database.prepare(`
+      UPDATE ai_schedule_jobs
+      SET status = 'pending', agent_id = NULL, claimed_at = NULL,
+          progress_phase = 'queued', progress_current = NULL, progress_total = NULL,
+          progress_updated_at = ?, message = '应用已关闭，任务将在下次启动后继续',
+          updated_at = ?
+      WHERE status = 'claimed' AND agent_id = ?
+    `).run(now, now, agentId)
+    return Number(result.changes)
+  }
+
   expireUnclaimedAiScheduleJobs(reference = new Date()): number {
     const threshold = new Date(reference.getTime() - AI_JOB_PENDING_MAX_AGE_MS).toISOString()
     const now = reference.toISOString()
-    const message = 'Codex 未在 5 分钟内接单，本次同步已停止；请打开 Codex 后重新同步'
+    const message = 'Codex 自动处理进程未在 5 分钟内接单，本次同步已停止；请重新同步'
     const staleJobs = this.database.prepare(`
       SELECT id, game_id AS gameId
       FROM ai_schedule_jobs

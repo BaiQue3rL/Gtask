@@ -1103,7 +1103,7 @@ describe('AppDatabase', () => {
       progressPhase: 'queued',
       progressCurrent: null,
       progressTotal: null,
-      message: '等待 Codex 接单'
+      message: '正在启动本机 Codex'
     })
     expect(database.getActiveAiScheduleJob('genshin')?.id).toBe(queued.id)
 
@@ -1194,6 +1194,56 @@ describe('AppDatabase', () => {
       new Date('2026-07-24T10:20:00.002Z')
     )).toEqual({ requeued: 0, expired: 1 })
     expect(database.getActiveAiScheduleJob('genshin')).toBeNull()
+  })
+
+  it('Codex 自动启动和连接重试会刷新等待进度及超时计时', () => {
+    database = new AppDatabase(':memory:')
+    const startedAt = new Date('2026-07-24T10:00:00.000Z')
+    database.createAiScheduleJob(
+      'star-rail',
+      'public_schedule',
+      startedAt,
+      true,
+      'tasks'
+    )
+    database.updatePendingAiScheduleJobsMessage(
+      'Codex 正在连接模型，重试 2/5',
+      2,
+      5,
+      new Date('2026-07-24T10:04:00.000Z')
+    )
+
+    expect(database.getActiveAiScheduleJob('star-rail')).toMatchObject({
+      status: 'pending',
+      progressPhase: 'queued',
+      progressCurrent: 2,
+      progressTotal: 5,
+      message: 'Codex 正在连接模型，重试 2/5'
+    })
+    expect(database.maintainAiScheduleJobs(
+      new Date('2026-07-24T10:08:00.000Z')
+    )).toEqual({ requeued: 0, expired: 0 })
+  })
+
+  it('应用关闭时只把后台 Codex 领取的任务立即放回队列', () => {
+    database = new AppDatabase(':memory:')
+    const startedAt = new Date('2026-07-24T10:00:00.000Z')
+    database.registerAiScheduleAgent('gacha-app-background-worker', '后台 Codex', startedAt)
+    database.createAiScheduleJob('zenless', 'public_schedule', startedAt, false, 'events')
+    database.claimAiScheduleJob('gacha-app-background-worker', startedAt)
+
+    expect(database.requeueClaimedAiScheduleJobsByAgent(
+      'another-agent',
+      new Date('2026-07-24T10:01:00.000Z')
+    )).toBe(0)
+    expect(database.requeueClaimedAiScheduleJobsByAgent(
+      'gacha-app-background-worker',
+      new Date('2026-07-24T10:01:00.000Z')
+    )).toBe(1)
+    expect(database.getActiveAiScheduleJob('zenless')).toMatchObject({
+      status: 'pending',
+      message: '应用已关闭，任务将在下次启动后继续'
+    })
   })
 
   it('持续上报进度的 Codex 任务不会按最初接单时间误判超时', () => {

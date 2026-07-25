@@ -12,6 +12,11 @@ import {
 import { CredentialVault, removeRetiredDeepSeekCredential } from './credential-vault'
 import { detectCodexPlugin } from './ai/codex-plugin'
 import { prepareCodexPluginMarketplace } from './ai/codex-plugin-installer'
+import {
+  CODEX_SCHEDULE_WORKER_AGENT_ID,
+  CodexScheduleWorker,
+  type CodexScheduleWorkerEvent
+} from './ai/codex-schedule-worker'
 import { MiyousheQrLoginService } from './auth/miyoushe-qr-login'
 import { solveMiyousheGeetest } from './auth/miyoushe-geetest-window'
 import { KuroCommunityCredentialService } from './auth/kuro-community-credential'
@@ -72,6 +77,7 @@ let periodTimer: ReturnType<typeof setInterval> | null = null
 let externalChangeTimer: ReturnType<typeof setInterval> | null = null
 let aiJobProgressTimer: ReturnType<typeof setInterval> | null = null
 const aiJobProgressSignatures = new Map<GameId, string>()
+let codexScheduleWorker: CodexScheduleWorker | null = null
 let credentialVault: CredentialVault | null = null
 let miyousheQrLogin: MiyousheQrLoginService | null = null
 let kuroCommunityCredential: KuroCommunityCredentialService | null = null
@@ -96,12 +102,20 @@ async function queueAiScheduleSync(
     : null
   try {
     const plugin = detectCodexPlugin()
-    const agent = appDatabase.getAiScheduleAgentStatus()
     const job = appDatabase.createAiScheduleJob(gameId, scope, new Date(), plugin.installed, target)
-    sendAiJobProgress(job)
-    const publicMessage = agent.connected
-      ? `已提交给 ${agent.name ?? 'AI 资料 Agent'}，等待联网检索和交叉验证（任务 ${job.id.slice(0, 8)}）`
-      : `已排队（任务 ${job.id.slice(0, 8)}）；请在 Codex 打开“幻游清单”插件并运行 $sync-gacha-schedules`
+    const launch = codexScheduleWorker?.start() ?? {
+      status: 'unavailable' as const,
+      message: 'Codex 自动处理服务尚未初始化',
+      executablePath: null
+    }
+    if (launch.status === 'unavailable') {
+      appDatabase.failPendingAiScheduleJobs(launch.message)
+      throw new Error(launch.message)
+    }
+    appDatabase.updatePendingAiScheduleJobsMessage(launch.message)
+    const activeJob = appDatabase.getActiveAiScheduleJob(gameId) ?? job
+    sendAiJobProgress(activeJob)
+    const publicMessage = `${launch.message}（任务 ${job.id.slice(0, 8)}）`
     const catalogMessage = bundledCatalogMerge
       ? `基础地图目录已同步（新增 ${bundledCatalogMerge.added}，更新 ${bundledCatalogMerge.updated}）；`
       : ''
@@ -174,6 +188,45 @@ async function queueAiScheduleSync(
   }
 }
 
+function handleCodexScheduleWorkerEvent(event: CodexScheduleWorkerEvent): void {
+  if (!appDatabase) return
+  if (event.phase === 'stopped') {
+    const message =
+      event.exitCode === 0 && event.message === 'Codex 自动处理进程已结束'
+        ? 'Codex 自动进程已结束，但仍有同步任务未完成；请重新同步'
+        : event.message
+    const failed =
+      appDatabase.failPendingAiScheduleJobs(message) +
+      appDatabase.failClaimedAiScheduleJobsByAgent(
+        CODEX_SCHEDULE_WORKER_AGENT_ID,
+        message
+      )
+    if (failed > 0) mainWindow?.webContents.send('checklist:changed')
+    return
+  }
+  const changed = appDatabase.updatePendingAiScheduleJobsMessage(
+    event.message,
+    event.current ?? null,
+    event.total ?? null
+  )
+  if (changed > 0) pollAiJobProgress()
+}
+
+function startCodexWorkerForPendingJobs(): void {
+  if (!appDatabase || !codexScheduleWorker) return
+  const hasPending = SUPPORTED_GAME_IDS.some(
+    (gameId) => appDatabase?.getActiveAiScheduleJob(gameId)?.status === 'pending'
+  )
+  if (!hasPending) return
+  const launch = codexScheduleWorker.start()
+  if (launch.status === 'unavailable') {
+    appDatabase.failPendingAiScheduleJobs(launch.message)
+    mainWindow?.webContents.send('checklist:changed')
+  } else {
+    appDatabase.updatePendingAiScheduleJobsMessage(launch.message)
+  }
+}
+
 function toAiJobProgress(job: AiScheduleJob): SyncProgressUpdate {
   return {
     gameId: job.gameId,
@@ -181,7 +234,7 @@ function toAiJobProgress(job: AiScheduleJob): SyncProgressUpdate {
     source: 'public_schedule',
     phase: job.progressPhase,
     status: job.status === 'pending' ? 'waiting' : 'running',
-    message: job.message ?? (job.status === 'pending' ? '等待 Codex 接单' : 'Codex 正在处理'),
+    message: job.message ?? (job.status === 'pending' ? '正在启动本机 Codex' : 'Codex 正在处理'),
     current: job.progressCurrent,
     total: job.progressTotal,
     updatedAt: job.progressUpdatedAt
@@ -587,6 +640,10 @@ if (!app.requestSingleInstanceLock()) {
     } catch (error) {
       console.error('创建或整理每日数据库备份失败', error)
     }
+    codexScheduleWorker = new CodexScheduleWorker({
+      workingDirectory: app.getPath('userData'),
+      onEvent: handleCodexScheduleWorkerEvent
+    })
     syncOrchestrator = createAppSyncOrchestrator(appDatabase)
     registerIpcHandlers()
     createWindow()
@@ -606,6 +663,7 @@ if (!app.requestSingleInstanceLock()) {
     }, 2_000)
     pollAiJobProgress()
     aiJobProgressTimer = setInterval(pollAiJobProgress, 2_000)
+    startCodexWorkerForPendingJobs()
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -625,6 +683,9 @@ app.on('before-quit', () => {
   if (aiJobProgressTimer) clearInterval(aiJobProgressTimer)
   aiJobProgressTimer = null
   aiJobProgressSignatures.clear()
+  appDatabase?.requeueClaimedAiScheduleJobsByAgent(CODEX_SCHEDULE_WORKER_AGENT_ID)
+  codexScheduleWorker?.stop()
+  codexScheduleWorker = null
   appDatabase?.close()
   appDatabase = null
   syncOrchestrator = null

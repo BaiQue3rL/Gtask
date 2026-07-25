@@ -449,7 +449,7 @@ async function loadActiveAiJob(): Promise<void> {
 }
 
 const syncProgressPhaseLabels: Record<SyncProgressUpdate['phase'], string> = {
-  queued: '等待接单',
+  queued: '启动 Codex',
   fetching: '读取数据',
   searching: '联网检索',
   verifying: '交叉核验',
@@ -508,13 +508,20 @@ function syncProgressMessage(progress: SyncProgressUpdate): string {
   ) {
     return progress.message
   }
+  if (
+    progress.message &&
+    progress.message !== '等待 Codex 接单' &&
+    !progress.message.includes('已提交给 AI')
+  ) {
+    return progress.message
+  }
   const waitingMs = clockNow.value - new Date(progress.updatedAt).getTime()
   if (progress.message.includes('重新排队')) {
     return '上次处理长时间没有进度，已重新排队等待 Codex 接单'
   }
-  if (waitingMs < 10_000) return '同步任务已提交，正在等待 Codex 接单'
-  if (waitingMs < 60_000) return 'Codex 尚未接单；请打开 Codex 中的“幻游清单”插件'
-  return '等待接单时间较长；请打开 Codex 接单，5 分钟后仍未接单将自动停止'
+  if (waitingMs < 10_000) return '同步任务已提交，正在启动本机 Codex'
+  if (waitingMs < 60_000) return '本机 Codex 正在启动并连接同步插件'
+  return 'Codex 启动时间较长，仍在自动重试；5 分钟后仍未接单将自动停止'
 }
 
 function progressForTarget(target: SyncTarget): SyncProgressUpdate | null {
@@ -1101,7 +1108,7 @@ function showError(error: unknown): void {
             :title="aiScheduleAgent?.connected
               ? `已连接 ${aiScheduleAgent.name}`
               : aiScheduleAgent?.codexPluginInstalled
-                ? '已安装 Codex 插件；点击后在 Codex 处理资料任务'
+                ? '已安装 Codex 插件；点击后将自动启动 Codex 处理资料任务'
                 : '刷新清单需要连接 Codex/MCP'"
             @click="runSync('public_schedule')"
           >
@@ -1152,20 +1159,10 @@ function showError(error: unknown): void {
                 : syncProgressAge(progress) }}
             </small>
           </div>
-          <button
-            v-if="progress.source === 'public_schedule' && activeAiJob?.status === 'pending' && aiScheduleAgent?.codexPluginInstalled"
-            type="button"
-            @click="openCodexPlugin"
-          >打开 Codex 接单</button>
         </article>
       </div>
       <div v-else-if="syncNotice" class="sync-banner" :class="syncNotice.status" aria-live="polite">
         <span>{{ syncNotice.message }}</span>
-        <button
-          v-if="aiScheduleAgent?.codexPluginInstalled && !aiScheduleAgent?.connected && syncNotice.status === 'partial' && !activeAiJob"
-          type="button"
-          @click="openCodexPlugin"
-        >打开 Codex 处理</button>
       </div>
       <section class="summary-grid">
         <article class="summary-card">
@@ -1446,17 +1443,18 @@ function showError(error: unknown): void {
               <span>{{ aiScheduleAgent?.connected
                 ? `Agent 已连接 · ${aiScheduleAgent.name}`
                 : aiScheduleAgent?.codexPluginInstalled
-                  ? '已安装 · 可先排队再由 Codex 领取'
+                  ? '已安装 · 同步时将自动启动 Codex'
                   : '未安装或未启用' }}</span>
             </div>
             <button
+              v-if="!aiScheduleAgent?.codexPluginInstalled"
               class="secondary-button"
               type="button"
               @click="openCodexPlugin"
-            >{{ aiScheduleAgent?.codexPluginInstalled ? '打开 Codex' : '安装 / 启用' }}</button>
+            >安装 / 启用</button>
           </div>
         </div>
-        <p class="recycle-hint">公开资料统一由 Codex/MCP 联网检索、交叉验证并结构化回写。首次点击“安装 / 启用”会打开本机插件页，由 Codex 完成安装；应用不会直接修改 Codex 缓存。</p>
+        <p class="recycle-hint">公开资料统一由 Codex/MCP 联网检索、交叉验证并结构化回写。插件启用后，点击同步会自动启动本机 Codex，无需再手动接单。</p>
         <h3 class="settings-heading data-heading">登录凭据</h3>
         <p class="recycle-hint">登录完全可选。凭据仅通过 Windows 安全存储加密后保存在本机，不读取浏览器 Cookie。</p>
         <div class="recycle-list">
