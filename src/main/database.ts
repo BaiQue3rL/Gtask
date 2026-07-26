@@ -7,6 +7,7 @@ import type {
   ChecklistCategory,
   ChecklistItem,
   ChecklistSource,
+  ActivityTagEnrichmentTarget,
   AiScheduleAgentStatus,
   AiScheduleJob,
   CreateChecklistItemInput,
@@ -24,7 +25,12 @@ import type {
   SyncStatus,
   UpdateChecklistItemInput
 } from '../shared/contracts'
-import type { NormalizedSyncItem, SemanticReviewDraft, SyncMergeResult } from './sync/types'
+import type {
+  ActivityTagUpdate,
+  NormalizedSyncItem,
+  SemanticReviewDraft,
+  SyncMergeResult
+} from './sync/types'
 
 const DEFAULT_GAMES: GameSummary[] = [
   {
@@ -105,6 +111,10 @@ function eventTitlesEquivalent(left: string, right: string): boolean {
   if (normalizedLeft === normalizedRight) return true
   if (Math.min(normalizedLeft.length, normalizedRight.length) < 6) return false
   return normalizedLeft.includes(normalizedRight) || normalizedRight.includes(normalizedLeft)
+}
+
+function activityTagsNeedReview(tags: string[]): boolean {
+  return tags.length === 0 || tags.some((tag) => tag === '待识别' || tag === '未知')
 }
 
 function isPersonalSectionConflict(gameId: GameId, item: NormalizedSyncItem): boolean {
@@ -844,7 +854,8 @@ export class AppDatabase {
     agentId: string,
     items: NormalizedSyncItem[],
     evidence: unknown,
-    reference = new Date()
+    reference = new Date(),
+    activityTagUpdates: ActivityTagUpdate[] = []
   ): { job: AiScheduleJob; merge: SyncMergeResult } {
     const job = this.getAiScheduleJob(jobId)
     if (job.status !== 'claimed' || job.agentId !== agentId) {
@@ -888,6 +899,54 @@ export class AppDatabase {
         `限时活动“${invalidEventTags.title}”必须提供玩法标签；无法核实时请使用“未知”`
       )
     }
+    const requiredTagTargets = job.activityTagTargets
+    if (requiredTagTargets.length > 0 || activityTagUpdates.length > 0) {
+      if (job.target !== 'events' && job.target !== 'all') {
+        throw new Error('当前任务不允许回写活动玩法标签')
+      }
+      const requiredById = new Map(requiredTagTargets.map((target) => [target.itemId, target]))
+      const submittedIds = new Set<string>()
+      for (const update of activityTagUpdates) {
+        const target = requiredById.get(update.itemId)
+        if (!target) throw new Error(`活动标签回写目标“${update.title}”不在本次待补全清单中`)
+        if (submittedIds.has(update.itemId)) throw new Error(`活动“${update.title}”重复提交标签`)
+        submittedIds.add(update.itemId)
+        if (update.title !== target.title) throw new Error(`活动标签回写目标“${update.title}”已经变化`)
+        if (!Array.isArray(update.activityTags) || update.activityTags.length === 0 ||
+          update.activityTags.length > 5) {
+          throw new Error(`活动“${update.title}”必须提供 1 到 5 个玩法标签`)
+        }
+        const tags = [...new Set(update.activityTags.map((tag) => tag.trim()).filter(Boolean))]
+        if (tags.length !== update.activityTags.length || tags.some((tag) => tag.length > 20)) {
+          throw new Error(`活动“${update.title}”的玩法标签格式不正确`)
+        }
+        if (tags.includes('待识别')) throw new Error('活动玩法标签不能使用“待识别”')
+        if (tags.includes('未知') && tags.length !== 1) {
+          throw new Error(`活动“${update.title}”的“未知”不能与其他玩法标签同时使用`)
+        }
+        if (tags.includes('未知') && (!update.unresolvedReason || update.unresolvedReason.trim().length < 8)) {
+          throw new Error(`活动“${update.title}”使用“未知”时必须说明交叉核验后仍无法确认的原因`)
+        }
+        if (!Number.isFinite(update.confidence) || update.confidence < 0.9 || update.confidence > 1) {
+          throw new Error(`活动“${update.title}”的标签核验置信度不足`)
+        }
+        try {
+          const url = new URL(update.sourceUrl)
+          if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error()
+        } catch {
+          throw new Error(`活动“${update.title}”缺少有效的标签核验来源`)
+        }
+      }
+      const missingTargets = requiredTagTargets.filter((target) => !submittedIds.has(target.itemId))
+      if (missingTargets.length > 0) {
+        throw new Error(
+          `活动标签补全遗漏 ${missingTargets.length} 项：${missingTargets
+            .slice(0, 6)
+            .map((target) => target.title)
+            .join('、')}${missingTargets.length > 6 ? '等' : ''}`
+        )
+      }
+    }
     const includesCycles = job.target === 'cycles' || items.some(
       (item) => item.category === 'weekly' || item.category === 'endgame'
     )
@@ -913,7 +972,10 @@ export class AppDatabase {
     const coveredTargets: Exclude<SyncTarget, 'all'>[] = job.target === 'all'
       ? [
           ...(versionItems.length > 0 ? ['tasks' as const] : []),
-          ...(items.some((item) => item.category === 'limited_event') ? ['events' as const] : []),
+          ...(items.some((item) => item.category === 'limited_event') ||
+            activityTagUpdates.length > 0
+            ? ['events' as const]
+            : []),
           ...(includesCycles ? ['cycles' as const] : []),
           ...(items.some((item) => item.category === 'exploration') ? ['exploration' as const] : [])
         ]
@@ -922,20 +984,55 @@ export class AppDatabase {
     const missingTargets = job.target === 'all'
       ? allSectionTargets.filter((target) => !coveredTargets.includes(target))
       : []
-    const merge = this.mergeSyncedItems(job.gameId, 'public_schedule', mergedItems, reference.toISOString())
     const now = reference.toISOString()
+    const merge = this.runTransaction(() => {
+      const result = this.mergeSyncedItems(
+        job.gameId,
+        'public_schedule',
+        mergedItems,
+        now,
+        false
+      )
+      const updateTags = this.database.prepare(`
+        UPDATE checklist_items
+        SET activity_tags_json = ?,
+            source_url = COALESCE(source_url, ?),
+            last_synced_at = ?,
+            updated_at = ?
+        WHERE id = ? AND game_id = ? AND category = 'limited_event' AND archived = 0
+      `)
+      for (const update of activityTagUpdates) {
+        const result = updateTags.run(
+          JSON.stringify(update.activityTags),
+          update.sourceUrl,
+          now,
+          now,
+          update.itemId,
+          job.gameId
+        )
+        if (result.changes !== 1) throw new Error(`活动“${update.title}”已不存在，无法补全标签`)
+      }
+      return result
+    })
+    const unresolvedActivityCount = (job.target === 'events' || job.target === 'all')
+      ? this.listActivityTagEnrichmentTargets(job.gameId, now).length
+      : 0
     const targetNames: Record<Exclude<SyncTarget, 'all'>, string> = {
       tasks: '任务',
       events: '活动',
       cycles: '周期事项',
       exploration: '地图探索'
     }
-    const mergeMessage = `新增 ${merge.added}，更新 ${merge.updated}，保护 ${merge.preserved}`
+    const tagMessage = activityTagUpdates.length > 0 ? `，补全标签 ${activityTagUpdates.length}` : ''
+    const unresolvedMessage = unresolvedActivityCount > 0
+      ? `；仍有 ${unresolvedActivityCount} 项活动经本轮核验后暂为未知`
+      : ''
+    const mergeMessage = `新增 ${merge.added}，更新 ${merge.updated}${tagMessage}，保护 ${merge.preserved}`
     const message = missingTargets.length > 0
       ? `AI 资料部分同步完成：${mergeMessage}；本次未更新${missingTargets.map(
           (target) => targetNames[target]
-        ).join('、')}`
-      : `AI 资料同步完成：${mergeMessage}`
+        ).join('、')}${unresolvedMessage}`
+      : `AI 资料同步完成：${mergeMessage}${unresolvedMessage}`
     this.database.prepare(`
       UPDATE ai_schedule_jobs
       SET status = 'completed', completed_at = ?, evidence_json = ?, message = ?,
@@ -948,26 +1045,38 @@ export class AppDatabase {
     const personalIssue = job.scope === 'public_and_personal' &&
       ['error', 'stale', 'verification_required'].includes(current.status)
     const partialPublicResult = job.target === 'all' && missingTargets.length > 0
+    const partialActivityTags = unresolvedActivityCount > 0
     const finalStatus = personalIssue
       ? current.status === 'verification_required'
         ? 'verification_required'
         : 'stale'
-      : partialPublicResult
+      : partialPublicResult || partialActivityTags
         ? 'stale'
         : 'success'
     const finalMessage = personalIssue && current.message
       ? `${message}；${current.message}`
       : message
-    this.recordSyncOutcome(job.gameId, finalStatus, finalMessage, !partialPublicResult)
+    this.recordSyncOutcome(
+      job.gameId,
+      finalStatus,
+      finalMessage,
+      !partialPublicResult && !partialActivityTags
+    )
     if (job.target === 'all') {
       for (const coveredTarget of coveredTargets) {
-        this.recordSyncTargetSuccess(job.gameId, coveredTarget, reference)
+        if (coveredTarget === 'events' && partialActivityTags) {
+          this.recordSyncTargetAttempt(job.gameId, coveredTarget, 'stale', reference)
+        } else {
+          this.recordSyncTargetSuccess(job.gameId, coveredTarget, reference)
+        }
       }
-      if (!partialPublicResult) {
+      if (!partialPublicResult && !partialActivityTags) {
         this.recordSyncTargetSuccess(job.gameId, 'all', reference)
       } else {
         this.recordSyncTargetAttempt(job.gameId, 'all', 'stale', reference)
       }
+    } else if (job.target === 'events' && partialActivityTags) {
+      this.recordSyncTargetAttempt(job.gameId, job.target, 'stale', reference)
     } else {
       this.recordSyncTargetSuccess(job.gameId, job.target, reference)
     }
@@ -1003,9 +1112,45 @@ export class AppDatabase {
       FROM ai_schedule_jobs j
       LEFT JOIN ai_schedule_agents a ON a.id = j.agent_id
       WHERE j.id = ?
-    `).get(id) as AiScheduleJob | undefined
+    `).get(id) as Omit<AiScheduleJob, 'activityTagTargets'> | undefined
     if (!row) throw new Error('AI 资料任务不存在')
-    return row
+    const activityTagTargets = (
+      row.status === 'pending' || row.status === 'claimed'
+    ) && (row.target === 'events' || row.target === 'all')
+      ? this.listActivityTagEnrichmentTargets(row.gameId, row.requestedAt)
+      : []
+    return { ...row, activityTagTargets }
+  }
+
+  private listActivityTagEnrichmentTargets(
+    gameId: GameId,
+    reference: string
+  ): ActivityTagEnrichmentTarget[] {
+    const rows = this.database.prepare(`
+      SELECT id AS itemId, title, activity_tags_json AS activityTagsJson,
+        source, remote_key AS remoteKey, source_url AS sourceUrl,
+        starts_at AS startsAt, ends_at AS endsAt
+      FROM checklist_items
+      WHERE game_id = ?
+        AND category = 'limited_event'
+        AND archived = 0
+        AND (ends_at IS NULL OR julianday(ends_at) > julianday(?))
+      ORDER BY COALESCE(starts_at, created_at), created_at
+    `).all(gameId, reference) as Array<
+      Omit<ActivityTagEnrichmentTarget, 'currentTags'> & { activityTagsJson: string }
+    >
+    return rows.flatMap(({ activityTagsJson, ...row }) => {
+      let tags: string[] = []
+      try {
+        const parsed = JSON.parse(activityTagsJson)
+        if (Array.isArray(parsed)) {
+          tags = parsed.filter((tag): tag is string => typeof tag === 'string')
+        }
+      } catch {
+        // Invalid legacy values are deliberately treated as requiring review.
+      }
+      return activityTagsNeedReview(tags) ? [{ ...row, currentTags: tags }] : []
+    })
   }
 
   private requeueStaleAiScheduleJobs(reference: Date): number {

@@ -121,6 +121,17 @@ export interface AiScheduleAgentStatus {
   lastSeenAt: string | null
 }
 
+export interface ActivityTagEnrichmentTarget {
+  itemId: string
+  title: string
+  currentTags: string[]
+  source: ChecklistSource
+  remoteKey: string | null
+  sourceUrl: string | null
+  startsAt: string | null
+  endsAt: string | null
+}
+
 export interface AiScheduleJob {
   id: string
   gameId: GameId
@@ -138,6 +149,7 @@ export interface AiScheduleJob {
   progressCurrent: number | null
   progressTotal: number | null
   progressUpdatedAt: string
+  activityTagTargets: ActivityTagEnrichmentTarget[]
 }
 
 export type SemanticReviewStatus = 'pending' | 'claimed' | 'approved' | 'rejected'

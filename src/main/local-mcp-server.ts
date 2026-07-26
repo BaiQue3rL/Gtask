@@ -10,7 +10,7 @@ import {
 import type { AppDatabase } from './database'
 import { listBackups } from './backup'
 import { LocalCommandService, type LocalCommandResult } from './local-command-service'
-import type { NormalizedSyncItem } from './sync/types'
+import type { ActivityTagUpdate, NormalizedSyncItem } from './sync/types'
 
 const gameIdSchema = z.enum(SUPPORTED_GAME_IDS)
 const categorySchema = z.enum(CHECKLIST_CATEGORIES)
@@ -466,7 +466,15 @@ export function createLocalMcpServer(
           recurrenceRule: recurrenceRuleSchema,
           sourceUrl: httpUrlSchema,
           confidence: z.number().min(0).max(1)
-        }).strict()).min(1).max(200),
+        }).strict()).max(200),
+        activityTagUpdates: z.array(z.object({
+          itemId: z.string().min(1).max(100),
+          title: chineseScheduleTitleSchema,
+          activityTags: z.array(z.string().min(1).max(20)).min(1).max(5),
+          sourceUrl: httpUrlSchema,
+          confidence: z.number().min(0.9).max(1),
+          unresolvedReason: z.string().min(8).max(500).nullable().optional()
+        }).strict()).max(100).optional(),
         evidence: z.array(z.object({
           url: httpUrlSchema,
           platform: z.string().min(1).max(100),
@@ -479,14 +487,22 @@ export function createLocalMcpServer(
       },
       annotations: { destructiveHint: false, openWorldHint: true }
     },
-    async ({ agentId, jobId, retrievedAt, items, evidence }) => {
+    async ({ agentId, jobId, retrievedAt, items, activityTagUpdates, evidence }) => {
       try {
+        if (items.length === 0 && (activityTagUpdates?.length ?? 0) === 0) {
+          throw new Error('公开资料提交必须包含排期事项或活动标签补全结果')
+        }
         const chineseEvidenceUrls = new Set(
           evidence.filter((entry) => entry.language === 'zh-CN').map((entry) => entry.url)
         )
         for (const item of items) {
           if (!chineseEvidenceUrls.has(item.titleSourceUrl)) {
             throw new Error(`“${item.title}”缺少对应的中文名称来源证据`)
+          }
+        }
+        for (const update of activityTagUpdates ?? []) {
+          if (!chineseEvidenceUrls.has(update.sourceUrl)) {
+            throw new Error(`“${update.title}”缺少对应的中文玩法分类来源证据`)
           }
         }
         const normalizedItems: NormalizedSyncItem[] = items.map(({
@@ -502,7 +518,9 @@ export function createLocalMcpServer(
           jobId,
           agentId,
           normalizedItems,
-          { retrievedAt, evidence: normalizedEvidence }
+          { retrievedAt, evidence: normalizedEvidence },
+          new Date(),
+          (activityTagUpdates ?? []) as ActivityTagUpdate[]
         )
         return toolResult({ command: 'apply_public_schedule', ...result })
       } catch (error) {

@@ -343,6 +343,95 @@ describe('本地 MCP server', () => {
     expect(database!.listChecklistItems('genshin').some((item) => item.remoteKey === 'event:no-timezone')).toBe(false)
   })
 
+  it('活动任务通过 MCP 明示全部旧标签目标并支持安全的标签专用回写', async () => {
+    const connected = await connect()
+    database!.mergeSyncedItems('star-rail', 'personal_sync', [{
+      remoteKey: 'personal:event:mcp-enrichment',
+      category: 'limited_event',
+      title: '巡星之礼',
+      startsAt: '2026-07-20T00:00:00.000Z',
+      endsAt: '2026-08-20T00:00:00.000Z'
+    }])
+    await connected.callTool({
+      name: 'register_gacha_schedule_agent',
+      arguments: { agentId: 'tag-mcp-agent', name: '标签 MCP Agent', webSearch: true }
+    })
+    const queued = database!.createAiScheduleJob(
+      'star-rail',
+      'public_schedule',
+      new Date('2026-07-26T00:00:00.000Z'),
+      false,
+      'events'
+    )
+    const claimed = await connected.callTool({
+      name: 'claim_gacha_schedule_job',
+      arguments: { agentId: 'tag-mcp-agent' }
+    })
+    const target = (
+      claimed.structuredContent as {
+        job: { activityTagTargets: Array<{ itemId: string; title: string }> }
+      }
+    ).job.activityTagTargets[0]
+    expect(target).toMatchObject({ title: '巡星之礼' })
+
+    const omitted = await connected.callTool({
+      name: 'apply_gacha_public_schedule',
+      arguments: {
+        agentId: 'tag-mcp-agent',
+        jobId: queued.id,
+        retrievedAt: '2026-07-26T00:10:00.000Z',
+        items: [{
+          remoteKey: 'public:event:new',
+          category: 'limited_event',
+          title: '本轮新活动',
+          titleSourceUrl: 'https://example.com/cn/new-event',
+          activityTags: ['战斗'],
+          startsAt: '2026-07-26T10:00:00+08:00',
+          endsAt: '2026-08-10T03:59:00+08:00',
+          sourceUrl: 'https://example.com/cn/new-event',
+          confidence: 0.98
+        }],
+        evidence: [{
+          url: 'https://example.com/cn/new-event',
+          platform: '官方平台',
+          publisher: '官方账号',
+          official: true,
+          language: 'zh-CN'
+        }]
+      }
+    })
+    expect(omitted.isError).toBe(true)
+    expect(database!.listChecklistItems('star-rail').some((item) => item.title === '本轮新活动'))
+      .toBe(false)
+
+    const applied = await connected.callTool({
+      name: 'apply_gacha_public_schedule',
+      arguments: {
+        agentId: 'tag-mcp-agent',
+        jobId: queued.id,
+        retrievedAt: '2026-07-26T00:12:00.000Z',
+        items: [],
+        activityTagUpdates: [{
+          itemId: target.itemId,
+          title: target.title,
+          activityTags: ['签到'],
+          sourceUrl: 'https://example.com/cn/check-in',
+          confidence: 0.99
+        }],
+        evidence: [{
+          url: 'https://example.com/cn/check-in',
+          platform: '官方平台',
+          publisher: '官方账号',
+          official: true,
+          language: 'zh-CN'
+        }]
+      }
+    })
+    expect(applied.isError).not.toBe(true)
+    expect(database!.listChecklistItems('star-rail').find((item) => item.title === '巡星之礼'))
+      .toMatchObject({ activityTags: ['签到'], source: 'personal_sync' })
+  })
+
   it('公开资料 MCP 接受地图区域目录并以 0% 初始化', async () => {
     const connected = await connect()
     await connected.callTool({

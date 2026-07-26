@@ -124,6 +124,190 @@ describe('AppDatabase', () => {
       .toEqual([expect.objectContaining({ activityTags: ['战斗'] })])
   })
 
+  it('四款游戏的活动同步都会把有效未知活动列为强制标签补全目标', () => {
+    database = new AppDatabase(':memory:')
+    const reference = new Date('2026-07-26T00:00:00.000Z')
+    database.registerAiScheduleAgent('tag-target-agent', '标签补全 Agent', reference)
+
+    for (const gameId of ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const) {
+      database.mergeSyncedItems(gameId, 'personal_sync', [
+        {
+          remoteKey: `${gameId}:active-unknown`,
+          category: 'limited_event',
+          title: `${gameId} 有效未知活动`,
+          startsAt: '2026-07-20T00:00:00.000Z',
+          endsAt: '2026-08-20T00:00:00.000Z'
+        },
+        {
+          remoteKey: `${gameId}:expired-unknown`,
+          category: 'limited_event',
+          title: `${gameId} 已过期未知活动`,
+          startsAt: '2026-06-01T00:00:00.000Z',
+          endsAt: '2026-06-20T00:00:00.000Z'
+        },
+        {
+          remoteKey: `${gameId}:classified`,
+          category: 'limited_event',
+          title: `${gameId} 已分类活动`,
+          activityTags: ['战斗'],
+          startsAt: '2026-07-20T00:00:00.000Z',
+          endsAt: '2026-08-20T00:00:00.000Z'
+        }
+      ])
+      const queued = database.createAiScheduleJob(
+        gameId,
+        'public_schedule',
+        reference,
+        false,
+        'events'
+      )
+      const claimed = database.claimAiScheduleJob('tag-target-agent', reference)!
+      expect(claimed.id).toBe(queued.id)
+      expect(claimed.activityTagTargets.map((target) => target.title)).toEqual([
+        `${gameId} 有效未知活动`
+      ])
+      database.failAiScheduleJob(queued.id, 'tag-target-agent', '测试结束', reference)
+    }
+  })
+
+  it('活动同步遗漏任一旧活动标签时拒绝整次提交且不产生部分写入', () => {
+    database = new AppDatabase(':memory:')
+    const reference = new Date('2026-07-26T00:00:00.000Z')
+    database.mergeSyncedItems('star-rail', 'personal_sync', [{
+      remoteKey: 'personal:event:must-enrich',
+      category: 'limited_event',
+      title: '必须补全的旧活动',
+      startsAt: '2026-07-20T00:00:00.000Z',
+      endsAt: '2026-08-20T00:00:00.000Z'
+    }])
+    database.registerAiScheduleAgent('tag-coverage-agent', '标签覆盖 Agent', reference)
+    const queued = database.createAiScheduleJob(
+      'star-rail',
+      'public_schedule',
+      reference,
+      false,
+      'events'
+    )
+    database.claimAiScheduleJob('tag-coverage-agent', reference)
+
+    expect(() => database!.applyAiScheduleJob(
+      queued.id,
+      'tag-coverage-agent',
+      [{
+        remoteKey: 'public:event:new',
+        category: 'limited_event',
+        title: '本轮新增活动',
+        activityTags: ['签到'],
+        startsAt: '2026-07-26T10:00:00+08:00',
+        endsAt: '2026-08-10T03:59:00+08:00'
+      }],
+      [],
+      reference
+    )).toThrow('活动标签补全遗漏 1 项：必须补全的旧活动')
+    expect(database.listChecklistItems('star-rail').some((item) => item.title === '本轮新增活动'))
+      .toBe(false)
+  })
+
+  it('标签专用回写只修改玩法标签并保留个人活动的时间、来源和完成状态', () => {
+    database = new AppDatabase(':memory:')
+    const reference = new Date('2026-07-26T00:00:00.000Z')
+    database.mergeSyncedItems('star-rail', 'personal_sync', [{
+      remoteKey: 'personal:event:tag-only',
+      category: 'limited_event',
+      title: '标签专用回写活动',
+      completed: true,
+      startsAt: '2026-07-20T00:00:00.000Z',
+      endsAt: '2026-08-20T00:00:00.000Z'
+    }], reference.toISOString())
+    const before = database.listChecklistItems('star-rail')
+      .find((item) => item.title === '标签专用回写活动')!
+    database.registerAiScheduleAgent('tag-only-agent', '标签专用 Agent', reference)
+    const queued = database.createAiScheduleJob(
+      'star-rail',
+      'public_schedule',
+      reference,
+      false,
+      'events'
+    )
+    const target = database.claimAiScheduleJob('tag-only-agent', reference)!.activityTagTargets[0]
+
+    const result = database.applyAiScheduleJob(
+      queued.id,
+      'tag-only-agent',
+      [],
+      [],
+      reference,
+      [{
+        itemId: target.itemId,
+        title: target.title,
+        activityTags: ['签到'],
+        sourceUrl: 'https://example.com/cn/tag-proof',
+        confidence: 0.98
+      }]
+    )
+
+    const after = database.listChecklistItems('star-rail')
+      .find((item) => item.id === before.id)!
+    expect(after).toMatchObject({
+      activityTags: ['签到'],
+      source: 'personal_sync',
+      remoteKey: before.remoteKey,
+      startsAt: before.startsAt,
+      endsAt: before.endsAt,
+      completed: true
+    })
+    expect(result.job).toMatchObject({ status: 'completed' })
+    expect(database.getSyncSettings('star-rail')).toMatchObject({ status: 'success' })
+  })
+
+  it('确实无法确认的活动允许写未知但同步明确标为部分完成并在下次重试', () => {
+    database = new AppDatabase(':memory:')
+    const reference = new Date('2026-07-26T00:00:00.000Z')
+    database.mergeSyncedItems('zenless', 'personal_sync', [{
+      remoteKey: 'personal:event:unresolved',
+      category: 'limited_event',
+      title: '资料不足的活动',
+      startsAt: '2026-07-20T00:00:00.000Z',
+      endsAt: '2026-08-20T00:00:00.000Z'
+    }])
+    database.registerAiScheduleAgent('unresolved-tag-agent', '未知标签 Agent', reference)
+    const queued = database.createAiScheduleJob(
+      'zenless',
+      'public_schedule',
+      reference,
+      false,
+      'events'
+    )
+    const target = database.claimAiScheduleJob('unresolved-tag-agent', reference)!.activityTagTargets[0]
+
+    const result = database.applyAiScheduleJob(
+      queued.id,
+      'unresolved-tag-agent',
+      [],
+      [],
+      reference,
+      [{
+        itemId: target.itemId,
+        title: target.title,
+        activityTags: ['未知'],
+        sourceUrl: 'https://example.com/cn/unresolved',
+        confidence: 0.95,
+        unresolvedReason: '已交叉检索官方公告和中文社区，但均未公布具体玩法'
+      }]
+    )
+
+    expect(result.job.message).toContain('仍有 1 项活动经本轮核验后暂为未知')
+    expect(database.getSyncSettings('zenless')).toMatchObject({ status: 'stale' })
+    const next = database.createAiScheduleJob(
+      'zenless',
+      'public_schedule',
+      new Date('2026-07-27T00:00:00.000Z'),
+      true,
+      'events'
+    )
+    expect(next.activityTagTargets.map((entry) => entry.title)).toEqual(['资料不足的活动'])
+  })
+
   it('启动时把旧限时活动的空标签和待识别统一为未知', () => {
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-activity-tags-test-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')

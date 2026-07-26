@@ -34,6 +34,15 @@ export interface SyncMergeResult {
   preserved: number
 }
 
+export interface ActivityTagUpdate {
+  itemId: string
+  title: string
+  activityTags: string[]
+  sourceUrl: string
+  confidence: number
+  unresolvedReason?: string | null
+}
+
 export interface SemanticReviewDraft {
   target: Exclude<SyncTarget, 'all' | 'tasks'>
   kind: string
