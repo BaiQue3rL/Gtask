@@ -677,6 +677,208 @@ describe('AppDatabase', () => {
     })
   })
 
+  it('四款游戏同一期挑战即使远端键和周期键格式变化也只保留一项', () => {
+    database = new AppDatabase(':memory:')
+    const gameIds = ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const
+
+    for (const gameId of gameIds) {
+      const modeKey = `mode-${gameId}`
+      const startsAt = '2026-07-20T04:00:00+08:00'
+      const endsAt = '2026-08-17T03:59:00+08:00'
+      database.mergeSyncedItems(gameId, 'public_schedule', [{
+        remoteKey: `${gameId}:endgame:first-key`,
+        category: 'endgame',
+        title: `${gameId} 周期挑战`,
+        modeKey,
+        periodKey: '2026-07-20',
+        startsAt,
+        endsAt
+      }])
+      const original = database.listChecklistItems(gameId)
+        .find((item) => item.modeKey === modeKey)!
+      database.updateChecklistItem({ id: original.id, completed: true })
+
+      expect(database.mergeSyncedItems(gameId, 'public_schedule', [{
+        remoteKey: `${gameId}:endgame:renamed-key`,
+        category: 'endgame',
+        title: `${gameId} 周期挑战`,
+        modeKey,
+        periodKey: '2026-07-20_2026-08-17',
+        startsAt,
+        endsAt
+      }])).toEqual({ added: 0, updated: 1, preserved: 0 })
+
+      expect(database.listChecklistItems(gameId)
+        .filter((item) => item.modeKey === modeKey)).toEqual([
+        expect.objectContaining({
+          id: original.id,
+          periodKey: '2026-07-20_2026-08-17',
+          completed: true,
+          manualCompletionLocked: true
+        })
+      ])
+    }
+  })
+
+  it('四款游戏的活动、地图、周常和固定任务不会因远端键变化产生重复项', () => {
+    database = new AppDatabase(':memory:')
+    const gameIds = ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const
+
+    for (const gameId of gameIds) {
+      const eventTitle = `${gameId} 同步活动`
+      const startsAt = '2026-07-20T04:00:00+08:00'
+      const endsAt = '2026-08-17T03:59:00+08:00'
+      database.mergeSyncedItems(gameId, 'public_schedule', [{
+        remoteKey: `${gameId}:event:first-key`,
+        category: 'limited_event',
+        title: eventTitle,
+        activityTags: ['战斗'],
+        startsAt,
+        endsAt
+      }])
+      database.mergeSyncedItems(gameId, 'public_schedule', [{
+        remoteKey: `${gameId}:event:renamed-key`,
+        category: 'limited_event',
+        title: eventTitle,
+        activityTags: ['战斗'],
+        startsAt,
+        endsAt
+      }])
+
+      const regionTitle = `${gameId} 测试区域`
+      database.mergeSyncedItems(gameId, 'public_schedule', [{
+        remoteKey: `${gameId}:region:first-key`,
+        category: 'exploration',
+        title: regionTitle,
+        modeKey: `${gameId}:region:first-mode`
+      }])
+      database.mergeSyncedItems(gameId, 'public_schedule', [{
+        remoteKey: `${gameId}:region:renamed-key`,
+        category: 'exploration',
+        title: regionTitle,
+        modeKey: `${gameId}:region:renamed-mode`
+      }])
+
+      database.mergeSyncedItems(gameId, 'public_schedule', [{
+        remoteKey: `${gameId}:weekly:first-key`,
+        category: 'weekly',
+        title: '任意周常名称'
+      }])
+      database.mergeSyncedItems(gameId, 'public_schedule', [{
+        remoteKey: `${gameId}:weekly:renamed-key`,
+        category: 'weekly',
+        title: '另一个周常名称'
+      }])
+
+      const items = database.listChecklistItems(gameId)
+      expect(items.filter((item) => item.title === eventTitle)).toHaveLength(1)
+      expect(items.filter((item) => item.title === regionTitle)).toHaveLength(1)
+      expect(items.filter((item) => item.category === 'weekly')).toHaveLength(1)
+      expect(items.filter((item) => item.category === 'main_quest')).toHaveLength(1)
+      expect(items.filter((item) => item.category === 'side_quest')).toHaveLength(1)
+    }
+  })
+
+  it('启动时自动归并各游戏历史遗留的同一期挑战重复项并保留完成状态', () => {
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-endgame-duplicate-cleanup-'))
+    const databasePath = join(temporaryDirectory, 'test.sqlite')
+    database = new AppDatabase(databasePath)
+    database.close()
+    database = null
+
+    const raw = new DatabaseSync(databasePath)
+    const insert = raw.prepare(`
+      INSERT INTO checklist_items(
+        id, game_id, category, title, completed, starts_at, ends_at,
+        period_key, mode_key, source, remote_key, manual_completion_locked,
+        completed_at, last_synced_at, created_at, updated_at
+      ) VALUES (?, ?, 'endgame', ?, ?, ?, ?, ?, ?, 'public_schedule', ?, ?, ?, ?, ?, ?)
+    `)
+    const gameIds = ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const
+    for (const gameId of gameIds) {
+      insert.run(
+        `${gameId}:duplicate:pending`,
+        gameId,
+        `${gameId} 历史挑战`,
+        0,
+        '2026-07-20T04:00:00+08:00',
+        '2026-08-17T03:59:00+08:00',
+        '2026-07-20_2026-08-17',
+        `${gameId}:historical-mode`,
+        `${gameId}:new-key`,
+        0,
+        null,
+        '2026-07-25T13:49:00.000Z',
+        '2026-07-25T13:49:00.000Z',
+        '2026-07-25T13:49:00.000Z'
+      )
+      insert.run(
+        `${gameId}:duplicate:completed`,
+        gameId,
+        `${gameId} 历史挑战`,
+        1,
+        '2026-07-20T04:00:00+08:00',
+        '2026-08-17T03:59:00+08:00',
+        '2026-07-20',
+        `${gameId}:historical-mode`,
+        `${gameId}:old-key`,
+        1,
+        '2026-07-25T13:40:00.000Z',
+        '2026-07-25T13:40:00.000Z',
+        '2026-07-25T13:40:00.000Z',
+        '2026-07-25T13:40:00.000Z'
+      )
+    }
+    insert.run(
+      'zenless:separate-period:first',
+      'zenless',
+      '绝区零 独立历史期',
+      1,
+      '2026-06-01T04:00:00+08:00',
+      '2026-06-15T03:59:00+08:00',
+      '2026-06-a',
+      'zenless:separate-period-mode',
+      'zenless:stable-mode-key:first',
+      1,
+      '2026-06-10T00:00:00.000Z',
+      '2026-06-10T00:00:00.000Z',
+      '2026-06-01T00:00:00.000Z',
+      '2026-06-10T00:00:00.000Z'
+    )
+    insert.run(
+      'zenless:separate-period:second',
+      'zenless',
+      '绝区零 独立历史期',
+      0,
+      '2026-06-15T04:00:00+08:00',
+      '2026-07-01T03:59:00+08:00',
+      '2026-06-b',
+      'zenless:separate-period-mode',
+      'zenless:stable-mode-key:second',
+      0,
+      null,
+      '2026-06-20T00:00:00.000Z',
+      '2026-06-15T00:00:00.000Z',
+      '2026-06-20T00:00:00.000Z'
+    )
+    raw.close()
+
+    database = new AppDatabase(databasePath)
+    for (const gameId of gameIds) {
+      expect(database.listChecklistItems(gameId)
+        .filter((item) => item.modeKey === `${gameId}:historical-mode`)).toEqual([
+        expect.objectContaining({
+          completed: true,
+          manualCompletionLocked: true
+        })
+      ])
+      expect(database.listArchivedChecklistItems(gameId)
+        .filter((item) => item.modeKey === `${gameId}:historical-mode`)).toHaveLength(1)
+    }
+    expect(database.listChecklistItems('zenless')
+      .filter((item) => item.modeKey === 'zenless:separate-period-mode')).toHaveLength(2)
+  })
+
   it('个人活动按中文名和重叠时间回填公开排期且不产生重复项', () => {
     database = new AppDatabase(':memory:')
     database.mergeSyncedItems('star-rail', 'public_schedule', [{

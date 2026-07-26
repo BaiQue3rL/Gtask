@@ -148,6 +148,7 @@ export class AppDatabase {
       this.reconcileSyncTargetStates()
       this.ensureWeeklyForInitializedGames()
       this.consolidateFixedWeeklyItems()
+      this.consolidateEquivalentSyncedEndgameItems()
       this.archivePersonalSectionConflicts()
       this.archiveUntimedPersonalEvents()
       this.normalizeLegacyActivityTags()
@@ -1730,6 +1731,11 @@ export class AppDatabase {
           AND (
             (remote_key = ? AND period_key IS ?)
             OR (? IS NOT NULL AND mode_key = ? AND period_key IS ?)
+            OR (? IS NOT NULL AND mode_key = ?
+              AND starts_at IS NOT NULL AND ends_at IS NOT NULL
+              AND ? IS NOT NULL AND ? IS NOT NULL
+              AND julianday(starts_at) < julianday(?)
+              AND julianday(ends_at) > julianday(?))
             OR (? IS NOT NULL AND mode_key = ? AND source = 'personal_sync'
               AND starts_at IS NOT NULL AND ends_at IS NOT NULL
               AND julianday(starts_at) <= julianday(?)
@@ -1747,6 +1753,12 @@ export class AppDatabase {
         item.modeKey ?? null,
         item.modeKey ?? null,
         item.periodKey ?? null,
+        item.modeKey ?? null,
+        item.modeKey ?? null,
+        item.startsAt ?? null,
+        item.endsAt ?? null,
+        item.endsAt ?? null,
+        item.startsAt ?? null,
         item.modeKey ?? null,
         item.modeKey ?? null,
         syncedAt,
@@ -2533,6 +2545,135 @@ export class AppDatabase {
         AND archived = 0
         AND id <> game_id || ':weekly'
     `).run(now)
+  }
+
+  private consolidateEquivalentSyncedEndgameItems(): void {
+    type EndgameIdentityRow = {
+      id: string
+      gameId: GameId
+      title: string
+      completed: number
+      manualCompletionLocked: number
+      completedAt: string | null
+      startsAt: string | null
+      endsAt: string | null
+      periodKey: string | null
+      modeKey: string | null
+      source: ChecklistSource
+      remoteKey: string | null
+      lastSyncedAt: string | null
+      updatedAt: string
+    }
+
+    const rows = this.database.prepare(`
+      SELECT id,
+        game_id AS gameId,
+        title,
+        completed,
+        manual_completion_locked AS manualCompletionLocked,
+        completed_at AS completedAt,
+        starts_at AS startsAt,
+        ends_at AS endsAt,
+        period_key AS periodKey,
+        mode_key AS modeKey,
+        source,
+        remote_key AS remoteKey,
+        last_synced_at AS lastSyncedAt,
+        updated_at AS updatedAt
+      FROM checklist_items
+      WHERE category = 'endgame'
+        AND source <> 'manual'
+        AND archived = 0
+    `).all() as EndgameIdentityRow[]
+    if (rows.length < 2) return
+
+    const parents = rows.map((_, index) => index)
+    const find = (index: number): number => {
+      while (parents[index] !== index) {
+        parents[index] = parents[parents[index]]
+        index = parents[index]
+      }
+      return index
+    }
+    const union = (left: number, right: number): void => {
+      const leftRoot = find(left)
+      const rightRoot = find(right)
+      if (leftRoot !== rightRoot) parents[rightRoot] = leftRoot
+    }
+    const windowsOverlap = (left: EndgameIdentityRow, right: EndgameIdentityRow): boolean => {
+      if (!left.startsAt || !left.endsAt || !right.startsAt || !right.endsAt) return false
+      return Date.parse(left.startsAt) < Date.parse(right.endsAt) &&
+        Date.parse(left.endsAt) > Date.parse(right.startsAt)
+    }
+    const equivalent = (left: EndgameIdentityRow, right: EndgameIdentityRow): boolean => {
+      if (left.gameId !== right.gameId) return false
+      const sameMode = Boolean(left.modeKey && right.modeKey && left.modeKey === right.modeKey)
+      const sameTitle = normalizeSyncedEventTitle(left.title) === normalizeSyncedEventTitle(right.title)
+      if (left.modeKey && right.modeKey ? !sameMode : !sameTitle) return false
+      if (windowsOverlap(left, right)) return true
+      if (left.periodKey && right.periodKey) return left.periodKey === right.periodKey
+      return Boolean(left.remoteKey && left.remoteKey === right.remoteKey)
+    }
+
+    for (let left = 0; left < rows.length; left += 1) {
+      for (let right = left + 1; right < rows.length; right += 1) {
+        if (equivalent(rows[left], rows[right])) union(left, right)
+      }
+    }
+
+    const groups = new Map<number, EndgameIdentityRow[]>()
+    rows.forEach((row, index) => {
+      const root = find(index)
+      const group = groups.get(root) ?? []
+      group.push(row)
+      groups.set(root, group)
+    })
+    const now = new Date().toISOString()
+    const updateCanonical = this.database.prepare(`
+      UPDATE checklist_items
+      SET completed = ?,
+          manual_completion_locked = ?,
+          completed_at = ?,
+          updated_at = ?
+      WHERE id = ? AND archived = 0
+    `)
+    const archiveDuplicate = this.database.prepare(`
+      UPDATE checklist_items
+      SET archived = 1, updated_at = ?
+      WHERE id = ? AND archived = 0 AND source <> 'manual'
+    `)
+
+    for (const group of groups.values()) {
+      if (group.length < 2) continue
+      group.sort((left, right) => {
+        const sourceDifference =
+          Number(right.source === 'public_schedule') - Number(left.source === 'public_schedule')
+        if (sourceDifference !== 0) return sourceDifference
+        const lockDifference = right.manualCompletionLocked - left.manualCompletionLocked
+        if (lockDifference !== 0) return lockDifference
+        const completionDifference = right.completed - left.completed
+        if (completionDifference !== 0) return completionDifference
+        return Date.parse(right.lastSyncedAt ?? right.updatedAt) -
+          Date.parse(left.lastSyncedAt ?? left.updatedAt)
+      })
+      const [canonical, ...duplicates] = group
+      const completed = group.some((row) => Boolean(row.completed))
+      const manualCompletionLocked = group.some((row) => Boolean(row.manualCompletionLocked))
+      const completedAt = completed
+        ? group
+            .map((row) => row.completedAt)
+            .filter((value): value is string => Boolean(value))
+            .sort()[0] ?? now
+        : null
+      updateCanonical.run(
+        completed ? 1 : 0,
+        manualCompletionLocked ? 1 : 0,
+        completedAt,
+        now,
+        canonical.id
+      )
+      for (const duplicate of duplicates) archiveDuplicate.run(now, duplicate.id)
+    }
   }
 
   private archivePersonalSectionConflicts(): void {
