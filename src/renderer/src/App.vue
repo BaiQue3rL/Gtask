@@ -1562,15 +1562,15 @@ function showError(error: unknown): void {
             </div>
           </div>
         </div>
-        <div class="settings-title-row">
-          <h3 class="settings-heading data-heading">本地数据与备份</h3>
-          <button class="secondary-button" type="button" :disabled="backingUp" @click="createBackup">
-            {{ backingUp ? '备份中…' : '立即备份' }}
-          </button>
-        </div>
+        <h3 class="settings-heading data-heading">本地数据与备份</h3>
         <div class="data-location">
           <span>{{ appInfo?.dataPath }}</span>
-          <button class="secondary-button" type="button" @click="openDataDirectory">打开目录</button>
+          <div class="data-location-actions">
+            <button class="secondary-button" type="button" :disabled="backingUp" @click="createBackup">
+              {{ backingUp ? '备份中…' : '立即备份' }}
+            </button>
+            <button class="secondary-button" type="button" @click="openDataDirectory">打开目录</button>
+          </div>
         </div>
         <p class="recycle-hint">本地数据位于系统“文档”目录的 GachaTaskManager；backups 子目录保留最近 30 份每日备份，手动与安全备份不自动清理。</p>
         <div class="backup-list">
