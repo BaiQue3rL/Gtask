@@ -140,7 +140,8 @@ const REQUIRED_ENDGAME_MODES: Record<GameId, ReadonlyArray<readonly [string, str
   ],
   'wuthering-waves': [
     ['tower-of-adversity', '逆境深塔'],
-    ['whimpering-wastes', '冥歌海墟']
+    ['whimpering-wastes', '冥歌海墟'],
+    ['endstate-matrix', '终焉矩阵']
   ]
 }
 
@@ -1730,7 +1731,9 @@ export class AppDatabase {
             startsAt,
             endsAt,
             preservePublicSchedule || item.resetRule === undefined ? current.resetRule : item.resetRule,
-            item.periodKey === undefined ? current.periodKey : item.periodKey,
+            preservePublicSchedule || item.periodKey === undefined
+              ? current.periodKey
+              : item.periodKey,
             preservePublicSchedule || item.scheduleKind === undefined
               ? current.scheduleKind
               : item.scheduleKind,
@@ -1920,12 +1923,17 @@ export class AppDatabase {
         WHERE game_id = ?
           AND category = 'endgame'
           AND source <> 'manual'
-          AND (remote_key = ? OR (? IS NOT NULL AND mode_key = ?))
+          AND (
+            remote_key = ?
+            OR (? IS NOT NULL AND mode_key = ?)
+            OR title = ?
+          )
         ORDER BY CASE WHEN ? IS NOT NULL AND period_key = ? THEN 0 ELSE 1 END,
           CASE WHEN starts_at IS NOT NULL AND ends_at IS NOT NULL
             AND julianday(starts_at) <= julianday(?)
             AND julianday(ends_at) >= julianday(?) THEN 0 ELSE 1 END,
           CASE WHEN source = 'public_schedule' THEN 0 ELSE 1 END,
+          CASE WHEN title = ? THEN 0 ELSE 1 END,
           updated_at DESC
         LIMIT 1
       `).get(
@@ -1933,10 +1941,12 @@ export class AppDatabase {
         remoteKey,
         item.modeKey ?? null,
         item.modeKey ?? null,
+        item.title,
         item.periodKey ?? null,
         item.periodKey ?? null,
         syncedAt,
-        syncedAt
+        syncedAt,
+        item.title
       ) as { id: string; archived: number; source: ChecklistSource } | undefined
     }
 
@@ -2750,11 +2760,21 @@ export class AppDatabase {
       return Date.parse(left.startsAt) < Date.parse(right.endsAt) &&
         Date.parse(left.endsAt) > Date.parse(right.startsAt)
     }
+    const activeAtStartup = (row: EndgameIdentityRow): boolean => {
+      if (!row.startsAt || !row.endsAt) return false
+      const now = Date.now()
+      return Date.parse(row.startsAt) <= now && Date.parse(row.endsAt) >= now
+    }
     const equivalent = (left: EndgameIdentityRow, right: EndgameIdentityRow): boolean => {
       if (left.gameId !== right.gameId) return false
       const sameMode = Boolean(left.modeKey && right.modeKey && left.modeKey === right.modeKey)
       const sameTitle = normalizeSyncedEventTitle(left.title) === normalizeSyncedEventTitle(right.title)
-      if (left.modeKey && right.modeKey ? !sameMode : !sameTitle) return false
+      if (!sameMode && !sameTitle) return false
+      if (
+        sameTitle &&
+        left.source !== right.source &&
+        (activeAtStartup(left) || activeAtStartup(right))
+      ) return true
       if (windowsOverlap(left, right)) return true
       if (left.periodKey && right.periodKey) return left.periodKey === right.periodKey
       return Boolean(left.remoteKey && left.remoteKey === right.remoteKey)

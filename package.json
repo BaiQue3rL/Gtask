@@ -1,6 +1,6 @@
 {
   "name": "gacha-task-manager",
-  "version": "0.1.0-rc.4",
+  "version": "0.1.0-rc.5",
   "description": "原神、崩坏：星穹铁道、绝区零和鸣潮的本地任务清单",
   "main": "./out/main/index.js",
   "author": "Gacha Task Manager contributors",

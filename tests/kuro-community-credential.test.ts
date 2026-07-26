@@ -93,6 +93,23 @@ describe('KuroCommunityCredentialService', () => {
     })
   })
 
+  it('兼容库街区把 accessToken 对象再次编码为 data 字符串', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response({
+      code: 200,
+      data: JSON.stringify({ accessToken: 'decoded-short-lived-bat' })
+    }))
+    const service = new KuroCommunityCredentialService(fetcher, resolveIosDevCode)
+
+    await expect(service.validateCredential({
+      token: 'app-token',
+      did: 'DEVICE-ID',
+      roleId: '123456789',
+      serverId: 'server-cn'
+    })).resolves.toMatchObject({
+      bat: 'decoded-short-lived-bat'
+    })
+  })
+
   it('无角色或 BAT 无效时拒绝导入', async () => {
     const noRoleFetcher = vi.fn<typeof fetch>().mockResolvedValue(response({
       code: 200,

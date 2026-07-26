@@ -33,7 +33,7 @@ export class KuroCommunityClient {
     private readonly resolveIosDevCode: () => Promise<string> =
       () => resolveKuroIosDevCode(fetcher)
   ) {
-    this.bat = credential.bat ?? ''
+    this.bat = extractKuroBatToken(credential.bat) ?? credential.bat?.trim() ?? ''
   }
 
   async getExploration(): Promise<unknown> {
@@ -172,7 +172,7 @@ export class KuroCommunityClient {
       if (code !== 0 && code !== 200) {
         throw new Error(envelope.msg?.trim() || `库街区请求失败（${code}）`)
       }
-      return envelope.data
+      return decodeKuroEnvelopeData(envelope.data)
     } catch (error) {
       const retryable =
         error instanceof KuroTransientError ||
@@ -243,4 +243,15 @@ function delay(milliseconds: number): Promise<void> {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function decodeKuroEnvelopeData(value: unknown): unknown {
+  if (typeof value !== 'string') return value
+  const normalized = value.trim()
+  if (!normalized) return value
+  try {
+    return JSON.parse(normalized) as unknown
+  } catch {
+    return value
+  }
 }

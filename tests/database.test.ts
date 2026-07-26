@@ -1512,11 +1512,45 @@ describe('AppDatabase', () => {
       completed: true,
       periodKey: 'public-period-a'
     })
-    expect(periods.find((item) => item.periodKey === 'personal-schedule-42')).toMatchObject({
+    expect(periods.find((item) => item.periodKey === 'public-period-b')).toMatchObject({
       title: '式舆防卫战·本期',
       completed: true,
       source: 'public_schedule'
     })
+  })
+
+  it('个人挑战与公开资料模式键不一致时按当前中文标题归并', () => {
+    database = new AppDatabase(':memory:')
+    database.mergeSyncedItems('wuthering-waves', 'public_schedule', [{
+      remoteKey: 'official:whimpering-wastes:2026-07',
+      category: 'endgame',
+      title: '冥歌海墟',
+      startsAt: '2026-07-06T04:00:00+08:00',
+      endsAt: '2026-08-03T03:59:00+08:00',
+      periodKey: '2026-07',
+      modeKey: 'whimpering-wastes'
+    }], '2026-07-20T00:00:00.000Z')
+
+    const result = database.mergeSyncedItems('wuthering-waves', 'personal_sync', [{
+      remoteKey: 'endgame:legacy-slash',
+      category: 'endgame',
+      title: '冥歌海墟',
+      completed: true,
+      periodKey: 'wuthering-waves:legacy-slash:current',
+      modeKey: 'legacy-slash'
+    }], '2026-07-20T01:00:00.000Z')
+
+    expect(result).toMatchObject({ added: 0, updated: 1 })
+    expect(database.listChecklistItems('wuthering-waves')
+      .filter((item) => item.title === '冥歌海墟')).toEqual([
+      expect.objectContaining({
+        source: 'public_schedule',
+        completed: true,
+        periodKey: '2026-07',
+        modeKey: 'whimpering-wastes',
+        endsAt: '2026-08-03T03:59:00+08:00'
+      })
+    ])
   })
 
   it('可检测其他本地进程写入数据库，供 AI 命令触发界面刷新', () => {

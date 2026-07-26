@@ -1,5 +1,18 @@
 export function extractKuroBatToken(value: unknown): string | null {
-  if (typeof value === 'string') return normalizeToken(value, 24)
+  if (typeof value === 'string') {
+    const normalized = value.trim()
+    if (!normalized) return null
+    try {
+      const parsed: unknown = JSON.parse(normalized)
+      if (parsed !== normalized) {
+        const nested = extractKuroBatToken(parsed)
+        if (nested) return nested
+      }
+    } catch {
+      // A direct BAT is not JSON and is validated below.
+    }
+    return normalizeToken(normalized, 24)
+  }
   if (!isRecord(value)) return null
   return normalizeToken(value.accessToken, 1)
 }

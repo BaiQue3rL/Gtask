@@ -52,8 +52,8 @@ describe('鸣潮个人进度解析', () => {
     })).toMatchObject({
       title: '逆境深塔',
       completed: true,
-      endsAt: '2026-08-19T23:59:59.000Z',
-      modeKey: 'tower'
+      endsAt: null,
+      modeKey: 'tower-of-adversity'
     })
 
     expect(parseWutheringWavesSlash({
@@ -119,8 +119,8 @@ describe('鸣潮个人进度解析', () => {
     )
     expect(order).toEqual(['tower', 'slash', 'matrix'])
     expect(output.items).toEqual(expect.arrayContaining([
-      expect.objectContaining({ modeKey: 'tower' }),
-      expect.objectContaining({ modeKey: 'matrix' })
+      expect.objectContaining({ modeKey: 'tower-of-adversity' }),
+      expect.objectContaining({ modeKey: 'endstate-matrix' })
     ]))
     expect(output.message).toContain('部分成功 2/3')
     expect(progress).toEqual(expect.arrayContaining([

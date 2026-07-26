@@ -67,7 +67,7 @@ export function parseWutheringWavesTower(value: unknown): NormalizedSyncItem {
       return floors.length > 0 || (finiteNumber(area.star) ?? 0) > 0
     })
   )
-  return endgameItem('tower', '逆境深塔', root.seasonEndTime, completed)
+  return endgameItem('tower-of-adversity', '逆境深塔', completed)
 }
 
 export function parseWutheringWavesSlash(value: unknown): NormalizedSyncItem {
@@ -78,7 +78,7 @@ export function parseWutheringWavesSlash(value: unknown): NormalizedSyncItem {
       recordArray(challenge.halfList).length > 0 || (finiteNumber(challenge.score) ?? 0) > 0
     )
   )
-  return endgameItem('slash', '冥歌海墟', root.seasonEndTime, completed)
+  return endgameItem('whimpering-wastes', '冥歌海墟', completed)
 }
 
 export function parseWutheringWavesMatrix(value: unknown): NormalizedSyncItem {
@@ -89,33 +89,25 @@ export function parseWutheringWavesMatrix(value: unknown): NormalizedSyncItem {
     (finiteNumber(mode.passBoss) ?? 0) > 0 ||
     recordArray(mode.teams).length > 0
   )
-  return endgameItem('matrix', '终焉矩阵', root.endTime, completed)
+  return endgameItem('endstate-matrix', '终焉矩阵', completed)
 }
 
 function endgameItem(
   modeKey: string,
   title: string,
-  rawEndTime: unknown,
   completed: boolean
 ): NormalizedSyncItem {
-  const endsAt = optionalUnixIso(rawEndTime)
   return {
     remoteKey: `endgame:${modeKey}`,
     category: 'endgame',
     title,
     completed,
-    endsAt,
-    periodKey: `wuthering-waves:${modeKey}:${endsAt ?? 'current'}`,
+    startsAt: null,
+    endsAt: null,
+    periodKey: `wuthering-waves:${modeKey}:current`,
     scheduleKind: 'remote_schedule',
     modeKey
   }
-}
-
-function optionalUnixIso(value: unknown): string | undefined {
-  const timestamp = finiteNumber(value)
-  if (timestamp === null || timestamp <= 0) return undefined
-  const date = new Date(timestamp < 10_000_000_000 ? timestamp * 1000 : timestamp)
-  return Number.isNaN(date.getTime()) ? undefined : date.toISOString()
 }
 
 function percentage(value: unknown, field: string): number {

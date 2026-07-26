@@ -259,8 +259,8 @@ h2 { margin: 0; font-size: 19px; }
 .settings-heading.data-heading { margin-top: 20px; }
 .settings-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 20px; }
 .settings-title-row .settings-heading { margin: 0; }
-.settings-title-row button { padding: 6px 11px; border-radius: 6px; cursor: pointer; }
-.data-location { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; padding: 10px 12px; border: 1px solid #2b4665; border-radius: 8px; background: rgba(13, 38, 68, 0.55); }
+.settings-title-row button { margin-right: 12px; padding: 6px 11px; border-radius: 6px; cursor: pointer; }
+.data-location { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 14px 0 8px; padding: 10px 12px; border: 1px solid #2b4665; border-radius: 8px; background: rgba(13, 38, 68, 0.55); }
 .data-location span { overflow: hidden; color: #8097b4; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .data-location button { flex: 0 0 auto; padding: 7px 12px; border-radius: 6px; cursor: pointer; }
 .backup-list { display: grid; max-height: 290px; gap: 6px; margin-top: 10px; overflow-y: auto; }

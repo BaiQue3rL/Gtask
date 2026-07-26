@@ -30,6 +30,27 @@ describe('KuroCommunityClient', () => {
     expect(new Headers(fetcher.mock.calls[0][1]?.headers).get('b-at')).toBe('fresh-login-bat')
   })
 
+  it('统一解码库街区以 JSON 字符串返回的个人战绩数据', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(response({ code: 200, data: '{}' }))
+      .mockResolvedValueOnce(response({
+        code: 200,
+        data: '{"difficultyList":[],"seasonEndTime":1787183999}'
+      }))
+    const client = new KuroCommunityClient({
+      token: 'long-token',
+      did: 'DEVICE-ID',
+      roleId: '123456789',
+      serverId: 'server-cn',
+      bat: 'fresh-login-bat'
+    }, fetcher, undefined, undefined, resolveIosDevCode)
+
+    await expect(client.getTower()).resolves.toEqual({
+      difficultyList: [],
+      seasonEndTime: 1787183999
+    })
+  })
+
   it('刷新短期 BAT 后顺序读取鸣潮探索与三类挑战', async () => {
     const fetcher = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(response({ code: 200, data: { accessToken: 'short-bat' } }))
@@ -99,6 +120,28 @@ describe('KuroCommunityClient', () => {
       current: 1,
       total: 1
     })
+  })
+
+  it('已保存错误 JSON 文本 BAT 时重新申请并解码真正令牌', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(response({ code: 10903, msg: '数据令牌已失效' }))
+      .mockResolvedValueOnce(response({
+        code: 200,
+        data: JSON.stringify({ accessToken: 'decoded-bat' })
+      }))
+      .mockResolvedValueOnce(response({ code: 200, data: {} }))
+      .mockResolvedValueOnce(response({ code: 200, data: { difficultyList: [] } }))
+    const client = new KuroCommunityClient({
+      token: 'long-token',
+      did: 'DEVICE-ID',
+      roleId: '123456789',
+      serverId: 'server-cn',
+      bat: '{"accessToken":"incorrectly-saved-bat"}'
+    }, fetcher, undefined, undefined, resolveIosDevCode)
+
+    await expect(client.getTower()).resolves.toEqual({ difficultyList: [] })
+    expect(new Headers(fetcher.mock.calls[2][1]?.headers).get('b-at')).toBe('decoded-bat')
+    expect(new Headers(fetcher.mock.calls[3][1]?.headers).get('b-at')).toBe('decoded-bat')
   })
 
   it('长期 Token 过期时要求重新登录', async () => {
