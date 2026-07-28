@@ -1,30 +1,75 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
-    <linearGradient id="background" x1="64" y1="32" x2="448" y2="480" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#153d77"/>
-      <stop offset="0.52" stop-color="#0a2348"/>
-      <stop offset="1" stop-color="#061326"/>
+    <linearGradient id="background" x1="68" y1="42" x2="448" y2="474" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#10173f"/>
+      <stop offset="0.5" stop-color="#090f32"/>
+      <stop offset="1" stop-color="#050a24"/>
     </linearGradient>
-    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="translate(256 248) rotate(90) scale(188)" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#79a9ff" stop-opacity="0.34"/>
-      <stop offset="1" stop-color="#79a9ff" stop-opacity="0"/>
+    <radialGradient id="ambient" cx="0" cy="0" r="1" gradientTransform="translate(278 250) rotate(90) scale(214)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3e35c9" stop-opacity="0.2"/>
+      <stop offset="1" stop-color="#3e35c9" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="star" x1="190" y1="152" x2="328" y2="350" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#ffffff"/>
-      <stop offset="0.5" stop-color="#dceaff"/>
-      <stop offset="1" stop-color="#78aaff"/>
+    <linearGradient id="ring" x1="118" y1="160" x2="408" y2="372" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2f66ff"/>
+      <stop offset="0.5" stop-color="#6254ff"/>
+      <stop offset="1" stop-color="#a653ef"/>
     </linearGradient>
-    <filter id="shadow" x="-40%" y="-40%" width="180%" height="180%">
-      <feGaussianBlur stdDeviation="13"/>
+    <linearGradient id="check" x1="170" y1="300" x2="348" y2="208" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#b84ee9"/>
+      <stop offset="0.55" stop-color="#8554f6"/>
+      <stop offset="1" stop-color="#5b63ff"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#020616" flood-opacity="0.72"/>
+    </filter>
+    <filter id="glow" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="9" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
     </filter>
   </defs>
+
   <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#background)"/>
-  <rect x="16" y="16" width="480" height="480" rx="112" fill="none" stroke="#335f98" stroke-width="10"/>
-  <circle cx="256" cy="256" r="196" fill="url(#glow)"/>
-  <ellipse cx="256" cy="256" rx="162" ry="86" fill="none" stroke="#6e9ee4" stroke-opacity="0.46" stroke-width="9" transform="rotate(-27 256 256)"/>
-  <ellipse cx="256" cy="256" rx="125" ry="174" fill="none" stroke="#496f9f" stroke-opacity="0.4" stroke-width="7" transform="rotate(32 256 256)"/>
-  <path d="M256 104C273 189 291 228 378 256C291 284 273 323 256 408C239 323 221 284 134 256C221 228 239 189 256 104Z" fill="#75a8ff" opacity="0.62" filter="url(#shadow)"/>
-  <path d="M256 112C272 193 289 231 370 256C289 281 272 319 256 400C240 319 223 281 142 256C223 231 240 193 256 112Z" fill="url(#star)"/>
-  <circle cx="379" cy="174" r="17" fill="#9dd8ff"/>
-  <circle cx="379" cy="174" r="32" fill="#78bfff" opacity="0.28" filter="url(#shadow)"/>
+  <rect x="21" y="21" width="470" height="470" rx="107" fill="none" stroke="#222d64" stroke-width="10"/>
+  <circle cx="278" cy="250" r="184" fill="url(#ambient)"/>
+
+  <g transform="translate(256 256) scale(.72) translate(-256 -256)">
+    <g filter="url(#shadow)">
+      <path
+        d="M400 173A166 166 0 1 0 400 339"
+        fill="none"
+        stroke="#080e2f"
+        stroke-width="92"
+        stroke-linecap="butt"
+      />
+      <path
+        d="M400 173A166 166 0 1 0 400 339"
+        fill="none"
+        stroke="url(#ring)"
+        stroke-width="70"
+        stroke-linecap="butt"
+      />
+      <path d="m358 296 80 41-38 73Z" fill="url(#ring)"/>
+    </g>
+
+    <path
+      d="m169 267 65 65 114-123"
+      fill="none"
+      stroke="#080e2f"
+      stroke-width="78"
+      stroke-linecap="square"
+      stroke-linejoin="miter"
+    />
+    <path
+      d="m169 267 65 65 114-123"
+      fill="none"
+      stroke="url(#check)"
+      stroke-width="50"
+      stroke-linecap="square"
+      stroke-linejoin="miter"
+      filter="url(#glow)"
+    />
+  </g>
 </svg>

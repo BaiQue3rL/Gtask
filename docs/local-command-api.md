@@ -11,7 +11,7 @@ node out/main/local-mcp-server-cli.js
 测试数据库可追加 `--database <路径>`。服务公开以下工具：
 
 - `describe_gacha_commands`：读取支持范围与安全约束。
-- `read_gacha_checklists`：读取一款或全部四款游戏的清单快照。
+- `read_gacha_checklists`：读取一款或全部已启用游戏的清单快照。
 - `create_gacha_item`、`update_gacha_item`、`restore_gacha_item`：带明确字段结构的常用写入操作。
 - `archive_gacha_item`、`archive_completed_gacha_section`：软删除操作，均要求 `confirm: true`。
 - `write_gacha_checklists`：用于批量写入等高级命令的通用入口；同样不会绕过确认保护。
@@ -84,7 +84,7 @@ node out/main/local-command-cli.js --request-base64 $encoded
 {"command":"list_games"}
 ```
 
-一次读取四款游戏的活动清单、周期、探索、自定义事项和同步状态：
+一次读取全部已启用游戏的活动清单、周期、探索、自定义事项和同步状态：
 
 ```json
 {"command":"get_all_snapshots","includeArchived":false}

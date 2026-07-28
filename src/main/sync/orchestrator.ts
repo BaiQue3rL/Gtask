@@ -7,10 +7,14 @@ import type {
   SyncTarget,
   SyncSourceResult,
   SyncStatus
+  , SyncRequestContext
 } from '../../shared/contracts'
 import type { AppDatabase } from '../database'
 import {
+  isSyncCancelledError,
+  SyncCancelledError,
   SyncVerificationRequiredError,
+  throwIfSyncCancelled,
   type SyncAdapter,
   type SyncAdapterProgress,
   type SyncAdapterRegistry
@@ -26,7 +30,10 @@ const PERSONAL_PLATFORM_NAMES: Record<GameId, string> = {
 
 export class SyncOrchestrator {
   private readonly inFlight = new Map<string, { scope: SyncScope; operation: Promise<SyncResult> }>()
-  private readonly personalInFlight = new Map<string, Promise<SyncSourceResult>>()
+  private readonly personalInFlight = new Map<
+    string,
+    { controller: AbortController; operation: Promise<SyncSourceResult> }
+  >()
 
   constructor(
     private readonly database: AppDatabase,
@@ -108,18 +115,29 @@ export class SyncOrchestrator {
     }
   }
 
-  async syncPersonalOnly(gameId: GameId, target: SyncTarget = 'all'): Promise<SyncResult> {
+  async syncPersonalOnly(
+    gameId: GameId,
+    target: SyncTarget = 'all',
+    requestContext: SyncRequestContext = {
+      outputLocale: 'zh-CN',
+      userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+    }
+  ): Promise<SyncResult> {
     const startedAt = new Date().toISOString()
     this.database.recordPersonalSyncAttempt(gameId)
     this.database.recordSyncTargetAttempt(gameId, target)
-    const personal = await this.syncPersonalData(gameId, target)
+    const personal = await this.syncPersonalData(gameId, target, requestContext)
     const hasPendingReview = (personal.pendingReview ?? 0) > 0
-    const status: SyncResult['status'] = personal.status === 'success'
+    const status: SyncResult['status'] = personal.status === 'cancelled'
+      ? 'cancelled'
+      : personal.status === 'success'
       ? hasPendingReview ? 'partial' : 'success'
       : 'error'
     const databaseStatus: SyncStatus = personal.status === 'verification_required'
       ? 'verification_required'
-      : personal.status === 'success'
+      : personal.status === 'cancelled'
+        ? 'stale'
+        : personal.status === 'success'
         ? hasPendingReview ? 'stale' : 'success'
         : 'error'
     this.database.recordSyncOutcome(
@@ -134,7 +152,13 @@ export class SyncOrchestrator {
       this.database.recordSyncTargetAttempt(
         gameId,
         target,
-        personal.status === 'verification_required' ? 'verification_required' : 'error'
+        personal.status === 'verification_required'
+          ? 'verification_required'
+          : personal.status === 'cancelled'
+            ? 'stale'
+          : hasPendingReview
+            ? 'stale'
+            : 'error'
       )
     }
     return {
@@ -149,21 +173,42 @@ export class SyncOrchestrator {
     }
   }
 
-  syncPersonalData(gameId: GameId, target: SyncTarget = 'all'): Promise<SyncSourceResult> {
-    const key = `${gameId}:${target}`
+  syncPersonalData(
+    gameId: GameId,
+    target: SyncTarget = 'all',
+    requestContext: SyncRequestContext = {
+      outputLocale: 'zh-CN',
+      userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+    }
+  ): Promise<SyncSourceResult> {
+    const key = `${gameId}:${target}:${requestContext.outputLocale}:${requestContext.userTimeZone}`
     const existing = this.personalInFlight.get(key)
-    if (existing) return existing
+    if (existing) return existing.operation
+    const controller = new AbortController()
     const operation = this.runAdapter(
       gameId,
       'personal_data',
       this.adapters.personalData[gameId],
       `${PERSONAL_PLATFORM_NAMES[gameId]}个人数据适配器尚未接入`,
-      target
+      target,
+      requestContext,
+      controller.signal
     ).finally(() => {
       this.personalInFlight.delete(key)
     })
-    this.personalInFlight.set(key, operation)
+    this.personalInFlight.set(key, { controller, operation })
     return operation
+  }
+
+  cancelPersonalSync(gameId: GameId, target: SyncTarget): boolean {
+    let cancelled = false
+    const prefix = `${gameId}:${target}:`
+    for (const [key, active] of this.personalInFlight) {
+      if (!key.startsWith(prefix)) continue
+      active.controller.abort(new SyncCancelledError())
+      cancelled = true
+    }
+    return cancelled
   }
 
   private async runAdapter(
@@ -171,7 +216,12 @@ export class SyncOrchestrator {
     source: SyncSourceResult['source'],
     adapter: SyncAdapter | undefined,
     unavailableMessage: string,
-    target: SyncTarget = 'all'
+    target: SyncTarget = 'all',
+    requestContext: SyncRequestContext = {
+      outputLocale: 'zh-CN',
+      userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+    },
+    signal?: AbortSignal
   ): Promise<SyncSourceResult> {
     if (!adapter) {
       return {
@@ -194,7 +244,9 @@ export class SyncOrchestrator {
         current: 0,
         total: null
       })
-      const result = await adapter.sync(gameId, target, reportProgress)
+      throwIfSyncCancelled(signal)
+      const result = await adapter.sync(gameId, target, reportProgress, signal)
+      throwIfSyncCancelled(signal)
       reportProgress({
         phase: 'structuring',
         message: '数据读取完成，正在整理可写入内容',
@@ -212,6 +264,7 @@ export class SyncOrchestrator {
       const normalizedItems = normalizeSyncItems(result.items).filter(
         (item) => !categories || categories.includes(item.category)
       )
+      throwIfSyncCancelled(signal)
       reportProgress({
         phase: 'merging',
         message: '内容整理完成，正在安全合并清单',
@@ -223,27 +276,51 @@ export class SyncOrchestrator {
         checklistSource,
         normalizedItems
       )
+      let reviewCandidates = result.reviewCandidates ?? []
+      if (
+        source === 'personal_data' &&
+        result.accountScope &&
+        reviewCandidates.length > 0
+      ) {
+        const resolution = this.database.resolveKnownPersonalDrafts(
+          gameId,
+          result.accountScope,
+          reviewCandidates
+        )
+        reviewCandidates = resolution.reviewCandidates
+        merge.updated += resolution.applied
+        merge.preserved += resolution.preserved
+      }
+      throwIfSyncCancelled(signal)
       const review = this.database.queueSemanticReviewCandidates(
         gameId,
         checklistSource,
-        result.reviewCandidates ?? []
+        reviewCandidates,
+        new Date(),
+        requestContext,
+        source === 'personal_data' ? result.accountScope ?? null : null
       )
       const changes = merge.added + merge.updated
+      if (source === 'personal_data' && (changes > 0 || review.pending > 0)) {
+        this.database.recordCatalogCoverage(gameId, target, 'personal_data', 'partial')
+      } else if (source === 'public_schedule') {
+        this.database.recordCatalogCoverage(gameId, target, 'public_schedule', 'complete')
+      }
       const changeMessage = changes > 0
         ? `新增 ${merge.added}，更新 ${merge.updated}`
         : '无清单变更'
       const preservedMessage = merge.preserved > 0 ? `，保护 ${merge.preserved}` : ''
       const reviewMessage = review.pending > 0
-        ? '；部分状态暂无法确认，已保留原清单'
+        ? `；${review.pending} 条状态正在由 Codex 核验，核验前保留原清单`
         : ''
       reportProgress({
-        phase: 'completed',
-        status: 'completed',
+        phase: review.pending > 0 ? 'verifying' : 'completed',
+        status: review.pending > 0 ? 'running' : 'completed',
         message: review.pending > 0
-          ? '进度读取完成；无法确认的状态已安全保留'
+          ? `个人数据已读取，Codex 正在核验 ${review.pending} 条状态`
           : '同步完成',
-        current: 1,
-        total: 1
+        current: review.pending > 0 ? 0 : 1,
+        total: review.pending > 0 ? review.pending : 1
       })
       return {
         source,
@@ -253,6 +330,24 @@ export class SyncOrchestrator {
         ...merge
       }
     } catch (error) {
+      const cancelled = isSyncCancelledError(error) || signal?.aborted === true
+      if (cancelled) {
+        this.emitProgress(gameId, target, source, {
+          phase: 'cancelled',
+          status: 'cancelled',
+          message: '已取消',
+          current: null,
+          total: null
+        })
+        return {
+          source,
+          status: 'cancelled',
+          message: '已取消',
+          added: 0,
+          updated: 0,
+          preserved: 0
+        }
+      }
       const verificationRequired = error instanceof SyncVerificationRequiredError
       this.emitProgress(gameId, target, source, {
         phase: verificationRequired ? 'verification' : 'failed',

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="72 58 376 396">
+  <defs>
+    <linearGradient id="brand-ring" x1="118" y1="160" x2="408" y2="372" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4d7cff"/>
+      <stop offset="0.5" stop-color="#7164ff"/>
+      <stop offset="1" stop-color="#b25af2"/>
+    </linearGradient>
+    <linearGradient id="brand-check" x1="170" y1="300" x2="348" y2="208" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#c158ed"/>
+      <stop offset="0.55" stop-color="#9362fa"/>
+      <stop offset="1" stop-color="#6a78ff"/>
+    </linearGradient>
+  </defs>
+  <path
+    d="M400 173A166 166 0 1 0 400 339"
+    fill="none"
+    stroke="url(#brand-ring)"
+    stroke-width="70"
+    stroke-linecap="butt"
+  />
+  <path d="m358 296 80 41-38 73Z" fill="url(#brand-ring)"/>
+  <path
+    d="m169 267 65 65 114-123"
+    fill="none"
+    stroke="url(#brand-check)"
+    stroke-width="50"
+    stroke-linecap="square"
+    stroke-linejoin="miter"
+  />
+</svg>

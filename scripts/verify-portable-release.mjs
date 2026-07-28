@@ -5,18 +5,17 @@ import { fileURLToPath } from 'node:url'
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const packageJson = JSON.parse(readFileSync(join(projectRoot, 'package.json'), 'utf8'))
+const releaseDirectory = resolve(projectRoot, process.argv[2] ?? 'release')
 const artifactPath = join(
-  projectRoot,
-  'release',
+  releaseDirectory,
   `${packageJson.build.productName}-${packageJson.version}-portable.exe`
 )
 const unpackedExecutablePath = join(
-  projectRoot,
-  'release',
+  releaseDirectory,
   'win-unpacked',
   `${packageJson.build.productName}.exe`
 )
-const asarPath = join(projectRoot, 'release', 'win-unpacked', 'resources', 'app.asar')
+const asarPath = join(releaseDirectory, 'win-unpacked', 'resources', 'app.asar')
 
 function requireFile(path, minimumBytes) {
   if (!existsSync(path)) throw new Error(`缺少发布文件：${path}`)

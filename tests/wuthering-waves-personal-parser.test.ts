@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  extractWutheringWavesExplorationReviewCandidates,
   parseWutheringWavesExploration,
   parseWutheringWavesMatrix,
   parseWutheringWavesPersonalData,
@@ -9,7 +10,7 @@ import {
 import { WutheringWavesPersonalAdapter } from '../src/main/sync/wuthering-waves-personal-adapter'
 
 describe('鸣潮个人进度解析', () => {
-  it('同时保留大区域和独立子区域探索度', () => {
+  it('只保留指导所需的一级大区域探索度', () => {
     expect(parseWutheringWavesExploration({
       open: true,
       exploreList: [{
@@ -26,20 +27,30 @@ describe('鸣潮个人进度解析', () => {
         title: '瑝珑',
         progressPercent: 78.4,
         completed: false
-      }),
-      expect.objectContaining({
-        remoteKey: 'exploration:area:101',
-        title: '乘霄山',
-        parentTitle: '瑝珑',
-        progressPercent: 100,
-        completed: true
-      }),
-      expect.objectContaining({
-        remoteKey: 'exploration:area:102',
-        title: '黑海岸',
-        progressPercent: 63
       })
     ])
+  })
+
+  it('地图语义候选不发送普通二级区域', () => {
+    const candidates = extractWutheringWavesExplorationReviewCandidates({
+      exploreList: [{
+        country: { countryId: 1, countryName: '瑝珑' },
+        countryProgress: 78.4,
+        areaInfoList: [
+          { areaId: 101, areaName: '乘霄山', areaProgress: 100 }
+        ]
+      }]
+    })
+
+    expect(candidates).toEqual([expect.objectContaining({
+      payload: expect.objectContaining({
+        officialId: '1',
+        officialTitle: '瑝珑',
+        observedNodeKind: 'region',
+        observedProgress: 78.4
+      })
+    })])
+    expect(JSON.stringify(candidates)).not.toContain('乘霄山')
   })
 
   it('挑战模式只要存在本期挑战记录就判定完成，不要求满星或满分', () => {
@@ -118,9 +129,16 @@ describe('鸣潮个人进度解析', () => {
       (update) => progress.push(update)
     )
     expect(order).toEqual(['tower', 'slash', 'matrix'])
-    expect(output.items).toEqual(expect.arrayContaining([
-      expect.objectContaining({ modeKey: 'tower-of-adversity' }),
-      expect.objectContaining({ modeKey: 'endstate-matrix' })
+    expect(output.items).toEqual([])
+    expect(output.reviewCandidates).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        target: 'cycles',
+        payload: expect.objectContaining({ observedModeKey: 'tower-of-adversity' })
+      }),
+      expect.objectContaining({
+        target: 'cycles',
+        payload: expect.objectContaining({ observedModeKey: 'endstate-matrix' })
+      })
     ]))
     expect(output.message).toContain('部分成功 2/3')
     expect(progress).toEqual(expect.arrayContaining([

@@ -5,8 +5,12 @@ import {
   personalPartialSuffix,
   type PersonalRequestOutcome
 } from './personal-sync-settler'
-import { parseWutheringWavesPersonalData } from './wuthering-waves-personal-parser'
+import {
+  extractWutheringWavesExplorationReviewCandidates,
+  parseWutheringWavesPersonalData
+} from './wuthering-waves-personal-parser'
 import type { SyncAdapter, SyncAdapterOutput, SyncProgressReporter } from './types'
+import { toCycleReviewCandidates } from './cycle-review'
 
 export interface WutheringWavesCommunityClient {
   getExploration: () => Promise<unknown>
@@ -57,8 +61,18 @@ export class WutheringWavesPersonalAdapter implements SyncAdapter {
       : undefined
     assertAnyPersonalRequestSucceeded(outcomes)
     const suffix = personalPartialSuffix(outcomes)
+    const hasCycleData = [tower, slash, matrix].some((value) => value !== undefined)
+    const cycleItems = hasCycleData
+      ? parseWutheringWavesPersonalData({ tower, slash, matrix })
+      : []
     return {
-      items: parseWutheringWavesPersonalData({ exploration, tower, slash, matrix }),
+      items: [],
+      reviewCandidates: exploration === undefined
+        ? toCycleReviewCandidates('kuro-community', cycleItems)
+        : [
+            ...extractWutheringWavesExplorationReviewCandidates(exploration),
+            ...toCycleReviewCandidates('kuro-community', cycleItems)
+          ],
       message: (target === 'exploration'
         ? '鸣潮地图探索度已同步'
         : target === 'cycles'

@@ -1,9 +1,9 @@
 {
-  "name": "gacha-task-manager",
-  "version": "0.1.0-rc.5",
-  "description": "原神、崩坏：星穹铁道、绝区零和鸣潮的本地任务清单",
+  "name": "gtask",
+  "version": "0.1.0-rc.23",
+  "description": "可扩展的本地游戏任务与进度清单",
   "main": "./out/main/index.js",
-  "author": "Gacha Task Manager contributors",
+  "author": "Gtask contributors",
   "license": "MIT",
   "scripts": {
     "dev": "electron-vite dev",
@@ -35,7 +35,7 @@
   },
   "build": {
     "appId": "com.gachataskmanager.app",
-    "productName": "幻游清单",
+    "productName": "Gtask",
     "electronDist": "node_modules/electron/dist",
     "npmRebuild": false,
     "directories": {
@@ -51,10 +51,14 @@
       {
         "from": "integrations/gacha-task-manager",
         "to": "codex-plugin"
+      },
+      {
+        "from": "out/main",
+        "to": "codex-mcp-runtime"
       }
     ],
     "win": {
-      "icon": "build/icon.svg",
+      "icon": "build/icon.ico",
       "target": [
         "portable"
       ]

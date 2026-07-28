@@ -1,6 +1,10 @@
 import { createHash, randomInt } from 'node:crypto'
 import type { CredentialPayload } from '../credential-vault'
-import { SyncVerificationRequiredError } from './types'
+import {
+  SyncCancelledError,
+  SyncVerificationRequiredError,
+  throwIfSyncCancelled
+} from './types'
 import type { SyncProgressReporter } from './types'
 import { ZenlessPersonalAdapter, type ZenlessBattleChronicleClient } from './zenless-personal-adapter'
 import { GenshinPersonalAdapter, type GenshinBattleChronicleClient } from './genshin-personal-adapter'
@@ -83,7 +87,8 @@ class MiyousheChronicleClient {
     private readonly fetcher: typeof fetch,
     private readonly solveGeetest?: MiyousheGeetestSolver,
     private readonly reuseLoginDevice = false,
-    private readonly reportProgress?: SyncProgressReporter
+    private readonly reportProgress?: SyncProgressReporter,
+    private readonly externalSignal?: AbortSignal
   ) {
     if (!cookie.trim()) throw new Error('米游社登录凭据为空')
     const accountId = readCookieValue(cookie, 'account_id_v2') ?? readCookieValue(cookie, 'ltuid_v2')
@@ -140,7 +145,10 @@ class MiyousheChronicleClient {
     method: 'GET' | 'POST' = 'GET',
     body?: Record<string, string>
   ): Promise<unknown> {
+    throwIfSyncCancelled(this.externalSignal)
     const controller = new AbortController()
+    const cancelRequest = (): void => controller.abort()
+    this.externalSignal?.addEventListener('abort', cancelRequest, { once: true })
     const timeout = setTimeout(() => controller.abort(), 15_000)
     try {
       if (this.deviceId && url.startsWith('https://api-takumi-record.mihoyo.com/')) {
@@ -230,10 +238,12 @@ class MiyousheChronicleClient {
       if (envelope.data === undefined || envelope.data === null) throw new Error('米游社未返回个人数据')
       return envelope.data
     } catch (error) {
+      if (this.externalSignal?.aborted) throw new SyncCancelledError()
       if (error instanceof Error && error.name === 'AbortError') throw new Error('米游社个人数据请求超时')
       throw error
     } finally {
       clearTimeout(timeout)
+      this.externalSignal?.removeEventListener('abort', cancelRequest)
     }
   }
 
@@ -262,9 +272,11 @@ class MiyousheChronicleClient {
         device_fp: '38d7ee834d1e9'
       }
       try {
+        throwIfSyncCancelled(this.externalSignal)
         const response = await this.fetcher(DEVICE_FP_URL, {
           method: 'POST',
           redirect: 'error',
+          signal: this.externalSignal,
           headers: {
             'content-type': 'application/json',
             ds: generateCnDynamicSecret({}, body),
@@ -280,6 +292,7 @@ class MiyousheChronicleClient {
         const fp = toNonEmptyString(asRecord(envelope.data).device_fp)
         if ((envelope.retcode ?? 0) === 0 && fp) this.deviceFp = fp
       } catch {
+        if (this.externalSignal?.aborted) throw new SyncCancelledError()
         // Fingerprint registration is an optimization. The battle-chronicle
         // request can still proceed without it and surface its own result.
       }
@@ -288,7 +301,10 @@ class MiyousheChronicleClient {
   }
 
   private async createGeetestChallenge(): Promise<MiyousheGeetestChallenge> {
+    throwIfSyncCancelled(this.externalSignal)
     const controller = new AbortController()
+    const cancelRequest = (): void => controller.abort()
+    this.externalSignal?.addEventListener('abort', cancelRequest, { once: true })
     const timeout = setTimeout(() => controller.abort(), 15_000)
     try {
       const response = await this.fetcher(CREATE_VERIFICATION_URL, {
@@ -316,12 +332,14 @@ class MiyousheChronicleClient {
         success: Number(data.success ?? 1)
       }
     } catch (error) {
+      if (this.externalSignal?.aborted) throw new SyncCancelledError()
       if (error instanceof Error && error.name === 'AbortError') {
         throw new SyncVerificationRequiredError('米游社验证服务请求超时')
       }
       throw error
     } finally {
       clearTimeout(timeout)
+      this.externalSignal?.removeEventListener('abort', cancelRequest)
     }
   }
 
@@ -329,7 +347,10 @@ class MiyousheChronicleClient {
     challenge: MiyousheGeetestV3Challenge,
     result: MiyousheGeetestV3Result
   ): Promise<void> {
+    throwIfSyncCancelled(this.externalSignal)
     const controller = new AbortController()
+    const cancelRequest = (): void => controller.abort()
+    this.externalSignal?.addEventListener('abort', cancelRequest, { once: true })
     const timeout = setTimeout(() => controller.abort(), 15_000)
     try {
       const body = {
@@ -356,12 +377,14 @@ class MiyousheChronicleClient {
         )
       }
     } catch (error) {
+      if (this.externalSignal?.aborted) throw new SyncCancelledError()
       if (error instanceof Error && error.name === 'AbortError') {
         throw new SyncVerificationRequiredError('米游社验证确认请求超时')
       }
       throw error
     } finally {
       clearTimeout(timeout)
+      this.externalSignal?.removeEventListener('abort', cancelRequest)
     }
   }
 }
@@ -373,9 +396,10 @@ export class MiyousheGenshinClient extends MiyousheChronicleClient implements Ge
     cookie: string,
     fetcher: typeof fetch,
     solveGeetest?: MiyousheGeetestSolver,
-    reportProgress?: SyncProgressReporter
+    reportProgress?: SyncProgressReporter,
+    signal?: AbortSignal
   ) {
-    super(cookie, fetcher, solveGeetest, true, reportProgress)
+    super(cookie, fetcher, solveGeetest, true, reportProgress, signal)
   }
 
   async getProfile(): Promise<unknown> {
@@ -430,9 +454,10 @@ export class MiyousheStarRailClient extends MiyousheChronicleClient implements S
     cookie: string,
     fetcher: typeof fetch,
     solveGeetest?: MiyousheGeetestSolver,
-    reportProgress?: SyncProgressReporter
+    reportProgress?: SyncProgressReporter,
+    signal?: AbortSignal
   ) {
-    super(cookie, fetcher, solveGeetest, true, reportProgress)
+    super(cookie, fetcher, solveGeetest, true, reportProgress, signal)
   }
 
   private async getChallenge(endpoint: string, extraQuery: Record<string, string> = {}): Promise<unknown> {
@@ -475,13 +500,21 @@ export function createMiyousheZenlessPersonalAdapter(
   credential: CredentialPayload,
   fetcher: typeof fetch,
   solveGeetest?: MiyousheGeetestSolver,
-  reportProgress?: SyncProgressReporter
+  reportProgress?: SyncProgressReporter,
+  signal?: AbortSignal
 ): ZenlessPersonalAdapter {
   if (credential.kind !== 'cookie') {
     throw new SyncVerificationRequiredError('米游社凭据格式已过期，请重新登录')
   }
   return new ZenlessPersonalAdapter(
-    new MiyousheZenlessClient(credential.value, fetcher, solveGeetest, false, reportProgress)
+    new MiyousheZenlessClient(
+      credential.value,
+      fetcher,
+      solveGeetest,
+      false,
+      reportProgress,
+      signal
+    )
   )
 }
 
@@ -489,13 +522,20 @@ export function createMiyousheGenshinPersonalAdapter(
   credential: CredentialPayload,
   fetcher: typeof fetch,
   solveGeetest?: MiyousheGeetestSolver,
-  reportProgress?: SyncProgressReporter
+  reportProgress?: SyncProgressReporter,
+  signal?: AbortSignal
 ): GenshinPersonalAdapter {
   if (credential.kind !== 'cookie') {
     throw new SyncVerificationRequiredError('米游社凭据格式已过期，请重新登录')
   }
   return new GenshinPersonalAdapter(
-    new MiyousheGenshinClient(credential.value, fetcher, solveGeetest, reportProgress)
+    new MiyousheGenshinClient(
+      credential.value,
+      fetcher,
+      solveGeetest,
+      reportProgress,
+      signal
+    )
   )
 }
 
@@ -503,13 +543,20 @@ export function createMiyousheStarRailPersonalAdapter(
   credential: CredentialPayload,
   fetcher: typeof fetch,
   solveGeetest?: MiyousheGeetestSolver,
-  reportProgress?: SyncProgressReporter
+  reportProgress?: SyncProgressReporter,
+  signal?: AbortSignal
 ): StarRailPersonalAdapter {
   if (credential.kind !== 'cookie') {
     throw new SyncVerificationRequiredError('米游社凭据格式已过期，请重新登录')
   }
   return new StarRailPersonalAdapter(
-    new MiyousheStarRailClient(credential.value, fetcher, solveGeetest, reportProgress)
+    new MiyousheStarRailClient(
+      credential.value,
+      fetcher,
+      solveGeetest,
+      reportProgress,
+      signal
+    )
   )
 }
 

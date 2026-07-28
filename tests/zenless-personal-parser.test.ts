@@ -210,8 +210,8 @@ describe('绝区零个人战绩解析', () => {
       expect.objectContaining({ message: '正在读取危局强袭战战绩', current: 2, total: 3 }),
       expect.objectContaining({ message: '正在读取绝区零活动进度', current: 3, total: 3 })
     ])
-    expect(output.items).toHaveLength(2)
-    expect(output.reviewCandidates).toHaveLength(1)
+    expect(output.items).toHaveLength(0)
+    expect(output.reviewCandidates).toHaveLength(3)
     order.length = 0
     const eventsOnly = await adapter.sync('zenless', 'events')
     expect(order).toEqual(['events'])
@@ -237,8 +237,12 @@ describe('绝区零个人战绩解析', () => {
     })
     const progress: Array<{ message: string }> = []
     const partial = await adapter.sync('zenless', 'cycles', (update) => progress.push(update))
-    expect(partial.items).toEqual(expect.arrayContaining([
-      expect.objectContaining({ modeKey: 'shiyu-defense' })
+    expect(partial.items).toEqual([])
+    expect(partial.reviewCandidates).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        target: 'cycles',
+        payload: expect.objectContaining({ observedModeKey: 'shiyu-defense' })
+      })
     ]))
     expect(partial.message).toContain('部分成功 1/2')
     expect(progress).toEqual(expect.arrayContaining([

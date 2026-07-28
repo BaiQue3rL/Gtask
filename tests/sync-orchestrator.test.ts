@@ -49,8 +49,18 @@ describe('SyncOrchestrator', () => {
     const result = await orchestrator.syncGame('genshin', 'public_and_personal')
 
     expect(order).toEqual(['public', 'personal'])
-    expect(publicSync).toHaveBeenCalledWith('genshin', 'all', expect.any(Function))
-    expect(personalSync).toHaveBeenCalledWith('genshin', 'all', expect.any(Function))
+    expect(publicSync).toHaveBeenCalledWith(
+      'genshin',
+      'all',
+      expect.any(Function),
+      undefined
+    )
+    expect(personalSync).toHaveBeenCalledWith(
+      'genshin',
+      'all',
+      expect.any(Function),
+      undefined
+    )
     expect(result.status).toBe('success')
     expect(result.sources.map((source) => source.added)).toEqual([1, 1])
     expect(database.listChecklistItems('genshin')).toEqual(
@@ -213,7 +223,12 @@ describe('SyncOrchestrator', () => {
     const result = await orchestrator.syncPersonalOnly('genshin', 'exploration')
 
     expect(publicSync).not.toHaveBeenCalled()
-    expect(personalSync).toHaveBeenCalledWith('genshin', 'exploration', expect.any(Function))
+    expect(personalSync).toHaveBeenCalledWith(
+      'genshin',
+      'exploration',
+      expect.any(Function),
+      expect.any(AbortSignal)
+    )
     expect(result).toMatchObject({
       requestedScope: 'personal_data',
       requestedTarget: 'exploration',
@@ -269,13 +284,64 @@ describe('SyncOrchestrator', () => {
       status: 'partial',
       sources: [expect.objectContaining({ pendingReview: 1 })]
     })
-    expect(result.message).toContain('部分状态暂无法确认，已保留原清单')
+    expect(result.message).toContain('1 条状态正在由 Codex 核验，核验前保留原清单')
     expect(progress.at(-1)).toMatchObject({
-      phase: 'completed',
-      status: 'completed',
-      message: '进度读取完成；无法确认的状态已安全保留'
+      phase: 'verifying',
+      status: 'running',
+      message: '个人数据已读取，Codex 正在核验 1 条状态'
     })
+    expect(database.getSyncTargetStates('star-rail')).toContainEqual(
+      expect.objectContaining({
+        target: 'events',
+        status: 'stale',
+        catalogCoverage: 'partial',
+        catalogSource: 'personal_data'
+      })
+    )
     expect(database.listChecklistItems('star-rail').some((item) => item.title === '反贪「砖」家'))
       .toBe(false)
+  })
+
+  it('取消个人同步会中断适配器且不会合并任何数据', async () => {
+    database = new AppDatabase(':memory:')
+    const progress: Array<{ phase: string; status: string }> = []
+    const personalSync = vi.fn(async (
+      _gameId,
+      _target,
+      _reportProgress,
+      signal?: AbortSignal
+    ) => {
+      await new Promise<void>((_resolve, reject) => {
+        signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
+      })
+      return {
+        items: [{
+          remoteKey: 'map:cancelled',
+          category: 'exploration' as const,
+          title: '不应写入',
+          progressPercent: 88
+        }],
+        message: '不应完成'
+      }
+    })
+    const orchestrator = new SyncOrchestrator(database, {
+      publicSchedule: {},
+      personalData: { genshin: { sync: personalSync } }
+    }, (update) => progress.push({
+      phase: update.phase,
+      status: update.status
+    }))
+
+    const operation = orchestrator.syncPersonalOnly('genshin', 'exploration')
+    await vi.waitFor(() => expect(personalSync).toHaveBeenCalledTimes(1))
+    expect(orchestrator.cancelPersonalSync('genshin', 'exploration')).toBe(true)
+    const result = await operation
+
+    expect(result.status).toBe('cancelled')
+    expect(result.sources[0]).toMatchObject({ status: 'cancelled', added: 0, updated: 0 })
+    expect(database.listChecklistItems('genshin').some(
+      (item) => item.remoteKey === 'map:cancelled'
+    )).toBe(false)
+    expect(progress.at(-1)).toEqual({ phase: 'cancelled', status: 'cancelled' })
   })
 })

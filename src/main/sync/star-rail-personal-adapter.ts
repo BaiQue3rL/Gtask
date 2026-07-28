@@ -10,6 +10,7 @@ import {
   type PersonalRequestOutcome
 } from './personal-sync-settler'
 import type { SyncAdapter, SyncAdapterOutput, SyncProgressReporter } from './types'
+import { toCycleReviewCandidates } from './cycle-review'
 
 export interface StarRailBattleChronicleClient {
   getMemoryOfChaos: () => Promise<unknown>
@@ -85,16 +86,29 @@ export class StarRailPersonalAdapter implements SyncAdapter {
       : undefined
     assertAnyPersonalRequestSucceeded(outcomes)
     const suffix = personalPartialSuffix(outcomes)
+    const hasCycleData = [
+      memoryOfChaos,
+      pureFiction,
+      apocalypticShadow,
+      anomalyArbitration
+    ].some((value) => value !== undefined)
+    const cycleItems = hasCycleData
+      ? parseStarRailPersonalData({
+          memoryOfChaos,
+          pureFiction,
+          apocalypticShadow,
+          anomalyArbitration
+        })
+      : []
+    const eventCandidates = eventCalendar === undefined
+      ? []
+      : extractStarRailEventReviewCandidates(eventCalendar)
     return {
-      items: parseStarRailPersonalData({
-        memoryOfChaos,
-        pureFiction,
-        apocalypticShadow,
-        anomalyArbitration
-      }),
-      reviewCandidates: eventCalendar === undefined
-        ? []
-        : extractStarRailEventReviewCandidates(eventCalendar),
+      items: [],
+      reviewCandidates: [
+        ...eventCandidates,
+        ...toCycleReviewCandidates('miyoushe', cycleItems)
+      ],
       message: '星铁四种周期战绩已同步' + suffix
     }
   }

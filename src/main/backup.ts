@@ -53,7 +53,7 @@ function verifyRestorableDatabase(databasePath: string): void {
       .all() as Array<{ name: string }>
     const tableNames = new Set(rows.map((row) => row.name))
     if (requiredTables.some((table) => !tableNames.has(table))) {
-      throw new Error('所选文件不是可恢复的幻游清单数据库')
+      throw new Error('所选文件不是可恢复的 Gtask 数据库')
     }
     const versionRow = candidate
       .prepare('SELECT MAX(version) AS version FROM schema_migrations')

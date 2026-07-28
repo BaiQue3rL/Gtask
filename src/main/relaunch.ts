@@ -6,6 +6,23 @@ export interface RelaunchOptions {
   args: string[]
 }
 
+export function resolveStablePackagedExecutable(
+  environment: NodeJS.ProcessEnv,
+  fallbackExecutable: string,
+  exists: (path: string) => boolean = existsSync
+): string {
+  const portableExecutable = environment.PORTABLE_EXECUTABLE_FILE?.trim()
+  if (
+    portableExecutable &&
+    isAbsolute(portableExecutable) &&
+    portableExecutable.toLowerCase().endsWith('.exe') &&
+    exists(portableExecutable)
+  ) {
+    return portableExecutable
+  }
+  return fallbackExecutable
+}
+
 export function restoreRelaunchOptions(
   environment: NodeJS.ProcessEnv,
   argv: readonly string[]

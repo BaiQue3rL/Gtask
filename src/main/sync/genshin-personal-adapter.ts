@@ -1,5 +1,6 @@
 import type { GameId, SyncTarget } from '../../shared/contracts'
 import {
+  extractGenshinExplorationReviewCandidates,
   extractGenshinEventReviewCandidates,
   parseGenshinPersonalData
 } from './genshin-personal-parser'
@@ -10,6 +11,7 @@ import {
   type PersonalRequestOutcome
 } from './personal-sync-settler'
 import type { SyncAdapter, SyncAdapterOutput, SyncProgressReporter } from './types'
+import { toCycleReviewCandidates } from './cycle-review'
 
 export interface GenshinBattleChronicleClient {
   getProfile: () => Promise<unknown>
@@ -63,20 +65,28 @@ export class GenshinPersonalAdapter implements SyncAdapter {
       : undefined
     assertAnyPersonalRequestSucceeded(outcomes)
     const suffix = personalPartialSuffix(outcomes)
-    const hasChecklistData = [profile, spiralAbyss, imaginariumTheater, stygianOnslaught]
+    const hasChecklistData = [spiralAbyss, imaginariumTheater, stygianOnslaught]
       .some((value) => value !== undefined)
-    return {
-      items: hasChecklistData
-        ? parseGenshinPersonalData({
-            profile,
+    const eventCandidates = eventCalendar === undefined
+      ? []
+      : extractGenshinEventReviewCandidates(eventCalendar)
+    const explorationCandidates = profile === undefined
+      ? []
+      : extractGenshinExplorationReviewCandidates(profile)
+    const cycleItems = hasChecklistData
+      ? parseGenshinPersonalData({
             spiralAbyss,
             imaginariumTheater,
             stygianOnslaught
           })
-        : [],
-      reviewCandidates: eventCalendar === undefined
-        ? []
-        : extractGenshinEventReviewCandidates(eventCalendar),
+      : []
+    return {
+      items: [],
+      reviewCandidates: [
+        ...eventCandidates,
+        ...explorationCandidates,
+        ...toCycleReviewCandidates('miyoushe', cycleItems)
+      ],
       message: (target === 'events'
         ? '原神活动进度已读取'
         : target === 'exploration'

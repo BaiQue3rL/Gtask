@@ -1,4 +1,4 @@
 interface:
-  display_name: "同步幻游清单公开资料"
-  short_description: "按版块联网核验活动、周期、版本时间或地图目录，并安全同步到本地幻游清单"
+  display_name: "同步 Gtask 公开资料"
+  short_description: "按版块联网核验活动、周期、版本时间或地图目录，并安全同步到本地 Gtask"
   default_prompt: "Use $sync-gacha-schedules to process the pending verified public-data refresh."

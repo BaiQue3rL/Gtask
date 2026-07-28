@@ -1,0 +1,108 @@
+import { describe, expect, it } from 'vitest'
+import {
+  getPublicSyncContract,
+  getSemanticReviewContract
+} from '../src/main/sync/interface-contract'
+
+describe('同步接口契约', () => {
+  it('全局任务明确覆盖四个可独立恢复的版块', () => {
+    const contract = getPublicSyncContract('all')
+    expect(contract.authority).toBe('interface_contract')
+    expect(contract).toMatchObject({
+      decisionAuthority: 'codex',
+      executorPolicy: 'mechanical_validation_only',
+      allowedMutations: ['create', 'update', 'archive']
+    })
+    expect(contract.workflow).toEqual([
+      'inventory',
+      'research_required_fields',
+      'verify',
+      'match_existing',
+      'submit'
+    ])
+    expect(contract.sections.map((section) => section.target)).toEqual([
+      'tasks',
+      'events',
+      'cycles',
+      'exploration'
+    ])
+  })
+
+  it('所有游戏和版块共用语言与时区请求上下文', () => {
+    const requestContext = {
+      outputLocale: 'en-US',
+      userTimeZone: 'America/Los_Angeles'
+    }
+    for (const target of ['all', 'tasks', 'events', 'cycles', 'exploration'] as const) {
+      const contract = getPublicSyncContract(target, requestContext)
+      expect(contract.requestContext).toEqual(requestContext)
+      expect(contract.fieldSemantics.title).toContain('en-US')
+      expect(contract.submissionRequiredFields).toContain('contentLocale')
+    }
+    expect(getSemanticReviewContract('events', requestContext)).toMatchObject({
+      requestContext,
+      decisionAuthority: 'codex',
+      executorPolicy: 'mechanical_validation_only'
+    })
+  })
+
+  it('活动契约区分限时与常驻时间语义', () => {
+    const [events] = getPublicSyncContract('events').sections
+    const limited = events.itemShapes.find((shape) =>
+      shape.categories.includes('limited_event')
+    )!
+    const permanent = events.itemShapes.find((shape) =>
+      shape.categories.includes('permanent_event')
+    )!
+
+    expect(limited.requiredFields).toEqual(expect.arrayContaining([
+      'activityTags',
+      'startsAt',
+      'endsAt'
+    ]))
+    expect(permanent.requiredFields).toContain('activityTags')
+    expect(permanent.forbiddenFields).toContain('endsAt')
+  })
+
+  it('周期与地图契约只向 Codex 请求应用不能机械补齐的数据', () => {
+    const [cycles] = getPublicSyncContract('cycles').sections
+    expect(cycles.itemShapes).toHaveLength(1)
+    expect(cycles.itemShapes[0]).toMatchObject({
+      categories: ['endgame'],
+      requiredFields: expect.arrayContaining([
+        'modeKey',
+        'periodKey',
+        'startsAt',
+        'endsAt'
+      ])
+    })
+
+    const [exploration] = getPublicSyncContract('exploration').sections
+    expect(exploration.itemShapes[0].requiredFields).toContain('mapNodeKind')
+    expect(exploration.itemShapes[0].forbiddenFields).toEqual(
+      expect.arrayContaining(['progressPercent', 'completed'])
+    )
+  })
+
+  it('个人进度契约按版块声明最终决策字段', () => {
+    expect(getSemanticReviewContract('events').requiredDecisionFields)
+      .toEqual(expect.arrayContaining(['remoteKey', 'category', 'title']))
+    expect(getSemanticReviewContract('events').requiredDecisionFields)
+      .not.toContain('completed')
+    expect(getSemanticReviewContract('cycles').requiredDecisionFields)
+      .toEqual(expect.arrayContaining(['category', 'completed']))
+    expect(getSemanticReviewContract('exploration').requiredDecisionFields)
+      .toEqual(expect.arrayContaining(['mapNodeKind', 'progressPercent']))
+  })
+
+  it('个人同步把同名且倒计时重叠的周期项视为强重复信号', () => {
+    const contract = getSemanticReviewContract('cycles')
+
+    expect(contract.fieldSemantics.matchCandidates).toContain('倒计时')
+    expect(contract.fieldSemantics.duplicateDetection).toContain('标题核心名称相同')
+    expect(contract.fieldSemantics.duplicateDetection).toContain('时间窗重叠')
+    expect(contract.fieldSemantics.matchItemId).toContain('public_schedule')
+    expect(contract.fieldSemantics.archiveItems).toContain('personal_sync')
+    expect(contract.fieldSemantics.archiveItems).toContain('归档')
+  })
+})

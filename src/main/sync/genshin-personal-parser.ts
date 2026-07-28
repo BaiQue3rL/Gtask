@@ -97,7 +97,7 @@ export function parseExplorations(value: unknown): NormalizedSyncItem[] {
     childrenByParent.set(exploration.parentId, children)
   }
 
-  const items = parsed.map((exploration): NormalizedSyncItem => {
+  return parsed.map((exploration): NormalizedSyncItem => {
     const children = childrenByParent.get(exploration.id) ?? []
     const progressPercent = resolveExplorationProgress(exploration.rawProgress, children)
     const parent = exploration.parentId ? byId.get(exploration.parentId) : undefined
@@ -111,31 +111,50 @@ export function parseExplorations(value: unknown): NormalizedSyncItem[] {
       modeKey: `world-exploration-${exploration.id}`
     }
   })
+}
 
-  const worldTitles = new Set(parsed.map((exploration) => normalizeExplorationTitle(exploration.title)))
+export function extractGenshinExplorationReviewCandidates(
+  value: unknown
+): SemanticReviewDraft[] {
+  const root = requiredRecord(value, '个人概览')
+  const explorations = Array.isArray(root.world_explorations)
+    ? root.world_explorations.filter(isRecord)
+    : []
+  const parsed = explorations.map((exploration) => ({
+    id: requiredIdentifier(exploration.id, '探索区域 id'),
+    title: requiredString(exploration.name, '探索区域名称'),
+    observedProgress: clampPercentage(
+      requiredNumber(exploration.exploration_percentage, '探索度') / 10
+    ),
+    parentId: optionalIdentifier(exploration.parent_id),
+    areas: Array.isArray(exploration.area_exploration_list)
+      ? exploration.area_exploration_list.filter(isRecord)
+      : []
+  }))
+  const titleById = new Map(parsed.map((entry) => [entry.id, entry.title]))
+  const drafts: SemanticReviewDraft[] = []
   for (const exploration of parsed) {
-    for (const area of exploration.areas) {
-      const title = requiredString(area.name, `${exploration.title}子区域名称`)
-      const normalizedTitle = normalizeExplorationTitle(title)
-      if (worldTitles.has(normalizedTitle)) continue
-      const rawProgress = requiredNumber(
-        area.exploration_percentage,
-        `${exploration.title}·${title} 探索度`
-      )
-      const progressPercent = clampPercentage(rawProgress / 10)
-      items.push({
-        remoteKey: `exploration:world:${exploration.id}:area:${encodeURIComponent(normalizedTitle)}`,
-        category: 'exploration',
-        title,
-        completed: progressPercent === 100,
-        progressPercent,
-        parentTitle: exploration.title,
-        modeKey: `world-exploration-${exploration.id}-area-${encodeURIComponent(normalizedTitle)}`
-      })
-      worldTitles.add(normalizedTitle)
-    }
+    const children = parsed.filter((candidate) => candidate.parentId === exploration.id)
+    drafts.push({
+      target: 'exploration',
+      kind: 'personal-map-progress',
+      payload: {
+        provider: 'miyoushe',
+        officialId: exploration.id,
+        officialTitle: exploration.title,
+        observedProgress: resolveExplorationProgress(
+          exploration.observedProgress * 10,
+          children.map((child) => ({ rawProgress: child.observedProgress * 10 }))
+        ),
+        observedNodeKind: exploration.parentId ? 'independent' : 'region',
+        observedParentId: exploration.parentId,
+        observedParentTitle: exploration.parentId
+          ? titleById.get(exploration.parentId) ?? null
+          : null
+      }
+    })
   }
-  return items
+  return drafts
 }
 
 function resolveExplorationProgress(
@@ -276,6 +295,7 @@ function requiredIdentifier(value: unknown, field: string): string {
 }
 
 function optionalIdentifier(value: unknown): string | null {
+  if (value === 0 || value === '0') return null
   if ((typeof value !== 'string' && typeof value !== 'number') || !String(value).trim()) {
     return null
   }

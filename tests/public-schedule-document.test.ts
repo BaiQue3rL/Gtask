@@ -74,15 +74,15 @@ describe('公开排期文档', () => {
     ).toThrow('只允许版本时间、限时活动、周期挑战和地图区域')
   })
 
-  it('拒绝没有经中文来源核对的纯英文名称', () => {
-    expect(() => parsePublicScheduleDocument({
+  it('名称语言由同步契约决定，机械文档解析器不按字符集否决', () => {
+    expect(parsePublicScheduleDocument({
       ...document,
       items: [{
         remoteKey: 'event:english-only',
         category: 'limited_event',
         title: 'English Event Name'
       }]
-    }, 'genshin')).toThrow('中文正式名称')
+    }, 'genshin').items[0].title).toBe('English Event Name')
   })
 
   it('适配器加载文档并返回协调器可直接合并的事项', async () => {

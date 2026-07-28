@@ -12,6 +12,12 @@ export async function capturePersonalRequest<T>(
     outcomes.push({ succeeded: true })
     return value
   } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.name === 'SyncCancelledError' || error.name === 'AbortError')
+    ) {
+      throw error
+    }
     outcomes.push({ succeeded: false, error })
     return undefined
   }

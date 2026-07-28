@@ -1,6 +1,7 @@
 import type {
   ChecklistCategory,
   GameId,
+  MapNodeKind,
   ScheduleKind,
   SyncProgressPhase,
   SyncProgressStatus,
@@ -17,6 +18,9 @@ export interface NormalizedSyncItem {
   completed?: boolean
   progressPercent?: number | null
   parentTitle?: string | null
+  mapNodeKind?: MapNodeKind | null
+  parentRemoteKey?: string | null
+  relatedRegionRemoteKey?: string | null
   startsAt?: string | null
   endsAt?: string | null
   resetRule?: string | null
@@ -26,6 +30,15 @@ export interface NormalizedSyncItem {
   timeZone?: string | null
   modeKey?: string | null
   recurrenceRule?: string | null
+}
+
+export interface CodexScheduleItem extends NormalizedSyncItem {
+  matchItemId?: string
+}
+
+export interface CodexArchiveDecision {
+  itemId: string
+  reason: string
 }
 
 export interface SyncMergeResult {
@@ -52,6 +65,11 @@ export interface SemanticReviewDraft {
 export interface SyncAdapterOutput {
   items: NormalizedSyncItem[]
   reviewCandidates?: SemanticReviewDraft[]
+  /**
+   * Opaque, one-way account/role scope used to keep personal states isolated.
+   * It must never contain a raw UID, role id, Cookie or token.
+   */
+  accountScope?: string
   message: string
 }
 
@@ -69,7 +87,8 @@ export interface SyncAdapter {
   sync: (
     gameId: GameId,
     target?: SyncTarget,
-    reportProgress?: SyncProgressReporter
+    reportProgress?: SyncProgressReporter,
+    signal?: AbortSignal
   ) => Promise<SyncAdapterOutput>
 }
 
@@ -83,6 +102,24 @@ export class SyncVerificationRequiredError extends Error {
     super(message)
     this.name = 'SyncVerificationRequiredError'
   }
+}
+
+export class SyncCancelledError extends Error {
+  constructor(message = '同步已取消') {
+    super(message)
+    this.name = 'SyncCancelledError'
+  }
+}
+
+export function throwIfSyncCancelled(signal?: AbortSignal): void {
+  if (!signal?.aborted) return
+  if (signal.reason instanceof SyncCancelledError) throw signal.reason
+  throw new SyncCancelledError()
+}
+
+export function isSyncCancelledError(error: unknown): boolean {
+  return error instanceof SyncCancelledError ||
+    (error instanceof Error && error.name === 'SyncCancelledError')
 }
 
 export type CompletedSourceResult = SyncSourceResult

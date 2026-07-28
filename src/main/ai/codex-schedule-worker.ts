@@ -3,7 +3,122 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { delimiter, join } from 'node:path'
 
 export const CODEX_SCHEDULE_WORKER_AGENT_ID = 'gacha-app-background-worker'
-export const MAX_CODEX_SCHEDULE_WORKERS = 4
+export const MIN_CODEX_SCHEDULE_WORKERS = 2
+export const MAX_CODEX_SCHEDULE_WORKERS = 6
+export const MAX_CODEX_SEMANTIC_REVIEW_WORKERS = 2
+export const CODEX_CONCURRENCY_COOLDOWN_MS = 2 * 60 * 1000
+export const CODEX_STABLE_COMPLETIONS_TO_SCALE_UP = 2
+
+export function desiredCodexWorkerCount(
+  activePublicJobs: number,
+  activeSemanticReviews: number,
+  maxWorkers = MAX_CODEX_SCHEDULE_WORKERS
+): number {
+  const capacity = Math.max(0, Math.floor(maxWorkers))
+  const publicJobs = Math.max(0, Math.floor(activePublicJobs))
+  const semanticReviews = Math.max(0, Math.floor(activeSemanticReviews))
+  if (capacity === 0 || publicJobs + semanticReviews === 0) return 0
+  if (publicJobs === 0) {
+    return Math.min(semanticReviews, MAX_CODEX_SEMANTIC_REVIEW_WORKERS, capacity)
+  }
+  if (semanticReviews === 0) return Math.min(publicJobs, capacity)
+  const reviewWorkers = Math.min(
+    semanticReviews,
+    MAX_CODEX_SEMANTIC_REVIEW_WORKERS,
+    Math.max(1, capacity - 1)
+  )
+  const publicWorkers = Math.min(publicJobs, Math.max(0, capacity - reviewWorkers))
+  return publicWorkers + reviewWorkers
+}
+
+export interface CodexDynamicConcurrencyOptions {
+  minWorkers?: number
+  maxWorkers?: number
+  stableCompletionsToScaleUp?: number
+  cooldownMs?: number
+}
+
+export class CodexDynamicConcurrencyController {
+  private limit: number
+  private stableCompletions = 0
+  private cooldownUntil = 0
+  private readonly minWorkers: number
+  private readonly maxWorkers: number
+  private readonly stableCompletionsToScaleUp: number
+  private readonly cooldownMs: number
+
+  constructor(options: CodexDynamicConcurrencyOptions = {}) {
+    this.minWorkers = Math.max(
+      1,
+      Math.floor(options.minWorkers ?? MIN_CODEX_SCHEDULE_WORKERS)
+    )
+    this.maxWorkers = Math.max(
+      this.minWorkers,
+      Math.floor(options.maxWorkers ?? MAX_CODEX_SCHEDULE_WORKERS)
+    )
+    this.stableCompletionsToScaleUp = Math.max(
+      1,
+      Math.floor(
+        options.stableCompletionsToScaleUp ?? CODEX_STABLE_COMPLETIONS_TO_SCALE_UP
+      )
+    )
+    this.cooldownMs = Math.max(1_000, Math.floor(
+      options.cooldownMs ?? CODEX_CONCURRENCY_COOLDOWN_MS
+    ))
+    this.limit = this.minWorkers
+  }
+
+  get currentLimit(): number {
+    return this.limit
+  }
+
+  get maximumLimit(): number {
+    return this.maxWorkers
+  }
+
+  recordHealthyCompletion(hasBacklog: boolean, reference = Date.now()): number {
+    if (!hasBacklog || reference < this.cooldownUntil || this.limit >= this.maxWorkers) {
+      if (!hasBacklog) this.stableCompletions = 0
+      return this.limit
+    }
+    this.stableCompletions += 1
+    if (this.stableCompletions >= this.stableCompletionsToScaleUp) {
+      this.limit = Math.min(this.maxWorkers, this.limit + 1)
+      this.stableCompletions = 0
+    }
+    return this.limit
+  }
+
+  recordBackpressure(reference = Date.now()): number {
+    this.limit = Math.max(this.minWorkers, Math.ceil(this.limit / 2))
+    this.stableCompletions = 0
+    this.cooldownUntil = reference + this.cooldownMs
+    return this.limit
+  }
+
+  desiredWorkers(
+    activePublicJobs: number,
+    activeSemanticReviews: number,
+    availableMemoryRatio = 1
+  ): number {
+    const normalizedMemory = Number.isFinite(availableMemoryRatio)
+      ? Math.max(0, Math.min(1, availableMemoryRatio))
+      : 1
+    const memoryLimit = normalizedMemory < 0.12
+      ? 1
+      : normalizedMemory < 0.2
+        ? 2
+        : normalizedMemory < 0.3
+          ? 3
+          : this.maxWorkers
+    return desiredCodexWorkerCount(
+      activePublicJobs,
+      activeSemanticReviews,
+      Math.min(this.limit, memoryLimit)
+    )
+  }
+}
+export type CodexWorkerTransportMode = 'websocket_preferred' | 'https_compatibility'
 
 export function codexScheduleWorkerAgentId(slot: number): string {
   if (!Number.isInteger(slot) || slot < 1) throw new Error('Codex Worker 槽位必须是正整数')
@@ -38,10 +153,31 @@ export type CodexScheduleWorkerDiagnosticEvent = Omit<CodexScheduleWorkerEvent, 
 export interface CodexScheduleWorkerOptions {
   workingDirectory: string
   agentId?: string
+  transportMode?: CodexWorkerTransportMode
   env?: NodeJS.ProcessEnv
   findExecutable?: () => string | null
   spawnProcess?: typeof spawn
   onEvent?: (event: CodexScheduleWorkerEvent) => void
+}
+
+export function codexWorkerTransportArguments(
+  mode: CodexWorkerTransportMode = 'websocket_preferred'
+): string[] {
+  if (mode !== 'https_compatibility') return []
+  return [
+    '-c',
+    'model_provider="gacha-chatgpt-http"',
+    '-c',
+    'model_providers.gacha-chatgpt-http.name="ChatGPT HTTPS compatibility"',
+    '-c',
+    'model_providers.gacha-chatgpt-http.base_url="https://chatgpt.com/backend-api/codex"',
+    '-c',
+    'model_providers.gacha-chatgpt-http.wire_api="responses"',
+    '-c',
+    'model_providers.gacha-chatgpt-http.requires_openai_auth=true',
+    '-c',
+    'model_providers.gacha-chatgpt-http.supports_websockets=false'
+  ]
 }
 
 export interface CodexScheduleWorkerLaunchResult {
@@ -63,12 +199,16 @@ export interface CodexScheduleWorkerPoolOptions
 }
 
 function backgroundPrompt(agentId: string): string {
-  return `必须使用 $sync-gacha-schedules 技能处理“幻游清单”的后台同步队列。
+  return `必须使用 $sync-gacha-schedules 技能处理 Gtask 的后台同步队列。
 你是由桌面应用自动启动的本地后台 Agent，不要修改项目源码，也不要要求用户回复。
-用户已经在桌面应用中主动点击同步，明确授权本轮读取公开资料并通过专用 MCP 安全合并对应清单；该授权不包含删除、凭据读取或其他版块写入。
-请使用固定 Agent ID“${agentId}”、名称“幻游清单后台 Codex”登记联网能力。
+用户已经在桌面应用中主动点击同步，明确授权本轮读取公开资料，并由你决定对本次契约范围内的同步数据执行新增、更新或软删除；该授权不包含凭据读取、跨版块写入或删除受保护的手动数据。
+请使用固定 Agent ID“${agentId}”、名称“Gtask 后台 Codex”登记联网能力。
+领取任务后先读取 job.contract；它是当前版块所需数据、字段语义和完成条件的唯一权威来源。先按契约建立完整目录，再逐项检索必需字段，不要从提示词猜字段要求。
+必须按 job.contract.requestContext 的 outputLocale 和 userTimeZone 组织结果，并在提交时原样回传 contentLocale。
+处理个人同步语义候选时，以候选携带的接口契约和 matchCandidates 为准，由你判断是匹配已有规范项目还是新增；标题、时间、层级和来源标识都只是证据，应用不会用其中任一启发式规则替你作业务决定。确认是同一事项时填写 matchItemId；确认存在同步重复项时使用 archiveItems 保留最合适的规范承载项。
 只领取一项公开资料任务并完整处理，严格按技能要求更新每个阶段的用户可见进度；已领取任务必须提交或明确失败。
-若 target=all，某一版块资料不足时提交其他已核验版块，由应用记录为部分完成；不得因为单一版块或单一来源失败而放弃全部结果。
+若 target=all，先提交已核验版块以安全保存；只要工具返回 remainingTargets 或任务仍为 claimed，就继续使用 Codex 原生联网检索自主补齐，不得把部分结果宣布为完成。
+不要自设搜索次数、固定来源路线或更短超时；根据搜索结果自由调整关键词和来源。只有确实穷尽有用检索后才能明确失败。
 本 Worker 的失败只允许结束自己领取的任务，不得领取、失败或结束其他 Worker 的任务。
 完成该任务后处理当前可领取的待核验语义候选，随后退出；不要继续领取第二项公开资料任务。`
 }
@@ -87,6 +227,11 @@ export function findCodexCli(options: CodexCliDiscoveryOptions = {}): string | n
   if (env.CODEX_CLI_PATH) candidates.push(env.CODEX_CLI_PATH)
   for (const directory of (env.PATH ?? '').split(delimiter).filter(Boolean)) {
     candidates.push(join(directory, executableName))
+  }
+  if (env.USERPROFILE) {
+    candidates.push(
+      join(env.USERPROFILE, '.codex', 'plugins', '.plugin-appserver', executableName)
+    )
   }
 
   const localAppData = env.LOCALAPPDATA
@@ -166,6 +311,7 @@ export function parseCodexWorkerLine(line: string): CodexScheduleWorkerDiagnosti
 export class CodexScheduleWorker {
   private child: ChildProcess | null = null
   private stopped = false
+  private readonly intentionallyStoppedChildren = new WeakSet<ChildProcess>()
 
   constructor(private readonly options: CodexScheduleWorkerOptions) {}
 
@@ -187,7 +333,7 @@ export class CodexScheduleWorker {
     }
 
     const executablePath = (this.options.findExecutable ?? (() =>
-      findCodexCli({ env: this.options.env })))()
+      findCodexCli({ env: { ...process.env, ...this.options.env } })))()
     if (!executablePath) {
       return {
         status: 'unavailable',
@@ -204,6 +350,7 @@ export class CodexScheduleWorker {
       '--json',
       '--color',
       'never',
+      ...codexWorkerTransportArguments(this.options.transportMode),
       '--sandbox',
       'read-only',
       '-c',
@@ -247,7 +394,8 @@ export class CodexScheduleWorker {
     child.stdout?.on('data', (chunk) => consume(chunk, 'stdout'))
     child.stderr?.on('data', (chunk) => consume(chunk, 'stderr'))
     child.once('error', (error) => {
-      this.child = null
+      if (this.child === child) this.child = null
+      if (this.intentionallyStoppedChildren.has(child)) return
       this.options.onEvent?.({
         agentId: this.agentId,
         phase: 'stopped',
@@ -256,8 +404,8 @@ export class CodexScheduleWorker {
       })
     })
     child.once('exit', (exitCode) => {
-      this.child = null
-      if (this.stopped) return
+      if (this.child === child) this.child = null
+      if (this.intentionallyStoppedChildren.has(child)) return
       this.options.onEvent?.({
         agentId: this.agentId,
         phase: 'stopped',
@@ -277,7 +425,10 @@ export class CodexScheduleWorker {
 
   stop(): void {
     this.stopped = true
-    if (this.child && this.child.exitCode === null) this.child.kill()
+    if (this.child && this.child.exitCode === null) {
+      this.intentionallyStoppedChildren.add(this.child)
+      this.child.kill()
+    }
     this.child = null
   }
 }
@@ -332,7 +483,7 @@ export class CodexScheduleWorkerPool {
     if (started > 0) {
       return {
         status: 'started',
-        message: `正在启动 Codex 并行处理进程（${running}/${this.workers.length}）`,
+        message: `正在启动 Codex 并行处理进程（${running}/${desired}，动态上限 ${this.workers.length}）`,
         started,
         running
       }
@@ -340,7 +491,7 @@ export class CodexScheduleWorkerPool {
     return {
       status: 'already_running',
       message: running > 1
-        ? `${running} 个 Codex 并行处理进程已运行，正在领取任务`
+        ? `${running} 个 Codex 并行处理进程已运行（动态目标 ${desired}/${this.workers.length}），正在领取任务`
         : 'Codex 自动处理进程已运行，正在领取任务',
       started,
       running
@@ -349,5 +500,12 @@ export class CodexScheduleWorkerPool {
 
   stop(): void {
     for (const worker of this.workers) worker.stop()
+  }
+
+  stopAgent(agentId: string): boolean {
+    const worker = this.workers.find((candidate) => candidate.agentId === agentId)
+    if (!worker || !worker.isRunning()) return false
+    worker.stop()
+    return true
   }
 }

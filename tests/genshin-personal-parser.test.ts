@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GenshinPersonalAdapter } from '../src/main/sync/genshin-personal-adapter'
 import {
+  extractGenshinExplorationReviewCandidates,
   extractGenshinEventReviewCandidates,
   parseGenshinPersonalData
 } from '../src/main/sync/genshin-personal-parser'
@@ -151,12 +152,45 @@ describe('Genshin personal parsing', () => {
         progressPercent: 100,
         parentTitle: '沉玉谷'
       }),
+    ]))
+    expect(items.some((item) => item.title === '遗珑埠')).toBe(false)
+  })
+
+  it('地图语义候选只保留一级地区和独立地图，不发送普通二级区域', () => {
+    const candidates = extractGenshinExplorationReviewCandidates({
+      world_explorations: [{
+        id: 10,
+        parent_id: 0,
+        name: '璃月',
+        exploration_percentage: 800,
+        area_exploration_list: [
+          { name: '归离原', exploration_percentage: 900 }
+        ]
+      }, {
+        id: 11,
+        parent_id: 10,
+        name: '层岩巨渊',
+        exploration_percentage: 1000
+      }]
+    })
+
+    expect(candidates).toHaveLength(2)
+    expect(candidates).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        title: '遗珑埠',
-        progressPercent: 100,
-        parentTitle: '沉玉谷'
+        payload: expect.objectContaining({
+          officialTitle: '璃月',
+          observedNodeKind: 'region'
+        })
+      }),
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          officialTitle: '层岩巨渊',
+          observedNodeKind: 'independent',
+          observedParentId: '10'
+        })
       })
     ]))
+    expect(JSON.stringify(candidates)).not.toContain('归离原')
   })
 
   it('父区域零值且子区域未全满时不伪造平均探索度', () => {
@@ -271,8 +305,8 @@ describe('Genshin personal parsing', () => {
       expect.objectContaining({ message: '正在读取幽境危战战绩', current: 4, total: 5 }),
       expect.objectContaining({ message: '正在读取原神活动进度', current: 5, total: 5 })
     ])
-    expect(result.items).toHaveLength(5)
-    expect(result.reviewCandidates).toHaveLength(1)
+    expect(result.items).toHaveLength(0)
+    expect(result.reviewCandidates).toHaveLength(6)
     order.length = 0
     const eventsOnly = await adapter.sync('genshin', 'events')
     expect(order).toEqual(['events'])
@@ -292,8 +326,12 @@ describe('Genshin personal parsing', () => {
 
     const progress: Array<{ message: string }> = []
     const partial = await adapter.sync('genshin', 'cycles', (update) => progress.push(update))
-    expect(partial.items).toEqual(expect.arrayContaining([
-      expect.objectContaining({ modeKey: 'imaginarium-theater' })
+    expect(partial.items).toEqual([])
+    expect(partial.reviewCandidates).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        target: 'cycles',
+        payload: expect.objectContaining({ observedModeKey: 'imaginarium-theater' })
+      })
     ]))
     expect(partial.message).toContain('部分成功 1/3')
     expect(progress).toEqual(expect.arrayContaining([

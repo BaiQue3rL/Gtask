@@ -1,4 +1,5 @@
-import { CHECKLIST_CATEGORIES, SCHEDULE_KINDS } from '../../shared/contracts'
+import { CHECKLIST_CATEGORIES, MAP_NODE_KINDS, SCHEDULE_KINDS } from '../../shared/contracts'
+import { normalizeActivityTags } from '../activity-tags'
 import type { NormalizedSyncItem } from './types'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -44,7 +45,7 @@ function optionalActivityTags(value: unknown): string[] | undefined {
   if (value === undefined) return undefined
   if (!Array.isArray(value) || value.length > 5) throw new Error('活动玩法标签格式不正确')
   const tags = value.map((entry) => requiredString(entry, '活动玩法标签', 20))
-  const uniqueTags = [...new Set(tags)]
+  const uniqueTags = normalizeActivityTags(tags)
   if (uniqueTags.includes('待识别')) {
     throw new Error('活动玩法标签不能使用“待识别”，无法确认时请使用“未知”')
   }
@@ -81,6 +82,14 @@ export function normalizeSyncItem(value: unknown): NormalizedSyncItem {
     throw new Error('同步周期类型格式不正确')
   }
   if (
+    value.mapNodeKind !== undefined &&
+    value.mapNodeKind !== null &&
+    (typeof value.mapNodeKind !== 'string' ||
+      !MAP_NODE_KINDS.includes(value.mapNodeKind as NormalizedSyncItem['mapNodeKind'] & string))
+  ) {
+    throw new Error('同步地图节点类型格式不正确')
+  }
+  if (
     value.resetWeekday !== undefined &&
     value.resetWeekday !== null &&
     (typeof value.resetWeekday !== 'number' ||
@@ -106,6 +115,9 @@ export function normalizeSyncItem(value: unknown): NormalizedSyncItem {
     completed: value.completed as boolean | undefined,
     progressPercent: value.progressPercent as number | null | undefined,
     parentTitle: nullableString(value.parentTitle, '同步上级区域'),
+    mapNodeKind: value.mapNodeKind as NormalizedSyncItem['mapNodeKind'] | undefined,
+    parentRemoteKey: nullableString(value.parentRemoteKey, '同步上级区域标识'),
+    relatedRegionRemoteKey: nullableString(value.relatedRegionRemoteKey, '同步关联区域标识'),
     startsAt,
     endsAt,
     resetRule: nullableString(value.resetRule, '同步重置规则'),

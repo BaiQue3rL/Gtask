@@ -2,6 +2,7 @@ import {
   CHECKLIST_CATEGORIES,
   CHECKLIST_SECTIONS,
   CREDENTIAL_PROVIDERS,
+  MAP_NODE_KINDS,
   SCHEDULE_KINDS,
   SYNC_RUN_MODES,
   SYNC_SCOPES,
@@ -12,12 +13,15 @@ import {
   type CredentialProvider,
   type CreateChecklistItemInput,
   type GameId,
+  type MapNodeKind,
   type ScheduleKind,
   type SyncRunMode,
   type SyncScope,
+  type SyncRequestContext,
   type SyncTarget,
   type UpdateChecklistItemInput
 } from '../shared/contracts'
+import { normalizeActivityTags } from './activity-tags'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -54,7 +58,7 @@ function parseActivityTags(value: unknown): string[] | undefined {
     if (!tag || tag.length > 20) throw new Error('活动玩法标签须为 1 到 20 个字符')
     return tag
   })
-  const uniqueTags = [...new Set(tags)]
+  const uniqueTags = normalizeActivityTags(tags)
   if (uniqueTags.includes('待识别')) {
     throw new Error('活动玩法标签不能使用“待识别”，无法确认时请使用“未知”')
   }
@@ -89,6 +93,15 @@ function parseProgress(value: unknown): number | null | undefined {
     throw new Error('探索进度必须在 0 到 100 之间')
   }
   return value
+}
+
+function parseMapNodeKind(value: unknown): MapNodeKind | null | undefined {
+  if (value === undefined) return undefined
+  if (value === null || value === '') return null
+  if (typeof value !== 'string' || !MAP_NODE_KINDS.includes(value as MapNodeKind)) {
+    throw new Error('地图节点类型格式不正确')
+  }
+  return value as MapNodeKind
 }
 
 function parseScheduleKind(value: unknown): ScheduleKind | null | undefined {
@@ -131,6 +144,9 @@ export function parseCreateChecklistItem(value: unknown): CreateChecklistItemInp
     activityTags: parseActivityTags(value.activityTags),
     progressPercent: parseProgress(value.progressPercent),
     parentTitle: parseNullableString(value.parentTitle, '上级区域'),
+    mapNodeKind: parseMapNodeKind(value.mapNodeKind),
+    parentRemoteKey: parseNullableString(value.parentRemoteKey, '上级区域标识'),
+    relatedRegionRemoteKey: parseNullableString(value.relatedRegionRemoteKey, '关联区域标识'),
     startsAt,
     endsAt,
     resetRule: parseNullableString(value.resetRule, '重置规则'),
@@ -162,6 +178,9 @@ export function parseUpdateChecklistItem(value: unknown): UpdateChecklistItemInp
     completed: value.completed,
     progressPercent: parseProgress(value.progressPercent),
     parentTitle: parseNullableString(value.parentTitle, '上级区域'),
+    mapNodeKind: parseMapNodeKind(value.mapNodeKind),
+    parentRemoteKey: parseNullableString(value.parentRemoteKey, '上级区域标识'),
+    relatedRegionRemoteKey: parseNullableString(value.relatedRegionRemoteKey, '关联区域标识'),
     startsAt,
     endsAt,
     resetRule: parseNullableString(value.resetRule, '重置规则'),
@@ -204,6 +223,28 @@ export function parseSyncTarget(value: unknown): SyncTarget {
     throw new Error('不支持的同步版块')
   }
   return value as SyncTarget
+}
+
+export function parseSyncRequestContext(value: unknown): SyncRequestContext {
+  if (!isRecord(value)) throw new Error('同步请求上下文格式不正确')
+  if (typeof value.outputLocale !== 'string') throw new Error('同步输出语言格式不正确')
+  let outputLocale: string
+  try {
+    outputLocale = Intl.getCanonicalLocales(value.outputLocale.trim())[0]
+  } catch {
+    throw new Error('同步输出语言不是有效的 BCP-47 语言标记')
+  }
+  if (!outputLocale) throw new Error('同步输出语言不能为空')
+  if (typeof value.userTimeZone !== 'string' || !value.userTimeZone.trim()) {
+    throw new Error('用户时区格式不正确')
+  }
+  const userTimeZone = value.userTimeZone.trim()
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: userTimeZone }).format()
+  } catch {
+    throw new Error('用户时区不是有效的 IANA 时区')
+  }
+  return { outputLocale, userTimeZone }
 }
 
 export function parseCredentialProvider(value: unknown): CredentialProvider {

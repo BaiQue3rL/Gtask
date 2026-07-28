@@ -1,5 +1,7 @@
-import { join } from 'node:path'
-import { app, BrowserWindow, dialog, ipcMain, net, safeStorage, shell } from 'electron'
+import { cpSync, existsSync, mkdirSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { freemem, totalmem } from 'node:os'
+import { app, BrowserWindow, dialog, ipcMain, net, safeStorage, session, shell } from 'electron'
 import { AppDatabase, CURRENT_SCHEMA_VERSION } from './database'
 import {
   createDailyBackup,
@@ -11,13 +13,23 @@ import {
 } from './backup'
 import { CredentialVault, removeRetiredDeepSeekCredential } from './credential-vault'
 import { detectCodexPlugin } from './ai/codex-plugin'
-import { prepareCodexPluginMarketplace } from './ai/codex-plugin-installer'
+import {
+  installCodexPluginFromPersonalMarketplace,
+  prepareStableMcpElectronRuntime,
+  prepareCodexPluginMarketplace,
+  refreshCodexMcpLauncher
+} from './ai/codex-plugin-installer'
 import {
   CODEX_SCHEDULE_WORKER_AGENT_ID,
-  MAX_CODEX_SCHEDULE_WORKERS,
+  CodexDynamicConcurrencyController,
   CodexScheduleWorkerPool,
+  findCodexCli,
+  type CodexWorkerTransportMode,
   type CodexScheduleWorkerEvent
 } from './ai/codex-schedule-worker'
+import {
+  resolveLoopbackHttpProxy
+} from './ai/codex-proxy-repair'
 import { MiyousheQrLoginService } from './auth/miyoushe-qr-login'
 import { solveMiyousheGeetest } from './auth/miyoushe-geetest-window'
 import { KuroCommunityCredentialService } from './auth/kuro-community-credential'
@@ -37,8 +49,7 @@ import { encodeKuroCommunityCredential } from './sync/kuro-community-credential'
 import { SyncOrchestrator } from './sync/orchestrator'
 import { restoreRelaunchOptions } from './relaunch'
 import { migrateLegacyAppData, resolveAppDataPaths } from './data-paths'
-import { normalizeSyncItems } from './sync/normalization'
-import { getBundledExplorationCatalog } from './sync/bundled-exploration-catalog'
+import { getFixedWeeklyBootstrap } from './sync/public-sync-bootstrap'
 import {
   getPersonalSyncTargets,
   supportsPersonalSyncTarget
@@ -46,8 +57,11 @@ import {
 import {
   SUPPORTED_GAME_IDS,
   type AiScheduleJob,
+  type CodexConnectionRepairMode,
+  type CodexConnectionRepairResult,
   type GameId,
   type SyncProgressUpdate,
+  type SyncRequestContext,
   type SyncResult,
   type SyncScope,
   type SyncTarget
@@ -60,6 +74,7 @@ import {
   parseGameId,
   parseItemId,
   parseSyncScope,
+  parseSyncRequestContext,
   parseSyncTarget,
   parseUpdateChecklistItem
 } from './validation'
@@ -78,7 +93,7 @@ let syncOrchestrator: SyncOrchestrator | null = null
 let periodTimer: ReturnType<typeof setInterval> | null = null
 let externalChangeTimer: ReturnType<typeof setInterval> | null = null
 let aiJobProgressTimer: ReturnType<typeof setInterval> | null = null
-const aiJobProgressSignatures = new Map<GameId, string>()
+const aiJobProgressSignatures = new Map<string, string>()
 let codexScheduleWorkerPool: CodexScheduleWorkerPool | null = null
 let credentialVault: CredentialVault | null = null
 let miyousheQrLogin: MiyousheQrLoginService | null = null
@@ -87,25 +102,101 @@ let kuroCommunityLogin: KuroCommunityLoginService | null = null
 let appBackupDirectory: string | null = null
 let appDatabasePath: string | null = null
 let appDataRoot: string | null = null
+let codexWorkerEnvironment: NodeJS.ProcessEnv = {}
+let codexWorkerTransportMode: CodexWorkerTransportMode = 'websocket_preferred'
+const codexConcurrency = new CodexDynamicConcurrencyController()
+
+function reportBackgroundError(context: string, error: unknown): void {
+  const message = error instanceof Error ? error.message : String(error)
+  if (/database is locked|SQLITE_BUSY/i.test(message)) {
+    codexConcurrency.recordBackpressure()
+    console.warn(`${context}暂时遇到数据库占用，稍后自动重试`)
+    return
+  }
+  console.error(`${context}失败`, error)
+}
+
+function codexMcpLauncherOptions() {
+  const integrationDirectory = join(app.getPath('userData'), 'codex-integration')
+  const sourceScriptPath = app.isPackaged
+    ? join(process.resourcesPath, 'codex-mcp-runtime', 'local-mcp-server-cli.js')
+    : join(app.getAppPath(), 'out', 'main', 'local-mcp-server-cli.js')
+  const runtimeDirectory = join(integrationDirectory, 'mcp-runtime')
+  mkdirSync(runtimeDirectory, { recursive: true })
+  cpSync(dirname(sourceScriptPath), runtimeDirectory, { recursive: true, force: true })
+  const executablePath = prepareStableMcpElectronRuntime(
+    process.execPath,
+    integrationDirectory,
+    app.getVersion()
+  )
+  return {
+    integrationDirectory,
+    executablePath,
+    mcpScriptPath: join(runtimeDirectory, 'local-mcp-server-cli.js'),
+    databasePath: appDatabasePath ?? join(app.getPath('documents'), 'GachaTaskManager', 'data', 'gacha-task-manager.sqlite'),
+    commandShellPath: process.env.ComSpec ??
+      join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'cmd.exe')
+  }
+}
+
+function createCodexWorkerPool(): CodexScheduleWorkerPool {
+  return new CodexScheduleWorkerPool({
+    workingDirectory: app.getPath('userData'),
+    env: codexWorkerEnvironment,
+    transportMode: codexWorkerTransportMode,
+    onEvent: handleCodexScheduleWorkerEvent
+  })
+}
+
+function restartCodexWorkers(message: string): void {
+  if (!appDatabase) throw new Error('数据库尚未初始化')
+  const agentIds = codexScheduleWorkerPool?.agentIds ?? []
+  codexScheduleWorkerPool?.stop()
+  for (const agentId of agentIds) {
+    appDatabase.requeueClaimedAiScheduleJobsByAgent(agentId)
+  }
+  codexScheduleWorkerPool = createCodexWorkerPool()
+  appDatabase.updatePendingAiScheduleJobsMessage(message, null, null)
+  startCodexWorkersForActiveJobs()
+  pollAiJobProgress()
+}
 
 async function queueAiScheduleSync(
   gameId: GameId,
   scope: SyncScope,
-  target: SyncTarget = 'all'
+  target: SyncTarget = 'all',
+  requestContext: SyncRequestContext = {
+    outputLocale: 'zh-CN',
+    userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+  }
 ): Promise<SyncResult> {
   if (!appDatabase) throw new Error('数据库尚未初始化')
   const startedAt = new Date().toISOString()
   const sources: SyncResult['sources'] = []
-  const bundledCatalogMerge = target === 'all' || target === 'exploration'
+  const fixedWeeklyMerge = target === 'all' || target === 'cycles'
     ? appDatabase.mergeSyncedItems(
         gameId,
         'public_schedule',
-        normalizeSyncItems(getBundledExplorationCatalog(gameId))
+        getFixedWeeklyBootstrap(gameId, target)
       )
+    : null
+  const bootstrapMerge = fixedWeeklyMerge
+    ? {
+        added: fixedWeeklyMerge.added,
+        updated: fixedWeeklyMerge.updated,
+        preserved: fixedWeeklyMerge.preserved
+      }
     : null
   try {
     const plugin = detectCodexPlugin()
-    const job = appDatabase.createAiScheduleJob(gameId, scope, new Date(), plugin.installed, target)
+    const job = appDatabase.createAiScheduleJob(
+      gameId,
+      scope,
+      new Date(),
+      plugin.installed,
+      target,
+      requestContext
+    )
     const launch = startCodexWorkersForActiveJobs() ?? {
       status: 'unavailable' as const,
       message: 'Codex 自动处理服务尚未初始化',
@@ -117,38 +208,40 @@ async function queueAiScheduleSync(
       throw new Error(launch.message)
     }
     appDatabase.updatePendingAiScheduleJobsMessage(launch.message)
-    const activeJob = appDatabase.getActiveAiScheduleJob(gameId) ?? job
+    const activeJob = appDatabase.getActiveAiScheduleJob(gameId, target) ?? job
     sendAiJobProgress(activeJob)
     const publicMessage = `${launch.message}（任务 ${job.id.slice(0, 8)}）`
-    const catalogMessage = bundledCatalogMerge
-      ? `基础地图目录已同步（新增 ${bundledCatalogMerge.added}，更新 ${bundledCatalogMerge.updated}）；`
-      : ''
+    const localMessages = [
+      fixedWeeklyMerge
+        ? `固定周常已维护（新增 ${fixedWeeklyMerge.added}，更新 ${fixedWeeklyMerge.updated}）`
+        : ''
+    ].filter(Boolean)
     sources.push({
       source: 'public_schedule',
       status: 'skipped',
-      message: `${catalogMessage}${publicMessage}`,
-      ...(bundledCatalogMerge ?? { added: 0, updated: 0, preserved: 0 })
+      message: `${localMessages.length ? `${localMessages.join('；')}；` : ''}${publicMessage}`,
+      ...(bootstrapMerge ?? { added: 0, updated: 0, preserved: 0 })
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : '无法创建 AI 资料任务'
     appDatabase.recordSyncTargetAttempt(
       gameId,
       target,
-      bundledCatalogMerge ? 'stale' : 'error'
+      bootstrapMerge ? 'stale' : 'error'
     )
     sources.push({
       source: 'public_schedule',
-      status: bundledCatalogMerge ? 'success' : 'error',
-      message: bundledCatalogMerge
-        ? `基础地图目录已同步（新增 ${bundledCatalogMerge.added}，更新 ${bundledCatalogMerge.updated}）；AI 增量校正未能排队：${message}`
+      status: bootstrapMerge ? 'success' : 'error',
+      message: bootstrapMerge
+        ? `本地基础目录已维护（新增 ${bootstrapMerge.added}，更新 ${bootstrapMerge.updated}）；AI 增量校正未能排队：${message}`
         : message,
-      ...(bundledCatalogMerge ?? { added: 0, updated: 0, preserved: 0 })
+      ...(bootstrapMerge ?? { added: 0, updated: 0, preserved: 0 })
     })
   }
 
   if (scope === 'public_and_personal') {
     const personal = syncOrchestrator
-      ? await syncOrchestrator.syncPersonalData(gameId, target)
+      ? await syncOrchestrator.syncPersonalData(gameId, target, requestContext)
       : {
           source: 'personal_data' as const,
           status: 'error' as const,
@@ -202,16 +295,39 @@ function handleCodexScheduleWorkerEvent(event: CodexScheduleWorkerEvent): void {
   if (event.phase === 'stopped') {
     const message =
       event.exitCode === 0 && event.message === 'Codex 自动处理进程已结束'
-        ? 'Codex 自动进程已结束，但仍有同步任务未完成；请重新同步'
+        ? 'Codex 处理进程已结束，未完成任务已重新排队'
         : event.message
-    const failed = appDatabase.failClaimedAiScheduleJobsByAgent(event.agentId, message)
-    if (failed > 0) mainWindow?.webContents.send('checklist:changed')
+    const requeuedJobs = appDatabase.requeueClaimedAiScheduleJobsByAgent(
+      event.agentId,
+      new Date(),
+      message
+    )
+    const requeuedReviews = appDatabase.requeueClaimedSemanticReviewsByAgent(
+      event.agentId,
+      message
+    )
+    const healthyExit =
+      event.exitCode === 0 &&
+      event.message === 'Codex 自动处理进程已结束' &&
+      requeuedJobs === 0 &&
+      requeuedReviews === 0
+    const hasBacklog =
+      appDatabase.listActiveAiScheduleJobs().length +
+      appDatabase.getActiveSemanticReviewCount() > 0
+    if (healthyExit) codexConcurrency.recordHealthyCompletion(hasBacklog)
+    else codexConcurrency.recordBackpressure()
+    if (requeuedJobs > 0 || requeuedReviews > 0) {
+      mainWindow?.webContents.send('checklist:changed')
+    }
     setTimeout(startCodexWorkersForActiveJobs, 0)
     return
   }
+  if (event.phase === 'retrying' || event.phase === 'fallback') {
+    codexConcurrency.recordBackpressure()
+  }
   const runningWorkers = codexScheduleWorkerPool?.runningCount ?? 0
   const message = runningWorkers > 1
-    ? `${event.message} · 并行 ${runningWorkers}/${MAX_CODEX_SCHEDULE_WORKERS}`
+    ? `${event.message} · 并行 ${runningWorkers} · 动态目标 ${codexConcurrency.currentLimit}/${codexConcurrency.maximumLimit}`
     : event.message
   const changed = appDatabase.updatePendingAiScheduleJobsMessage(
     message,
@@ -225,11 +341,16 @@ function startCodexWorkersForActiveJobs():
   | ReturnType<CodexScheduleWorkerPool['ensureCapacity']>
   | null {
   if (!appDatabase || !codexScheduleWorkerPool) return null
-  const activeJobs = SUPPORTED_GAME_IDS.filter(
-    (gameId) => appDatabase?.getActiveAiScheduleJob(gameId)
-  ).length
-  if (activeJobs === 0) return null
-  const launch = codexScheduleWorkerPool.ensureCapacity(activeJobs)
+  const activeJobs = appDatabase.listActiveAiScheduleJobs().length
+  const activeReviews = appDatabase.getActiveSemanticReviewCount()
+  const memoryRatio = totalmem() > 0 ? freemem() / totalmem() : 1
+  const activeWork = codexConcurrency.desiredWorkers(
+    activeJobs,
+    activeReviews,
+    memoryRatio
+  )
+  if (activeWork === 0) return null
+  const launch = codexScheduleWorkerPool.ensureCapacity(activeWork)
   if (launch.status === 'unavailable') {
     appDatabase.failPendingAiScheduleJobs(launch.message)
     mainWindow?.webContents.send('checklist:changed')
@@ -259,32 +380,34 @@ function sendAiJobProgress(job: AiScheduleJob): void {
 
 function pollAiJobProgress(): void {
   if (!appDatabase) return
-  const maintenance = appDatabase.maintainAiScheduleJobs()
-  if (maintenance.requeued > 0 || maintenance.expired > 0) {
-    mainWindow?.webContents.send('checklist:changed')
-  }
-  for (const gameId of SUPPORTED_GAME_IDS) {
-    const job = appDatabase.getActiveAiScheduleJob(gameId)
-    const previousSignature = aiJobProgressSignatures.get(gameId)
-    if (!job) {
-      if (previousSignature) {
-        aiJobProgressSignatures.delete(gameId)
-        mainWindow?.webContents.send('checklist:changed')
-      }
-      continue
+  try {
+    const maintenance = appDatabase.maintainAiScheduleJobs()
+    if (maintenance.requeued > 0 || maintenance.expired > 0) {
+      mainWindow?.webContents.send('checklist:changed')
     }
-    const signature = [
-      job.id,
-      job.status,
-      job.progressPhase,
-      job.progressCurrent,
-      job.progressTotal,
-      job.progressUpdatedAt,
-      job.message
-    ].join(':')
-    if (signature === previousSignature) continue
-    aiJobProgressSignatures.set(gameId, signature)
-    sendAiJobProgress(job)
+    const jobs = appDatabase.listActiveAiScheduleJobs()
+    const activeJobIds = new Set(jobs.map((job) => job.id))
+    for (const knownJobId of aiJobProgressSignatures.keys()) {
+      if (activeJobIds.has(knownJobId)) continue
+      aiJobProgressSignatures.delete(knownJobId)
+      mainWindow?.webContents.send('checklist:changed')
+    }
+    for (const job of jobs) {
+      const previousSignature = aiJobProgressSignatures.get(job.id)
+      const signature = [
+        job.status,
+        job.progressPhase,
+        job.progressCurrent,
+        job.progressTotal,
+        job.progressUpdatedAt,
+        job.message
+      ].join(':')
+      if (signature === previousSignature) continue
+      aiJobProgressSignatures.set(job.id, signature)
+      sendAiJobProgress(job)
+    }
+  } catch (error) {
+    reportBackgroundError('同步任务后台维护', error)
   }
 }
 
@@ -423,36 +546,96 @@ function registerIpcHandlers(): void {
       codexPluginInstalled: detectCodexPlugin({ appMarketplacePath }).installed
     }
   })
-  ipcMain.handle('ai-schedule:get-active-job', (_event, gameId: unknown) => {
+  ipcMain.handle('ai-schedule:get-active-job', (
+    _event,
+    gameId: unknown,
+    target?: unknown
+  ) => {
     if (!appDatabase) throw new Error('数据库尚未初始化')
-    return appDatabase.getActiveAiScheduleJob(parseGameId(gameId))
+    return appDatabase.getActiveAiScheduleJob(
+      parseGameId(gameId),
+      target === undefined ? undefined : parseSyncTarget(target)
+    )
   })
-  ipcMain.handle('semantic-review:get-summary', (_event, gameId: unknown) => {
+  ipcMain.handle('ai-schedule:list-active-jobs', (_event, gameId?: unknown) => {
     if (!appDatabase) throw new Error('数据库尚未初始化')
-    return appDatabase.getSemanticReviewSummary(parseGameId(gameId))
+    return appDatabase.listActiveAiScheduleJobs(
+      gameId === undefined ? undefined : parseGameId(gameId)
+    )
+  })
+  ipcMain.handle('semantic-review:get-summary', (
+    _event,
+    gameId: unknown,
+    target?: unknown
+  ) => {
+    if (!appDatabase) throw new Error('数据库尚未初始化')
+    const parsedTarget = target === undefined ? undefined : parseSyncTarget(target)
+    if (parsedTarget === 'all' || parsedTarget === 'tasks') {
+      throw new Error('语义核验进度只支持活动、周期事项和地图探索版块')
+    }
+    return appDatabase.getSemanticReviewSummary(parseGameId(gameId), parsedTarget)
   })
   ipcMain.handle('codex-plugin:open', async () => {
-    const integrationDirectory = join(app.getPath('userData'), 'codex-integration')
-    const appMarketplacePath = join(integrationDirectory, 'marketplace.json')
-    const plugin = detectCodexPlugin({ appMarketplacePath })
-    if (plugin.installed) {
-      await shell.openExternal(plugin.deeplink)
-      return
-    }
+    const launcherOptions = codexMcpLauncherOptions()
     const sourcePluginPath = app.isPackaged
       ? join(process.resourcesPath, 'codex-plugin')
       : join(app.getAppPath(), 'integrations', 'gacha-task-manager')
     const prepared = prepareCodexPluginMarketplace({
+      ...launcherOptions,
       sourcePluginPath,
-      integrationDirectory,
-      executablePath: process.execPath,
-      mcpScriptPath: app.isPackaged
-        ? join(process.resourcesPath, 'app.asar', 'out', 'main', 'local-mcp-server-cli.js')
-        : join(app.getAppPath(), 'out', 'main', 'local-mcp-server-cli.js'),
-      databasePath: appDatabasePath ?? join(app.getPath('documents'), 'GachaTaskManager', 'data', 'gacha-task-manager.sqlite')
+      personalMarketplacePath: join(app.getPath('home'), '.agents', 'plugins', 'marketplace.json'),
+      personalPluginPath: join(app.getPath('home'), 'plugins', 'gacha-task-manager')
     })
     await shell.openExternal(prepared.deeplink)
   })
+  ipcMain.handle('codex-plugin:update', async () => {
+    const launcherOptions = codexMcpLauncherOptions()
+    const sourcePluginPath = app.isPackaged
+      ? join(process.resourcesPath, 'codex-plugin')
+      : join(app.getAppPath(), 'integrations', 'gacha-task-manager')
+    prepareCodexPluginMarketplace({
+      ...launcherOptions,
+      sourcePluginPath,
+      personalMarketplacePath: join(app.getPath('home'), '.agents', 'plugins', 'marketplace.json'),
+      personalPluginPath: join(app.getPath('home'), 'plugins', 'gacha-task-manager')
+    })
+    const codexCliPath = findCodexCli()
+    if (!codexCliPath) throw new Error('未找到 Codex 命令行，请先安装或更新 Codex')
+    return installCodexPluginFromPersonalMarketplace(codexCliPath)
+  })
+  ipcMain.handle(
+    'codex-proxy:repair',
+    async (_event, mode: CodexConnectionRepairMode): Promise<CodexConnectionRepairResult> => {
+      if (!['proxy', 'https'].includes(mode)) throw new Error('Codex 连接修复方式无效')
+      if ((appDatabase?.listActiveAiScheduleJobs().length ?? 0) === 0) {
+        throw new Error('当前没有需要修复的 Codex 同步任务')
+      }
+      if (mode === 'proxy') {
+        const resolution = await session.defaultSession.resolveProxy(
+          'https://chatgpt.com/backend-api/codex'
+        )
+        const proxyUrl = resolveLoopbackHttpProxy(resolution)
+        if (!proxyUrl) {
+          throw new Error('系统代理未解析到可安全显式套用的本地端口；可以切换全局/TUN，或继续选择 HTTPS 兼容连接')
+        }
+        codexWorkerEnvironment = {
+          HTTP_PROXY: proxyUrl,
+          HTTPS_PROXY: proxyUrl,
+          ALL_PROXY: '',
+          NO_PROXY: 'localhost,127.0.0.1,::1'
+        }
+        codexWorkerTransportMode = 'websocket_preferred'
+        const message = '已把当前本地代理显式应用到本软件启动的 Codex，正在重新连接'
+        restartCodexWorkers(message)
+        return { mode, message }
+      }
+
+      codexWorkerTransportMode = 'https_compatibility'
+      const message = '已关闭本次 Codex 的 Responses WebSocket，正在通过 HTTPS 兼容连接重新同步'
+      restartCodexWorkers(message)
+      return { mode, message }
+    }
+  )
 
   ipcMain.handle('games:list', () => appDatabase?.listGames() ?? [])
   ipcMain.handle('checklist:list', (_event, gameId: unknown) =>
@@ -510,6 +693,10 @@ function registerIpcHandlers(): void {
     if (!appDatabase) throw new Error('数据库尚未初始化')
     return appDatabase.getSyncSettings(parseGameId(gameId))
   })
+  ipcMain.handle('sync:dismiss-initial-guide', (_event, gameId: unknown) => {
+    if (!appDatabase) throw new Error('数据库尚未初始化')
+    return appDatabase.dismissInitialSyncGuide(parseGameId(gameId))
+  })
   ipcMain.handle('sync:get-target-states', (_event, gameId: unknown) => {
     if (!appDatabase) throw new Error('数据库尚未初始化')
     return appDatabase.getSyncTargetStates(parseGameId(gameId))
@@ -517,27 +704,106 @@ function registerIpcHandlers(): void {
   ipcMain.handle('sync:get-personal-targets', (_event, gameId: unknown) =>
     getPersonalSyncTargets(parseGameId(gameId))
   )
-  ipcMain.handle('sync:run', async (_event, gameId: unknown, scope: unknown, target: unknown = 'all') => {
+  ipcMain.handle('sync:run', async (
+    _event,
+    gameId: unknown,
+    scope: unknown,
+    target: unknown = 'all',
+    requestContext: unknown
+  ) => {
     return await queueAiScheduleSync(
       parseGameId(gameId),
       parseSyncScope(scope),
-      parseSyncTarget(target)
+      parseSyncTarget(target),
+      parseSyncRequestContext(requestContext)
     )
   })
-  ipcMain.handle('sync:run-personal', async (_event, gameId: unknown, target: unknown = 'all') => {
+  ipcMain.handle('sync:run-personal', async (
+    _event,
+    gameId: unknown,
+    target: unknown = 'all',
+    requestContext: unknown
+  ) => {
     if (!syncOrchestrator) throw new Error('个人数据同步服务尚未初始化')
     const parsedGameId = parseGameId(gameId)
     const parsedTarget = parseSyncTarget(target)
+    const parsedRequestContext = parseSyncRequestContext(requestContext)
     if (parsedTarget === 'all' || parsedTarget === 'tasks') {
       throw new Error('同步进度只能从活动、周期事项或地图探索版块发起')
     }
     if (!supportsPersonalSyncTarget(parsedGameId, parsedTarget)) {
       throw new Error('当前游戏的个人数据接口不提供该版块进度')
     }
-    return await syncOrchestrator.syncPersonalOnly(
+    const result = await syncOrchestrator.syncPersonalOnly(
       parsedGameId,
-      parsedTarget
+      parsedTarget,
+      parsedRequestContext
     )
+    if (result.sources.some((source) => (source.pendingReview ?? 0) > 0)) {
+      startCodexWorkersForActiveJobs()
+    }
+    return result
+  })
+  ipcMain.handle('sync:cancel', (
+    _event,
+    gameId: unknown,
+    target: unknown,
+    source: unknown
+  ) => {
+    if (!appDatabase || !syncOrchestrator) throw new Error('同步服务尚未初始化')
+    const parsedGameId = parseGameId(gameId)
+    const parsedTarget = parseSyncTarget(target)
+    if (source !== 'public_schedule' && source !== 'personal_data') {
+      throw new Error('同步取消来源不受支持')
+    }
+
+    let cancelled = false
+    if (source === 'public_schedule') {
+      const result = appDatabase.cancelActiveAiScheduleJob(parsedGameId, parsedTarget)
+      if (result?.agentId) codexScheduleWorkerPool?.stopAgent(result.agentId)
+      cancelled = Boolean(result)
+    } else {
+      if (parsedTarget === 'all' || parsedTarget === 'tasks') {
+        throw new Error('个人进度取消只支持活动、周期事项和地图探索版块')
+      }
+      const adapterCancelled = syncOrchestrator.cancelPersonalSync(
+        parsedGameId,
+        parsedTarget
+      )
+      const reviews = appDatabase.cancelSemanticReviewCandidates(
+        parsedGameId,
+        parsedTarget
+      )
+      for (const agentId of reviews.agentIds) {
+        codexScheduleWorkerPool?.stopAgent(agentId)
+      }
+      cancelled = adapterCancelled || reviews.cancelled > 0
+    }
+
+    const message = cancelled ? '已取消' : '当前没有可取消的同步'
+    if (cancelled) {
+      mainWindow?.webContents.send('sync:progress', {
+        gameId: parsedGameId,
+        target: parsedTarget,
+        source,
+        phase: 'cancelled',
+        status: 'cancelled',
+        message,
+        current: null,
+        total: null,
+        updatedAt: new Date().toISOString()
+      } satisfies SyncProgressUpdate)
+      mainWindow?.webContents.send('checklist:changed')
+      pollAiJobProgress()
+      setTimeout(startCodexWorkersForActiveJobs, 0)
+    }
+    return {
+      gameId: parsedGameId,
+      target: parsedTarget,
+      source,
+      cancelled,
+      message
+    }
   })
   ipcMain.handle('credentials:list-status', () => {
     if (!credentialVault) throw new Error('安全凭据存储尚未初始化')
@@ -677,26 +943,51 @@ if (!app.requestSingleInstanceLock()) {
     } catch (error) {
       console.error('创建或整理每日数据库备份失败', error)
     }
-    codexScheduleWorkerPool = new CodexScheduleWorkerPool({
-      workingDirectory: app.getPath('userData'),
-      onEvent: handleCodexScheduleWorkerEvent
-    })
+    try {
+      const appMarketplacePath = join(app.getPath('userData'), 'codex-integration', 'marketplace.json')
+      if (detectCodexPlugin({ appMarketplacePath }).installed) {
+        const launcherOptions = codexMcpLauncherOptions()
+        refreshCodexMcpLauncher(launcherOptions)
+        const legacyIntegrationDirectory = join(
+          app.getPath('appData'),
+          'gacha-task-manager',
+          'codex-integration'
+        )
+        if (existsSync(join(legacyIntegrationDirectory, 'launch-gacha-mcp.cmd'))) {
+          refreshCodexMcpLauncher({
+            ...launcherOptions,
+            integrationDirectory: legacyIntegrationDirectory
+          })
+        }
+      }
+    } catch (error) {
+      console.error('刷新 Codex MCP 启动路径失败', error)
+    }
+    codexScheduleWorkerPool = createCodexWorkerPool()
     syncOrchestrator = createAppSyncOrchestrator(appDatabase)
     registerIpcHandlers()
     createWindow()
     periodTimer = setInterval(() => {
-      const changes =
-        (appDatabase?.resetDueWeeklyItems() ?? 0) +
-        (appDatabase?.resetDueQuestItems() ?? 0) +
-        (appDatabase?.markStaleSyncStates() ?? 0)
-      if (changes > 0) mainWindow?.webContents.send('checklist:changed')
+      try {
+        const changes =
+          (appDatabase?.resetDueWeeklyItems() ?? 0) +
+          (appDatabase?.resetDueQuestItems() ?? 0) +
+          (appDatabase?.markStaleSyncStates() ?? 0)
+        if (changes > 0) mainWindow?.webContents.send('checklist:changed')
+      } catch (error) {
+        reportBackgroundError('周期状态后台维护', error)
+      }
     }, 60_000)
     let lastDataVersion = appDatabase.getDataVersion()
     externalChangeTimer = setInterval(() => {
-      const currentDataVersion = appDatabase?.getDataVersion() ?? lastDataVersion
-      if (currentDataVersion === lastDataVersion) return
-      lastDataVersion = currentDataVersion
-      mainWindow?.webContents.send('checklist:changed')
+      try {
+        const currentDataVersion = appDatabase?.getDataVersion() ?? lastDataVersion
+        if (currentDataVersion === lastDataVersion) return
+        lastDataVersion = currentDataVersion
+        mainWindow?.webContents.send('checklist:changed')
+      } catch (error) {
+        reportBackgroundError('数据库变更检测', error)
+      }
     }, 2_000)
     pollAiJobProgress()
     aiJobProgressTimer = setInterval(pollAiJobProgress, 2_000)
@@ -720,13 +1011,18 @@ app.on('before-quit', () => {
   if (aiJobProgressTimer) clearInterval(aiJobProgressTimer)
   aiJobProgressTimer = null
   aiJobProgressSignatures.clear()
+  codexScheduleWorkerPool?.stop()
   for (const agentId of [
     CODEX_SCHEDULE_WORKER_AGENT_ID,
     ...(codexScheduleWorkerPool?.agentIds ?? [])
   ]) {
-    appDatabase?.requeueClaimedAiScheduleJobsByAgent(agentId)
+    try {
+      appDatabase?.requeueClaimedAiScheduleJobsByAgent(agentId)
+      appDatabase?.requeueClaimedSemanticReviewsByAgent(agentId)
+    } catch (error) {
+      reportBackgroundError('退出时归还同步任务', error)
+    }
   }
-  codexScheduleWorkerPool?.stop()
   codexScheduleWorkerPool = null
   appDatabase?.close()
   appDatabase = null
@@ -759,40 +1055,59 @@ function createAppSyncOrchestrator(database: AppDatabase): SyncOrchestrator {
       genshin: new CredentialBackedAdapter(
         'miyoushe',
         credentialVault,
-        (credential, onProgress) => createMiyousheGenshinPersonalAdapter(
+        (credential, onProgress, signal) => createMiyousheGenshinPersonalAdapter(
           credential,
           fetcher,
-          (challenge) => solveMiyousheGeetest(mainWindow, challenge),
-          onProgress
+          (challenge) => solveMiyousheGeetest(
+            mainWindow,
+            challenge,
+            undefined,
+            signal
+          ),
+          onProgress,
+          signal
         )
       ),
       'star-rail': new CredentialBackedAdapter(
         'miyoushe',
         credentialVault,
-        (credential, onProgress) => createMiyousheStarRailPersonalAdapter(
+        (credential, onProgress, signal) => createMiyousheStarRailPersonalAdapter(
           credential,
           fetcher,
-          (challenge) => solveMiyousheGeetest(mainWindow, challenge),
-          onProgress
+          (challenge) => solveMiyousheGeetest(
+            mainWindow,
+            challenge,
+            undefined,
+            signal
+          ),
+          onProgress,
+          signal
         )
       ),
       zenless: new CredentialBackedAdapter(
         'miyoushe',
         credentialVault,
-        (credential, onProgress) => createMiyousheZenlessPersonalAdapter(
+        (credential, onProgress, signal) => createMiyousheZenlessPersonalAdapter(
           credential,
           fetcher,
-          (challenge) => solveMiyousheGeetest(mainWindow, challenge),
-          onProgress
+          (challenge) => solveMiyousheGeetest(
+            mainWindow,
+            challenge,
+            undefined,
+            signal
+          ),
+          onProgress,
+          signal
         )
       ),
       'wuthering-waves': new CredentialBackedAdapter(
         'kuro-community',
         credentialVault,
-        (credential, onProgress) => createKuroCommunityPersonalAdapter(
+        (credential, onProgress, signal) => createKuroCommunityPersonalAdapter(
           credential,
           fetcher,
-          onProgress
+          onProgress,
+          signal
         )
       )
     }

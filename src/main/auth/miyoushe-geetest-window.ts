@@ -28,8 +28,10 @@ const MIYOUSHE_COPY: GeetestWindowCopy = {
 export async function solveMiyousheGeetest(
   parent: BrowserWindow | null,
   challenge: MiyousheGeetestChallenge,
-  copy: GeetestWindowCopy = MIYOUSHE_COPY
+  copy: GeetestWindowCopy = MIYOUSHE_COPY,
+  signal?: AbortSignal
 ): Promise<MiyousheGeetestResult | null> {
+  signal?.throwIfAborted()
   const verificationWindow = new BrowserWindow({
     width: 480,
     height: 620,
@@ -52,12 +54,15 @@ export async function solveMiyousheGeetest(
 
   return await new Promise<MiyousheGeetestResult | null>((resolve, reject) => {
     let settled = false
+    const cancel = (): void => finish(null)
     const finish = (result: MiyousheGeetestResult | null): void => {
       if (settled) return
       settled = true
+      signal?.removeEventListener('abort', cancel)
       resolve(result)
       if (!verificationWindow.isDestroyed()) verificationWindow.close()
     }
+    signal?.addEventListener('abort', cancel, { once: true })
 
     verificationWindow.on('closed', () => finish(null))
     verificationWindow.webContents.on('will-navigate', (event, url) => {

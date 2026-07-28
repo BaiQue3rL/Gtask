@@ -4,7 +4,12 @@ import {
   resolveKuroIosDevCode
 } from '../auth/kuro-community-device'
 import { decodeKuroCommunityCredential, type KuroCommunityCredential } from './kuro-community-credential'
-import { SyncVerificationRequiredError, type SyncProgressReporter } from './types'
+import {
+  SyncCancelledError,
+  SyncVerificationRequiredError,
+  throwIfSyncCancelled,
+  type SyncProgressReporter
+} from './types'
 import {
   WutheringWavesPersonalAdapter
 } from './wuthering-waves-personal-adapter'
@@ -31,7 +36,8 @@ export class KuroCommunityClient {
     private readonly reportProgress?: SyncProgressReporter,
     private readonly wait: (milliseconds: number) => Promise<void> = delay,
     private readonly resolveIosDevCode: () => Promise<string> =
-      () => resolveKuroIosDevCode(fetcher)
+      () => resolveKuroIosDevCode(fetcher),
+    private readonly externalSignal?: AbortSignal
   ) {
     this.bat = extractKuroBatToken(credential.bat) ?? credential.bat?.trim() ?? ''
   }
@@ -113,12 +119,15 @@ export class KuroCommunityClient {
     isBatRetry = false,
     attempt = 1
   ): Promise<unknown> {
+    throwIfSyncCancelled(this.externalSignal)
+    const devCode = await this.resolveIosDevCode()
+    throwIfSyncCancelled(this.externalSignal)
     const headers: Record<string, string> = {
       source: 'ios',
       version: '3.1.3',
       'content-type': 'application/x-www-form-urlencoded; charset=utf-8',
       'user-agent': KURO_IOS_USER_AGENT,
-      devCode: await this.resolveIosDevCode()
+      devCode
     }
     if (options.includeToken) headers.token = this.credential.token
     if (options.includeDid) headers.did = this.credential.did
@@ -129,6 +138,8 @@ export class KuroCommunityClient {
     if (options.includeEmptyBat) headers['b-at'] = ''
 
     const controller = new AbortController()
+    const cancelRequest = (): void => controller.abort()
+    this.externalSignal?.addEventListener('abort', cancelRequest, { once: true })
     const timeout = setTimeout(() => controller.abort(), 15_000)
     try {
       const response = await this.fetcher(`${BASE_URL}${path}`, {
@@ -174,6 +185,7 @@ export class KuroCommunityClient {
       }
       return decodeKuroEnvelopeData(envelope.data)
     } catch (error) {
+      if (this.externalSignal?.aborted) throw new SyncCancelledError()
       const retryable =
         error instanceof KuroTransientError ||
         (error instanceof Error && ['AbortError', 'TypeError'].includes(error.name))
@@ -185,7 +197,7 @@ export class KuroCommunityClient {
           current: nextAttempt,
           total: MAX_ATTEMPTS
         })
-        await this.wait(250 * 2 ** (attempt - 1))
+        await this.waitForRetry(250 * 2 ** (attempt - 1))
         return await this.request(path, body, options, isBatRetry, nextAttempt)
       }
       if (error instanceof Error && error.name === 'AbortError') {
@@ -194,7 +206,30 @@ export class KuroCommunityClient {
       throw error
     } finally {
       clearTimeout(timeout)
+      this.externalSignal?.removeEventListener('abort', cancelRequest)
     }
+  }
+
+  private async waitForRetry(milliseconds: number): Promise<void> {
+    throwIfSyncCancelled(this.externalSignal)
+    if (!this.externalSignal) {
+      await this.wait(milliseconds)
+      return
+    }
+    await new Promise<void>((resolve, reject) => {
+      const onAbort = (): void => reject(new SyncCancelledError())
+      this.externalSignal!.addEventListener('abort', onAbort, { once: true })
+      this.wait(milliseconds).then(
+        () => {
+          this.externalSignal!.removeEventListener('abort', onAbort)
+          resolve()
+        },
+        (error) => {
+          this.externalSignal!.removeEventListener('abort', onAbort)
+          reject(error)
+        }
+      )
+    })
   }
 
   private roleBody(): Record<string, string> {
@@ -209,13 +244,17 @@ export class KuroCommunityClient {
 export function createKuroCommunityPersonalAdapter(
   credential: CredentialPayload,
   fetcher: typeof fetch,
-  reportProgress?: SyncProgressReporter
+  reportProgress?: SyncProgressReporter,
+  signal?: AbortSignal
 ): WutheringWavesPersonalAdapter {
   return new WutheringWavesPersonalAdapter(
     new KuroCommunityClient(
       decodeKuroCommunityCredential(credential),
       fetcher,
-      reportProgress
+      reportProgress,
+      undefined,
+      undefined,
+      signal
     )
   )
 }

@@ -76,7 +76,7 @@ for (const packageName of rootPackages) visitPackage(packageName, projectRoot)
 notices.sort((left, right) => left.key.localeCompare(right.key))
 
 const content = [
-  '幻游清单第三方软件声明',
+  'Gtask 第三方软件声明',
   '========================',
   '',
   '本文件由 scripts/generate-third-party-notices.mjs 根据实际锁定依赖生成。',

@@ -10,6 +10,7 @@ import {
   type PersonalRequestOutcome
 } from './personal-sync-settler'
 import type { SyncAdapter, SyncAdapterOutput, SyncProgressReporter } from './types'
+import { toCycleReviewCandidates } from './cycle-review'
 
 export interface ZenlessBattleChronicleClient {
   getShiyuDefense: () => Promise<unknown>
@@ -59,13 +60,18 @@ export class ZenlessPersonalAdapter implements SyncAdapter {
     assertAnyPersonalRequestSucceeded(outcomes)
     const suffix = personalPartialSuffix(outcomes)
     const hasChecklistData = [shiyuDefense, deadlyAssault].some((value) => value !== undefined)
+    const cycleItems = hasChecklistData
+      ? parseZenlessPersonalData({ shiyuDefense, deadlyAssault })
+      : []
+    const eventCandidates = eventCalendar === undefined
+      ? []
+      : extractZenlessEventReviewCandidates(eventCalendar)
     return {
-      items: hasChecklistData
-        ? parseZenlessPersonalData({ shiyuDefense, deadlyAssault })
-        : [],
-      reviewCandidates: eventCalendar === undefined
-        ? []
-        : extractZenlessEventReviewCandidates(eventCalendar),
+      items: [],
+      reviewCandidates: [
+        ...eventCandidates,
+        ...toCycleReviewCandidates('miyoushe', cycleItems)
+      ],
       message: (target === 'events'
         ? '绝区零活动进度已读取'
         : target === 'cycles'

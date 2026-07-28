@@ -1,4 +1,4 @@
-import type { NormalizedSyncItem } from './types'
+import type { NormalizedSyncItem, SemanticReviewDraft } from './types'
 import { finiteNumber } from './numbers'
 
 export interface WutheringWavesPersonalPayload {
@@ -39,23 +39,35 @@ export function parseWutheringWavesExploration(value: unknown): NormalizedSyncIt
       modeKey: `exploration-country-${countryId}`
     })
 
-    const areas = Array.isArray(group.areaInfoList) ? group.areaInfoList.filter(isRecord) : []
-    for (const area of areas) {
-      const areaId = requiredIdentifier(area.areaId, `${countryName}子区域 id`)
-      const areaName = requiredString(area.areaName, `${countryName}子区域名称`)
-      const areaProgress = percentage(area.areaProgress, `${areaName}探索度`)
-      items.push({
-        remoteKey: `exploration:area:${areaId}`,
-        category: 'exploration',
-        title: areaName,
-        completed: areaProgress === 100,
-        progressPercent: areaProgress,
-        parentTitle: countryName,
-        modeKey: `exploration-area-${areaId}`
-      })
-    }
   }
   return items
+}
+
+export function extractWutheringWavesExplorationReviewCandidates(
+  value: unknown
+): SemanticReviewDraft[] {
+  const root = requiredRecord(value, '地图探索')
+  const groups = Array.isArray(root.exploreList) ? root.exploreList.filter(isRecord) : []
+  const drafts: SemanticReviewDraft[] = []
+  for (const group of groups) {
+    const country = requiredRecord(group.country, '地图大区域')
+    const countryId = requiredIdentifier(country.countryId, '地图大区域 id')
+    const countryName = requiredString(country.countryName, '地图大区域名称')
+    drafts.push({
+      target: 'exploration',
+      kind: 'personal-map-progress',
+      payload: {
+        provider: 'kuro-community',
+        officialId: countryId,
+        officialTitle: countryName,
+        observedProgress: percentage(group.countryProgress, `${countryName}探索度`),
+        observedNodeKind: 'region',
+        observedParentId: null,
+        observedParentTitle: null
+      }
+    })
+  }
+  return drafts
 }
 
 export function parseWutheringWavesTower(value: unknown): NormalizedSyncItem {

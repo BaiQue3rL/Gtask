@@ -1,8 +1,11 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it } from 'vitest'
-import { prepareCodexPluginMarketplace } from '../src/main/ai/codex-plugin-installer'
+import {
+  prepareCodexPluginMarketplace,
+  prepareStableMcpElectronRuntime
+} from '../src/main/ai/codex-plugin-installer'
 
 const temporaryDirectories: string[] = []
 
@@ -11,24 +14,62 @@ afterEach(() => {
 })
 
 describe('Codex plugin installer', () => {
-  it('creates a local marketplace and packaged MCP launch command', () => {
-    const integrationDirectory = mkdtempSync(join(tmpdir(), 'gacha-codex-plugin-'))
-    temporaryDirectories.push(integrationDirectory)
-    const executablePath = 'C:\\Apps\\幻游清单\\幻游清单.exe'
-    const mcpScriptPath = 'C:\\Apps\\幻游清单\\resources\\app.asar\\out\\main\\local-mcp-server-cli.js'
+  it('persists the minimal Electron Node runtime outside portable temp folders', () => {
+    const root = mkdtempSync(join(tmpdir(), 'gacha-codex-runtime-'))
+    temporaryDirectories.push(root)
+    const sourceDirectory = join(root, 'portable-temp')
+    const integrationDirectory = join(root, 'AppData', 'gtask', 'codex-integration')
+    mkdirSync(sourceDirectory, { recursive: true })
+    const sourceExecutable = join(sourceDirectory, 'Gtask.exe')
+    writeFileSync(sourceExecutable, 'electron')
+    for (const name of ['icudtl.dat', 'snapshot_blob.bin', 'v8_context_snapshot.bin']) {
+      writeFileSync(join(sourceDirectory, name), name)
+    }
+
+    const executablePath = prepareStableMcpElectronRuntime(
+      sourceExecutable,
+      integrationDirectory,
+      '0.1.0-rc.20'
+    )
+
+    expect(executablePath).toBe(join(
+      integrationDirectory,
+      'electron-node',
+      '0.1.0-rc.20',
+      'gtask-mcp-node.exe'
+    ))
+    expect(readFileSync(executablePath, 'utf8')).toBe('electron')
+    expect(readFileSync(
+      join(integrationDirectory, 'electron-node', '0.1.0-rc.20', 'icudtl.dat'),
+      'utf8'
+    )).toBe('icudtl.dat')
+  })
+
+  it('uses the auto-discovered personal marketplace and a stable MCP launcher', () => {
+    const root = mkdtempSync(join(tmpdir(), 'gacha-codex-plugin-'))
+    temporaryDirectories.push(root)
+    const integrationDirectory = join(root, 'AppData', 'gacha-task-manager', 'codex-integration')
+    const personalMarketplacePath = join(root, '.agents', 'plugins', 'marketplace.json')
+    const personalPluginPath = join(root, 'plugins', 'gacha-task-manager')
+    const executablePath = 'C:\\Apps\\Gtask\\Gtask.exe'
+    const mcpScriptPath = 'C:\\Apps\\Gtask\\resources\\app.asar\\out\\main\\local-mcp-server-cli.js'
     const databasePath = 'D:\\Documents\\GachaTaskManager\\data\\gacha-task-manager.sqlite'
     const prepared = prepareCodexPluginMarketplace({
       sourcePluginPath: join(process.cwd(), 'integrations', 'gacha-task-manager'),
       integrationDirectory,
+      personalMarketplacePath,
+      personalPluginPath,
       executablePath,
       mcpScriptPath,
-      databasePath
+      databasePath,
+      commandShellPath: 'C:\\Windows\\System32\\cmd.exe'
     })
 
     const marketplace = JSON.parse(readFileSync(prepared.marketplacePath, 'utf8'))
     const mcp = JSON.parse(readFileSync(join(prepared.pluginPath, '.mcp.json'), 'utf8'))
+    const launcher = readFileSync(prepared.launcherPath, 'utf8')
     expect(marketplace).toMatchObject({
-      name: 'gacha-task-manager-app',
+      name: 'personal',
       plugins: [{
         name: 'gacha-task-manager',
         source: { source: 'local', path: './plugins/gacha-task-manager' },
@@ -36,11 +77,50 @@ describe('Codex plugin installer', () => {
       }]
     })
     expect(mcp.mcpServers.gacha_task_manager).toEqual({
-      command: executablePath,
-      args: [mcpScriptPath, '--database', databasePath],
-      cwd: 'C:\\Apps\\幻游清单',
-      env: { ELECTRON_RUN_AS_NODE: '1' }
+      command: 'C:\\Windows\\System32\\cmd.exe',
+      args: ['/d', '/c', prepared.launcherPath],
+      cwd: integrationDirectory
     })
-    expect(decodeURIComponent(prepared.deeplink)).toContain(prepared.marketplacePath)
+    expect(launcher).toContain(
+      `start "" /wait /b "${executablePath}" "${mcpScriptPath}" --database "${databasePath}"`
+    )
+    expect(decodeURIComponent(prepared.deeplink)).toContain(personalMarketplacePath)
+  })
+
+  it('preserves unrelated personal marketplace plugins', () => {
+    const root = mkdtempSync(join(tmpdir(), 'gacha-codex-plugin-'))
+    temporaryDirectories.push(root)
+    const marketplacePath = join(root, '.agents', 'plugins', 'marketplace.json')
+    const integrationDirectory = join(root, 'integration')
+    const pluginPath = join(root, 'plugins', 'gacha-task-manager')
+    mkdirSync(join(root, '.agents', 'plugins'), { recursive: true })
+    writeFileSync(marketplacePath, JSON.stringify({
+      name: 'personal',
+      interface: { displayName: 'My plugins' },
+      plugins: [{
+        name: 'other-plugin',
+        source: { source: 'local', path: './plugins/other-plugin' },
+        policy: { installation: 'AVAILABLE', authentication: 'ON_USE' },
+        category: 'Developer tools'
+      }]
+    }), { encoding: 'utf8', flag: 'w' })
+
+    prepareCodexPluginMarketplace({
+      sourcePluginPath: join(process.cwd(), 'integrations', 'gacha-task-manager'),
+      integrationDirectory,
+      personalMarketplacePath: marketplacePath,
+      personalPluginPath: pluginPath,
+      executablePath: 'C:\\Apps\\Gtask.exe',
+      mcpScriptPath: 'C:\\Apps\\resources\\app.asar\\mcp.js',
+      databasePath: 'D:\\Documents\\GachaTaskManager\\data\\db.sqlite',
+      commandShellPath: 'C:\\Windows\\System32\\cmd.exe'
+    })
+
+    const marketplace = JSON.parse(readFileSync(marketplacePath, 'utf8'))
+    expect(marketplace.interface.displayName).toBe('My plugins')
+    expect(marketplace.plugins.map((plugin: { name: string }) => plugin.name)).toEqual([
+      'other-plugin',
+      'gacha-task-manager'
+    ])
   })
 })

@@ -1,4 +1,5 @@
 export const SUPPORTED_GAME_IDS = ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const
+export const GTASK_MCP_PROTOCOL_VERSION = '2026-07-28.3'
 
 export type GameId = (typeof SUPPORTED_GAME_IDS)[number]
 
@@ -15,6 +16,8 @@ export const CHECKLIST_CATEGORIES = [
 
 export type ChecklistCategory = (typeof CHECKLIST_CATEGORIES)[number]
 export type ChecklistSource = 'manual' | 'public_schedule' | 'personal_sync'
+export const MAP_NODE_KINDS = ['region', 'subregion', 'independent', 'group'] as const
+export type MapNodeKind = (typeof MAP_NODE_KINDS)[number]
 
 export const CHECKLIST_SECTIONS = ['tasks', 'events', 'cycles', 'exploration', 'custom'] as const
 export type ChecklistSection = (typeof CHECKLIST_SECTIONS)[number]
@@ -91,7 +94,8 @@ export const SYNC_PROGRESS_PHASES = [
   'verification',
   'merging',
   'completed',
-  'failed'
+  'failed',
+  'cancelled'
 ] as const
 export type SyncProgressPhase = (typeof SYNC_PROGRESS_PHASES)[number]
 export type SyncProgressStatus =
@@ -100,6 +104,7 @@ export type SyncProgressStatus =
   | 'verification_required'
   | 'completed'
   | 'error'
+  | 'cancelled'
 
 export interface SyncProgressUpdate {
   gameId: GameId
@@ -111,6 +116,20 @@ export interface SyncProgressUpdate {
   current: number | null
   total: number | null
   updatedAt: string
+}
+
+export type CodexConnectionRepairMode = 'proxy' | 'https'
+
+export interface CodexConnectionRepairResult {
+  mode: CodexConnectionRepairMode
+  message: string
+}
+
+export interface CodexPluginInstallResult {
+  pluginId: string
+  version: string
+  installedPath: string
+  message: string
 }
 
 export interface AiScheduleAgentStatus {
@@ -132,12 +151,87 @@ export interface ActivityTagEnrichmentTarget {
   endsAt: string | null
 }
 
+export interface AiScheduleMatchCandidate {
+  itemId: string
+  category: ChecklistCategory
+  title: string
+  source: ChecklistSource
+  remoteKey: string | null
+  modeKey: string | null
+  periodKey: string | null
+  startsAt: string | null
+  endsAt: string | null
+  parentTitle: string | null
+  mapNodeKind: MapNodeKind | null
+  parentRemoteKey: string | null
+  relatedRegionRemoteKey: string | null
+  completed: boolean
+  progressPercent: number | null
+}
+
+export interface SyncContractConditionalField {
+  field: string
+  when: string
+  meaning: string
+}
+
+export interface SyncContractItemShape {
+  name: string
+  categories: ChecklistCategory[]
+  requiredFields: string[]
+  conditionalFields: SyncContractConditionalField[]
+  forbiddenFields: string[]
+}
+
+export interface SyncSectionContract {
+  target: Exclude<SyncTarget, 'all'>
+  purpose: string
+  inventoryScope: string
+  itemShapes: SyncContractItemShape[]
+  completionCriteria: string[]
+}
+
+export interface SyncRequestContext {
+  outputLocale: string
+  userTimeZone: string
+}
+
+export interface PublicSyncContract {
+  schemaVersion: 3
+  authority: 'interface_contract'
+  decisionAuthority: 'codex'
+  executorPolicy: 'mechanical_validation_only'
+  allowedMutations: ['create', 'update', 'archive']
+  target: SyncTarget
+  requestContext: SyncRequestContext
+  workflow: ['inventory', 'research_required_fields', 'verify', 'match_existing', 'submit']
+  commonRequiredItemFields: string[]
+  submissionRequiredFields: string[]
+  fieldSemantics: Record<string, string>
+  sections: SyncSectionContract[]
+}
+
+export interface SemanticReviewContract {
+  schemaVersion: 4
+  authority: 'interface_contract'
+  decisionAuthority: 'codex'
+  executorPolicy: 'mechanical_validation_only'
+  allowedMutations: ['create', 'update', 'archive']
+  target: PersonalSyncTarget
+  requestContext: SyncRequestContext
+  requiredDecisionFields: string[]
+  conditionalFields: SyncContractConditionalField[]
+  fieldSemantics: Record<string, string>
+}
+
 export interface AiScheduleJob {
   id: string
   gameId: GameId
   scope: SyncScope
   target: SyncTarget
   userTimeZone: string
+  outputLocale: string
+  requestContext: SyncRequestContext
   status: AiScheduleJobStatus
   requestedAt: string
   claimedAt: string | null
@@ -150,6 +244,8 @@ export interface AiScheduleJob {
   progressTotal: number | null
   progressUpdatedAt: string
   activityTagTargets: ActivityTagEnrichmentTarget[]
+  matchCandidates: AiScheduleMatchCandidate[]
+  contract: PublicSyncContract
 }
 
 export type SemanticReviewStatus = 'pending' | 'claimed' | 'approved' | 'rejected'
@@ -168,6 +264,8 @@ export interface SemanticReviewCandidate {
   agentId: string | null
   agentName: string | null
   message: string | null
+  accountScope: string | null
+  requestContext: SyncRequestContext
 }
 
 export interface SemanticReviewDecisionSummary {
@@ -209,6 +307,9 @@ export interface ChecklistItem {
   completed: boolean
   progressPercent: number | null
   parentTitle: string | null
+  mapNodeKind: MapNodeKind | null
+  parentRemoteKey: string | null
+  relatedRegionRemoteKey: string | null
   startsAt: string | null
   endsAt: string | null
   resetRule: string | null
@@ -235,6 +336,9 @@ export interface CreateChecklistItemInput {
   activityTags?: string[]
   progressPercent?: number | null
   parentTitle?: string | null
+  mapNodeKind?: MapNodeKind | null
+  parentRemoteKey?: string | null
+  relatedRegionRemoteKey?: string | null
   startsAt?: string | null
   endsAt?: string | null
   resetRule?: string | null
@@ -253,6 +357,9 @@ export interface UpdateChecklistItemInput {
   completed?: boolean
   progressPercent?: number | null
   parentTitle?: string | null
+  mapNodeKind?: MapNodeKind | null
+  parentRemoteKey?: string | null
+  relatedRegionRemoteKey?: string | null
   startsAt?: string | null
   endsAt?: string | null
   resetRule?: string | null
@@ -272,6 +379,7 @@ export interface SyncSettings {
   gameId: GameId
   runMode: SyncRunMode
   autoScope: SyncScope
+  initialGuideDismissed: boolean
   status: SyncStatus
   lastScope: SyncScope | null
   lastAttemptAt: string | null
@@ -285,11 +393,13 @@ export interface SyncTargetState {
   lastSuccessAt: string | null
   lastAttemptAt: string | null
   status: SyncStatus
+  catalogCoverage: 'empty' | 'partial' | 'complete'
+  catalogSource: 'public_schedule' | 'personal_data' | null
 }
 
 export interface SyncSourceResult {
   source: 'public_schedule' | 'personal_data'
-  status: 'success' | 'error' | 'skipped' | 'verification_required'
+  status: 'success' | 'error' | 'skipped' | 'verification_required' | 'cancelled'
   message: string
   added: number
   updated: number
@@ -301,10 +411,18 @@ export interface SyncResult {
   gameId: GameId
   requestedScope: SyncRequestScope
   requestedTarget: SyncTarget
-  status: 'success' | 'partial' | 'error'
+  status: 'success' | 'partial' | 'error' | 'cancelled'
   startedAt: string
   finishedAt: string
   sources: SyncSourceResult[]
+  message: string
+}
+
+export interface SyncCancellationResult {
+  gameId: GameId
+  target: SyncTarget
+  source: 'public_schedule' | 'personal_data'
+  cancelled: boolean
   message: string
 }
 
@@ -316,9 +434,17 @@ export interface GachaApi {
   createBackup: () => Promise<BackupSummary>
   restoreBackup: (fileName: string) => Promise<boolean>
   getAiScheduleAgentStatus: () => Promise<AiScheduleAgentStatus>
-  getActiveAiScheduleJob: (gameId: GameId) => Promise<AiScheduleJob | null>
-  getSemanticReviewSummary: (gameId: GameId) => Promise<SemanticReviewSummary>
+  getActiveAiScheduleJob: (gameId: GameId, target?: SyncTarget) => Promise<AiScheduleJob | null>
+  listActiveAiScheduleJobs: (gameId?: GameId) => Promise<AiScheduleJob[]>
+  getSemanticReviewSummary: (
+    gameId: GameId,
+    target?: PersonalSyncTarget
+  ) => Promise<SemanticReviewSummary>
   openCodexPlugin: () => Promise<void>
+  updateCodexPlugin: () => Promise<CodexPluginInstallResult>
+  repairCodexConnection: (
+    mode: CodexConnectionRepairMode
+  ) => Promise<CodexConnectionRepairResult>
   listGames: () => Promise<GameSummary[]>
   listChecklistItems: (gameId: GameId) => Promise<ChecklistItem[]>
   listArchivedChecklistItems: (gameId: GameId) => Promise<ChecklistItem[]>
@@ -329,10 +455,25 @@ export interface GachaApi {
   emptyRecycleBin: (gameId: GameId) => Promise<number>
   archiveCompletedSection: (input: ArchiveCompletedSectionInput) => Promise<number>
   getSyncSettings: (gameId: GameId) => Promise<SyncSettings>
+  dismissInitialSyncGuide: (gameId: GameId) => Promise<SyncSettings>
   getSyncTargetStates: (gameId: GameId) => Promise<SyncTargetState[]>
   getPersonalSyncTargets: (gameId: GameId) => Promise<PersonalSyncTarget[]>
-  syncGame: (gameId: GameId, scope: SyncScope, target?: SyncTarget) => Promise<SyncResult>
-  syncPersonalData: (gameId: GameId, target?: SyncTarget) => Promise<SyncResult>
+  syncGame: (
+    gameId: GameId,
+    scope: SyncScope,
+    target?: SyncTarget,
+    requestContext?: SyncRequestContext
+  ) => Promise<SyncResult>
+  syncPersonalData: (
+    gameId: GameId,
+    target?: SyncTarget,
+    requestContext?: SyncRequestContext
+  ) => Promise<SyncResult>
+  cancelSync: (
+    gameId: GameId,
+    target: SyncTarget,
+    source: 'public_schedule' | 'personal_data'
+  ) => Promise<SyncCancellationResult>
   listCredentialStatuses: () => Promise<CredentialStatus[]>
   startMiyousheQrLogin: () => Promise<MiyousheQrLoginState>
   pollMiyousheQrLogin: (sessionId: string) => Promise<MiyousheQrLoginState>

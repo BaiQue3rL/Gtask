@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type { GameId, SyncTarget } from '../../shared/contracts'
 import type { CredentialPayload } from '../credential-vault'
 import type { CredentialProvider } from '../../shared/contracts'
@@ -23,15 +24,18 @@ export class CredentialBackedAdapter implements SyncAdapter {
     private readonly credentials: CredentialReader,
     private readonly createAdapter: (
       credential: CredentialPayload,
-      reportProgress?: SyncProgressReporter
+      reportProgress?: SyncProgressReporter,
+      signal?: AbortSignal
     ) => SyncAdapter
   ) {}
 
   async sync(
     gameId: GameId,
     target: SyncTarget = 'all',
-    reportProgress?: SyncProgressReporter
+    reportProgress?: SyncProgressReporter,
+    signal?: AbortSignal
   ): Promise<SyncAdapterOutput> {
+    signal?.throwIfAborted()
     let credential: CredentialPayload | null
     try {
       credential = this.credentials.read(this.provider)
@@ -41,9 +45,56 @@ export class CredentialBackedAdapter implements SyncAdapter {
     if (!credential) {
       throw new SyncVerificationRequiredError(`${PROVIDER_LABELS[this.provider]}尚未登录`)
     }
-    const adapter = reportProgress
-      ? this.createAdapter(credential, reportProgress)
-      : this.createAdapter(credential)
-    return adapter.sync(gameId, target, reportProgress)
+    const adapter = this.createAdapter(credential, reportProgress, signal)
+    const output = await adapter.sync(gameId, target, reportProgress, signal)
+    return {
+      ...output,
+      accountScope: createPersonalAccountScope(this.provider, gameId, credential)
+    }
+  }
+}
+
+function createPersonalAccountScope(
+  provider: CredentialProvider,
+  gameId: GameId,
+  credential: CredentialPayload
+): string {
+  const stableIdentity = provider === 'miyoushe'
+    ? readCookieValue(credential.value, 'account_id_v2') ??
+      readCookieValue(credential.value, 'ltuid_v2') ??
+      credential.accountLabel
+    : readKuroRoleIdentity(credential.value) ?? credential.accountLabel
+  if (!stableIdentity) {
+    throw new SyncVerificationRequiredError(
+      `${PROVIDER_LABELS[provider]}凭据缺少稳定账号标识，请重新登录`
+    )
+  }
+  const digest = createHash('sha256')
+    .update(`${provider}|${gameId}|${stableIdentity}`)
+    .digest('hex')
+  return `${provider}:${digest}`
+}
+
+function readCookieValue(cookie: string, name: string): string | null {
+  for (const segment of cookie.split(';')) {
+    const separator = segment.indexOf('=')
+    if (separator < 0) continue
+    if (segment.slice(0, separator).trim() !== name) continue
+    const value = segment.slice(separator + 1).trim()
+    return value || null
+  }
+  return null
+}
+
+function readKuroRoleIdentity(value: string): string | null {
+  try {
+    const parsed = JSON.parse(value) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+    const record = parsed as Record<string, unknown>
+    const roleId = typeof record.roleId === 'string' ? record.roleId.trim() : ''
+    const serverId = typeof record.serverId === 'string' ? record.serverId.trim() : ''
+    return roleId && serverId ? `${serverId}:${roleId}` : null
+  } catch {
+    return null
   }
 }

@@ -9,9 +9,15 @@ const gachaApi: GachaApi = {
   createBackup: () => ipcRenderer.invoke('backups:create'),
   restoreBackup: (fileName) => ipcRenderer.invoke('backups:restore', fileName),
   getAiScheduleAgentStatus: () => ipcRenderer.invoke('ai-schedule:get-agent-status'),
-  getActiveAiScheduleJob: (gameId) => ipcRenderer.invoke('ai-schedule:get-active-job', gameId),
-  getSemanticReviewSummary: (gameId) => ipcRenderer.invoke('semantic-review:get-summary', gameId),
+  getActiveAiScheduleJob: (gameId, target) =>
+    ipcRenderer.invoke('ai-schedule:get-active-job', gameId, target),
+  listActiveAiScheduleJobs: (gameId) =>
+    ipcRenderer.invoke('ai-schedule:list-active-jobs', gameId),
+  getSemanticReviewSummary: (gameId, target) =>
+    ipcRenderer.invoke('semantic-review:get-summary', gameId, target),
   openCodexPlugin: () => ipcRenderer.invoke('codex-plugin:open'),
+  updateCodexPlugin: () => ipcRenderer.invoke('codex-plugin:update'),
+  repairCodexConnection: (mode) => ipcRenderer.invoke('codex-proxy:repair', mode),
   listGames: () => ipcRenderer.invoke('games:list'),
   listChecklistItems: (gameId) => ipcRenderer.invoke('checklist:list', gameId),
   listArchivedChecklistItems: (gameId) => ipcRenderer.invoke('checklist:list-archived', gameId),
@@ -22,10 +28,16 @@ const gachaApi: GachaApi = {
   emptyRecycleBin: (gameId) => ipcRenderer.invoke('checklist:empty-recycle-bin', gameId),
   archiveCompletedSection: (input) => ipcRenderer.invoke('checklist:archive-completed-section', input),
   getSyncSettings: (gameId) => ipcRenderer.invoke('sync:get-settings', gameId),
+  dismissInitialSyncGuide: (gameId) =>
+    ipcRenderer.invoke('sync:dismiss-initial-guide', gameId),
   getSyncTargetStates: (gameId) => ipcRenderer.invoke('sync:get-target-states', gameId),
   getPersonalSyncTargets: (gameId) => ipcRenderer.invoke('sync:get-personal-targets', gameId),
-  syncGame: (gameId, scope, target = 'all') => ipcRenderer.invoke('sync:run', gameId, scope, target),
-  syncPersonalData: (gameId, target = 'all') => ipcRenderer.invoke('sync:run-personal', gameId, target),
+  syncGame: (gameId, scope, target = 'all', requestContext) =>
+    ipcRenderer.invoke('sync:run', gameId, scope, target, requestContext),
+  syncPersonalData: (gameId, target = 'all', requestContext) =>
+    ipcRenderer.invoke('sync:run-personal', gameId, target, requestContext),
+  cancelSync: (gameId, target, source) =>
+    ipcRenderer.invoke('sync:cancel', gameId, target, source),
   listCredentialStatuses: () => ipcRenderer.invoke('credentials:list-status'),
   startMiyousheQrLogin: () => ipcRenderer.invoke('miyoushe-login:start'),
   pollMiyousheQrLogin: (sessionId) => ipcRenderer.invoke('miyoushe-login:poll', sessionId),

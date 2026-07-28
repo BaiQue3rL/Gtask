@@ -192,8 +192,8 @@ describe('Star Rail personal parsing', () => {
       current: 5,
       total: 5
     })
-    expect(result.items).toHaveLength(4)
-    expect(result.reviewCandidates).toHaveLength(1)
+    expect(result.items).toHaveLength(0)
+    expect(result.reviewCandidates).toHaveLength(5)
     order.length = 0
     const eventsOnly = await adapter.sync('star-rail', 'events')
     expect(order).toEqual(['events'])
@@ -217,8 +217,12 @@ describe('Star Rail personal parsing', () => {
     })
     const progress: Array<{ message: string }> = []
     const partial = await adapter.sync('star-rail', 'cycles', (update) => progress.push(update))
-    expect(partial.items).toEqual(expect.arrayContaining([
-      expect.objectContaining({ modeKey: 'memory-of-chaos' })
+    expect(partial.items).toEqual([])
+    expect(partial.reviewCandidates).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        target: 'cycles',
+        payload: expect.objectContaining({ observedModeKey: 'memory-of-chaos' })
+      })
     ]))
     expect(partial.message).toContain('部分成功 1/4')
     expect(progress).toEqual(expect.arrayContaining([

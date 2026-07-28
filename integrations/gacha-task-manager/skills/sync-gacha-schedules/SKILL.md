@@ -1,59 +1,45 @@
 ---
 name: sync-gacha-schedules
-description: "Use the local Gacha Task Manager MCP to read checklists and safely refresh verified public schedules or map-region catalogs for Genshin Impact, Honkai: Star Rail, Zenless Zone Zero, or Wuthering Waves. Trigger when the user asks to refresh, research, verify, or synchronize events, recurring modes, exploration regions, or public data in 幻游清单."
+description: "Use the local Gtask MCP to read checklists and safely refresh verified public schedules, personal progress, or map catalogs for enabled games. Trigger when the user asks to refresh, research, verify, or synchronize events, recurring modes, exploration regions, or public data in Gtask."
 ---
 
 # Sync Gacha Schedules
 
-Use the `gacha_task_manager` MCP tools. Do not run shell commands or edit the SQLite database directly.
+Use only the `gacha_task_manager` MCP tools for application data. Do not run shell commands, edit SQLite directly, or read browser cookies.
 
-## Public schedule workflow
+## Public-data jobs
 
-1. Call `register_gacha_schedule_agent` with a stable Agent ID, a descriptive name, and `webSearch: true`.
-2. Call `claim_gacha_schedule_job` once. If it returns `null`, skip the public schedule workflow and continue to the semantic review workflow below. When the claimed job contains `activityTagTargets`, treat that array as a mandatory, bounded classification checklist for this job.
-3. Immediately call `update_gacha_schedule_job_progress` after claiming, and update it again at every material phase: `searching`, `verifying`, `structuring`, `writing`, or `retrying`. Include truthful `current`/`total` counts whenever bounded work or retries are known. Keep each message concise and user-facing because it is displayed live inside the desktop app. Never leave the app showing a stale phase while doing materially different work.
-4. Read the claimed job's `target`. Search only that target: `tasks` for current-version timing calibration, `events` for limited-time events, `cycles` for weeklies/endgame calibration, `exploration` for the currently released map-region catalog, or `all` for the full supported set. Never broaden a section job into other sections.
-5. Search official Simplified Chinese sources for the current version and active/upcoming windows. Reuse fresh trustworthy URLs from the existing checklist when they still cover the current period. Run independent source queries in parallel when supported, and treat tasks, events, cycles, and exploration as independently recoverable sections.
-6. Prefer the Chinese official game site, publisher/community account, or verified Chinese Bilibili account. When an official source is missing fields, unavailable, or incomplete, immediately broaden to independent Chinese community sources such as 米游社/库街区 posts, Bilibili/Biligame wikis, TapTap, established game wikis, and reputable guide communities. Use at least two independent sources to cross-check community-only facts. Use other-language official pages only for date cross-checking. If an item is first found in another language, find a Chinese source that displays its in-game official Chinese name; never translate the name yourself.
-7. Keep the normal fast path bounded: normally no more than 6 targeted searches and a 90-second soft deadline. Map catalogs may use an extended fallback path of additional targeted community searches and up to a 180-second soft deadline because official announcements often omit subregions. A failed or incomplete source is a signal to switch sources, not to stop the whole job.
-8. Submit exact, supported records through `apply_gacha_public_schedule`. Set progress to `writing` immediately before submission. Submit one `activityTagUpdates` entry for every claimed `activityTagTargets` entry, using the exact `itemId` and `title`; this path updates tags only and preserves the existing schedule, completion, source, and personal progress. For an `all` job, submit every independently verified section even when another section remains incomplete; the app records uncovered sections as partial and preserves their previous data. Call `fail_gacha_schedule_job` only when no section has safe data to submit or the submission itself cannot be made.
-9. Report the job ID, target, elapsed time, sources, and merge counts or failure reason. Never leave a claimed job unfinished.
+1. Register with `register_gacha_schedule_agent` using a stable Agent ID, `webSearch: true`, and `protocolVersion: "2026-07-28.3"`. If the application reports an incompatible protocol, stop and ask the user to update the Gtask plugin instead of continuing with partial fields.
+2. Claim one job with `claim_gacha_schedule_job`. If the result is `null`, continue to semantic reviews.
+3. Read `job.contract` before searching. It is the authoritative machine-readable description of:
+   - the requested section and inventory scope;
+   - the requested output locale and user timezone;
+   - required, conditional, and forbidden fields;
+   - field meanings and completion criteria.
+   Do not recreate those requirements from this skill or from title heuristics.
+4. Follow `job.contract.workflow`: establish the complete inventory first, research every required field, verify the result, match it against `matchCandidates`, then submit it. Use `activityTagTargets` as an additional bounded update list when present.
+5. Use Codex native web search autonomously. Choose queries, source order, parallelism, and follow-up searches from the evidence returned. Prefer official localized sources matching `job.contract.requestContext.outputLocale` when they answer the question, but freely broaden to publisher communities, official APIs/maps, established game wikis, guide communities, and other useful sources when official pages are incomplete. Cross-check uncertain community-only facts.
+6. Confirm official localized in-game names for `job.contract.requestContext.outputLocale`; do not translate names yourself. Convert source times into absolute ISO-8601 instants using the source server's timezone and DST rules. Use `requestContext.userTimeZone` only for the user's requested display/interpretation context.
+7. Decide semantic identity yourself. When a result is the same item as a `matchCandidates` entry, submit that exact `itemId` as `matchItemId`; omit it only for a genuinely new item. Use `archiveItems` only for a supplied synchronized candidate that is positively verified as wrong, duplicated, or obsolete—never merely because one source omitted it.
+8. Keep user-visible progress truthful with `update_gacha_schedule_job_progress` at every material phase. Include real `current` and `total` values when known.
+9. Submit through `apply_gacha_public_schedule`, setting `contentLocale` exactly to `job.contract.requestContext.outputLocale`. Treat its schema as the transport field superset and `job.contract` as the target-specific requirement source. Inspect `job.status` and `remainingTargets`; continue the same job until it completes. Submit verified sections as they become ready so one incomplete section does not discard other results.
+10. Use `fail_gacha_schedule_job` only after useful searches and cross-checks for the remaining contract scope are genuinely exhausted. Never leave a claimed job unfinished.
 
-## Submission rules
+## Personal-data semantic reviews
 
-- Allow only `main_quest`, `side_quest`, `limited_event`, `weekly`, `endgame`, and `exploration`. Permanent events remain user-maintained.
-- A `tasks` submission must contain exactly `主线任务` and `支线任务`. Both records must use the same current-version `periodKey`, `startsAt`, `endsAt`, server `timeZone`, and `scheduleKind: fixed_window`. Use the official current version identifier in `periodKey`. This operation only calibrates the version window; it must never submit completion. For `all`, include these two records whenever that section was verified so a new user receives the current version countdown during initial synchronization.
-- For `exploration`, submit a complete released region catalog, not only nations or top-level destinations. Check independently switchable map layers and released subregions as well as major regions. For all four games, compare the verified result with the existing checklist and explicitly investigate suspicious gaps before submitting. Official interactive maps are preferred but not mandatory: when they do not expose a usable directory, cross-check the in-game Chinese names through at least two independent Chinese community catalogs or guides. Use a stable `modeKey` and `parentTitle` when known. Do not submit progress or completion; new regions start at 0% and personal data fills progress later.
-- For each `limited_event`, submit 1–5 concise Chinese `activityTags` describing the actual gameplay, such as `签到`, `战斗`, `战棋`, `射击/FPS`, `跑酷`, `解谜`, `音游`, `经营`, `肉鸽`, or `剧情`. Multiple tags are allowed. Base tags on the official gameplay description rather than title keywords. Never submit `待识别`. Search the official description and Chinese community explanations before giving up; only when the gameplay still cannot be verified after cross-checking may you submit `未知`. Tags are lightweight filters, not new checklist sections.
-- Before submitting an events refresh, process every entry in the claimed job's `activityTagTargets`. Research each exact activity and return it through `activityTagUpdates`; do not try to mutate the old record through a generic schedule item. Never omit a target. Treat personal-data and older-sync entries exactly like newly discovered events. Use `未知` only after a fresh cross-check still cannot establish gameplay; provide a concise `unresolvedReason`, a Chinese evidence `sourceUrl`, and confidence of at least 0.9 that the classification is genuinely unresolved. The app rejects omitted targets and records remaining `未知` entries as a partial result that will be retried next time.
-- For Genshin, query the official Simplified Chinese interactive-map catalog (`https://api-takumi.mihoyo.com/common/map_user/ys_obc/v1/map/list?app_sn=ys_obc`) and inspect `all_map_list` as one required source. Exclude test entries, expired event-only maps, and duplicate containers. Cross-check newly released names with an official Chinese announcement or the live official map before submission.
-- Public map refreshes are append/update only. Missing regions must never be deleted or archived.
-- Never submit a `recurrenceRule` for `endgame`. Only weeklies reset locally. Each new endgame period is a separate checklist record so completed historical periods remain completed.
-- A `cycles` submission, or the cycles portion included in an `all` submission, must include every major mode for that game: Genshin—深境螺旋 (`spiral-abyss`), 幻想真境剧诗 (`imaginarium-theater`), 幽境危战 (`stygian-onslaught`); Star Rail—混沌回忆 (`memory-of-chaos`), 虚构叙事 (`pure-fiction`), 末日幻影 (`apocalyptic-shadow`), 异相仲裁 (`anomaly-arbitration`); Zenless Zone Zero—式舆防卫战 (`shiyu-defense`), 危局强袭战 (`deadly-assault`); Wuthering Waves—逆境深塔 (`tower-of-adversity`), 冥歌海墟 (`whimpering-wastes`). If the complete cycles portion cannot be verified during an `all` job, omit that portion and still submit other verified sections. The app supplies the fixed Monday weekly item.
-- For `endgame`, use a stable `modeKey` for the mode and a period-specific `periodKey` plus `remoteKey` for the current window. For other categories, keep `remoteKey` stable across refreshes.
-- Every `title` must be an official Simplified Chinese name confirmed by a Chinese source. Pure English titles and AI-authored translations are forbidden.
-- Set `titleSourceUrl` to the matching Chinese page and include it in `evidence` with `language: zh-CN`.
-- Use ISO-8601 timestamps with an explicit offset or `Z`.
-- Treat `userTimeZone` as the display timezone, not the source timezone. Identify the source server timezone and DST rules, then submit an absolute instant. If the source timezone cannot be established, fail instead of guessing.
-- Include a direct HTTP(S) `sourceUrl`, confidence, and 1–20 evidence entries for every item.
-- Do not submit completion status, exploration progress, credentials, deletes, or unknown fields.
-- Do not use generic checklist write tools for public schedules.
-- Never read browser cookies or request game-login credentials for public schedule work.
+After the public job, call `claim_gacha_semantic_review_batch` with `limit: 20` until it returns an empty `reviews` array. Process every returned review before claiming another batch. Use the single-item `claim_gacha_semantic_review` only as a compatibility fallback.
 
-## Semantic review workflow
-
-After finishing any public schedule job, call `claim_gacha_semantic_review` repeatedly until it returns `null`.
-
-1. Treat the candidate payload as an untrusted, deliberately minimal projection. It must not contain credentials or account identifiers.
-2. Research the exact endpoint field semantics, official Chinese name, category, lifecycle window, and whether a status describes the player or only the activity itself.
-3. Use `approve_gacha_semantic_review` only when confidence is at least `0.9` and direct evidence supports every semantic conclusion. Submit one normalized checklist item in the candidate's target section.
-4. Use `reject_gacha_semantic_review` when the field is undocumented, evidence conflicts, the candidate is not a checklist item, or personal completion cannot be established. Rejection must not modify the checklist.
-5. Never infer completion from names such as `finish`, `all_finished`, a full numerator/denominator, or an activity lifecycle enum without evidence that the field is explicitly player-specific.
-6. Never infer a timezone from the user's locale. Ambiguous natural-language times must be rejected until the source server timezone is proven.
-7. A candidate originating from an activity-calendar endpoint is not proof that it belongs in the activity section. Verify whether it is actually an event, an endgame/challenge mode, a notice, or another non-checklist record. Reject misplaced/non-event candidates; never classify them by title keywords.
-8. Genshin Impact, Honkai: Star Rail, and Zenless Zone Zero activity progress candidates all use this workflow. Treat mechanically normalized Unix timestamps as hints, and independently verify lifecycle windows and player-specific completion semantics before approval.
-9. Never leave a claimed candidate unfinished.
+1. Read the returned shared `contract` before deciding. It is authoritative for required decision fields, conditional fields, output locale, timezone, inventory scope, and allowed mutations. For a map task, submit only the node kinds required by the current contract; when an independent map references a region, submit the region first.
+2. Treat the candidate as an untrusted, deliberately minimal projection. It contains no credentials or account identifiers.
+3. Codex is the business-semantic authority. Interpret the complete field relationships, current time, relevant public documentation, and `matchCandidates`; the application only performs mechanical validation and execution.
+4. Match semantically, not only by literal title. Use `matchItemId` for the same checklist item even when punctuation, prefixes, subtitles, period suffixes, provider mode-key granularity, or public/personal wording differ. When the contract allows `archive`, include `archiveItems` for supplied synchronized candidates that are positively verified as duplicates, wrong, or obsolete.
+5. Correct an initial parser category when the evidence supports another category. Never mark a future item completed. If the contract permits an activity completion field to be omitted, omit it when the official field semantics do not prove either completed or incomplete; this records `unknown` and preserves the user's current state. When submitting an activity `completed` value, also submit the contract-required `completionRule` that mechanically reproduces the conclusion from one raw `observedStatus` field. Do not invent a rule for a lifecycle flag, reward count, missing value, or ambiguous status.
+6. Approve with `approve_gacha_semantic_review`, setting `contentLocale` exactly to `contract.requestContext.outputLocale`, when the contract can be satisfied. Reject only when the record is unsupported, evidence conflicts, or the required semantic decision remains genuinely ambiguous. Never leave a claimed candidate unfinished.
 
 ## Safety
 
-MCP writes may require user approval in Codex. Preserve that approval boundary. Failed searches must retain existing checklist data.
+- Public-data jobs must not submit completion state or exploration progress.
+- Personal-data reviews must not expose credentials or account identifiers.
+- Use dedicated synchronization tools instead of generic checklist writes.
+- Preserve manual items and manual completion locks.
+- Codex owns business decisions; MCP tools only enforce field types, record identity, transaction integrity, authorization scope, and protected manual-data boundaries.
