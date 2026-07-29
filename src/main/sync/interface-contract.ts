@@ -227,7 +227,7 @@ export function getPublicSyncContract(
       endsAt: '活动或周期结束的绝对时刻，ISO-8601 且包含 Z 或明确 UTC 偏移量。',
       periodKey: '版本或周期实例身份；同一期稳定，不同周期不能复用。',
       modeKey: '跨周期稳定的玩法模式身份。',
-      mapNodeKind: '地图节点语义：当前清单只接受一级地区 region 与独立地图 independent。',
+      mapNodeKind: '地图节点语义：当前清单只接受一级地区 region 与独立地图 independent。个人接口返回的 parentId、层级或节点类型只是观测证据，不能覆盖公开规范目录的节点类型。',
       titleSourceUrl: `能够核验 ${requestContext.outputLocale} 官方本地化名称的直接页面。`,
       sourceUrl: '能够核验该事项核心事实的直接 HTTP(S) 来源。',
       confidence: 'Codex 对该条结构化结果的 0 到 1 置信度。',
@@ -299,7 +299,7 @@ export function getSemanticReviewContract(
     }
   }
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     authority: 'interface_contract',
     decisionAuthority: 'codex',
     executorPolicy: 'mechanical_validation_only',
@@ -309,6 +309,7 @@ export function getSemanticReviewContract(
     requiredDecisionFields: targetFields[target].required,
     conditionalFields: targetFields[target].conditional,
     fieldSemantics: {
+      catalogPrerequisite: '个人接口只提供观测值与进度，不决定最终清单目录。应用仅在当前版块的公开规范清单覆盖度为 complete 后开放本候选；空目录或不完整目录会先由公开资料任务建立规范项目，再将个人来源 ID 绑定到规范项目。',
       matchCandidates: '当前版块已有同步清单或与当前地图记录机械筛出的相关子集。提交前必须逐项完成身份核对；个人接口的简称、总称和 provider remoteKey 只是观察值，不代表新事项。新增前必须比较同类别候选的标题核心语义、startsAt/endsAt 时间窗和界面倒计时：名称明显重复且时间窗重叠，或倒计时相同/接近时，默认是同一事项，除非有明确证据证明它们是不同玩法。',
       matchCandidateScope: 'complete_target 表示返回当前版块全部候选；relevant_map_subset 表示地图版块已按当前名称和父级关系机械缩小范围；bound_item 表示该官方 ID 已有 Codex 确认的持久映射，只返回规范承载项。筛选只减少无关上下文，不替代 Codex 对本次状态语义的判断。',
       duplicateDetection: '同一 category 下，公开全称与个人简称、玩法名与节点后缀、标点或语序差异不能制造新事项。标题核心名称相同并且时间窗重叠或倒计时相同/接近，是强重复信号；必须优先匹配现有 public_schedule 项。只有能够说明两者实际玩法不同的明确证据，才允许省略 matchItemId 新建。',

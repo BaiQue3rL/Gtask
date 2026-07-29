@@ -45,6 +45,7 @@ describe('SyncOrchestrator', () => {
       publicSchedule: { genshin: { sync: publicSync } },
       personalData: { genshin: { sync: personalSync } }
     })
+    database.recordCatalogCoverage('genshin', 'cycles', 'public_schedule', 'complete')
 
     const result = await orchestrator.syncGame('genshin', 'public_and_personal')
 
@@ -184,6 +185,7 @@ describe('SyncOrchestrator', () => {
       publicSchedule: {},
       personalData: { zenless: { sync: personal } }
     })
+    database.recordCatalogCoverage('zenless', 'cycles', 'public_schedule', 'complete')
 
     const first = orchestrator.syncPersonalData('zenless')
     const second = orchestrator.syncPersonalData('zenless')
@@ -219,6 +221,7 @@ describe('SyncOrchestrator', () => {
       status: update.status,
       message: update.message
     }))
+    database.recordCatalogCoverage('genshin', 'exploration', 'public_schedule', 'complete')
 
     const result = await orchestrator.syncPersonalOnly('genshin', 'exploration')
 
@@ -277,7 +280,6 @@ describe('SyncOrchestrator', () => {
       status: update.status,
       message: update.message
     }))
-
     const result = await orchestrator.syncPersonalOnly('star-rail', 'events')
 
     expect(result).toMatchObject({

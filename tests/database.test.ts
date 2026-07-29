@@ -499,6 +499,7 @@ describe('AppDatabase', () => {
 
   it('语义核验候选脱敏去重，并且只有高置信 Codex 结论才能安全写入', () => {
     database = new AppDatabase(':memory:')
+    database.recordCatalogCoverage('star-rail', 'events', 'public_schedule', 'complete')
     const draft = {
       target: 'events' as const,
       kind: 'personal-item-semantics',
@@ -572,6 +573,7 @@ describe('AppDatabase', () => {
 
   it('活动完成语义不明确时可提交 unknown 并保留用户当前状态', () => {
     database = new AppDatabase(':memory:')
+    database.recordCatalogCoverage('star-rail', 'events', 'public_schedule', 'complete')
     database.mergeSyncedItems('star-rail', 'public_schedule', [{
       remoteKey: 'public-event:unknown-status',
       category: 'limited_event',
@@ -625,6 +627,7 @@ describe('AppDatabase', () => {
 
   it('Codex 确认一次活动字段规则后，同一官方 ID 的后续状态机械写入', () => {
     database = new AppDatabase(':memory:')
+    database.recordCatalogCoverage('genshin', 'events', 'public_schedule', 'complete')
     const accountScope = `miyoushe:${'e'.repeat(64)}`
     const draft = {
       target: 'events' as const,
@@ -699,8 +702,41 @@ describe('AppDatabase', () => {
     })
   })
 
+  it('个人候选在规范清单完成前只暂存，完成后才允许 Codex 领取', () => {
+    database = new AppDatabase(':memory:')
+    database.queueSemanticReviewCandidates('genshin', 'personal_sync', [{
+      target: 'exploration',
+      kind: 'personal-map-progress',
+      payload: {
+        provider: 'miyoushe',
+        officialId: 'area-6',
+        officialTitle: '璃月',
+        observedProgress: 100,
+        observedNodeKind: 'region'
+      }
+    }])
+    database.registerAiScheduleAgent('catalog-gate-agent', '规范清单门槛 Agent')
+
+    expect(database.getSemanticReviewSummary('genshin', 'exploration')).toMatchObject({
+      pendingCount: 1,
+      claimedCount: 0,
+      waitingForCatalogCount: 1
+    })
+    expect(database.getActiveSemanticReviewCount()).toBe(0)
+    expect(database.claimSemanticReviewCandidate('catalog-gate-agent')).toBeNull()
+
+    database.recordCatalogCoverage('genshin', 'exploration', 'public_schedule', 'complete')
+
+    expect(database.getActiveSemanticReviewCount()).toBe(1)
+    expect(database.getSemanticReviewSummary('genshin', 'exploration'))
+      .toMatchObject({ waitingForCatalogCount: 0 })
+    expect(database.claimSemanticReviewCandidate('catalog-gate-agent'))
+      .toMatchObject({ target: 'exploration', status: 'claimed' })
+  })
+
   it('同一批语义核验存在拒绝项时版块保持陈旧状态而不伪报成功', () => {
     database = new AppDatabase(':memory:')
+    database.recordCatalogCoverage('zenless', 'cycles', 'public_schedule', 'complete')
     const reference = new Date('2026-07-26T12:00:00.000Z')
     database.queueSemanticReviewCandidates('zenless', 'personal_sync', [
       {
@@ -752,6 +788,7 @@ describe('AppDatabase', () => {
 
   it('上次 rejected 的同一地图候选会在下一次同步重新入队', () => {
     database = new AppDatabase(':memory:')
+    database.recordCatalogCoverage('genshin', 'exploration', 'public_schedule', 'complete')
     const draft = {
       target: 'exploration' as const,
       kind: 'map-progress',
@@ -861,6 +898,8 @@ describe('AppDatabase', () => {
 
   it('同一批个人候选可以成批领取且不会跨游戏或版块', () => {
     database = new AppDatabase(':memory:')
+    database.recordCatalogCoverage('genshin', 'exploration', 'public_schedule', 'complete')
+    database.recordCatalogCoverage('star-rail', 'cycles', 'public_schedule', 'complete')
     database.registerAiScheduleAgent('batch-review-agent', '批量审核 Agent')
     const reference = new Date('2026-07-28T01:30:00.000Z')
     const accountScope = `miyoushe:${'e'.repeat(64)}`
@@ -917,8 +956,9 @@ describe('AppDatabase', () => {
     expect(nextGroup[0]).toMatchObject({ gameId: 'star-rail', target: 'cycles' })
   })
 
-  it('个人进度先建表后公开资料补全不会破坏项目 ID、绑定或完成状态', () => {
+  it('规范清单完成后个人进度建立绑定，后续公开资料补全不破坏 ID 或完成状态', () => {
     database = new AppDatabase(':memory:')
+    database.recordCatalogCoverage('genshin', 'events', 'public_schedule', 'complete')
     const accountScope = `miyoushe:${'f'.repeat(64)}`
     const personalAt = new Date('2026-07-28T02:30:00.000Z')
     database.registerAiScheduleAgent('dual-entry-agent', '双入口 Agent', personalAt)
@@ -1075,6 +1115,7 @@ describe('AppDatabase', () => {
 
   it('地图首次由 Codex 建立官方 ID 映射，后续同一账号直接机械写入', () => {
     database = new AppDatabase(':memory:')
+    database.recordCatalogCoverage('genshin', 'exploration', 'public_schedule', 'complete')
     database.mergeSyncedItems('genshin', 'public_schedule', [{
       remoteKey: 'public-map:liyue',
       category: 'exploration',
@@ -1136,7 +1177,12 @@ describe('AppDatabase', () => {
       accountScope,
       [{
         ...draft,
-        payload: { ...draft.payload, observedProgress: 88 }
+        payload: {
+          ...draft.payload,
+          officialTitle: '璃月探索总览',
+          observedNodeKind: 'independent',
+          observedProgress: 88
+        }
       }],
       new Date('2026-07-28T03:00:00.000Z')
     )
@@ -1149,6 +1195,7 @@ describe('AppDatabase', () => {
 
   it('地图名称和类型唯一时直接建绑，绑定名称冲突时停止机械写入', () => {
     database = new AppDatabase(':memory:')
+    database.recordCatalogCoverage('genshin', 'exploration', 'public_schedule', 'complete')
     database.mergeSyncedItems('genshin', 'public_schedule', [{
       remoteKey: 'public-map:inazuma',
       category: 'exploration',
@@ -1206,6 +1253,7 @@ describe('AppDatabase', () => {
 
   it('周期玩法按稳定 modeKey 唯一匹配后直接写入并建立绑定', () => {
     database = new AppDatabase(':memory:')
+    database.recordCatalogCoverage('star-rail', 'cycles', 'public_schedule', 'complete')
     database.mergeSyncedItems('star-rail', 'public_schedule', [{
       remoteKey: 'public-cycle:moc:2026-07',
       category: 'endgame',
@@ -1244,6 +1292,7 @@ describe('AppDatabase', () => {
 
   it('可分别取消公开任务与个人语义核验并保留精确的 Agent 范围', () => {
     database = new AppDatabase(':memory:')
+    database.recordCatalogCoverage('genshin', 'exploration', 'public_schedule', 'complete')
     const reference = new Date('2026-07-26T14:00:00.000Z')
     database.registerAiScheduleAgent('cancel-public-agent', '公开任务 Agent', reference)
     database.registerAiScheduleAgent('cancel-review-agent', '语义核验 Agent', reference)
@@ -1323,6 +1372,7 @@ describe('AppDatabase', () => {
 
   it('Codex 可按现有活动 ID 精确回填名称略有差异的个人进度且不产生重复项', () => {
     database = new AppDatabase(':memory:')
+    database.recordCatalogCoverage('genshin', 'events', 'public_schedule', 'complete')
     database.mergeSyncedItems('genshin', 'public_schedule', [{
       remoteKey: 'genshin:event:heated-battle',
       category: 'limited_event',
@@ -1389,6 +1439,7 @@ describe('AppDatabase', () => {
 
   it('个人进度可匹配公开清单简称并按 Codex 决定归档历史重复项', () => {
     database = new AppDatabase(':memory:')
+    database.recordCatalogCoverage('zenless', 'cycles', 'public_schedule', 'complete')
     const startsAt = '2026-07-23T20:00:00.000Z'
     const endsAt = '2026-08-06T19:59:59.000Z'
     database.mergeSyncedItems('zenless', 'public_schedule', [{

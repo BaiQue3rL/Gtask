@@ -15,6 +15,7 @@ import {
   SyncCancelledError,
   SyncVerificationRequiredError,
   throwIfSyncCancelled,
+  type SemanticReviewDraft,
   type SyncAdapter,
   type SyncAdapterProgress,
   type SyncAdapterRegistry
@@ -264,6 +265,22 @@ export class SyncOrchestrator {
       const normalizedItems = normalizeSyncItems(result.items).filter(
         (item) => !categories || categories.includes(item.category)
       )
+      const personalTargetByCategory: Partial<Record<ChecklistCategory, Exclude<SyncTarget, 'all' | 'tasks'>>> = {
+        limited_event: 'events',
+        permanent_event: 'events',
+        weekly: 'cycles',
+        endgame: 'cycles',
+        exploration: 'exploration'
+      }
+      const directlyMergeableItems = source === 'personal_data'
+        ? normalizedItems.filter((item) => {
+            const itemTarget = personalTargetByCategory[item.category]
+            return !itemTarget || this.database.isCatalogComplete(gameId, itemTarget)
+          })
+        : normalizedItems
+      const deferredPersonalItems = source === 'personal_data'
+        ? normalizedItems.filter((item) => !directlyMergeableItems.includes(item))
+        : []
       throwIfSyncCancelled(signal)
       reportProgress({
         phase: 'merging',
@@ -274,9 +291,21 @@ export class SyncOrchestrator {
       const merge = this.database.mergeSyncedItems(
         gameId,
         checklistSource,
-        normalizedItems
+        directlyMergeableItems
       )
-      let reviewCandidates = result.reviewCandidates ?? []
+      let reviewCandidates = [
+        ...(result.reviewCandidates ?? []),
+        ...deferredPersonalItems.flatMap((item): SemanticReviewDraft[] => {
+          const itemTarget = personalTargetByCategory[item.category]
+          return itemTarget
+            ? [{
+                target: itemTarget,
+                kind: 'normalized-personal-item',
+                payload: { normalizedItem: item }
+              }]
+            : []
+        })
+      ]
       if (
         source === 'personal_data' &&
         result.accountScope &&

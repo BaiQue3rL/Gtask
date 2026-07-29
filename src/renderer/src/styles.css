@@ -101,6 +101,7 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .onboarding-banner span,
 .onboarding-banner small { color: #9eb6d4; font-size: 12px; }
 .onboarding-banner button { flex: 0 0 auto; padding: 8px 13px; border: 1px solid #67a0df; border-radius: 7px; color: #e8f3ff; background: #17477d; cursor: pointer; }
+.onboarding-banner .onboarding-primary { margin-left: auto; }
 .onboarding-banner .onboarding-dismiss { width: 32px; height: 32px; padding: 0; border-color: transparent; color: #9eb6d4; background: transparent; font-size: 20px; }
 .onboarding-banner .onboarding-dismiss:hover { color: #ffffff; background: rgba(255, 255, 255, .08); }
 .onboarding-banner button:disabled { cursor: not-allowed; opacity: 0.5; }

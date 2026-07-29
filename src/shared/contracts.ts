@@ -1,5 +1,5 @@
 export const SUPPORTED_GAME_IDS = ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const
-export const GTASK_MCP_PROTOCOL_VERSION = '2026-07-28.3'
+export const GTASK_MCP_PROTOCOL_VERSION = '2026-07-29.1'
 
 export type GameId = (typeof SUPPORTED_GAME_IDS)[number]
 
@@ -212,7 +212,7 @@ export interface PublicSyncContract {
 }
 
 export interface SemanticReviewContract {
-  schemaVersion: 4
+  schemaVersion: 5
   authority: 'interface_contract'
   decisionAuthority: 'codex'
   executorPolicy: 'mechanical_validation_only'
@@ -281,6 +281,7 @@ export interface SemanticReviewSummary {
   gameId: GameId
   pendingCount: number
   claimedCount: number
+  waitingForCatalogCount: number
   latestDecision: SemanticReviewDecisionSummary | null
 }
 

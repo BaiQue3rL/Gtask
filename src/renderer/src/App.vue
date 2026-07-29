@@ -754,6 +754,20 @@ async function refreshSemanticReviewProgress(
       nextSummaries[key] = summary
       const remaining = summary.pendingCount + summary.claimedCount
       if (remaining > 0) {
+        const waitingForCatalog = summary.waitingForCatalogCount > 0
+        const catalogJobActive = activeAiJobs.value.some(
+          (job) =>
+            job.gameId === gameId &&
+            (job.target === target || job.target === 'all')
+        )
+        if (waitingForCatalog && !catalogJobActive) {
+          delete nextProgress[key]
+          syncNotice.value = {
+            status: 'partial',
+            message: '个人数据已暂存，但规范清单尚未完成；请重新同步进度以继续补建清单'
+          }
+          continue
+        }
         const total = Math.max(personalReviewTotals.get(key) ?? 0, remaining)
         personalReviewTotals.set(key, total)
         if (
@@ -771,7 +785,9 @@ async function refreshSemanticReviewProgress(
           status: summary.claimedCount > 0 ? 'running' : 'waiting',
           message: summary.claimedCount > 0
             ? `Codex 正在核验个人${target === 'events' ? '活动' : target === 'cycles' ? '周期事项' : '地图'}数据，剩余 ${remaining} 条`
-            : '排队中，等待可用的 Codex 处理',
+            : waitingForCatalog
+              ? '个人数据已暂存，正在先建立完整的公开规范清单'
+              : '排队中，等待可用的 Codex 处理',
           current: summary.claimedCount > 0 ? Math.max(0, total - remaining) : null,
           total: summary.claimedCount > 0 ? total : null,
           updatedAt: semanticReviewLastUpdatedAt.get(key)!
@@ -1365,6 +1381,7 @@ async function runPersonalSync(target: SyncTarget): Promise<void> {
       if (pendingReview > 0) {
         keepReviewProgress = true
         personalReviewTotals.set(progressKey, pendingReview)
+        await loadActiveAiJobs()
         await refreshSemanticReviewProgress(target)
       }
       await Promise.all([loadItems(), loadSyncSettings(), loadSyncTargetStates()])
@@ -1769,7 +1786,7 @@ function showError(error: unknown): void {
           <strong>建立你的第一份清单</strong>
           <small>可以同步公开资料，也可以直接在活动、周期或地图版块同步个人进度。</small>
         </div>
-        <button type="button" :disabled="syncing || hasActivePublicSync" @click="aiScheduleAvailable ? runSync('public_schedule', 'all') : settingsOpen = true">
+        <button class="onboarding-primary" type="button" :disabled="syncing || hasActivePublicSync" @click="aiScheduleAvailable ? runSync('public_schedule', 'all') : settingsOpen = true">
           {{ aiScheduleAvailable ? '同步公开资料' : '连接 Codex' }}
         </button>
         <button

@@ -80,7 +80,7 @@ export const CURRENT_SCHEMA_VERSION = 23
 
 const AI_AGENT_MAX_AGE_MS = 5 * 60 * 1000
 const AI_JOB_CLAIM_MAX_AGE_MS = 15 * 60 * 1000
-const SEMANTIC_REVIEW_PROTOCOL_VERSION = 'codex-authority-v6'
+const SEMANTIC_REVIEW_PROTOCOL_VERSION = 'codex-authority-v7'
 
 export type PersonalCompletionState = 'completed' | 'incomplete' | 'unknown'
 export type SourceBindingKind = 'mechanical' | 'codex' | 'backfill'
@@ -468,6 +468,15 @@ export class AppDatabase {
     statement.run(gameId, target, coverage, source)
   }
 
+  isCatalogComplete(gameId: GameId, target: PersonalSyncTarget): boolean {
+    const row = this.database.prepare(`
+      SELECT catalog_coverage AS catalogCoverage
+      FROM sync_target_states
+      WHERE game_id = ? AND target = ?
+    `).get(gameId, target) as { catalogCoverage: string } | undefined
+    return row?.catalogCoverage === 'complete'
+  }
+
   recordSyncTargetAttempt(
     gameId: GameId,
     target: SyncTarget,
@@ -725,27 +734,43 @@ export class AppDatabase {
     gameId: GameId,
     target?: PersonalSyncTarget
   ): SemanticReviewSummary {
-    const targetFilter = target ? ' AND target = ?' : ''
+    const targetFilter = target ? ' AND c.target = ?' : ''
     const parameters = target ? [gameId, target] : [gameId]
     const counts = this.database.prepare(`
       SELECT
-        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pendingCount,
-        SUM(CASE WHEN status = 'claimed' THEN 1 ELSE 0 END) AS claimedCount
-      FROM semantic_review_candidates
-      WHERE game_id = ?${targetFilter}
-    `).get(...parameters) as { pendingCount: number | null; claimedCount: number | null }
+        SUM(CASE WHEN c.status = 'pending' THEN 1 ELSE 0 END) AS pendingCount,
+        SUM(CASE WHEN c.status = 'claimed' THEN 1 ELSE 0 END) AS claimedCount,
+        SUM(CASE
+          WHEN c.status = 'pending'
+            AND c.source = 'personal_sync'
+            AND COALESCE((
+              SELECT s.catalog_coverage
+              FROM sync_target_states s
+              WHERE s.game_id = c.game_id AND s.target = c.target
+            ), 'empty') <> 'complete'
+          THEN 1 ELSE 0
+        END) AS waitingForCatalogCount
+      FROM semantic_review_candidates c
+      WHERE c.game_id = ?${targetFilter}
+    `).get(...parameters) as {
+      pendingCount: number | null
+      claimedCount: number | null
+      waitingForCatalogCount: number | null
+    }
     const latestDecision = this.database.prepare(`
-      SELECT id, game_id AS gameId, target, status, completed_at AS completedAt, message
-      FROM semantic_review_candidates
-      WHERE game_id = ?${targetFilter}
-        AND status IN ('approved', 'rejected') AND completed_at IS NOT NULL
-      ORDER BY completed_at DESC, updated_at DESC
+      SELECT c.id, c.game_id AS gameId, c.target, c.status,
+        c.completed_at AS completedAt, c.message
+      FROM semantic_review_candidates c
+      WHERE c.game_id = ?${targetFilter}
+        AND c.status IN ('approved', 'rejected') AND c.completed_at IS NOT NULL
+      ORDER BY c.completed_at DESC, c.updated_at DESC
       LIMIT 1
     `).get(...parameters) as SemanticReviewDecisionSummary | undefined
     return {
       gameId,
       pendingCount: Number(counts.pendingCount ?? 0),
       claimedCount: Number(counts.claimedCount ?? 0),
+      waitingForCatalogCount: Number(counts.waitingForCatalogCount ?? 0),
       latestDecision: latestDecision ?? null
     }
   }
@@ -753,8 +778,19 @@ export class AppDatabase {
   getActiveSemanticReviewCount(): number {
     const row = this.database.prepare(`
       SELECT COUNT(*) AS count
-      FROM semantic_review_candidates
-      WHERE status IN ('pending', 'claimed')
+      FROM semantic_review_candidates c
+      WHERE c.status = 'claimed'
+        OR (
+          c.status = 'pending'
+          AND (
+            c.source <> 'personal_sync'
+            OR COALESCE((
+              SELECT s.catalog_coverage
+              FROM sync_target_states s
+              WHERE s.game_id = c.game_id AND s.target = c.target
+            ), 'empty') = 'complete'
+          )
+        )
     `).get() as { count: number }
     return Number(row.count)
   }
@@ -1001,6 +1037,10 @@ export class AppDatabase {
       let applied = 0
       let preserved = 0
       for (const draft of drafts) {
+        if (!this.isCatalogComplete(gameId, draft.target)) {
+          remaining.push(draft)
+          continue
+        }
         const identity = readSemanticSourceIdentity(draft.kind, draft.payload)
         if (!identity) {
           remaining.push(draft)
@@ -1015,7 +1055,11 @@ export class AppDatabase {
         let item = binding
           ? this.findActiveChecklistItem(binding.itemId, gameId)
           : null
-        if (item && !this.isPersonalDraftBindingConsistent(draft, item)) {
+        if (
+          item &&
+          binding?.bindingKind !== 'codex' &&
+          !this.isPersonalDraftBindingConsistent(draft, item)
+        ) {
           item = null
           binding = null
         }
@@ -1206,8 +1250,16 @@ export class AppDatabase {
       const pending = this.database.prepare(`
         SELECT game_id AS gameId, target, account_scope AS accountScope,
           requested_at AS requestedAt
-        FROM semantic_review_candidates
-        WHERE status = 'pending'
+        FROM semantic_review_candidates c
+        WHERE c.status = 'pending'
+          AND (
+            c.source <> 'personal_sync'
+            OR COALESCE((
+              SELECT s.catalog_coverage
+              FROM sync_target_states s
+              WHERE s.game_id = c.game_id AND s.target = c.target
+            ), 'empty') = 'complete'
+          )
         ORDER BY requested_at ASC
         LIMIT 1
       `).get() as {
@@ -1225,6 +1277,15 @@ export class AppDatabase {
           AND target = ?
           AND account_scope IS ?
           AND requested_at = ?
+          AND (
+            source <> 'personal_sync'
+            OR COALESCE((
+              SELECT catalog_coverage
+              FROM sync_target_states
+              WHERE game_id = semantic_review_candidates.game_id
+                AND target = semantic_review_candidates.target
+            ), 'empty') = 'complete'
+          )
         ORDER BY
           CASE
             WHEN target = 'exploration'
@@ -1281,6 +1342,12 @@ export class AppDatabase {
     }
     if (candidate.status !== 'claimed' || candidate.agentId !== agentId) {
       throw new Error('语义核验候选未由当前 Agent 领取或已经结束')
+    }
+    if (
+      candidate.source === 'personal_sync' &&
+      !this.isCatalogComplete(candidate.gameId, candidate.target)
+    ) {
+      throw new Error('当前版块的公开规范清单尚未完成，个人进度暂不能写入')
     }
     const semanticWritableCategories: ChecklistCategory[] = [
       'limited_event',
@@ -1480,6 +1547,7 @@ export class AppDatabase {
     )
     if (!binding) return null
     const item = this.findActiveChecklistItem(binding.itemId, candidate.gameId)
+    if (binding.bindingKind === 'codex') return item
     return item && this.isPersonalDraftBindingConsistent(
       { target: candidate.target, kind: candidate.kind, payload: candidate.payload },
       item

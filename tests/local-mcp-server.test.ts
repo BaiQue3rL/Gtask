@@ -689,6 +689,7 @@ describe('本地 MCP server', () => {
 
   it('Codex 可按同一游戏和版块批量领取个人语义候选', async () => {
     const connected = await connect()
+    database!.recordCatalogCoverage('genshin', 'exploration', 'public_schedule', 'complete')
     await connected.callTool({
       name: 'register_gacha_schedule_agent',
       arguments: {
@@ -750,6 +751,7 @@ describe('本地 MCP server', () => {
 
   it('Codex 可领取脱敏语义候选，并通过专用工具安全写回', async () => {
     const connected = await connect()
+    database!.recordCatalogCoverage('star-rail', 'events', 'public_schedule', 'complete')
     await connected.callTool({
       name: 'register_gacha_schedule_agent',
       arguments: {
@@ -800,7 +802,7 @@ describe('本地 MCP server', () => {
         remoteKey: 'event:public:anti-fraud'
       })],
       contract: {
-        schemaVersion: 4,
+        schemaVersion: 5,
         authority: 'interface_contract',
         target: 'events',
         requestContext: {
@@ -855,6 +857,7 @@ describe('本地 MCP server', () => {
 
   it('地图语义核验通过 MCP 写入探索度，并只返回当前节点相关地图上下文', async () => {
     const connected = await connect()
+    database!.recordCatalogCoverage('genshin', 'exploration', 'public_schedule', 'complete')
     await connected.callTool({
       name: 'register_gacha_schedule_agent',
       arguments: {

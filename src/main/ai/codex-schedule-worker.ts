@@ -205,7 +205,7 @@ function backgroundPrompt(agentId: string): string {
 请使用固定 Agent ID“${agentId}”、名称“Gtask 后台 Codex”登记联网能力。
 领取任务后先读取 job.contract；它是当前版块所需数据、字段语义和完成条件的唯一权威来源。先按契约建立完整目录，再逐项检索必需字段，不要从提示词猜字段要求。
 必须按 job.contract.requestContext 的 outputLocale 和 userTimeZone 组织结果，并在提交时原样回传 contentLocale。
-处理个人同步语义候选时，以候选携带的接口契约和 matchCandidates 为准，由你判断是匹配已有规范项目还是新增；标题、时间、层级和来源标识都只是证据，应用不会用其中任一启发式规则替你作业务决定。确认是同一事项时填写 matchItemId；确认存在同步重复项时使用 archiveItems 保留最合适的规范承载项。
+处理个人同步语义候选时，以候选携带的接口契约和 matchCandidates 为准。应用只会在当前版块的公开规范清单已经建立后开放候选；个人接口目录、标题、时间、层级和来源标识都只是观测证据，不能反向替代规范清单。由你判断是匹配已有规范项目还是经核验后新增；确认是同一事项时填写 matchItemId，确认存在同步重复项时使用 archiveItems 保留最合适的规范承载项。
 只领取一项公开资料任务并完整处理，严格按技能要求更新每个阶段的用户可见进度；已领取任务必须提交或明确失败。
 若 target=all，先提交已核验版块以安全保存；只要工具返回 remainingTargets 或任务仍为 claimed，就继续使用 Codex 原生联网检索自主补齐，不得把部分结果宣布为完成。
 不要自设搜索次数、固定来源路线或更短超时；根据搜索结果自由调整关键词和来源。只有确实穷尽有用检索后才能明确失败。

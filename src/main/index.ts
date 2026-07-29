@@ -724,7 +724,7 @@ function registerIpcHandlers(): void {
     target: unknown = 'all',
     requestContext: unknown
   ) => {
-    if (!syncOrchestrator) throw new Error('个人数据同步服务尚未初始化')
+    if (!appDatabase || !syncOrchestrator) throw new Error('个人数据同步服务尚未初始化')
     const parsedGameId = parseGameId(gameId)
     const parsedTarget = parseSyncTarget(target)
     const parsedRequestContext = parseSyncRequestContext(requestContext)
@@ -734,11 +734,18 @@ function registerIpcHandlers(): void {
     if (!supportsPersonalSyncTarget(parsedGameId, parsedTarget)) {
       throw new Error('当前游戏的个人数据接口不提供该版块进度')
     }
-    const result = await syncOrchestrator.syncPersonalOnly(
-      parsedGameId,
-      parsedTarget,
-      parsedRequestContext
-    )
+    const result = appDatabase.isCatalogComplete(parsedGameId, parsedTarget)
+      ? await syncOrchestrator.syncPersonalOnly(
+          parsedGameId,
+          parsedTarget,
+          parsedRequestContext
+        )
+      : await queueAiScheduleSync(
+          parsedGameId,
+          'public_and_personal',
+          parsedTarget,
+          parsedRequestContext
+        )
     if (result.sources.some((source) => (source.pendingReview ?? 0) > 0)) {
       startCodexWorkersForActiveJobs()
     }

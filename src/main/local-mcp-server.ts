@@ -491,7 +491,7 @@ export function createLocalMcpServer(
     'claim_gacha_semantic_review_batch',
     {
       title: '批量领取同步语义核验候选',
-      description: '从同一次个人同步、同一游戏与版块中领取最多 30 条候选。适合空清单首次建表或新地图批量建立官方 ID 绑定；每条仍通过专用通过/拒绝工具独立安全写入。',
+      description: '从同一次个人同步、同一游戏与版块中领取最多 30 条候选。候选只会在公开规范清单完成后开放，用于批量建立官方 ID 绑定或处理新增语义；每条仍通过专用通过/拒绝工具独立安全写入。',
       inputSchema: {
         agentId: z.string().min(1).max(100),
         limit: z.number().int().min(1).max(30).default(20)
