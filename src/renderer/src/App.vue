@@ -56,7 +56,7 @@ interface ChecklistPanel {
 
 const panels: ChecklistPanel[] = [
   { title: '任务', section: 'tasks', categories: ['main_quest', 'side_quest'], defaultCategory: 'side_quest', allowCreate: false, allowClear: false, syncTarget: 'tasks' },
-  { title: '活动', section: 'events', categories: ['limited_event', 'permanent_event'], defaultCategory: 'limited_event', syncTarget: 'events' },
+  { title: '活动', section: 'events', categories: ['limited_event'], defaultCategory: 'limited_event', syncTarget: 'events' },
   { title: '周期事项', section: 'cycles', categories: ['weekly', 'endgame'], defaultCategory: 'endgame', syncTarget: 'cycles' },
   { title: '地图探索', section: 'exploration', categories: ['exploration'], defaultCategory: 'exploration', syncTarget: 'exploration' }
 ]
@@ -78,7 +78,6 @@ const categoryLabels: Record<ChecklistCategory, string> = {
   main_quest: '主线任务',
   side_quest: '支线任务',
   limited_event: '限时活动',
-  permanent_event: '常驻活动',
   weekly: '周常',
   endgame: '深渊/挑战模式',
   exploration: '地图探索',
@@ -104,7 +103,7 @@ const gameEditorExamples: Record<GameId, {
   genshin: {
     titles: {
       main_quest: '例如：主线任务', side_quest: '例如：支线任务', limited_event: '例如：砺行修远',
-      permanent_event: '例如：七圣召唤', weekly: '例如：周常', endgame: '例如：深境螺旋',
+      weekly: '例如：周常', endgame: '例如：深境螺旋',
       exploration: '例如：枫丹廷区', custom: '例如：刷角色突破素材'
     },
     parentTitle: '例如：枫丹',
@@ -114,7 +113,7 @@ const gameEditorExamples: Record<GameId, {
   'star-rail': {
     titles: {
       main_quest: '例如：开拓任务', side_quest: '例如：冒险任务', limited_event: '例如：折纸小鸟对对碰',
-      permanent_event: '例如：模拟宇宙', weekly: '例如：周常', endgame: '例如：混沌回忆',
+      weekly: '例如：周常', endgame: '例如：混沌回忆',
       exploration: '例如：黄金的时刻', custom: '例如：刷行迹材料'
     },
     parentTitle: '例如：匹诺康尼',
@@ -124,7 +123,7 @@ const gameEditorExamples: Record<GameId, {
   zenless: {
     titles: {
       main_quest: '例如：主线任务', side_quest: '例如：代理人秘闻', limited_event: '例如：嗯呢从天降',
-      permanent_event: '例如：零号空洞', weekly: '例如：周常', endgame: '例如：式舆防卫战',
+      weekly: '例如：周常', endgame: '例如：式舆防卫战',
       exploration: '例如：六分街', custom: '例如：刷驱动盘'
     },
     parentTitle: '例如：新艾利都',
@@ -134,7 +133,7 @@ const gameEditorExamples: Record<GameId, {
   'wuthering-waves': {
     titles: {
       main_quest: '例如：潮汐任务', side_quest: '例如：危行任务', limited_event: '例如：限时活动',
-      permanent_event: '例如：常驻活动', weekly: '例如：周常', endgame: '例如：逆境深塔',
+      weekly: '例如：周常', endgame: '例如：逆境深塔',
       exploration: '例如：乘霄山', custom: '例如：刷声骸'
     },
     parentTitle: '例如：瑝珑',
@@ -160,9 +159,7 @@ const saving = ref(false)
 const errorMessage = ref('')
 const selectedGameId = ref<GameId>('genshin')
 const showIncompleteOnly = ref(false)
-const activityTypeFilter = ref<'all' | 'limited_event' | 'permanent_event'>('all')
 const activityTagFilter = ref('')
-const activityTypeMenuOpen = ref(false)
 const activityTagMenuOpen = ref(false)
 const sectionSyncMenuOpen = ref<ChecklistSection | null>(null)
 const collapsedMapKeys = ref(new Set<string>())
@@ -317,7 +314,7 @@ const completedCount = computed(() => {
 })
 const activityTagOptions = computed(() => [...new Set(
   items.value
-    .filter((item) => ['limited_event', 'permanent_event'].includes(item.category))
+    .filter((item) => item.category === 'limited_event')
     .flatMap((item) => item.activityTags)
 )].sort((left, right) => left.localeCompare(right, 'zh-CN')))
 const expiringCount = computed(() => {
@@ -468,7 +465,6 @@ function handleGlobalKeydown(event: KeyboardEvent): void {
     return
   }
   sectionSyncMenuOpen.value = null
-  activityTypeMenuOpen.value = false
   activityTagMenuOpen.value = false
   editorOpen.value = false
   recycleBinOpen.value = false
@@ -484,10 +480,8 @@ watch(selectedGameId, async (gameId, previousGameId) => {
   activeAiJob.value = null
   activeAiJobs.value = []
   sectionSyncMenuOpen.value = null
-  activityTypeMenuOpen.value = false
   activityTagMenuOpen.value = false
   recycleBinOpen.value = false
-  activityTypeFilter.value = 'all'
   activityTagFilter.value = ''
   try {
     await Promise.all([
@@ -1404,13 +1398,8 @@ function itemsFor(categories: ChecklistCategory[]): ChecklistItem[] {
       categories.includes(item.category) &&
       (!showIncompleteOnly.value || !item.completed) &&
       (
-        activityTypeFilter.value === 'all' ||
-        !['limited_event', 'permanent_event'].includes(item.category) ||
-        item.category === activityTypeFilter.value
-      ) &&
-      (
         !activityTagFilter.value ||
-        !['limited_event', 'permanent_event'].includes(item.category) ||
+        item.category !== 'limited_event' ||
         item.activityTags.includes(activityTagFilter.value)
       )
   ).sort((left, right) => compareChecklistItems(left, right, clockNow.value))
@@ -1510,7 +1499,7 @@ async function saveItem(): Promise<void> {
     const common: Omit<CreateChecklistItemInput, 'gameId'> = {
       category: form.category,
       title: form.title,
-      activityTags: ['limited_event', 'permanent_event'].includes(form.category)
+      activityTags: form.category === 'limited_event'
         ? parseActivityTags(form.activityTags)
         : [],
       progressPercent: form.category === 'exploration' ? normalizeProgress(form.progressPercent) : null,
@@ -1707,7 +1696,7 @@ function showError(error: unknown): void {
 </script>
 
 <template>
-  <main class="app-shell" @click="sectionSyncMenuOpen = null; activityTypeMenuOpen = false; activityTagMenuOpen = false">
+  <main class="app-shell" @click="sectionSyncMenuOpen = null; activityTagMenuOpen = false">
     <aside class="sidebar">
       <div class="brand">
         <img class="brand-mark" :src="appIcon" alt="" aria-hidden="true">
@@ -2009,35 +1998,6 @@ function showError(error: unknown): void {
                 class="activity-tag-filter"
                 @click.stop
               >
-                <div class="activity-filter-control">
-                  <span>活动类型</span>
-                  <div class="dropdown activity-filter-dropdown">
-                    <button
-                      class="activity-filter-button"
-                      type="button"
-                      aria-haspopup="menu"
-                      :aria-expanded="activityTypeMenuOpen"
-                      @click="activityTypeMenuOpen = !activityTypeMenuOpen; activityTagMenuOpen = false"
-                    >
-                      <span>{{ activityTypeFilter === 'limited_event' ? '限时活动' : activityTypeFilter === 'permanent_event' ? '常驻活动' : '全部活动' }}</span><i>⌄</i>
-                    </button>
-                    <div v-if="activityTypeMenuOpen" class="dropdown-menu activity-filter-menu" role="menu">
-                      <button
-                        v-for="option in [
-                          { value: 'all', label: '全部活动' },
-                          { value: 'limited_event', label: '限时活动' },
-                          { value: 'permanent_event', label: '常驻活动' }
-                        ]"
-                        :key="option.value"
-                        role="menuitemradio"
-                        type="button"
-                        :aria-checked="activityTypeFilter === option.value"
-                        :class="{ selected: activityTypeFilter === option.value }"
-                        @click="activityTypeFilter = option.value as typeof activityTypeFilter; activityTypeMenuOpen = false"
-                      >{{ option.label }}</button>
-                    </div>
-                  </div>
-                </div>
                 <div v-if="activityTagOptions.length > 0" class="activity-filter-control">
                   <span>玩法筛选</span>
                   <div class="dropdown activity-filter-dropdown">
@@ -2046,7 +2006,7 @@ function showError(error: unknown): void {
                       type="button"
                       aria-haspopup="menu"
                       :aria-expanded="activityTagMenuOpen"
-                      @click="activityTagMenuOpen = !activityTagMenuOpen; activityTypeMenuOpen = false"
+                      @click="activityTagMenuOpen = !activityTagMenuOpen"
                     >
                       <span>{{ activityTagFilter || '全部玩法' }}</span><i>⌄</i>
                     </button>
@@ -2202,7 +2162,7 @@ function showError(error: unknown): void {
             <option v-for="[category, label] in editorCategories" :key="category" :value="category">{{ label }}</option>
           </select>
         </label>
-        <label v-if="['limited_event', 'permanent_event'].includes(form.category)">
+        <label v-if="form.category === 'limited_event'">
           玩法标签（最多5个）
           <input
             v-model="form.activityTags"

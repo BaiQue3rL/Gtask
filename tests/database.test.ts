@@ -124,62 +124,6 @@ describe('AppDatabase', () => {
       .toEqual([expect.objectContaining({ activityTags: ['战斗'] })])
   })
 
-  it('公开资料活动同步支持常驻活动并为已有常驻活动补齐玩法标签', () => {
-    database = new AppDatabase(':memory:')
-    const reference = new Date('2026-07-26T00:00:00.000Z')
-    database.mergeSyncedItems('genshin', 'personal_sync', [{
-      remoteKey: 'personal:event:permanent-legacy',
-      category: 'permanent_event',
-      title: '旧常驻活动'
-    }])
-    database.registerAiScheduleAgent('permanent-event-agent', '常驻活动 Agent', reference)
-    const queued = database.createAiScheduleJob(
-      'genshin',
-      'public_schedule',
-      reference,
-      false,
-      'events'
-    )
-    const claimed = database.claimAiScheduleJob('permanent-event-agent', reference)!
-    expect(claimed.activityTagTargets.map((target) => target.title)).toEqual(['旧常驻活动'])
-
-    const result = database.applyAiScheduleJob(
-      queued.id,
-      'permanent-event-agent',
-      [{
-        remoteKey: 'public:event:permanent-new',
-        category: 'permanent_event',
-        title: '新常驻活动',
-        activityTags: ['卡牌']
-      }],
-      [],
-      reference,
-      [{
-        itemId: claimed.activityTagTargets[0].itemId,
-        title: '旧常驻活动',
-        activityTags: ['剧情'],
-        sourceUrl: 'https://example.com/permanent-event',
-        confidence: 0.99
-      }]
-    )
-
-    expect(result.job.status).toBe('completed')
-    expect(database.listChecklistItems('genshin')).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        title: '旧常驻活动',
-        category: 'permanent_event',
-        activityTags: ['剧情']
-      }),
-      expect.objectContaining({
-        title: '新常驻活动',
-        category: 'permanent_event',
-        activityTags: ['卡牌'],
-        startsAt: null,
-        endsAt: null
-      })
-    ]))
-  })
-
   it('四款游戏的活动同步都会把有效未知活动列为强制标签补全目标', () => {
     database = new AppDatabase(':memory:')
     const reference = new Date('2026-07-26T00:00:00.000Z')
@@ -431,7 +375,7 @@ describe('AppDatabase', () => {
     })
     const pendingEvent = database.createChecklistItem({
       gameId: 'genshin',
-      category: 'permanent_event',
+      category: 'limited_event',
       title: '未完成活动'
     })
     const completedCustom = database.createChecklistItem({
@@ -443,7 +387,7 @@ describe('AppDatabase', () => {
     database.updateChecklistItem({ id: completedCustom.id, completed: true })
 
     expect(
-      database.archiveCompletedSection('genshin', ['limited_event', 'permanent_event'])
+      database.archiveCompletedSection('genshin', ['limited_event'])
     ).toBe(1)
 
     const remaining = database.listChecklistItems('genshin')
@@ -1527,14 +1471,14 @@ describe('AppDatabase', () => {
     })
     const urgent = database.createChecklistItem({
       gameId: 'genshin',
-      category: 'permanent_event',
+      category: 'limited_event',
       title: '最后一天活动',
       endsAt: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString()
     })
     database.updateChecklistItem({ id: urgent.id, completed: true })
     const pendingUrgent = database.createChecklistItem({
       gameId: 'genshin',
-      category: 'permanent_event',
+      category: 'limited_event',
       title: '未完成的最后一天活动',
       endsAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString()
     })
@@ -1548,7 +1492,7 @@ describe('AppDatabase', () => {
 
     const eventIds = database
       .listChecklistItems('genshin')
-      .filter((item) => item.category === 'limited_event' || item.category === 'permanent_event')
+      .filter((item) => item.category === 'limited_event')
       .map((item) => item.id)
     expect(eventIds).toEqual([pendingUrgent.id, normal.id, upcoming.id, urgent.id])
   })

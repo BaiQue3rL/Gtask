@@ -1,5 +1,5 @@
 export const SUPPORTED_GAME_IDS = ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const
-export const GTASK_MCP_PROTOCOL_VERSION = '2026-07-29.1'
+export const GTASK_MCP_PROTOCOL_VERSION = '2026-07-29.2'
 
 export type GameId = (typeof SUPPORTED_GAME_IDS)[number]
 
@@ -7,7 +7,6 @@ export const CHECKLIST_CATEGORIES = [
   'main_quest',
   'side_quest',
   'limited_event',
-  'permanent_event',
   'weekly',
   'endgame',
   'exploration',

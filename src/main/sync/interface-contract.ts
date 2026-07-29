@@ -44,50 +44,29 @@ const tasksContract: SyncSectionContract = {
 
 const eventsContract: SyncSectionContract = {
   target: 'events',
-  purpose: '建立当前有效、已公布即将开始以及常驻活动的完整清单和倒计时。',
-  inventoryScope: '全部正在进行的限时活动、官方已经公布的即将开始活动，以及当前可用的常驻活动。',
-  itemShapes: [
-    {
-      name: '限时活动',
-      categories: ['limited_event'],
-      requiredFields: [
-        'remoteKey',
-        'category',
-        'title',
-        'activityTags',
-        'startsAt',
-        'endsAt',
-        'titleSourceUrl',
-        'sourceUrl',
-        'confidence'
-      ],
-      conditionalFields: [{
-        field: 'timeZone',
-        when: '来源使用本地时间或服务器时间而不是绝对时间戳时',
-        meaning: '来源所采用的服务器时区；startsAt 和 endsAt 仍须换算成带偏移量的绝对时间。'
-      }],
-      forbiddenFields: ['completed', 'progressPercent', 'recurrenceRule']
-    },
-    {
-      name: '常驻活动',
-      categories: ['permanent_event'],
-      requiredFields: [
-        'remoteKey',
-        'category',
-        'title',
-        'activityTags',
-        'titleSourceUrl',
-        'sourceUrl',
-        'confidence'
-      ],
-      conditionalFields: [{
-        field: 'startsAt',
-        when: '存在适用于所有玩家的统一开放时间时',
-        meaning: '常驻活动统一开放的绝对时间；仅由任务或等级解锁时可为 null。'
-      }],
-      forbiddenFields: ['endsAt', 'completed', 'progressPercent', 'recurrenceRule']
-    }
-  ],
+  purpose: '建立当前有效及官方已公布即将开始的限时活动清单和倒计时。',
+  inventoryScope: '全部正在进行的限时活动，以及官方已经公布的即将开始限时活动。',
+  itemShapes: [{
+    name: '限时活动',
+    categories: ['limited_event'],
+    requiredFields: [
+      'remoteKey',
+      'category',
+      'title',
+      'activityTags',
+      'startsAt',
+      'endsAt',
+      'titleSourceUrl',
+      'sourceUrl',
+      'confidence'
+    ],
+    conditionalFields: [{
+      field: 'timeZone',
+      when: '来源使用本地时间或服务器时间而不是绝对时间戳时',
+      meaning: '来源所采用的服务器时区；startsAt 和 endsAt 仍须换算成带偏移量的绝对时间。'
+    }],
+    forbiddenFields: ['completed', 'progressPercent', 'recurrenceRule']
+  }],
   completionCriteria: [
     '先完成活动目录枚举，再逐项补齐字段，不能只搜索到少数热门活动就结束。',
     '限时活动必须同时具有准确 startsAt 和 endsAt；开始后界面自动由“距离开始”切换为“剩余”。',
@@ -262,7 +241,7 @@ export function getSemanticReviewContract(
         },
         {
           field: 'activityTags',
-          when: '候选最终属于 limited_event 或 permanent_event 时',
+          when: '候选最终属于 limited_event 时',
           meaning: '保留或补充实际玩法标签。'
         },
         {

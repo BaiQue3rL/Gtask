@@ -257,7 +257,7 @@ export class SyncOrchestrator {
       const checklistSource = source === 'public_schedule' ? 'public_schedule' : 'personal_sync'
       const targetCategories: Partial<Record<SyncTarget, ChecklistCategory[]>> = {
         tasks: ['main_quest', 'side_quest'],
-        events: ['limited_event', 'permanent_event'],
+        events: ['limited_event'],
         cycles: ['weekly', 'endgame'],
         exploration: ['exploration']
       }
@@ -267,7 +267,6 @@ export class SyncOrchestrator {
       )
       const personalTargetByCategory: Partial<Record<ChecklistCategory, Exclude<SyncTarget, 'all' | 'tasks'>>> = {
         limited_event: 'events',
-        permanent_event: 'events',
         weekly: 'cycles',
         endgame: 'cycles',
         exploration: 'exploration'

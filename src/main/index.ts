@@ -81,7 +81,7 @@ import {
 
 const SECTION_CATEGORIES = {
   tasks: ['main_quest', 'side_quest'],
-  events: ['limited_event', 'permanent_event'],
+  events: ['limited_event'],
   cycles: ['weekly', 'endgame'],
   exploration: ['exploration'],
   custom: ['custom']

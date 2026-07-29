@@ -106,4 +106,14 @@ describe('清单 IPC 参数校验', () => {
       })
     ).toThrow('活动玩法标签')
   })
+
+  it('不再接受常驻活动分类', () => {
+    expect(() =>
+      parseCreateChecklistItem({
+        gameId: 'genshin',
+        category: 'permanent_event',
+        title: '旧常驻活动'
+      })
+    ).toThrow('不支持的事项分类')
+  })
 })

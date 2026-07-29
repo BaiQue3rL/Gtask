@@ -9,7 +9,7 @@ Use only the `gacha_task_manager` MCP tools for application data. Do not run she
 
 ## Public-data jobs
 
-1. Register with `register_gacha_schedule_agent` using a stable Agent ID, `webSearch: true`, and `protocolVersion: "2026-07-29.1"`. If the application reports an incompatible protocol, stop and ask the user to update the Gtask plugin instead of continuing with partial fields.
+1. Register with `register_gacha_schedule_agent` using a stable Agent ID, `webSearch: true`, and `protocolVersion: "2026-07-29.2"`. If the application reports an incompatible protocol, stop and ask the user to update the Gtask plugin instead of continuing with partial fields.
 2. Claim one job with `claim_gacha_schedule_job`. If the result is `null`, continue to semantic reviews.
 3. Read `job.contract` before searching. It is the authoritative machine-readable description of:
    - the requested section and inventory scope;
@@ -39,6 +39,7 @@ After the public job, call `claim_gacha_semantic_review_batch` with `limit: 20` 
 ## Safety
 
 - Public-data jobs must not submit completion state or exploration progress.
+- Event jobs must only submit the categories allowed by the current contract; Gtask's activity section accepts limited-time events only.
 - Personal-data reviews must not expose credentials or account identifiers.
 - Use dedicated synchronization tools instead of generic checklist writes.
 - Preserve manual items and manual completion locks.

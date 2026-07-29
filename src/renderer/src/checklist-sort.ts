@@ -4,7 +4,6 @@ const CATEGORY_ORDER: Record<ChecklistCategory, number> = {
   main_quest: 10,
   side_quest: 20,
   limited_event: 30,
-  permanent_event: 40,
   weekly: 50,
   endgame: 60,
   exploration: 70,

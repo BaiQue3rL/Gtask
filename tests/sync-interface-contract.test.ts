@@ -46,22 +46,18 @@ describe('同步接口契约', () => {
     })
   })
 
-  it('活动契约区分限时与常驻时间语义', () => {
+  it('活动契约只接受具有完整时间窗的限时活动', () => {
     const [events] = getPublicSyncContract('events').sections
     const limited = events.itemShapes.find((shape) =>
       shape.categories.includes('limited_event')
     )!
-    const permanent = events.itemShapes.find((shape) =>
-      shape.categories.includes('permanent_event')
-    )!
 
+    expect(events.itemShapes).toHaveLength(1)
     expect(limited.requiredFields).toEqual(expect.arrayContaining([
       'activityTags',
       'startsAt',
       'endsAt'
     ]))
-    expect(permanent.requiredFields).toContain('activityTags')
-    expect(permanent.forbiddenFields).toContain('endsAt')
   })
 
   it('周期与地图契约只向 Codex 请求应用不能机械补齐的数据', () => {

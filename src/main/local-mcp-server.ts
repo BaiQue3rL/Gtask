@@ -44,7 +44,6 @@ const publicScheduleCategorySchema = z.enum([
   'main_quest',
   'side_quest',
   'limited_event',
-  'permanent_event',
   'weekly',
   'endgame',
   'exploration'
@@ -667,7 +666,7 @@ export function createLocalMcpServer(
           startsAt: isoDateSchema.nullable().optional()
             .describe('绝对开始时间；限时活动必须提供'),
           endsAt: isoDateSchema.nullable().optional()
-            .describe('绝对结束时间；限时活动必须提供，真正常驻活动禁止提供'),
+            .describe('绝对结束时间；限时活动必须提供'),
           resetRule: z.string().max(200).nullable().optional(),
           periodKey: z.string().max(200).nullable().optional(),
           scheduleKind: scheduleKindSchema.nullable().optional(),

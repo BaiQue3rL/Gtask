@@ -195,10 +195,6 @@ describe('本地 MCP server', () => {
                   'startsAt',
                   'endsAt'
                 ])
-              }),
-              expect.objectContaining({
-                categories: ['permanent_event'],
-                forbiddenFields: expect.arrayContaining(['endsAt'])
               })
             ])
           }]
@@ -301,15 +297,6 @@ describe('本地 MCP server', () => {
             activityTags: ['战斗', '跑酷'],
             sourceUrl: 'https://example.com/official-event',
             confidence: 0.98
-          },
-          {
-            remoteKey: 'official:event:permanent',
-            category: 'permanent_event',
-            title: '公开常驻活动',
-            titleSourceUrl: 'https://example.com/official-event-cn',
-            activityTags: ['卡牌'],
-            sourceUrl: 'https://example.com/official-event',
-            confidence: 0.98
           }
         ],
         evidence: [{
@@ -326,7 +313,7 @@ describe('本地 MCP server', () => {
     expect(applied.structuredContent).toMatchObject({
       command: 'apply_public_schedule',
       job: { status: 'completed' },
-      merge: { added: 2, updated: 0 }
+      merge: { added: 1, updated: 0 }
     })
     expect(database!.listChecklistItems('genshin')).toEqual(
       expect.arrayContaining([
@@ -336,13 +323,6 @@ describe('本地 MCP server', () => {
           sourceUrl: 'https://example.com/official-event',
           activityTags: ['战斗', '跑酷'],
           completed: false
-        }),
-        expect.objectContaining({
-          title: '公开常驻活动',
-          category: 'permanent_event',
-          activityTags: ['卡牌'],
-          startsAt: null,
-          endsAt: null
         })
       ])
     )

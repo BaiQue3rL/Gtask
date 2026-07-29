@@ -1121,7 +1121,7 @@ export class AppDatabase {
           continue
         }
         const expectedCategories: Record<PersonalSyncTarget, ChecklistCategory[]> = {
-          events: ['limited_event', 'permanent_event'],
+          events: ['limited_event'],
           cycles: ['endgame', 'weekly'],
           exploration: ['exploration']
         }
@@ -1351,7 +1351,6 @@ export class AppDatabase {
     }
     const semanticWritableCategories: ChecklistCategory[] = [
       'limited_event',
-      'permanent_event',
       'weekly',
       'endgame',
       'exploration'
@@ -1527,7 +1526,7 @@ export class AppDatabase {
     target: PersonalSyncTarget
   ): ChecklistItem[] {
     const categories: Record<PersonalSyncTarget, ChecklistCategory[]> = {
-      events: ['limited_event', 'permanent_event'],
+      events: ['limited_event'],
       cycles: ['weekly', 'endgame'],
       exploration: ['exploration']
     }
@@ -1940,7 +1939,7 @@ export class AppDatabase {
       throw new Error('AI 资料任务未由当前 Agent 领取或已经结束')
     }
     const targetCategories: Partial<Record<SyncTarget, ChecklistCategory[]>> = {
-      events: ['limited_event', 'permanent_event'],
+      events: ['limited_event'],
       cycles: ['weekly', 'endgame'],
       exploration: ['exploration'],
       tasks: ['main_quest', 'side_quest']
@@ -2011,7 +2010,7 @@ export class AppDatabase {
       throw new Error(`限时活动“${invalidEventWindow.title}”缺少带时区的完整起止时间`)
     }
     const invalidEventTags = items.find((item) =>
-      (item.category === 'limited_event' || item.category === 'permanent_event') &&
+      item.category === 'limited_event' &&
       (
         !Array.isArray(item.activityTags) ||
         item.activityTags.length === 0 ||
@@ -2021,12 +2020,6 @@ export class AppDatabase {
     )
     if (invalidEventTags) {
       throw new Error(`活动“${invalidEventTags.title}”必须提供 1 到 5 个有效玩法标签`)
-    }
-    const timedPermanentEvent = items.find((item) =>
-      item.category === 'permanent_event' && Boolean(item.endsAt)
-    )
-    if (timedPermanentEvent) {
-      throw new Error(`常驻活动“${timedPermanentEvent.title}”不能包含结束时间；有结束时间时应归类为限时活动`)
     }
     const invalidEndgame = items.find((item) =>
       item.category === 'endgame' &&
@@ -2104,7 +2097,7 @@ export class AppDatabase {
       ? [
           ...(versionItems.length > 0 ? ['tasks' as const] : []),
           ...(items.some((item) =>
-            item.category === 'limited_event' || item.category === 'permanent_event'
+            item.category === 'limited_event'
           ) ||
             activityTagUpdates.length > 0 ||
             uniqueVerifiedEmptyTargets.includes('events')
@@ -2153,7 +2146,7 @@ export class AppDatabase {
             last_synced_at = ?,
             updated_at = ?
         WHERE id = ? AND game_id = ?
-          AND category IN ('limited_event', 'permanent_event')
+          AND category = 'limited_event'
           AND archived = 0
       `)
       for (const update of activityTagUpdates) {
@@ -2342,14 +2335,13 @@ export class AppDatabase {
       : []
     const targetCategories: Record<SyncTarget, ChecklistCategory[]> = {
       tasks: ['main_quest', 'side_quest'],
-      events: ['limited_event', 'permanent_event'],
+      events: ['limited_event'],
       cycles: ['weekly', 'endgame'],
       exploration: ['exploration'],
       all: [
         'main_quest',
         'side_quest',
         'limited_event',
-        'permanent_event',
         'weekly',
         'endgame',
         'exploration'
@@ -2402,7 +2394,7 @@ export class AppDatabase {
         starts_at AS startsAt, ends_at AS endsAt
       FROM checklist_items
       WHERE game_id = ?
-        AND category IN ('limited_event', 'permanent_event')
+        AND category = 'limited_event'
         AND archived = 0
         AND (ends_at IS NULL OR julianday(ends_at) > julianday(?))
       ORDER BY COALESCE(starts_at, created_at), created_at
@@ -2506,7 +2498,6 @@ export class AppDatabase {
             WHEN 'main_quest' THEN 10
             WHEN 'side_quest' THEN 20
             WHEN 'limited_event' THEN 30
-            WHEN 'permanent_event' THEN 40
             WHEN 'weekly' THEN 50
             WHEN 'endgame' THEN 60
             WHEN 'exploration' THEN 70
@@ -2598,7 +2589,7 @@ export class AppDatabase {
         input.category,
         input.title,
         JSON.stringify(
-          ['limited_event', 'permanent_event'].includes(input.category)
+          input.category === 'limited_event'
             ? normalizeActivityTags(input.activityTags ?? [])
             : []
         ),
@@ -2653,7 +2644,7 @@ export class AppDatabase {
       throw new Error('不能把其他事项改为主线或支线状态项')
     }
     const categoryChanged = category !== current.category
-    const activityTags = normalizeActivityTags(['limited_event', 'permanent_event'].includes(category)
+    const activityTags = normalizeActivityTags(category === 'limited_event'
       ? input.activityTags === undefined
         ? categoryChanged ? [] : current.activityTags
         : input.activityTags
@@ -2827,7 +2818,7 @@ export class AppDatabase {
   ): SyncMergeResult {
     const result: SyncMergeResult = { added: 0, updated: 0, preserved: 0 }
     for (const item of items) {
-      if (item.category === 'limited_event' || item.category === 'permanent_event') {
+      if (item.category === 'limited_event') {
         item.activityTags = normalizeActivityTags(
           item.activityTags ?? [],
           options.outputLocale ?? 'zh-CN'
@@ -2929,7 +2920,7 @@ export class AppDatabase {
               item.category,
               item.title,
               JSON.stringify(
-                ['limited_event', 'permanent_event'].includes(item.category)
+                item.category === 'limited_event'
             ? normalizeActivityTags(
                 item.activityTags ?? [],
                 options.outputLocale ?? 'zh-CN'
@@ -2979,7 +2970,7 @@ export class AppDatabase {
           source === 'public_schedule' || current.source === 'public_schedule'
             ? 'public_schedule'
             : 'personal_sync'
-        const resolvedActivityTags = ['limited_event', 'permanent_event'].includes(resolvedCategory)
+        const resolvedActivityTags = resolvedCategory === 'limited_event'
           ? preservePublicSchedule || item.activityTags === undefined
             ? current.activityTags
             : normalizeActivityTags(
@@ -3708,7 +3699,7 @@ export class AppDatabase {
         id TEXT PRIMARY KEY,
         game_id TEXT NOT NULL REFERENCES games(id) ON DELETE RESTRICT,
         category TEXT NOT NULL CHECK (category IN (
-          'main_quest', 'side_quest', 'limited_event', 'permanent_event',
+          'main_quest', 'side_quest', 'limited_event',
           'weekly', 'endgame', 'exploration', 'custom'
         )),
         title TEXT NOT NULL,
@@ -4268,7 +4259,7 @@ export class AppDatabase {
               AND item.archived = 0
               AND (
                 (sync_target_states.target = 'events'
-                  AND item.category IN ('limited_event', 'permanent_event'))
+                  AND item.category = 'limited_event')
                 OR (sync_target_states.target = 'cycles'
                   AND item.category IN ('weekly', 'endgame'))
                 OR (sync_target_states.target = 'exploration'
@@ -4713,7 +4704,7 @@ export class AppDatabase {
     const rows = this.database.prepare(`
       SELECT id, activity_tags_json AS activityTagsJson
       FROM checklist_items
-      WHERE category IN ('limited_event', 'permanent_event') AND archived = 0
+      WHERE category = 'limited_event' AND archived = 0
     `).all() as Array<{ id: string; activityTagsJson: string }>
     const update = this.database.prepare(`
       UPDATE checklist_items
