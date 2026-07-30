@@ -78,6 +78,14 @@ describe('同步接口契约', () => {
     expect(exploration.itemShapes[0].forbiddenFields).toEqual(
       expect.arrayContaining(['progressPercent', 'completed'])
     )
+    expect(exploration.inventoryScope).toContain('顶层')
+    expect(exploration.completionCriteria.join('；')).toContain('璃月')
+    expect(exploration.completionCriteria.join('；')).toContain('匹诺康尼')
+    expect(exploration.completionCriteria.join('；')).toContain('云陵谷')
+    expect(exploration.completionCriteria.join('；')).toContain('交叉核验')
+    expect(exploration.completionCriteria.join('；')).toContain('不得猜测')
+    expect(getPublicSyncContract('exploration').fieldSemantics.mapNodeKind)
+      .toContain('单独 Wiki 页面')
   })
 
   it('个人进度契约按版块声明最终决策字段', () => {
@@ -89,6 +97,8 @@ describe('同步接口契约', () => {
       .toEqual(expect.arrayContaining(['category', 'completed']))
     expect(getSemanticReviewContract('exploration').requiredDecisionFields)
       .toEqual(expect.arrayContaining(['mapNodeKind', 'progressPercent']))
+    expect(getSemanticReviewContract('exploration').fieldSemantics.mapNodeKind)
+      .toContain('禁止猜测')
   })
 
   it('个人同步把同名且倒计时重叠的周期项视为强重复信号', () => {

@@ -1,6 +1,6 @@
 {
   "name": "gtask",
-  "version": "0.1.0-rc.27",
+  "version": "0.1.0-rc.28",
   "description": "可扩展的本地游戏任务与进度清单",
   "main": "./out/main/index.js",
   "author": "Gtask contributors",

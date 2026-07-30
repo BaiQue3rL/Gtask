@@ -170,7 +170,7 @@ describe('本地 MCP server', () => {
         status: 'claimed',
         progressPhase: 'searching',
         contract: {
-          schemaVersion: 3,
+          schemaVersion: 4,
           authority: 'interface_contract',
           target: 'events',
           requestContext: {
@@ -782,7 +782,7 @@ describe('本地 MCP server', () => {
         remoteKey: 'event:public:anti-fraud'
       })],
       contract: {
-        schemaVersion: 5,
+        schemaVersion: 6,
         authority: 'interface_contract',
         target: 'events',
         requestContext: {

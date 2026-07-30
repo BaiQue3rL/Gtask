@@ -196,7 +196,7 @@ export interface SyncRequestContext {
 }
 
 export interface PublicSyncContract {
-  schemaVersion: 3
+  schemaVersion: 4
   authority: 'interface_contract'
   decisionAuthority: 'codex'
   executorPolicy: 'mechanical_validation_only'
@@ -211,7 +211,7 @@ export interface PublicSyncContract {
 }
 
 export interface SemanticReviewContract {
-  schemaVersion: 5
+  schemaVersion: 6
   authority: 'interface_contract'
   decisionAuthority: 'codex'
   executorPolicy: 'mechanical_validation_only'
