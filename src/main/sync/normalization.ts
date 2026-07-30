@@ -117,7 +117,6 @@ export function normalizeSyncItem(value: unknown): NormalizedSyncItem {
     parentTitle: nullableString(value.parentTitle, '同步上级区域'),
     mapNodeKind: value.mapNodeKind as NormalizedSyncItem['mapNodeKind'] | undefined,
     parentRemoteKey: nullableString(value.parentRemoteKey, '同步上级区域标识'),
-    relatedRegionRemoteKey: nullableString(value.relatedRegionRemoteKey, '同步关联区域标识'),
     startsAt,
     endsAt,
     resetRule: nullableString(value.resetRule, '同步重置规则'),

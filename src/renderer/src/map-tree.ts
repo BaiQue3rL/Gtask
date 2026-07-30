@@ -33,13 +33,6 @@ export function buildMapTreeRows(
   }
   const parentKeyOf = (item: ChecklistItem): string | null => {
     if (item.parentRemoteKey && byKey.has(item.parentRemoteKey)) return item.parentRemoteKey
-    if (
-      item.mapNodeKind === 'independent' &&
-      item.relatedRegionRemoteKey &&
-      byKey.has(item.relatedRegionRemoteKey)
-    ) {
-      return item.relatedRegionRemoteKey
-    }
     if (!item.parentTitle) return null
     const candidates = titleGroups.get(item.parentTitle) ?? []
     return candidates.length === 1 ? keyOf(candidates[0]) : null
@@ -65,7 +58,7 @@ export function buildMapTreeRows(
     if (visiting.has(key)) return null
     const nextVisiting = new Set(visiting)
     nextVisiting.add(key)
-    if (item.mapNodeKind !== 'group' && item.progressPercent !== null) {
+    if (item.progressPercent !== null) {
       displayProgress.set(key, item.progressPercent)
       return item.progressPercent
     }

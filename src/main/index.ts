@@ -20,7 +20,6 @@ import {
   refreshCodexMcpLauncher
 } from './ai/codex-plugin-installer'
 import {
-  CODEX_SCHEDULE_WORKER_AGENT_ID,
   CodexDynamicConcurrencyController,
   CodexScheduleWorkerPool,
   findCodexCli,
@@ -51,6 +50,7 @@ import { syncPersonalBeforeCatalogBootstrap } from './sync/personal-catalog-boot
 import { restoreRelaunchOptions } from './relaunch'
 import { migrateLegacyAppData, resolveAppDataPaths } from './data-paths'
 import { getFixedWeeklyBootstrap } from './sync/public-sync-bootstrap'
+import { getBundledMapCatalog } from './sync/map-catalog'
 import {
   getPersonalSyncTargets,
   supportsPersonalSyncTarget
@@ -106,6 +106,7 @@ let appDataRoot: string | null = null
 let codexWorkerEnvironment: NodeJS.ProcessEnv = {}
 let codexWorkerTransportMode: CodexWorkerTransportMode = 'websocket_preferred'
 const codexConcurrency = new CodexDynamicConcurrencyController()
+let isShuttingDown = false
 
 function reportBackgroundError(context: string, error: unknown): void {
   const message = error instanceof Error ? error.message : String(error)
@@ -115,6 +116,45 @@ function reportBackgroundError(context: string, error: unknown): void {
     return
   }
   console.error(`${context}失败`, error)
+}
+
+function shutdownApplicationRuntime(): void {
+  if (isShuttingDown) return
+  isShuttingDown = true
+  if (periodTimer) clearInterval(periodTimer)
+  periodTimer = null
+  if (externalChangeTimer) clearInterval(externalChangeTimer)
+  externalChangeTimer = null
+  if (aiJobProgressTimer) clearInterval(aiJobProgressTimer)
+  aiJobProgressTimer = null
+  aiJobProgressSignatures.clear()
+
+  syncOrchestrator?.shutdown()
+  miyousheQrLogin?.dispose()
+  kuroCommunityLogin?.dispose()
+  try {
+    appDatabase?.cancelAllActiveAiScheduleJobs()
+    appDatabase?.cancelAllSemanticReviewCandidates()
+  } catch (error) {
+    reportBackgroundError('退出时取消同步任务', error)
+  }
+  codexScheduleWorkerPool?.stop()
+  codexScheduleWorkerPool = null
+
+  try {
+    appDatabase?.close()
+  } catch (error) {
+    reportBackgroundError('退出时关闭数据库', error)
+  }
+  appDatabase = null
+  syncOrchestrator = null
+  credentialVault = null
+  miyousheQrLogin = null
+  kuroCommunityCredential = null
+  kuroCommunityLogin = null
+  appBackupDirectory = null
+  appDatabasePath = null
+  appDataRoot = null
 }
 
 function codexMcpLauncherOptions() {
@@ -180,6 +220,10 @@ async function queueAiScheduleSync(
       appDatabase.isCatalogComplete(gameId, target)
     return syncPersonalBeforeCatalogBootstrap({
       catalogComplete,
+      isCatalogComplete: () =>
+        target !== 'all' &&
+        target !== 'tasks' &&
+        Boolean(appDatabase?.isCatalogComplete(gameId, target)),
       syncPersonal: async () => {
         if (syncOrchestrator) {
           return syncOrchestrator.syncPersonalOnly(gameId, target, requestContext)
@@ -213,6 +257,27 @@ async function queueAiScheduleSync(
     })
   }
   const startedAt = new Date().toISOString()
+  if (target === 'exploration') {
+    const merge = maintainBundledMapCatalog(appDatabase, gameId)
+    const message = `地图目录已同步：新增 ${merge.added}，更新 ${merge.updated}`
+    appDatabase.recordSyncAttempt(gameId, scope)
+    appDatabase.recordSyncOutcome(gameId, 'success', message, true)
+    return {
+      gameId,
+      requestedScope: scope,
+      requestedTarget: target,
+      status: 'success',
+      startedAt,
+      finishedAt: new Date().toISOString(),
+      sources: [{
+        source: 'public_schedule',
+        status: 'success',
+        message,
+        ...merge
+      }],
+      message
+    }
+  }
   const sources: SyncResult['sources'] = []
   const fixedWeeklyMerge = target === 'all' || target === 'cycles'
     ? appDatabase.mergeSyncedItems(
@@ -221,7 +286,7 @@ async function queueAiScheduleSync(
         getFixedWeeklyBootstrap(gameId, target)
       )
     : null
-  const bootstrapMerge = fixedWeeklyMerge
+  let bootstrapMerge = fixedWeeklyMerge
     ? {
         added: fixedWeeklyMerge.added,
         updated: fixedWeeklyMerge.updated,
@@ -238,6 +303,14 @@ async function queueAiScheduleSync(
       target,
       requestContext
     )
+    if (target === 'all') {
+      const mapMerge = maintainBundledMapCatalog(appDatabase, gameId)
+      bootstrapMerge = {
+        added: (bootstrapMerge?.added ?? 0) + mapMerge.added,
+        updated: (bootstrapMerge?.updated ?? 0) + mapMerge.updated,
+        preserved: (bootstrapMerge?.preserved ?? 0) + mapMerge.preserved
+      }
+    }
     const launch = startCodexWorkersForActiveJobs() ?? {
       status: 'unavailable' as const,
       message: 'Codex 自动处理服务尚未初始化',
@@ -442,6 +515,10 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => mainWindow?.show())
+  mainWindow.on('closed', () => {
+    mainWindow = null
+    if (!isShuttingDown) app.quit()
+  })
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     try {
@@ -528,13 +605,7 @@ function registerIpcHandlers(): void {
     }
     appDatabase = null
     syncOrchestrator = null
-    if (periodTimer) clearInterval(periodTimer)
-    periodTimer = null
-    if (externalChangeTimer) clearInterval(externalChangeTimer)
-    externalChangeTimer = null
-    if (aiJobProgressTimer) clearInterval(aiJobProgressTimer)
-    aiJobProgressTimer = null
-    aiJobProgressSignatures.clear()
+    shutdownApplicationRuntime()
     setTimeout(() => {
       try {
         const relaunchOptions = restoreRelaunchOptions(process.env, process.argv)
@@ -1024,36 +1095,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
-  if (periodTimer) clearInterval(periodTimer)
-  periodTimer = null
-  if (externalChangeTimer) clearInterval(externalChangeTimer)
-  externalChangeTimer = null
-  if (aiJobProgressTimer) clearInterval(aiJobProgressTimer)
-  aiJobProgressTimer = null
-  aiJobProgressSignatures.clear()
-  codexScheduleWorkerPool?.stop()
-  for (const agentId of [
-    CODEX_SCHEDULE_WORKER_AGENT_ID,
-    ...(codexScheduleWorkerPool?.agentIds ?? [])
-  ]) {
-    try {
-      appDatabase?.requeueClaimedAiScheduleJobsByAgent(agentId)
-      appDatabase?.requeueClaimedSemanticReviewsByAgent(agentId)
-    } catch (error) {
-      reportBackgroundError('退出时归还同步任务', error)
-    }
-  }
-  codexScheduleWorkerPool = null
-  appDatabase?.close()
-  appDatabase = null
-  syncOrchestrator = null
-  credentialVault = null
-  miyousheQrLogin = null
-  kuroCommunityCredential = null
-  kuroCommunityLogin = null
-  appBackupDirectory = null
-  appDatabasePath = null
-  appDataRoot = null
+  shutdownApplicationRuntime()
 })
 
 function parseQrLoginSessionId(value: unknown): string {
@@ -1067,7 +1109,14 @@ function createAppSyncOrchestrator(database: AppDatabase): SyncOrchestrator {
   const reportProgress = (progress: SyncProgressUpdate): void => {
     mainWindow?.webContents.send('sync:progress', progress)
   }
-  if (!credentialVault) return new SyncOrchestrator(database, undefined, reportProgress)
+  const preparePersonalCatalog = (gameId: GameId, target: SyncTarget): void => {
+    if (target === 'exploration' || target === 'all') {
+      maintainBundledMapCatalog(database, gameId)
+    }
+  }
+  if (!credentialVault) {
+    return new SyncOrchestrator(database, undefined, reportProgress, preparePersonalCatalog)
+  }
   const fetcher = createElectronNetFetcher(net.fetch)
   return new SyncOrchestrator(database, {
     publicSchedule: {},
@@ -1131,5 +1180,23 @@ function createAppSyncOrchestrator(database: AppDatabase): SyncOrchestrator {
         )
       )
     }
-  }, reportProgress)
+  }, reportProgress, preparePersonalCatalog)
+}
+
+function maintainBundledMapCatalog(
+  database: AppDatabase,
+  gameId: GameId,
+  reference = new Date()
+): { added: number; updated: number; preserved: number } {
+  const merge = database.mergeSyncedItems(
+    gameId,
+    'public_schedule',
+    getBundledMapCatalog(gameId),
+    reference.toISOString(),
+    true,
+    { identityPolicy: 'remote-key-only' }
+  )
+  database.recordCatalogCoverage(gameId, 'exploration', 'public_schedule', 'complete')
+  database.recordSyncTargetSuccess(gameId, 'exploration', reference)
+  return merge
 }

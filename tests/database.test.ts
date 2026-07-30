@@ -1124,7 +1124,7 @@ describe('AppDatabase', () => {
         payload: {
           ...draft.payload,
           officialTitle: '璃月探索总览',
-          observedNodeKind: 'independent',
+          observedNodeKind: 'region',
           observedProgress: 88
         }
       }],
@@ -1137,7 +1137,7 @@ describe('AppDatabase', () => {
       .toMatchObject({ progressPercent: 88, completionState: 'incomplete' })
   })
 
-  it('地图名称和类型唯一时直接建绑，绑定名称冲突时停止机械写入', () => {
+  it('规范地图名称唯一时忽略来源层级直接建绑，绑定名称冲突时停止机械写入', () => {
     database = new AppDatabase(':memory:')
     database.recordCatalogCoverage('genshin', 'exploration', 'public_schedule', 'complete')
     database.mergeSyncedItems('genshin', 'public_schedule', [{
@@ -1172,6 +1172,46 @@ describe('AppDatabase', () => {
       'personal-map-progress',
       '20'
     )).toMatchObject({ itemId: item.id, bindingKind: 'mechanical' })
+
+    database.mergeSyncedItems('genshin', 'public_schedule', [
+      {
+        remoteKey: 'public-map:liyue',
+        category: 'exploration',
+        title: '璃月',
+        mapNodeKind: 'region'
+      },
+      {
+        remoteKey: 'public-map:chenyu-vale',
+        category: 'exploration',
+        title: '沉玉谷',
+        parentTitle: '璃月',
+        mapNodeKind: 'subregion',
+        parentRemoteKey: 'public-map:liyue'
+      }
+    ])
+    const providerHierarchyDiffers = database.resolveKnownPersonalDrafts(
+      'genshin',
+      accountScope,
+      [{
+        target: 'exploration',
+        kind: 'personal-map-progress',
+        payload: {
+          provider: 'miyoushe',
+          officialId: '40',
+          officialTitle: '沉玉谷',
+          observedNodeKind: 'region',
+          observedProgress: 100
+        }
+      }]
+    )
+    expect(providerHierarchyDiffers).toEqual({
+      reviewCandidates: [],
+      applied: 1,
+      preserved: 0
+    })
+    expect(database.listChecklistItems('genshin').find(
+      (candidate) => candidate.remoteKey === 'public-map:chenyu-vale'
+    )).toMatchObject({ mapNodeKind: 'subregion', progressPercent: 100 })
 
     const conflictDraft = {
       target: 'exploration' as const,
@@ -1279,6 +1319,43 @@ describe('AppDatabase', () => {
       pendingCount: 0,
       claimedCount: 0,
       latestDecision: { status: 'rejected', message: '用户已取消' }
+    })
+  })
+
+  it('应用退出时一次性取消全部公开任务和语义核验任务', () => {
+    database = new AppDatabase(':memory:')
+    const reference = new Date('2026-07-31T00:00:00.000Z')
+    database.registerAiScheduleAgent('shutdown-public-1', '公开 Agent 1', reference)
+    database.registerAiScheduleAgent('shutdown-public-2', '公开 Agent 2', reference)
+    database.registerAiScheduleAgent('shutdown-review', '审核 Agent', reference)
+
+    database.queueSemanticReviewCandidates('genshin', 'personal_sync', [{
+      target: 'events',
+      kind: 'shutdown-test-1',
+      payload: { officialEventId: '1' }
+    }, {
+      target: 'cycles',
+      kind: 'shutdown-test-2',
+      payload: { officialId: '2' }
+    }], reference)
+    database.claimSemanticReviewBatch('shutdown-review', 2, reference)
+    database.createAiScheduleJob('genshin', 'public_schedule', reference, false, 'events')
+    database.createAiScheduleJob('star-rail', 'public_schedule', reference, false, 'cycles')
+    database.claimAiScheduleJob('shutdown-public-1', reference)
+    database.claimAiScheduleJob('shutdown-public-2', reference)
+
+    expect(database.cancelAllActiveAiScheduleJobs(reference)).toEqual({
+      cancelled: 2,
+      agentIds: expect.arrayContaining(['shutdown-public-1', 'shutdown-public-2'])
+    })
+    expect(database.cancelAllSemanticReviewCandidates(reference)).toEqual({
+      cancelled: 2,
+      agentIds: []
+    })
+    expect(database.listActiveAiScheduleJobs()).toEqual([])
+    expect(database.getSemanticReviewSummary('genshin')).toMatchObject({
+      pendingCount: 0,
+      claimedCount: 0
     })
   })
 
@@ -2342,16 +2419,17 @@ describe('AppDatabase', () => {
       {
         remoteKey: 'map:world:a:independent',
         category: 'exploration',
-        title: '自定义独立区域',
-        mapNodeKind: 'independent',
-        relatedRegionRemoteKey: 'map:world:a'
+        title: '自定义二级区域',
+        mapNodeKind: 'subregion',
+        parentTitle: '自定义主区域',
+        parentRemoteKey: 'map:world:a'
       }
     ])
     expect(database.listChecklistItems('star-rail').find(
       (item) => item.remoteKey === 'map:world:a:independent'
     )).toMatchObject({
-      mapNodeKind: 'independent',
-      relatedRegionRemoteKey: 'map:world:a',
+      mapNodeKind: 'subregion',
+      parentRemoteKey: 'map:world:a',
       progressPercent: 0
     })
 
@@ -2370,7 +2448,7 @@ describe('AppDatabase', () => {
         mapNodeKind: 'subregion',
         parentRemoteKey: 'map:loop:a'
       }
-    ])).toThrow('地图层级存在循环')
+    ])).toThrow('上级必须是一级主地区')
   })
 
   it('个人数据先到达时，后续公开排期仍取得元数据优先级', () => {
@@ -2744,7 +2822,7 @@ describe('AppDatabase', () => {
         userTimeZone: 'America/Los_Angeles'
       },
       contract: {
-        schemaVersion: 5,
+        schemaVersion: 6,
         decisionAuthority: 'codex',
         executorPolicy: 'mechanical_validation_only'
       }
@@ -3363,7 +3441,7 @@ describe('AppDatabase', () => {
         remoteKey: 'map:new-eridu:waifei-peninsula',
         category: 'exploration',
         title: '卫非地',
-        mapNodeKind: 'independent',
+        mapNodeKind: 'subregion',
         parentRemoteKey: 'map:new-eridu'
       }
     ])
@@ -3396,24 +3474,19 @@ describe('AppDatabase', () => {
     const result = database.applyAiScheduleJob(
       queued.id,
       'agent-map-reference',
-      [{
-        matchItemId: child.id,
-        remoteKey: 'ignored-by-match',
-        category: 'exploration',
-        title: '卫非地',
-        mapNodeKind: 'independent',
-        parentRemoteKey: null
-      }],
+      [],
       [],
       new Date(),
       [],
       [],
-      [{ itemId: parent.id, reason: '移除过时包装层并重新挂接子地图' }]
+      [
+        { itemId: child.id, reason: '与父地区一起移除过时二级地区' },
+        { itemId: parent.id, reason: '移除过时一级地区' }
+      ]
     )
 
-    expect(result.archived).toBe(1)
-    expect(database.listChecklistItems('zenless')
-      .find((item) => item.id === child.id)?.parentRemoteKey).toBeNull()
+    expect(result.archived).toBe(2)
+    expect(database.listChecklistItems('zenless').some((item) => item.id === child.id)).toBe(false)
   })
 
   it('原神周期同步接受 Codex 判定的清单并自动补齐周常', () => {

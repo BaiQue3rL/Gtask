@@ -8,11 +8,12 @@ describe('个人进度同步能力', () => {
   it('只开放个人接口实际提供的版块', () => {
     expect(getPersonalSyncTargets('genshin')).toEqual(['events', 'cycles', 'exploration'])
     expect(getPersonalSyncTargets('star-rail')).toEqual(['events', 'cycles'])
-    expect(getPersonalSyncTargets('zenless')).toEqual(['events', 'cycles'])
+    expect(getPersonalSyncTargets('zenless')).toEqual(['events', 'cycles', 'exploration'])
     expect(getPersonalSyncTargets('wuthering-waves')).toEqual(['cycles', 'exploration'])
     expect(supportsPersonalSyncTarget('star-rail', 'exploration')).toBe(false)
     expect(supportsPersonalSyncTarget('star-rail', 'events')).toBe(true)
     expect(supportsPersonalSyncTarget('genshin', 'exploration')).toBe(true)
+    expect(supportsPersonalSyncTarget('zenless', 'exploration')).toBe(true)
     expect(supportsPersonalSyncTarget('wuthering-waves', 'events')).toBe(false)
     expect(supportsPersonalSyncTarget('wuthering-waves', 'cycles')).toBe(true)
     expect(supportsPersonalSyncTarget('wuthering-waves', 'exploration')).toBe(true)

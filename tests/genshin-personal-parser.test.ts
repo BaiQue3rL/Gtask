@@ -144,7 +144,8 @@ describe('Genshin personal parsing', () => {
         title: '沉玉谷',
         progressPercent: 100,
         completed: true,
-        parentTitle: '世界探索'
+        mapNodeKind: 'region',
+        parentTitle: null
       }),
       expect.objectContaining({
         remoteKey: 'exploration:world:11',
@@ -153,10 +154,17 @@ describe('Genshin personal parsing', () => {
         parentTitle: '沉玉谷'
       }),
     ]))
-    expect(items.some((item) => item.title === '遗珑埠')).toBe(false)
+    expect(items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        title: '遗珑埠',
+        mapNodeKind: 'subregion',
+        parentTitle: '沉玉谷',
+        progressPercent: 100
+      })
+    ]))
   })
 
-  it('地图语义候选只保留一级地区和独立地图，不发送普通二级区域', () => {
+  it('地图语义候选保留一级地区和全部二级地区', () => {
     const candidates = extractGenshinExplorationReviewCandidates({
       world_explorations: [{
         id: 10,
@@ -174,7 +182,7 @@ describe('Genshin personal parsing', () => {
       }]
     })
 
-    expect(candidates).toHaveLength(2)
+    expect(candidates).toHaveLength(3)
     expect(candidates).toEqual(expect.arrayContaining([
       expect.objectContaining({
         payload: expect.objectContaining({
@@ -185,12 +193,18 @@ describe('Genshin personal parsing', () => {
       expect.objectContaining({
         payload: expect.objectContaining({
           officialTitle: '层岩巨渊',
-          observedNodeKind: 'independent',
+          observedNodeKind: 'subregion',
+          observedParentId: '10'
+        })
+      }),
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          officialTitle: '归离原',
+          observedNodeKind: 'subregion',
           observedParentId: '10'
         })
       })
     ]))
-    expect(JSON.stringify(candidates)).not.toContain('归离原')
   })
 
   it('父区域零值且子区域未全满时不伪造平均探索度', () => {

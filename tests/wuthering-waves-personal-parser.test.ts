@@ -10,7 +10,7 @@ import {
 import { WutheringWavesPersonalAdapter } from '../src/main/sync/wuthering-waves-personal-adapter'
 
 describe('鸣潮个人进度解析', () => {
-  it('只保留指导所需的一级大区域探索度', () => {
+  it('保留一级主地区和二级地区探索度', () => {
     expect(parseWutheringWavesExploration({
       open: true,
       exploreList: [{
@@ -21,17 +21,29 @@ describe('鸣潮个人进度解析', () => {
           { areaId: 102, areaName: '黑海岸', areaProgress: 63, itemList: [] }
         ]
       }]
-    })).toEqual([
+    })).toEqual(expect.arrayContaining([
       expect.objectContaining({
         remoteKey: 'exploration:country:1',
         title: '瑝珑',
         progressPercent: 78.4,
         completed: false
+      }),
+      expect.objectContaining({
+        remoteKey: 'exploration:area:101',
+        title: '乘霄山',
+        parentTitle: '瑝珑',
+        progressPercent: 100
+      }),
+      expect.objectContaining({
+        remoteKey: 'exploration:area:102',
+        title: '黑海岸',
+        parentTitle: '瑝珑',
+        progressPercent: 63
       })
-    ])
+    ]))
   })
 
-  it('地图语义候选不发送普通二级区域', () => {
+  it('地图语义候选同时发送一级主地区和二级地区', () => {
     const candidates = extractWutheringWavesExplorationReviewCandidates({
       exploreList: [{
         country: { countryId: 1, countryName: '瑝珑' },
@@ -42,15 +54,25 @@ describe('鸣潮个人进度解析', () => {
       }]
     })
 
-    expect(candidates).toEqual([expect.objectContaining({
-      payload: expect.objectContaining({
-        officialId: '1',
-        officialTitle: '瑝珑',
-        observedNodeKind: 'region',
-        observedProgress: 78.4
+    expect(candidates).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          officialId: '1',
+          officialTitle: '瑝珑',
+          observedNodeKind: 'region',
+          observedProgress: 78.4
+        })
+      }),
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          officialId: 'area:101',
+          officialTitle: '乘霄山',
+          observedNodeKind: 'subregion',
+          observedParentTitle: '瑝珑',
+          observedProgress: 100
+        })
       })
-    })])
-    expect(JSON.stringify(candidates)).not.toContain('乘霄山')
+    ]))
   })
 
   it('挑战模式只要存在本期挑战记录就判定完成，不要求满星或满分', () => {

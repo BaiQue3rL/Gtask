@@ -42,6 +42,14 @@ describe('MiyousheZenlessClient', () => {
         ]
       } }))
       .mockResolvedValueOnce(response({ retcode: 0, data: { activity_list: [] } }))
+      .mockResolvedValueOnce(response({ retcode: 0, data: {
+        area_collections: [{
+          urban_area_group_id: 21,
+          name: '罗斯凯利法',
+          collection_progress: 60,
+          map_collections: []
+        }]
+      } }))
     const client = new MiyousheZenlessClient('cookie_token_v2=secret', fetcher)
 
     await expect(client.getShiyuDefense()).resolves.toMatchObject({
@@ -54,7 +62,12 @@ describe('MiyousheZenlessClient', () => {
       total_star: 6
     })
     await expect(client.getZenlessEventCalendar()).resolves.toEqual({ activity_list: [] })
-    expect(fetcher).toHaveBeenCalledTimes(4)
+    await expect(client.getZenlessExploration()).resolves.toEqual({
+      area_collections: [expect.objectContaining({ urban_area_group_id: 21 })]
+    })
+    expect(fetcher).toHaveBeenCalledTimes(5)
+    expect(String(fetcher.mock.calls[4][0])).toContain('/exploration_detail')
+    expect(String(fetcher.mock.calls[4][0])).toContain('uid=10194867')
     expect(String(fetcher.mock.calls[1][0])).toContain('role_id=10194867')
     const headers = new Headers(fetcher.mock.calls[1][1]?.headers)
     expect(headers.get('cookie')).toBe('cookie_token_v2=secret')

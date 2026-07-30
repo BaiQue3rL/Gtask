@@ -35,10 +35,27 @@ export function parseWutheringWavesExploration(value: unknown): NormalizedSyncIt
       title: countryName,
       completed: countryProgress === 100,
       progressPercent: countryProgress,
-      parentTitle: '瑝珑世界',
+      parentTitle: null,
+      mapNodeKind: 'region',
+      parentRemoteKey: null,
       modeKey: `exploration-country-${countryId}`
     })
-
+    for (const area of recordArray(group.areaInfoList)) {
+      const areaId = requiredIdentifier(area.areaId, '二级地图区域 id')
+      const areaName = requiredString(area.areaName, '二级地图区域名称')
+      const areaProgress = percentage(area.areaProgress, `${areaName}探索度`)
+      items.push({
+        remoteKey: `exploration:area:${areaId}`,
+        category: 'exploration',
+        title: areaName,
+        completed: areaProgress === 100,
+        progressPercent: areaProgress,
+        parentTitle: countryName,
+        mapNodeKind: 'subregion',
+        parentRemoteKey: `exploration:country:${countryId}`,
+        modeKey: `exploration-area-${areaId}`
+      })
+    }
   }
   return items
 }
@@ -66,6 +83,23 @@ export function extractWutheringWavesExplorationReviewCandidates(
         observedParentTitle: null
       }
     })
+    for (const area of recordArray(group.areaInfoList)) {
+      const areaId = requiredIdentifier(area.areaId, '二级地图区域 id')
+      const areaName = requiredString(area.areaName, '二级地图区域名称')
+      drafts.push({
+        target: 'exploration',
+        kind: 'personal-map-progress',
+        payload: {
+          provider: 'kuro-community',
+          officialId: `area:${areaId}`,
+          officialTitle: areaName,
+          observedProgress: percentage(area.areaProgress, `${areaName}探索度`),
+          observedNodeKind: 'subregion',
+          observedParentId: countryId,
+          observedParentTitle: countryName
+        }
+      })
+    }
   }
   return drafts
 }

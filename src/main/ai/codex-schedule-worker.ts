@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, statSync } from 'node:fs'
-import { spawn, type ChildProcess } from 'node:child_process'
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { delimiter, join } from 'node:path'
 
 export const CODEX_SCHEDULE_WORKER_AGENT_ID = 'gacha-app-background-worker'
@@ -427,7 +427,17 @@ export class CodexScheduleWorker {
     this.stopped = true
     if (this.child && this.child.exitCode === null) {
       this.intentionallyStoppedChildren.add(this.child)
-      this.child.kill()
+      const pid = this.child.pid
+      if (process.platform === 'win32' && typeof pid === 'number') {
+        const taskkill = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'taskkill.exe')
+        const result = spawnSync(taskkill, ['/PID', String(pid), '/T', '/F'], {
+          windowsHide: true,
+          stdio: 'ignore'
+        })
+        if (result.error) this.child.kill()
+      } else {
+        this.child.kill()
+      }
     }
     this.child = null
   }

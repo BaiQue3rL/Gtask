@@ -271,4 +271,26 @@ describe('Codex schedule worker', () => {
     expect(children[2].exitCode).toBeNull()
     expect(pool.stopAgent('unknown-agent')).toBe(false)
   })
+
+  it('stops every launched worker when the application exits', () => {
+    const children: FakeChildProcess[] = []
+    const spawnProcess = (() => {
+      const child = new FakeChildProcess()
+      children.push(child)
+      return child as unknown as ChildProcess
+    }) as unknown as typeof spawn
+    const pool = new CodexScheduleWorkerPool({
+      workingDirectory: 'C:\\GachaData',
+      findExecutable: () => 'C:\\Codex\\codex.exe',
+      spawnProcess
+    })
+
+    pool.ensureCapacity(4)
+    expect(pool.runningCount).toBe(4)
+
+    pool.stop()
+
+    expect(pool.runningCount).toBe(0)
+    expect(children.every((child) => child.exitCode === 0)).toBe(true)
+  })
 })

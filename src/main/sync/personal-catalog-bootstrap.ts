@@ -2,6 +2,7 @@ import type { SyncResult } from '../../shared/contracts'
 
 interface PersonalCatalogBootstrapOptions {
   catalogComplete: boolean
+  isCatalogComplete?: () => boolean
   syncPersonal: () => Promise<SyncResult>
   queueCatalog: () => Promise<SyncResult>
 }
@@ -21,6 +22,7 @@ export async function syncPersonalBeforeCatalogBootstrap(
 
   if (
     options.catalogComplete ||
+    options.isCatalogComplete?.() === true ||
     personalResult.status === 'cancelled' ||
     personalSource?.status !== 'success'
   ) {

@@ -65,7 +65,6 @@ const checklistFields = {
   parentTitle: nullableTextSchema,
   mapNodeKind: mapNodeKindSchema.nullable().optional(),
   parentRemoteKey: nullableTextSchema,
-  relatedRegionRemoteKey: nullableTextSchema,
   startsAt: nullableDateSchema,
   endsAt: nullableDateSchema,
   resetRule: nullableTextSchema,
@@ -118,8 +117,7 @@ function selectSemanticReviewMatchCandidates(
 
   const relatedRemoteKeys = new Set(directMatches.flatMap((item) => [
     item.remoteKey,
-    item.parentRemoteKey,
-    item.relatedRegionRemoteKey
+    item.parentRemoteKey
   ]).filter((value): value is string => Boolean(value)))
   const relatedTitles = new Set([
     normalizeSemanticMatchTitle(candidate.payload.observedParentTitle),
@@ -153,7 +151,6 @@ function semanticReviewMatchCandidateProjection(item: ChecklistItem): Record<str
     parentTitle: item.parentTitle,
     mapNodeKind: item.mapNodeKind,
     parentRemoteKey: item.parentRemoteKey,
-    relatedRegionRemoteKey: item.relatedRegionRemoteKey,
     completed: item.completed,
     manualCompletionLocked: item.manualCompletionLocked
   }).filter(([, value]) => value !== null && value !== undefined))
@@ -291,7 +288,6 @@ export function createLocalMcpServer(
         parentTitle: nullableTextSchema,
         mapNodeKind: mapNodeKindSchema.nullable().optional(),
         parentRemoteKey: nullableTextSchema,
-        relatedRegionRemoteKey: nullableTextSchema,
         startsAt: nullableDateSchema,
         endsAt: nullableDateSchema,
         resetRule: nullableTextSchema,
@@ -553,7 +549,6 @@ export function createLocalMcpServer(
           parentTitle: nullableTextSchema,
           mapNodeKind: mapNodeKindSchema.nullable().optional(),
           parentRemoteKey: nullableTextSchema,
-          relatedRegionRemoteKey: nullableTextSchema,
           startsAt: isoDateSchema.nullable().optional(),
           endsAt: isoDateSchema.nullable().optional(),
           resetRule: nullableTextSchema,
@@ -662,7 +657,6 @@ export function createLocalMcpServer(
           parentTitle: z.string().max(200).nullable().optional(),
           mapNodeKind: mapNodeKindSchema.nullable().optional(),
           parentRemoteKey: z.string().max(200).nullable().optional(),
-          relatedRegionRemoteKey: z.string().max(200).nullable().optional(),
           startsAt: isoDateSchema.nullable().optional()
             .describe('绝对开始时间；限时活动必须提供'),
           endsAt: isoDateSchema.nullable().optional()

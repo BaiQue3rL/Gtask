@@ -34,6 +34,8 @@ interface PendingLogin {
 
 export class KuroCommunityLoginService {
   private readonly sessions = new Map<string, PendingLogin>()
+  private readonly requestControllers = new Set<AbortController>()
+  private disposed = false
 
   constructor(
     private readonly credentialService: KuroCommunityCredentialService,
@@ -47,6 +49,7 @@ export class KuroCommunityLoginService {
     phone: unknown,
     geetest: MiyousheGeetestV4Result
   ): Promise<KuroCommunitySmsState> {
+    if (this.disposed) throw new Error('库街区登录服务已关闭')
     const normalizedPhone = normalizePhone(phone)
     const validation = normalizeGeetest(geetest)
     const did = randomUUID().toUpperCase()
@@ -77,6 +80,7 @@ export class KuroCommunityLoginService {
   }
 
   async complete(sessionId: unknown, code: unknown): Promise<KuroCommunityLoginResult> {
+    if (this.disposed) throw new Error('库街区登录服务已关闭')
     const session = this.getSession(sessionId)
     const normalizedCode = normalizeCode(code)
     const data = await this.request(
@@ -109,6 +113,7 @@ export class KuroCommunityLoginService {
     roleId: unknown,
     serverId: unknown
   ): Promise<KuroCommunityCredential> {
+    if (this.disposed) throw new Error('库街区登录服务已关闭')
     const normalizedSessionId = requiredSessionId(sessionId)
     const session = this.getSession(normalizedSessionId)
     if (!session.token || !session.roles) {
@@ -132,6 +137,13 @@ export class KuroCommunityLoginService {
 
   cancel(sessionId: unknown): boolean {
     return this.sessions.delete(requiredSessionId(sessionId))
+  }
+
+  dispose(): void {
+    this.disposed = true
+    this.sessions.clear()
+    for (const controller of this.requestControllers) controller.abort()
+    this.requestControllers.clear()
   }
 
   private getSession(value: unknown): PendingLogin {
@@ -160,6 +172,7 @@ export class KuroCommunityLoginService {
     headerDevCode: string = did
   ): Promise<unknown> {
     const controller = new AbortController()
+    this.requestControllers.add(controller)
     const timeout = setTimeout(() => controller.abort(), 15_000)
     try {
       const response = await this.fetcher(`${BASE_URL}${path}`, {
@@ -196,6 +209,7 @@ export class KuroCommunityLoginService {
       throw error
     } finally {
       clearTimeout(timeout)
+      this.requestControllers.delete(controller)
     }
   }
 }

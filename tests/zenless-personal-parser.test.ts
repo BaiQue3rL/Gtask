@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  extractZenlessExplorationReviewCandidates,
   extractZenlessEventReviewCandidates,
   parseZenlessDeadlyAssault,
   parseZenlessPersonalData,
@@ -8,6 +9,55 @@ import {
 import { ZenlessPersonalAdapter } from '../src/main/sync/zenless-personal-adapter'
 
 describe('绝区零个人战绩解析', () => {
+  it('把官方区域收集解析为一级、二级地图进度候选', () => {
+    expect(extractZenlessExplorationReviewCandidates({
+      area_collections: [{
+        urban_area_group_id: 21,
+        name: '罗斯凯利法',
+        collection_progress: 60,
+        map_collections: [{
+          urban_area_id: 2101,
+          name: '布亚斯特城区',
+          collection_progress: 100
+        }, {
+          urban_area_id: 2102,
+          name: '[管制区]算枢局',
+          collection_progress: 65
+        }]
+      }]
+    })).toEqual([
+      expect.objectContaining({
+        target: 'exploration',
+        payload: expect.objectContaining({
+          officialId: 'group:21',
+          officialTitle: '罗斯凯利法',
+          observedNodeKind: 'region',
+          observedProgress: 60
+        })
+      }),
+      expect.objectContaining({
+        target: 'exploration',
+        payload: expect.objectContaining({
+          officialId: 'area:2101',
+          officialTitle: '布亚斯特城区',
+          observedNodeKind: 'subregion',
+          observedParentTitle: '罗斯凯利法',
+          observedProgress: 100
+        })
+      }),
+      expect.objectContaining({
+        target: 'exploration',
+        payload: expect.objectContaining({
+          officialId: 'area:2102',
+          officialTitle: '[管制区]算枢局',
+          observedNodeKind: 'subregion',
+          observedParentTitle: '罗斯凯利法',
+          observedProgress: 65
+        })
+      })
+    ])
+  })
+
   it('把式舆防卫战映射为稳定模式标识、周期和战绩状态', () => {
     expect(
       parseZenlessShiyuDefense({
@@ -163,7 +213,7 @@ describe('绝区零个人战绩解析', () => {
     })).toMatchObject({ completed: false })
   })
 
-  it('正式适配器顺序请求两个已验证接口并拒绝用于其他游戏', async () => {
+  it('正式适配器按目标顺序请求已验证接口并拒绝用于其他游戏', async () => {
     const order: string[] = []
     const adapter = new ZenlessPersonalAdapter({
       getShiyuDefense: async () => {
@@ -199,19 +249,35 @@ describe('绝区零个人战绩解析', () => {
             end_ts: 1787183999
           }]
         }
+      },
+      getZenlessExploration: async () => {
+        order.push('exploration')
+        return {
+          area_collections: [{
+            urban_area_group_id: 21,
+            name: '罗斯凯利法',
+            collection_progress: 60,
+            map_collections: [{
+              urban_area_id: 2101,
+              name: '布亚斯特城区',
+              collection_progress: 100
+            }]
+          }]
+        }
       }
     })
     const progress: Array<{ message: string; current?: number | null; total?: number | null }> = []
 
     const output = await adapter.sync('zenless', 'all', (update) => progress.push(update))
-    expect(order).toEqual(['shiyu', 'deadly', 'events'])
+    expect(order).toEqual(['shiyu', 'deadly', 'events', 'exploration'])
     expect(progress).toEqual([
-      expect.objectContaining({ message: '正在读取式舆防卫战战绩', current: 1, total: 3 }),
-      expect.objectContaining({ message: '正在读取危局强袭战战绩', current: 2, total: 3 }),
-      expect.objectContaining({ message: '正在读取绝区零活动进度', current: 3, total: 3 })
+      expect.objectContaining({ message: '正在读取式舆防卫战战绩', current: 1, total: 4 }),
+      expect.objectContaining({ message: '正在读取危局强袭战战绩', current: 2, total: 4 }),
+      expect.objectContaining({ message: '正在读取绝区零活动进度', current: 3, total: 4 }),
+      expect.objectContaining({ message: '正在读取绝区零区域探索进度', current: 4, total: 4 })
     ])
     expect(output.items).toHaveLength(0)
-    expect(output.reviewCandidates).toHaveLength(3)
+    expect(output.reviewCandidates).toHaveLength(5)
     order.length = 0
     const eventsOnly = await adapter.sync('zenless', 'events')
     expect(order).toEqual(['events'])
@@ -219,8 +285,9 @@ describe('绝区零个人战绩解析', () => {
     expect(eventsOnly.reviewCandidates).toHaveLength(1)
     order.length = 0
     const exploration = await adapter.sync('zenless', 'exploration')
-    expect(order).toEqual([])
+    expect(order).toEqual(['exploration'])
     expect(exploration.items).toEqual([])
+    expect(exploration.reviewCandidates).toHaveLength(2)
     await expect(adapter.sync('genshin')).rejects.toThrow('不能用于其他游戏')
   })
 
@@ -233,7 +300,8 @@ describe('绝区零个人战绩解析', () => {
         passed_fifth_floor: true
       }),
       getDeadlyAssault: async () => { throw new Error('危局接口失败') },
-      getZenlessEventCalendar: async () => ({ activity_list: [] })
+      getZenlessEventCalendar: async () => ({ activity_list: [] }),
+      getZenlessExploration: async () => ({ area_collections: [] })
     })
     const progress: Array<{ message: string }> = []
     const partial = await adapter.sync('zenless', 'cycles', (update) => progress.push(update))

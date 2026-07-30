@@ -67,7 +67,6 @@ describe('本地 MCP server', () => {
       'activityTags',
       'mapNodeKind',
       'parentRemoteKey',
-      'relatedRegionRemoteKey'
     ]))
 
     const response = await connected.callTool({
@@ -170,7 +169,7 @@ describe('本地 MCP server', () => {
         status: 'claimed',
         progressPhase: 'searching',
         contract: {
-          schemaVersion: 5,
+          schemaVersion: 6,
           authority: 'interface_contract',
           target: 'events',
           requestContext: {
@@ -537,7 +536,7 @@ describe('本地 MCP server', () => {
             category: 'exploration',
             title: '旧日之海',
             titleSourceUrl: sourceUrl,
-            mapNodeKind: 'independent',
+            mapNodeKind: 'subregion',
             parentRemoteKey: 'exploration:fontaine',
             parentTitle: '枫丹',
             modeKey: 'sea-of-bygone-eras',
@@ -565,7 +564,7 @@ describe('本地 MCP server', () => {
       })
     expect(database!.listChecklistItems('genshin').find((item) => item.title === '旧日之海'))
       .toMatchObject({
-        mapNodeKind: 'independent',
+        mapNodeKind: 'subregion',
         parentRemoteKey: 'exploration:fontaine',
         progressPercent: 0
       })
@@ -782,7 +781,7 @@ describe('本地 MCP server', () => {
         remoteKey: 'event:public:anti-fraud'
       })],
       contract: {
-        schemaVersion: 7,
+        schemaVersion: 8,
         authority: 'interface_contract',
         target: 'events',
         requestContext: {
@@ -858,7 +857,7 @@ describe('本地 MCP server', () => {
         remoteKey: 'map:fontaine:sea-of-bygone-eras',
         category: 'exploration',
         title: '旧日之海',
-        mapNodeKind: 'independent',
+        mapNodeKind: 'subregion',
         parentTitle: '枫丹',
         parentRemoteKey: 'map:fontaine'
       },
@@ -869,7 +868,7 @@ describe('本地 MCP server', () => {
         mapNodeKind: 'region'
       }
     ])
-    const independentMap = database!.listChecklistItems('genshin').find(
+    const subregionMap = database!.listChecklistItems('genshin').find(
       (item) => item.remoteKey === 'map:fontaine:sea-of-bygone-eras'
     )!
     database!.queueSemanticReviewCandidates('genshin', 'personal_sync', [{
@@ -877,10 +876,10 @@ describe('本地 MCP server', () => {
       kind: 'personal-map-progress',
       payload: {
         provider: 'miyoushe',
-        officialId: '6:independent:sea-of-bygone-eras',
+        officialId: '6:subregion:sea-of-bygone-eras',
         officialTitle: '旧日之海',
         observedProgress: 82.5,
-        observedNodeKind: 'independent',
+        observedNodeKind: 'subregion',
         observedParentId: '6',
         observedParentTitle: '枫丹'
       }
@@ -902,7 +901,7 @@ describe('本地 MCP server', () => {
       targetMatchCandidateCount: 3,
       matchCandidates: expect.arrayContaining([
         expect.objectContaining({
-          itemId: independentMap.id,
+          itemId: subregionMap.id,
           title: '旧日之海',
           progressPercent: 0,
           parentRemoteKey: 'map:fontaine'
@@ -922,14 +921,14 @@ describe('本地 MCP server', () => {
         agentId: 'map-semantic-agent',
         candidateId,
         contentLocale: 'zh-CN',
-        matchItemId: independentMap.id,
+        matchItemId: subregionMap.id,
         confidence: 0.99,
         item: {
           remoteKey: 'map:miyoushe:6:area:fontaine-court',
           category: 'exploration',
           title: '旧日之海',
           progressPercent: 82.5,
-          mapNodeKind: 'independent',
+          mapNodeKind: 'subregion',
           parentTitle: '枫丹',
           parentRemoteKey: 'map:fontaine'
         },
@@ -942,7 +941,7 @@ describe('本地 MCP server', () => {
 
     expect(approved.isError).not.toBe(true)
     expect(database!.listChecklistItems('genshin').find(
-      (item) => item.id === independentMap.id
+      (item) => item.id === subregionMap.id
     ))
       .toMatchObject({
         source: 'public_schedule',

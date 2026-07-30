@@ -123,6 +123,14 @@ class MiyousheChronicleClient {
     })
   }
 
+  async getZenlessExploration(): Promise<unknown> {
+    const account = await this.getAccount('nap_cn', '绝区零')
+    return await this.request(`${ZENLESS_RECORD_BASE}/exploration_detail`, {
+      uid: account.uid,
+      region: account.region
+    })
+  }
+
   protected async getAccount(gameBiz: string, gameLabel: string): Promise<{ uid: string; region: string }> {
     const cached = this.accounts.get(gameBiz)
     if (cached) return cached

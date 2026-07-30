@@ -23,8 +23,7 @@ describe('同步接口契约', () => {
     expect(contract.sections.map((section) => section.target)).toEqual([
       'tasks',
       'events',
-      'cycles',
-      'exploration'
+      'cycles'
     ])
   })
 
@@ -90,7 +89,7 @@ describe('同步接口契约', () => {
     expect(exploration.itemShapes[0].forbiddenFields).toEqual(
       expect.arrayContaining(['progressPercent', 'completed'])
     )
-    expect(exploration.inventoryScope).toContain('顶层')
+    expect(exploration.inventoryScope).toContain('一级主地区')
     expect(exploration.completionCriteria.join('；')).toContain('璃月')
     expect(exploration.completionCriteria.join('；')).toContain('匹诺康尼')
     expect(exploration.completionCriteria.join('；')).toContain('云陵谷')
@@ -98,7 +97,7 @@ describe('同步接口契约', () => {
     expect(exploration.completionCriteria.join('；')).toContain('交叉核验')
     expect(exploration.completionCriteria.join('；')).toContain('不得猜测')
     expect(getPublicSyncContract('exploration').fieldSemantics.mapNodeKind)
-      .toContain('单独 Wiki 页面')
+      .toContain('不得提交第三种节点')
   })
 
   it('版更校时明确排除卡池、活动和维护期限', () => {
@@ -121,7 +120,7 @@ describe('同步接口契约', () => {
     expect(getSemanticReviewContract('exploration').requiredDecisionFields)
       .toEqual(expect.arrayContaining(['mapNodeKind', 'progressPercent']))
     expect(getSemanticReviewContract('exploration').fieldSemantics.mapNodeKind)
-      .toContain('禁止猜测')
+      .toContain('个人接口的节点类型只作为观测')
     expect(getSemanticReviewContract('events').fieldSemantics.itemIdentity)
       .toContain('活动商店')
     expect(getSemanticReviewContract('cycles').fieldSemantics.itemIdentity)

@@ -35,11 +35,16 @@ export class SyncOrchestrator {
     string,
     { controller: AbortController; operation: Promise<SyncSourceResult> }
   >()
+  private shuttingDown = false
 
   constructor(
     private readonly database: AppDatabase,
     private readonly adapters: SyncAdapterRegistry = { publicSchedule: {}, personalData: {} },
-    private readonly onProgress?: (progress: SyncProgressUpdate) => void
+    private readonly onProgress?: (progress: SyncProgressUpdate) => void,
+    private readonly preparePersonalCatalog?: (
+      gameId: GameId,
+      target: SyncTarget
+    ) => void | Promise<void>
   ) {}
 
   syncGame(gameId: GameId, scope: SyncScope, target: SyncTarget = 'all'): Promise<SyncResult> {
@@ -128,6 +133,18 @@ export class SyncOrchestrator {
     this.database.recordPersonalSyncAttempt(gameId)
     this.database.recordSyncTargetAttempt(gameId, target)
     const personal = await this.syncPersonalData(gameId, target, requestContext)
+    if (this.shuttingDown) {
+      return {
+        gameId,
+        requestedScope: 'personal_data',
+        requestedTarget: target,
+        status: 'cancelled',
+        startedAt,
+        finishedAt: new Date().toISOString(),
+        sources: [personal],
+        message: '应用已退出，任务已取消'
+      }
+    }
     const hasPendingReview = (personal.pendingReview ?? 0) > 0
     const status: SyncResult['status'] = personal.status === 'cancelled'
       ? 'cancelled'
@@ -212,6 +229,21 @@ export class SyncOrchestrator {
     return cancelled
   }
 
+  cancelAllPersonalSync(): number {
+    let cancelled = 0
+    for (const active of this.personalInFlight.values()) {
+      if (active.controller.signal.aborted) continue
+      active.controller.abort(new SyncCancelledError())
+      cancelled += 1
+    }
+    return cancelled
+  }
+
+  shutdown(): number {
+    this.shuttingDown = true
+    return this.cancelAllPersonalSync()
+  }
+
   private async runAdapter(
     gameId: GameId,
     source: SyncSourceResult['source'],
@@ -248,6 +280,10 @@ export class SyncOrchestrator {
       throwIfSyncCancelled(signal)
       const result = await adapter.sync(gameId, target, reportProgress, signal)
       throwIfSyncCancelled(signal)
+      if (source === 'personal_data') {
+        await this.preparePersonalCatalog?.(gameId, target)
+        throwIfSyncCancelled(signal)
+      }
       reportProgress({
         phase: 'structuring',
         message: '数据读取完成，正在整理可写入内容',
@@ -271,14 +307,24 @@ export class SyncOrchestrator {
         endgame: 'cycles',
         exploration: 'exploration'
       }
+      const explicitReviewTargets = new Set(
+        (result.reviewCandidates ?? []).map((candidate) => candidate.target)
+      )
       const directlyMergeableItems = source === 'personal_data'
         ? normalizedItems.filter((item) => {
+            // Personal map payloads are observations, not catalog definitions.
+            // Their progress is applied through a source binding below.
+            if (item.category === 'exploration') return false
             const itemTarget = personalTargetByCategory[item.category]
             return !itemTarget || this.database.isCatalogComplete(gameId, itemTarget)
           })
         : normalizedItems
       const deferredPersonalItems = source === 'personal_data'
-        ? normalizedItems.filter((item) => !directlyMergeableItems.includes(item))
+        ? normalizedItems.filter((item) => {
+            if (directlyMergeableItems.includes(item)) return false
+            const itemTarget = personalTargetByCategory[item.category]
+            return Boolean(itemTarget && !explicitReviewTargets.has(itemTarget))
+          })
         : []
       throwIfSyncCancelled(signal)
       reportProgress({

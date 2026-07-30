@@ -39,6 +39,8 @@ export interface MiyousheQrPollResult {
 
 export class MiyousheQrLoginService {
   private readonly sessions = new Map<string, PendingQrLogin>()
+  private readonly requestControllers = new Set<AbortController>()
+  private disposed = false
 
   constructor(
     private readonly fetcher: typeof fetch,
@@ -46,6 +48,7 @@ export class MiyousheQrLoginService {
   ) {}
 
   async start(): Promise<MiyousheQrLoginState> {
+    if (this.disposed) throw new Error('米游社登录服务已关闭')
     const response = await this.request(CREATE_QR_URL)
     const ticket = readNonEmptyString(response.body.data?.ticket, '米游社未返回二维码票据')
     const url = readNonEmptyString(response.body.data?.url, '米游社未返回二维码地址')
@@ -63,6 +66,7 @@ export class MiyousheQrLoginService {
   }
 
   async poll(sessionId: string): Promise<MiyousheQrPollResult> {
+    if (this.disposed) throw new Error('米游社登录服务已关闭')
     const session = this.sessions.get(sessionId)
     if (!session) throw new Error('二维码登录会话不存在或已结束，请重新获取')
     if (session.expiresAt <= this.now()) {
@@ -107,8 +111,16 @@ export class MiyousheQrLoginService {
     return this.sessions.delete(sessionId)
   }
 
+  dispose(): void {
+    this.disposed = true
+    this.sessions.clear()
+    for (const controller of this.requestControllers) controller.abort()
+    this.requestControllers.clear()
+  }
+
   private async request(url: string, body?: Record<string, string>): Promise<{ response: Response; body: JsonEnvelope }> {
     const controller = new AbortController()
+    this.requestControllers.add(controller)
     const timeout = setTimeout(() => controller.abort(), 15_000)
     try {
       const response = await this.fetcher(url, {
@@ -136,6 +148,7 @@ export class MiyousheQrLoginService {
       throw error
     } finally {
       clearTimeout(timeout)
+      this.requestControllers.delete(controller)
     }
   }
 

@@ -17,6 +17,74 @@ function requiredIdentifier(value: unknown, field: string): string {
   return String(value)
 }
 
+function requiredString(value: unknown, field: string): string {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error(`绝区零个人数据缺少 ${field}`)
+  }
+  return value.trim()
+}
+
+function explorationPercent(value: unknown, field: string): number {
+  const progress = finiteNumber(value)
+  if (progress === null || progress < 0 || progress > 100) {
+    throw new Error(`绝区零个人数据的 ${field} 必须在 0 到 100 之间`)
+  }
+  return Math.round(progress * 100) / 100
+}
+
+export function extractZenlessExplorationReviewCandidates(value: unknown): SemanticReviewDraft[] {
+  const root = requiredRecord(value, '区域收集')
+  const groups = Array.isArray(root.area_collections)
+    ? root.area_collections.filter(isRecord)
+    : []
+  const drafts: SemanticReviewDraft[] = []
+  for (const group of groups) {
+    const groupId = requiredIdentifier(group.urban_area_group_id, '一级区域 id')
+    const groupName = requiredString(group.name, '一级区域名称')
+    drafts.push({
+      target: 'exploration',
+      kind: 'personal-map-progress',
+      payload: {
+        provider: 'miyoushe',
+        officialId: `group:${groupId}`,
+        officialTitle: groupName,
+        observedProgress: explorationPercent(
+          group.collection_progress,
+          `${groupName}探索度`
+        ),
+        observedNodeKind: 'region',
+        observedParentId: null,
+        observedParentTitle: null
+      }
+    })
+    const areas = Array.isArray(group.map_collections)
+      ? group.map_collections.filter(isRecord)
+      : []
+    for (const area of areas) {
+      const areaId = requiredIdentifier(area.urban_area_id, '二级区域 id')
+      const areaName = requiredString(area.name, '二级区域名称')
+      drafts.push({
+        target: 'exploration',
+        kind: 'personal-map-progress',
+        payload: {
+          provider: 'miyoushe',
+          officialId: `area:${areaId}`,
+          officialTitle: areaName,
+          observedProgress: explorationPercent(
+            area.collection_progress,
+            `${areaName}探索度`
+          ),
+          observedNodeKind: 'subregion',
+          observedParentId: `group:${groupId}`,
+          observedParentTitle: groupName
+        }
+      })
+    }
+  }
+  if (drafts.length === 0) throw new Error('绝区零个人数据没有可识别的区域探索进度')
+  return drafts
+}
+
 function optionalChinaDateTime(value: unknown, field: string): string | undefined {
   if (value === undefined || value === null || value === '') return undefined
   let parsed: Date

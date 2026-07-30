@@ -20,7 +20,6 @@ export interface NormalizedSyncItem {
   parentTitle?: string | null
   mapNodeKind?: MapNodeKind | null
   parentRemoteKey?: string | null
-  relatedRegionRemoteKey?: string | null
   startsAt?: string | null
   endsAt?: string | null
   resetRule?: string | null

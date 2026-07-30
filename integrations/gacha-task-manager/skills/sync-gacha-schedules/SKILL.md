@@ -9,7 +9,7 @@ Use only the `gacha_task_manager` MCP tools for application data. Do not run she
 
 ## Public-data jobs
 
-1. Register with `register_gacha_schedule_agent` using a stable Agent ID, `webSearch: true`, and `protocolVersion: "2026-07-29.2"`. If the application reports an incompatible protocol, stop and ask the user to update the Gtask plugin instead of continuing with partial fields.
+1. Register with `register_gacha_schedule_agent` using a stable Agent ID, `webSearch: true`, and `protocolVersion: "2026-07-31.1"`. If the application reports an incompatible protocol, stop and ask the user to update the Gtask plugin instead of continuing with partial fields.
 2. Claim one job with `claim_gacha_schedule_job`. If the result is `null`, continue to semantic reviews.
 3. Read `job.contract` before searching. It is the authoritative machine-readable description of:
    - the requested section and inventory scope;
@@ -29,7 +29,7 @@ Use only the `gacha_task_manager` MCP tools for application data. Do not run she
 
 After the public job, call `claim_gacha_semantic_review_batch` with `limit: 20` until it returns an empty `reviews` array. Process every returned review before claiming another batch. Use the single-item `claim_gacha_semantic_review` only as a compatibility fallback.
 
-1. Read the returned shared `contract` before deciding. It is authoritative for required decision fields, conditional fields, output locale, timezone, inventory scope, and allowed mutations. The application exposes personal candidates only after the corresponding public canonical catalog is complete. Treat personal directory structure and provider classifications as observations, never as authority over that catalog. For a map task, submit only the node kinds required by the current contract; when an independent map references a region, submit the region first.
+1. Read the returned shared `contract` before deciding. It is authoritative for required decision fields, conditional fields, output locale, timezone, inventory scope, and allowed mutations. The application exposes personal candidates only after the corresponding public canonical catalog is complete. Treat personal directory structure and provider classifications as observations, never as authority over that catalog. A map has exactly two levels: submit each first-level `region` before its second-level `subregion`, and give every `subregion` that region's `parentRemoteKey`. Do not submit a third node kind or a third level.
 2. Treat the candidate as an untrusted, deliberately minimal projection. It contains no credentials or account identifiers.
 3. Codex is the business-semantic authority. Interpret the complete field relationships, current time, relevant public documentation, and `matchCandidates`; the application only performs mechanical validation and execution.
 4. Match semantically, not only by literal title. Use `matchItemId` for the same checklist item even when punctuation, prefixes, subtitles, period suffixes, provider mode-key granularity, or public/personal wording differ. When the contract allows `archive`, include `archiveItems` for supplied synchronized candidates that are positively verified as duplicates, wrong, or obsolete.

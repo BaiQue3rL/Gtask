@@ -87,15 +87,14 @@ describe('compareChecklistItems', () => {
       .map((value) => value.id)).toEqual(['open-child', 'done-child'])
   })
 
-  it('地图同级目录按分组、地区、独立地图、子地区稳定排列', () => {
+  it('地图同级目录按一级地区、二级地区稳定排列', () => {
     const values = [
       item('child', { category: 'exploration', mapNodeKind: 'subregion', title: '子地区' }),
-      item('independent', { category: 'exploration', mapNodeKind: 'independent', title: '独立地图' }),
-      item('region', { category: 'exploration', mapNodeKind: 'region', title: '主地区' }),
-      item('group', { category: 'exploration', mapNodeKind: 'group', title: '地图分组' })
+      item('region-b', { category: 'exploration', mapNodeKind: 'region', title: '主地区乙' }),
+      item('region-a', { category: 'exploration', mapNodeKind: 'region', title: '主地区甲' })
     ]
 
     expect(values.sort(compareMapTreeItems).map((value) => value.id))
-      .toEqual(['group', 'region', 'independent', 'child'])
+      .toEqual(['region-a', 'region-b', 'child'])
   })
 })

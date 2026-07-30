@@ -60,10 +60,8 @@ export function compareChecklistItems(
 }
 
 const MAP_KIND_ORDER = {
-  group: 0,
-  region: 1,
-  independent: 2,
-  subregion: 3
+  region: 0,
+  subregion: 1
 } as const
 
 export function compareMapTreeItems(left: ChecklistItem, right: ChecklistItem): number {

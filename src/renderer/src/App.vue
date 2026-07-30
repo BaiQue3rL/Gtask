@@ -2055,8 +2055,7 @@ function showError(error: unknown): void {
                     class="checklist-row"
                     :class="{
                       completed: row.item.completed,
-                      'map-tree-row': panel.section === 'exploration',
-                      'map-group-row': row.item.mapNodeKind === 'group'
+                      'map-tree-row': panel.section === 'exploration'
                     }"
                     :style="panel.section === 'exploration' ? { '--tree-depth': row.depth } : undefined"
                   >
@@ -2069,7 +2068,6 @@ function showError(error: unknown): void {
                   >{{ collapsedMapKeys.has(row.item.remoteKey ?? row.item.id) ? '›' : '⌄' }}</button>
                   <span v-else-if="panel.section === 'exploration'" class="map-tree-spacer"></span>
                   <button
-                    v-if="row.item.mapNodeKind !== 'group'"
                     class="check-button"
                     type="button"
                     :aria-label="row.item.completed ? '标为未完成' : '标为完成'"
@@ -2077,7 +2075,6 @@ function showError(error: unknown): void {
                   >
                     {{ row.item.completed ? '✓' : '' }}
                   </button>
-                  <span v-else class="check-button-spacer"></span>
                   <button
                     class="item-main"
                     type="button"
@@ -2094,7 +2091,6 @@ function showError(error: unknown): void {
                         :key="tag"
                         class="activity-tag"
                       >{{ tag }}</span>
-                      <span v-if="row.item.mapNodeKind === 'independent'">独立地图</span>
                       <span v-if="row.item.category === 'exploration' && row.displayProgressPercent !== null">
                         {{ row.displayProgressPercent }}%
                       </span>

@@ -126,9 +126,9 @@ const cyclesContract: SyncSectionContract = {
 
 const explorationContract: SyncSectionContract = {
   target: 'exploration',
-  purpose: '建立游戏当前已开放的一级地区与独立地图目录，供个人数据随后合并探索度。',
+  purpose: '维护游戏当前已开放的两级地图目录，供个人数据随后按稳定来源 ID 合并探索度。',
   inventoryScope:
-    '全部当前已正式开放的一级主地区，以及具有独立探索度的独立地图；普通二级子区域不进入清单。“一级主地区”是游戏地图顶层导航、顶层世界选择或官方社区顶层探索统计中的主地区，不是 Wiki 泛称的 region，也不是每个具有探索度的区域。',
+    '全部当前已正式开放的一级主地区，以及明确归属于某个一级主地区的二级地区。地图只有这两种层级；任何特殊入口、地下区域或箱庭区域也必须按真实归属表示为 region 或 subregion。',
   itemShapes: [{
     name: '地图目录节点',
     categories: ['exploration'],
@@ -144,17 +144,12 @@ const explorationContract: SyncSectionContract = {
     conditionalFields: [
       {
         field: 'parentRemoteKey',
-        when: '独立地图在官方目录中真实包含于某一级地区时',
-        meaning: '对应一级地区的 remoteKey。'
-      },
-      {
-        field: 'relatedRegionRemoteKey',
-        when: 'independent 节点与某一级地区相关但不构成真实包含关系时',
-        meaning: '关联一级地区的 remoteKey，仅用于展示归属。'
+        when: 'mapNodeKind 为 subregion 时',
+        meaning: '必填，且必须指向本次目录中唯一的一级主地区 region。'
       },
       {
         field: 'parentTitle',
-        when: '需要为父级关系提供显示回退名称时',
+        when: 'mapNodeKind 为 subregion 时',
         meaning: '仅为显示回退；身份与层级以 remoteKey 为准。'
       }
     ],
@@ -168,15 +163,12 @@ const explorationContract: SyncSectionContract = {
     ]
   }],
   completionCriteria: [
-    '完整枚举全部一级地区与具有独立探索度的独立地图；普通二级子区域不提交。',
-    '一级地区正例：原神的“璃月”“稻妻”、星铁的“匹诺康尼”、鸣潮的“瑝珑”“黑海岸”“黎那汐塔”等顶层主地区。正例只用于说明目录层级，仍须检索当前游戏的实际开放目录。',
-    '一级地区反例：主地区内部的城市、山脉、台地、港口或探索报告区域，例如鸣潮“云陵谷”“今州城”等；网页仅把某地点称为 region，不能证明它是本清单所需的一级地区。',
-    '独立地图正例：原神“渊下宫”“层岩巨渊·地下矿区”等在地图导航或官方社区探索统计中具有独立入口或独立探索度的地图。正例只用于说明层级，仍须核验当前游戏的实际目录。',
-    '独立地图反例：普通主地区内部仅有单独名称、传送层级、攻略页面或局部探索度的城市、山脉、台地、港口和任务场景；不能仅凭名称特殊、Wiki 单独建页或地图可单独缩放判定为 independent。',
-    '每个 region 或 independent 都必须用能够证明其目录层级的资料核验；单个 Wiki 地区页、攻略页或“探索报告”页只能证明名称存在，不能单独证明一级层级。',
-    '无法确认某地点是否属于一级地区或独立地图时，继续用官方地图导航、官方社区战绩目录及至少一个独立可靠来源交叉核验；仍无法确认则不得猜测、不得提交，并将该目标保留为未完成。',
-    '地图清单只使用 region 与 independent；不创建 subregion、group 或通用世界根节点。',
-    '同一独立地图只保留一个节点，不在根目录和地区下各复制一份。',
+    '完整枚举全部一级主地区及其二级地区；同一地点只能出现一次。',
+    'region 只表示顶层主地区，例如原神“璃月”“稻妻”、星铁“匹诺康尼”、鸣潮“瑝珑”“黑海岸”“黎那汐塔”。',
+    'subregion 表示归属于某个一级主地区的具体地区，例如原神“层岩巨渊·地下矿区”归于“璃月”，鸣潮“云陵谷”“今州城”归于“瑝珑”。',
+    '地下区域、特殊入口或箱庭区域也只作为 subregion，并必须给出唯一 parentRemoteKey；不得复制为根节点。',
+    'region 不得包含 parentRemoteKey；subregion 必须包含 parentRemoteKey，且父级必须为 region。禁止第三层、通用世界根节点和无父级子地区。',
+    '无法确认某地点的一级归属时，继续用官方地图导航、官方社区战绩目录及可靠资料交叉核验；仍无法确认则不得猜测、不得提交。',
     '若 matchCandidates 中已有经核验属于普通二级区域的同步项，应在提交正确目录时通过 archiveItems 移入回收站；不得删除手动项目。',
     '公开资料只建立目录，应用机械初始化为 0%；探索度仅由个人数据或用户更新。'
   ]
@@ -194,7 +186,7 @@ export function getPublicSyncContract(
   requestContext: SyncRequestContext = DEFAULT_REQUEST_CONTEXT
 ): PublicSyncContract {
   return {
-    schemaVersion: 5,
+    schemaVersion: 6,
     authority: 'interface_contract',
     decisionAuthority: 'codex',
     executorPolicy: 'mechanical_validation_only',
@@ -229,14 +221,14 @@ export function getPublicSyncContract(
       periodKey: '版本或周期实例身份；同一期稳定，不同周期不能复用。周期挑战的标题、副标题或期数变化通常属于 periodKey，而不是新的 modeKey。',
       modeKey: '跨周期稳定的玩法模式身份；单层、节点、阶段、难度、增益或奖励档位不能拥有独立 modeKey。',
       mapNodeKind:
-        '地图节点语义：当前清单只接受一级主地区 region 与独立地图 independent。region 必须是游戏地图顶层导航、顶层世界选择或官方社区顶层探索统计中的主地区；原神“璃月/稻妻”、星铁“匹诺康尼”、鸣潮“瑝珑/黑海岸/黎那汐塔”是层级正例，鸣潮“云陵谷/今州城”等主地区内部探索区域是反例。网页泛称 region、单独 Wiki 页面或单独探索度不能证明一级层级。无法确认时必须交叉核验，仍不确定则不提交，禁止猜测。个人接口返回的 parentId、层级或节点类型只是观测证据，不能单独覆盖公开规范目录的节点类型。',
+        '地图只有 region 与 subregion。region 是一级主地区且 parentRemoteKey 必须为空；subregion 是二级地区且 parentRemoteKey 必须指向唯一 region。不得提交第三种节点或第三层。个人接口层级只是观测证据，不能单独覆盖规范目录。',
       titleSourceUrl: `能够核验 ${requestContext.outputLocale} 官方本地化名称的直接页面。`,
       sourceUrl: '能够核验该事项核心事实的直接 HTTP(S) 来源。',
       confidence: 'Codex 对该条结构化结果的 0 到 1 置信度。',
       evidence: '本次提交的交叉核验证据；至少一条，且应覆盖所提交事项。'
     },
     sections: target === 'all'
-      ? [tasksContract, eventsContract, cyclesContract, explorationContract]
+      ? [tasksContract, eventsContract, cyclesContract]
       : [sectionContracts[target]]
   }
 }
@@ -289,13 +281,8 @@ export function getSemanticReviewContract(
       conditional: [
         {
           field: 'parentRemoteKey',
-          when: '独立地图在官方目录中真实包含于某一级地区时',
-          meaning: '与公开地图目录匹配后的一级地区 remoteKey。'
-        },
-        {
-          field: 'relatedRegionRemoteKey',
-          when: '独立地图仅与一级地区相关而非真实包含时',
-          meaning: '关联地区 remoteKey。'
+          when: '候选匹配规范目录中的 subregion 时',
+          meaning: '使用规范目录中唯一一级父地区的 remoteKey。'
         }
       ]
     }
@@ -306,10 +293,10 @@ export function getSemanticReviewContract(
     cycles:
       '周期候选必须区分稳定模式与当期实例。深境螺旋、幻想真境剧诗、混沌回忆、虚构叙事、末日幻影、式舆防卫战和危局强袭战是模式正例；楼层、节点、关卡、难度、当期增益和奖励档位是反例。同一模式的标题变化属于 periodKey；无法确认是否为独立模式时交叉核验，仍不确定则拒绝，禁止猜测。',
     exploration:
-      '地图候选只允许对应一级主地区或独立地图。一级地区正例包括璃月、稻妻、匹诺康尼、瑝珑、黑海岸和黎那汐塔；独立地图正例包括渊下宫、层岩巨渊·地下矿区；云陵谷、今州城等主地区内部探索区域及普通城市、山脉、台地、港口是反例。无法确认层级时交叉核验，仍不确定则拒绝，禁止猜测。'
+      '地图候选只对应规范目录中的一级主地区 region 或其二级地区 subregion。云陵谷、今州城、渊下宫、层岩巨渊·地下矿区等具体地点均应匹配到所属一级主地区下的 subregion。无法确认归属时交叉核验，仍不确定则拒绝，禁止猜测。'
   }
   return {
-    schemaVersion: 7,
+    schemaVersion: 8,
     authority: 'interface_contract',
     decisionAuthority: 'codex',
     executorPolicy: 'mechanical_validation_only',
@@ -330,8 +317,8 @@ export function getSemanticReviewContract(
       completed: '周期候选按接口契约提交 true 或 false。活动完成状态只能来自能够证明“当前账号已完成整个活动”的个人字段语义；公开活动说明不能证明个人完成，is_finished、all_finished、状态字符串或奖励计数也不能跨接口一概解释。证据不足时必须省略，表示 unknown，应用保留当前状态。',
       completionRule: '仅活动提交 completed 时使用。fieldPath 必须指向本次 payload.observedStatus 下的一个原始字段，并列出明确的完成值与未完成值；规则必须能机械复现本次结论，确认后会绑定到该来源接口与官方 ID，后续同步直接复用。',
       progressPercent: '仅地图探索使用，范围 0 到 100。',
-      mapNodeKind:
-        '地图候选只允许绑定或建立一级主地区 region 与独立地图 independent。一级主地区是地图顶层导航、顶层世界选择或官方社区顶层探索统计中的主地区；独立地图必须在地图导航或官方社区探索统计中具有独立入口或独立探索度。原神“璃月/稻妻”、星铁“匹诺康尼”、鸣潮“瑝珑/黑海岸/黎那汐塔”是一级层级正例，原神“渊下宫”“层岩巨渊·地下矿区”是独立地图正例，鸣潮“云陵谷/今州城”等内部探索区域是反例。个人接口或 Wiki 使用 region 一词不能单独决定层级；无法与公开规范目录匹配时必须交叉核验，仍无法确认则拒绝候选，禁止猜测或把普通子区域新增为 region。',
+    mapNodeKind:
+      '地图候选只绑定规范目录中的 region 或 subregion。region 必须无父级；subregion 必须挂到唯一 region，且禁止第三层。特殊入口、地下层和箱庭地图仍按真实归属匹配为 subregion。个人接口的节点类型只作为观测，不能覆盖规范目录。',
       category: 'Codex 可纠正解析器初始分类；应用不再二次解释业务语义。',
       title: `使用 ${requestContext.outputLocale} 的官方本地化名称。`,
       activityTags: `使用 ${requestContext.outputLocale} 的玩法标签。`,

@@ -211,8 +211,6 @@ h2 { margin: 0; font-size: 19px; }
 .map-tree-toggle { z-index: 1; width: 18px; height: 24px; padding: 0; border: 0; color: #7fa6d0; background: transparent; font-size: 20px; line-height: 1; cursor: pointer; }
 .map-tree-toggle:hover { color: #dcecff; }
 .map-tree-spacer, .check-button-spacer { display: block; }
-.map-group-row { border-style: dashed; background: rgba(15, 39, 68, .45); }
-.map-group-row .item-title { color: #b9cee6; font-weight: 600; }
 .check-button { display: grid; width: 23px; height: 23px; padding: 0; place-items: center; border: 1px solid #b7c9e4; border-radius: 50%; color: #06251d; background: transparent; cursor: pointer; }
 .completed .check-button { border-color: #65d7a5; background: #65d7a5; }
 .item-main { display: grid; grid-template: "title timing" auto "details details" auto / minmax(0, 1fr) auto; gap: 6px 12px; min-width: 0; padding: 5px 8px; border: 0; color: inherit; background: transparent; text-align: left; cursor: pointer; }

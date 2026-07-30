@@ -97,7 +97,7 @@ export function parseExplorations(value: unknown): NormalizedSyncItem[] {
     childrenByParent.set(exploration.parentId, children)
   }
 
-  return parsed.map((exploration): NormalizedSyncItem => {
+  const items = parsed.map((exploration): NormalizedSyncItem => {
     const children = childrenByParent.get(exploration.id) ?? []
     const progressPercent = resolveExplorationProgress(exploration.rawProgress, children)
     const parent = exploration.parentId ? byId.get(exploration.parentId) : undefined
@@ -107,10 +107,41 @@ export function parseExplorations(value: unknown): NormalizedSyncItem[] {
       title: exploration.title,
       completed: progressPercent === 100,
       progressPercent,
-      parentTitle: parent?.title ?? '世界探索',
+      parentTitle: parent?.title ?? null,
+      mapNodeKind: parent ? 'subregion' : 'region',
+      parentRemoteKey: parent ? `exploration:world:${parent.id}` : null,
       modeKey: `world-exploration-${exploration.id}`
     }
   })
+  const knownChildren = new Set(parsed
+    .filter((entry) => entry.parentId)
+    .map((entry) => `${entry.parentId}:${normalizeExplorationTitle(entry.title)}`))
+  for (const parent of parsed.filter((entry) => !entry.parentId)) {
+    for (const area of parent.areas) {
+      const title = requiredString(area.name, '二级探索区域名称')
+      const identity = `${parent.id}:${normalizeExplorationTitle(title)}`
+      if (knownChildren.has(identity)) continue
+      const rawProgress = requiredNumber(
+        area.exploration_percentage,
+        `${title} 探索度`
+      )
+      const areaId = optionalIdentifier(area.id ?? area.area_id ?? area.map_id)
+        ?? `title:${normalizeExplorationTitle(title)}`
+      const progressPercent = clampPercentage(rawProgress / 10)
+      items.push({
+        remoteKey: `exploration:area:${parent.id}:${areaId}`,
+        category: 'exploration',
+        title,
+        completed: progressPercent === 100,
+        progressPercent,
+        parentTitle: parent.title,
+        mapNodeKind: 'subregion',
+        parentRemoteKey: `exploration:world:${parent.id}`,
+        modeKey: `area-exploration-${parent.id}-${areaId}`
+      })
+    }
+  }
+  return items
 }
 
 export function extractGenshinExplorationReviewCandidates(
@@ -133,6 +164,9 @@ export function extractGenshinExplorationReviewCandidates(
   }))
   const titleById = new Map(parsed.map((entry) => [entry.id, entry.title]))
   const drafts: SemanticReviewDraft[] = []
+  const knownChildren = new Set(parsed
+    .filter((entry) => entry.parentId)
+    .map((entry) => `${entry.parentId}:${normalizeExplorationTitle(entry.title)}`))
   for (const exploration of parsed) {
     const children = parsed.filter((candidate) => candidate.parentId === exploration.id)
     drafts.push({
@@ -146,13 +180,36 @@ export function extractGenshinExplorationReviewCandidates(
           exploration.observedProgress * 10,
           children.map((child) => ({ rawProgress: child.observedProgress * 10 }))
         ),
-        observedNodeKind: exploration.parentId ? 'independent' : 'region',
+        observedNodeKind: exploration.parentId ? 'subregion' : 'region',
         observedParentId: exploration.parentId,
         observedParentTitle: exploration.parentId
           ? titleById.get(exploration.parentId) ?? null
           : null
       }
     })
+    if (exploration.parentId) continue
+    for (const area of exploration.areas) {
+      const title = requiredString(area.name, '二级探索区域名称')
+      const identity = `${exploration.id}:${normalizeExplorationTitle(title)}`
+      if (knownChildren.has(identity)) continue
+      const areaId = optionalIdentifier(area.id ?? area.area_id ?? area.map_id)
+        ?? `title:${normalizeExplorationTitle(title)}`
+      drafts.push({
+        target: 'exploration',
+        kind: 'personal-map-progress',
+        payload: {
+          provider: 'miyoushe',
+          officialId: `area:${exploration.id}:${areaId}`,
+          officialTitle: title,
+          observedProgress: clampPercentage(
+            requiredNumber(area.exploration_percentage, `${title} 探索度`) / 10
+          ),
+          observedNodeKind: 'subregion',
+          observedParentId: exploration.id,
+          observedParentTitle: exploration.title
+        }
+      })
+    }
   }
   return drafts
 }

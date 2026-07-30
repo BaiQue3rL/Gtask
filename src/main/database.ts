@@ -76,7 +76,7 @@ const DEFAULT_GAMES: GameSummary[] = [
   }
 ]
 
-export const CURRENT_SCHEMA_VERSION = 23
+export const CURRENT_SCHEMA_VERSION = 24
 
 const AI_AGENT_MAX_AGE_MS = 5 * 60 * 1000
 const AI_JOB_CLAIM_MAX_AGE_MS = 15 * 60 * 1000
@@ -302,8 +302,8 @@ function readObservedTitle(payload: Record<string, unknown>): string | null {
 
 function readObservedMapNodeKind(
   payload: Record<string, unknown>
-): Extract<ChecklistItem['mapNodeKind'], 'region' | 'independent'> | null {
-  return payload.observedNodeKind === 'region' || payload.observedNodeKind === 'independent'
+): Extract<ChecklistItem['mapNodeKind'], 'region' | 'subregion'> | null {
+  return payload.observedNodeKind === 'region' || payload.observedNodeKind === 'subregion'
     ? payload.observedNodeKind
     : null
 }
@@ -1055,6 +1055,7 @@ export class AppDatabase {
         let item = binding
           ? this.findActiveChecklistItem(binding.itemId, gameId)
           : null
+        let hasConflictingMechanicalBinding = false
         if (
           item &&
           binding?.bindingKind !== 'codex' &&
@@ -1062,8 +1063,9 @@ export class AppDatabase {
         ) {
           item = null
           binding = null
+          hasConflictingMechanicalBinding = true
         }
-        if (!item && draft.target === 'cycles') {
+        if (!item && !hasConflictingMechanicalBinding && draft.target === 'cycles') {
           const modeKey = typeof draft.payload.observedModeKey === 'string'
             ? draft.payload.observedModeKey.trim()
             : ''
@@ -1086,18 +1088,35 @@ export class AppDatabase {
             }, reference)
           }
         }
-        if (!item && draft.target === 'exploration') {
+        if (!item && !hasConflictingMechanicalBinding && draft.target === 'exploration') {
           const observedTitle = readObservedTitle(draft.payload)
           const observedNodeKind = readObservedMapNodeKind(draft.payload)
-          const matches = observedTitle && observedNodeKind
+          const observedParentTitle = typeof draft.payload.observedParentTitle === 'string'
+            ? draft.payload.observedParentTitle.trim()
+            : ''
+          const titleMatches = observedTitle
             ? this.listChecklistItems(gameId).filter(
                 (candidate) =>
                   candidate.category === 'exploration' &&
                   candidate.source !== 'manual' &&
-                  candidate.mapNodeKind === observedNodeKind &&
                   normalizeSourceTitle(candidate.title) === normalizeSourceTitle(observedTitle)
               )
             : []
+          // The bundled catalog owns hierarchy. A provider's grouping is only
+          // an observation, so an exact title that is unique in the canonical
+          // catalog can bind even when the provider reports a different level.
+          const matches = titleMatches.length <= 1
+            ? titleMatches
+            : titleMatches.filter(
+                (candidate) =>
+                  (!observedNodeKind || candidate.mapNodeKind === observedNodeKind) &&
+                  (
+                    observedNodeKind !== 'subregion' ||
+                    !observedParentTitle ||
+                    normalizeSourceTitle(candidate.parentTitle ?? '') ===
+                      normalizeSourceTitle(observedParentTitle)
+                  )
+              )
           if (matches.length === 1) {
             item = matches[0]
             binding = this.upsertSourceBinding({
@@ -1114,7 +1133,7 @@ export class AppDatabase {
           continue
         }
         if (
-          draft.target !== 'events' &&
+          draft.target === 'cycles' &&
           !this.getActiveSemanticProfile(gameId, identity.provider, identity.endpoint)
         ) {
           remaining.push(draft)
@@ -1160,8 +1179,6 @@ export class AppDatabase {
       ) {
         return false
       }
-      const observedNodeKind = readObservedMapNodeKind(draft.payload)
-      if (observedNodeKind && item.mapNodeKind !== observedNodeKind) return false
     }
     if (draft.target === 'cycles') {
       const observedModeKey = typeof draft.payload.observedModeKey === 'string'
@@ -1199,6 +1216,28 @@ export class AppDatabase {
     }
     return {
       cancelled,
+      agentIds: rows.map((row) => row.agentId)
+    }
+  }
+
+  cancelAllSemanticReviewCandidates(
+    reference = new Date()
+  ): { cancelled: number; agentIds: string[] } {
+    const rows = this.database.prepare(`
+      SELECT DISTINCT agent_id AS agentId
+      FROM semantic_review_candidates
+      WHERE status = 'claimed' AND agent_id IS NOT NULL
+    `).all() as Array<{ agentId: string }>
+    const now = reference.toISOString()
+    const result = this.database.prepare(`
+      UPDATE semantic_review_candidates
+      SET status = 'rejected', completed_at = ?, decision_json = NULL,
+          evidence_json = NULL, message = '应用已退出，任务已取消',
+          agent_id = NULL, claimed_at = NULL, updated_at = ?
+      WHERE status IN ('pending', 'claimed')
+    `).run(now, now)
+    return {
+      cancelled: Number(result.changes),
       agentIds: rows.map((row) => row.agentId)
     }
   }
@@ -1369,8 +1408,8 @@ export class AppDatabase {
         ) {
           throw new Error('Codex 必须为个人地图数据提交 0–100 的探索度')
         }
-        if (item.mapNodeKind !== 'region' && item.mapNodeKind !== 'independent') {
-          throw new Error('个人地图清单只接受一级地区或独立地图')
+        if (item.mapNodeKind !== 'region' && item.mapNodeKind !== 'subregion') {
+          throw new Error('个人地图清单只接受一级主地区或二级地区')
         }
       } else if (
         candidate.target === 'cycles' &&
@@ -1772,6 +1811,28 @@ export class AppDatabase {
     })
   }
 
+  cancelAllActiveAiScheduleJobs(
+    reference = new Date()
+  ): { cancelled: number; agentIds: string[] } {
+    const rows = this.database.prepare(`
+      SELECT DISTINCT agent_id AS agentId
+      FROM ai_schedule_jobs
+      WHERE status = 'claimed' AND agent_id IS NOT NULL
+    `).all() as Array<{ agentId: string }>
+    const now = reference.toISOString()
+    const result = this.database.prepare(`
+      UPDATE ai_schedule_jobs
+      SET status = 'failed', completed_at = ?, message = '应用已退出，任务已取消',
+          progress_phase = 'failed', progress_current = NULL,
+          progress_total = NULL, progress_updated_at = ?, updated_at = ?
+      WHERE status IN ('pending', 'claimed')
+    `).run(now, now, now)
+    return {
+      cancelled: Number(result.changes),
+      agentIds: rows.map((row) => row.agentId)
+    }
+  }
+
   listActiveAiScheduleJobs(gameId?: GameId): AiScheduleJob[] {
     const gameFilter = gameId ? ' AND game_id = ?' : ''
     const rows = this.database.prepare(`
@@ -2037,10 +2098,10 @@ export class AppDatabase {
     const unsupportedExploration = items.find((item) =>
       item.category === 'exploration' &&
       item.mapNodeKind !== 'region' &&
-      item.mapNodeKind !== 'independent'
+      item.mapNodeKind !== 'subregion'
     )
     if (unsupportedExploration) {
-      throw new Error(`地图“${unsupportedExploration.title}”不是一级地区或独立地图`)
+      throw new Error(`地图“${unsupportedExploration.title}”不是一级主地区或二级地区`)
     }
     const requiredTagTargets = job.activityTagTargets
     if (requiredTagTargets.length > 0 || activityTagUpdates.length > 0) {
@@ -2365,7 +2426,6 @@ export class AppDatabase {
         parentTitle: item.parentTitle,
         mapNodeKind: item.mapNodeKind,
         parentRemoteKey: item.parentRemoteKey,
-        relatedRegionRemoteKey: item.relatedRegionRemoteKey,
         completed: item.completed,
         progressPercent: item.progressPercent
       }))
@@ -2597,7 +2657,7 @@ export class AppDatabase {
         input.parentTitle ?? null,
         input.mapNodeKind ?? (input.category === 'exploration' ? 'region' : null),
         input.parentRemoteKey ?? null,
-        input.relatedRegionRemoteKey ?? null,
+        null,
         startsAt,
         endsAt,
         input.resetRule ?? null,
@@ -2719,9 +2779,7 @@ export class AppDatabase {
         input.parentRemoteKey === undefined
           ? (categoryChanged ? null : current.parentRemoteKey)
           : input.parentRemoteKey,
-        input.relatedRegionRemoteKey === undefined
-          ? (categoryChanged ? null : current.relatedRegionRemoteKey)
-          : input.relatedRegionRemoteKey,
+        null,
         startsAt,
         endsAt,
         input.resetRule === undefined ? current.resetRule : input.resetRule,
@@ -2929,16 +2987,14 @@ export class AppDatabase {
               ),
               remoteCompleted ? 1 : 0,
               item.category === 'exploration'
-                ? item.mapNodeKind === 'group'
-                  ? null
-                  : source === 'personal_sync'
+                ? source === 'personal_sync'
                   ? item.progressPercent ?? null
                   : 0
                 : null,
               item.parentTitle ?? null,
               item.mapNodeKind ?? (item.category === 'exploration' ? 'region' : null),
               item.parentRemoteKey ?? null,
-              item.relatedRegionRemoteKey ?? null,
+              null,
               item.startsAt ?? null,
               item.endsAt ?? null,
               item.resetRule ?? null,
@@ -3039,18 +3095,14 @@ export class AppDatabase {
             JSON.stringify(resolvedActivityTags),
             completed ? 1 : 0,
             resolvedCategory === 'exploration'
-              ? item.mapNodeKind === 'group'
-                ? null
-                : source === 'public_schedule' || item.progressPercent === undefined
+              ? source === 'public_schedule' || item.progressPercent === undefined
                 ? current.progressPercent
                 : item.progressPercent
               : null,
             item.parentTitle === undefined ? current.parentTitle : item.parentTitle,
             item.mapNodeKind === undefined ? current.mapNodeKind : item.mapNodeKind,
             item.parentRemoteKey === undefined ? current.parentRemoteKey : item.parentRemoteKey,
-            item.relatedRegionRemoteKey === undefined
-              ? current.relatedRegionRemoteKey
-              : item.relatedRegionRemoteKey,
+            null,
             startsAt,
             endsAt,
             preservePublicSchedule || item.resetRule === undefined ? current.resetRule : item.resetRule,
@@ -4329,6 +4381,57 @@ export class AppDatabase {
         `)
     }
 
+    const migration24 = this.database
+      .prepare('SELECT version FROM schema_migrations WHERE version = 24')
+      .get()
+
+    if (!migration24) {
+      this.database.exec(`
+        BEGIN;
+        UPDATE checklist_items
+        SET parent_remote_key = COALESCE(parent_remote_key, related_region_remote_key)
+        WHERE category = 'exploration'
+          AND parent_remote_key IS NULL
+          AND related_region_remote_key IS NOT NULL;
+        UPDATE checklist_items
+        SET parent_remote_key = (
+          SELECT parent.parent_remote_key
+          FROM checklist_items parent
+          WHERE parent.game_id = checklist_items.game_id
+            AND parent.remote_key = checklist_items.parent_remote_key
+            AND parent.archived = 0
+        )
+        WHERE category = 'exploration'
+          AND parent_remote_key IN (
+            SELECT remote_key
+            FROM checklist_items
+            WHERE category = 'exploration'
+              AND parent_remote_key IS NOT NULL
+              AND archived = 0
+          );
+        UPDATE checklist_items
+        SET parent_remote_key = NULL
+        WHERE category = 'exploration'
+          AND parent_remote_key IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1
+            FROM checklist_items parent
+            WHERE parent.game_id = checklist_items.game_id
+              AND parent.remote_key = checklist_items.parent_remote_key
+              AND parent.archived = 0
+          );
+        UPDATE checklist_items
+        SET map_node_kind = CASE
+              WHEN parent_remote_key IS NULL THEN 'region'
+              ELSE 'subregion'
+            END,
+            related_region_remote_key = NULL
+        WHERE category = 'exploration';
+        INSERT INTO schema_migrations(version) VALUES (24);
+        COMMIT;
+      `)
+    }
+
     const versionRow = this.database
       .prepare('SELECT MAX(version) AS version FROM schema_migrations')
       .get() as { version: number | null }
@@ -4415,30 +4518,23 @@ export class AppDatabase {
           completionMeaning: '存在任意挑战记录即视为已完成'
         }
       },
-      {
-        gameId: 'genshin',
-        provider: 'miyoushe',
+      ...([
+        ['genshin', 'miyoushe'],
+        ['zenless', 'miyoushe'],
+        ['wuthering-waves', 'kuro-community']
+      ] as const).map(([gameId, provider]) => ({
+        gameId,
+        provider,
         endpoint: 'personal-map-progress',
-        target: 'exploration',
-        status: 'active',
+        target: 'exploration' as const,
+        status: 'active' as const,
         semantics: {
           identityField: 'officialId',
           progressField: 'observedProgress',
-          progressRange: '0-100'
+          progressRange: '0-100',
+          catalogAuthority: 'bundled-canonical-map-catalog'
         }
-      },
-      {
-        gameId: 'wuthering-waves',
-        provider: 'kuro-community',
-        endpoint: 'personal-map-progress',
-        target: 'exploration',
-        status: 'active',
-        semantics: {
-          identityField: 'officialId',
-          progressField: 'observedProgress',
-          progressRange: '0-100'
-        }
-      },
+      })),
       {
         gameId: 'genshin',
         provider: 'miyoushe',
@@ -4872,18 +4968,24 @@ export class AppDatabase {
   private assertMapStructure(gameId: GameId, items: NormalizedSyncItem[]): void {
     for (const item of items) {
       const hasMapFields = Boolean(
-        item.mapNodeKind || item.parentRemoteKey || item.relatedRegionRemoteKey
+        item.mapNodeKind || item.parentRemoteKey
       )
       if (item.category !== 'exploration' && hasMapFields) {
         throw new Error('地图层级字段只能用于地图探索事项')
       }
       if (
         item.category === 'exploration' &&
-        item.mapNodeKind === 'group' &&
-        item.progressPercent !== undefined &&
-        item.progressPercent !== null
+        item.mapNodeKind === 'region' &&
+        item.parentRemoteKey
       ) {
-        throw new Error('地图分组节点不能包含探索度')
+        throw new Error(`一级主地区“${item.title}”不能包含上级地区`)
+      }
+      if (
+        item.category === 'exploration' &&
+        item.mapNodeKind === 'subregion' &&
+        !item.parentRemoteKey
+      ) {
+        throw new Error(`二级地区“${item.title}”必须指定一级主地区`)
       }
     }
 
@@ -4896,29 +4998,31 @@ export class AppDatabase {
     const knownKeys = new Set(existingMaps.map((item) => item.remoteKey!))
     for (const item of incomingMaps) knownKeys.add(item.remoteKey)
 
+    const nodeKinds = new Map<string, ChecklistItem['mapNodeKind']>()
     const parents = new Map<string, string | null>()
-    for (const item of existingMaps) parents.set(item.remoteKey!, item.parentRemoteKey)
+    for (const item of existingMaps) {
+      nodeKinds.set(item.remoteKey!, item.mapNodeKind)
+      parents.set(item.remoteKey!, item.parentRemoteKey)
+    }
     for (const item of incomingMaps) {
       if (item.parentRemoteKey === item.remoteKey) throw new Error('地图节点不能以自身为上级')
-      if (item.relatedRegionRemoteKey === item.remoteKey) {
-        throw new Error('地图节点不能关联自身')
-      }
       if (item.parentRemoteKey && !knownKeys.has(item.parentRemoteKey)) {
         throw new Error(`地图上级标识不存在：${item.parentRemoteKey}`)
       }
-      if (item.relatedRegionRemoteKey && !knownKeys.has(item.relatedRegionRemoteKey)) {
-        throw new Error(`地图关联区域标识不存在：${item.relatedRegionRemoteKey}`)
-      }
+      nodeKinds.set(item.remoteKey, item.mapNodeKind ?? 'region')
       parents.set(item.remoteKey, item.parentRemoteKey ?? null)
     }
 
-    for (const key of parents.keys()) {
-      const visited = new Set<string>()
-      let cursor: string | null | undefined = key
-      while (cursor) {
-        if (visited.has(cursor)) throw new Error(`地图层级存在循环：${key}`)
-        visited.add(cursor)
-        cursor = parents.get(cursor)
+    for (const [key, parentKey] of parents) {
+      const kind = nodeKinds.get(key)
+      if (kind === 'region' && parentKey) {
+        throw new Error(`一级主地区“${key}”不能包含上级地区`)
+      }
+      if (kind === 'subregion') {
+        if (!parentKey) throw new Error(`二级地区“${key}”必须指定一级主地区`)
+        if (nodeKinds.get(parentKey) !== 'region') {
+          throw new Error(`二级地区“${key}”的上级必须是一级主地区`)
+        }
       }
     }
   }
@@ -4932,8 +5036,15 @@ export class AppDatabase {
       if (item.parentRemoteKey && !activeKeys.has(item.parentRemoteKey)) {
         throw new Error(`地图“${item.title}”的父级已归档或不存在，请在同一提交中重新挂接`)
       }
-      if (item.relatedRegionRemoteKey && !activeKeys.has(item.relatedRegionRemoteKey)) {
-        throw new Error(`地图“${item.title}”的关联地区已归档或不存在，请在同一提交中重新挂接`)
+      if (item.mapNodeKind === 'region' && item.parentRemoteKey) {
+        throw new Error(`一级主地区“${item.title}”不能包含上级地区`)
+      }
+      if (item.mapNodeKind === 'subregion') {
+        if (!item.parentRemoteKey) throw new Error(`二级地区“${item.title}”必须指定一级主地区`)
+        const parent = maps.find((candidate) => candidate.remoteKey === item.parentRemoteKey)
+        if (parent?.mapNodeKind !== 'region') {
+          throw new Error(`二级地区“${item.title}”的上级必须是一级主地区`)
+        }
       }
     }
   }

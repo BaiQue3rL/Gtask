@@ -1,5 +1,5 @@
 export const SUPPORTED_GAME_IDS = ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const
-export const GTASK_MCP_PROTOCOL_VERSION = '2026-07-29.2'
+export const GTASK_MCP_PROTOCOL_VERSION = '2026-07-31.1'
 
 export type GameId = (typeof SUPPORTED_GAME_IDS)[number]
 
@@ -15,7 +15,7 @@ export const CHECKLIST_CATEGORIES = [
 
 export type ChecklistCategory = (typeof CHECKLIST_CATEGORIES)[number]
 export type ChecklistSource = 'manual' | 'public_schedule' | 'personal_sync'
-export const MAP_NODE_KINDS = ['region', 'subregion', 'independent', 'group'] as const
+export const MAP_NODE_KINDS = ['region', 'subregion'] as const
 export type MapNodeKind = (typeof MAP_NODE_KINDS)[number]
 
 export const CHECKLIST_SECTIONS = ['tasks', 'events', 'cycles', 'exploration', 'custom'] as const
@@ -163,7 +163,6 @@ export interface AiScheduleMatchCandidate {
   parentTitle: string | null
   mapNodeKind: MapNodeKind | null
   parentRemoteKey: string | null
-  relatedRegionRemoteKey: string | null
   completed: boolean
   progressPercent: number | null
 }
@@ -196,7 +195,7 @@ export interface SyncRequestContext {
 }
 
 export interface PublicSyncContract {
-  schemaVersion: 5
+  schemaVersion: 6
   authority: 'interface_contract'
   decisionAuthority: 'codex'
   executorPolicy: 'mechanical_validation_only'
@@ -211,7 +210,7 @@ export interface PublicSyncContract {
 }
 
 export interface SemanticReviewContract {
-  schemaVersion: 7
+  schemaVersion: 8
   authority: 'interface_contract'
   decisionAuthority: 'codex'
   executorPolicy: 'mechanical_validation_only'
@@ -309,6 +308,7 @@ export interface ChecklistItem {
   parentTitle: string | null
   mapNodeKind: MapNodeKind | null
   parentRemoteKey: string | null
+  /** @deprecated Legacy database compatibility; new map data uses parentRemoteKey only. */
   relatedRegionRemoteKey: string | null
   startsAt: string | null
   endsAt: string | null
@@ -338,7 +338,6 @@ export interface CreateChecklistItemInput {
   parentTitle?: string | null
   mapNodeKind?: MapNodeKind | null
   parentRemoteKey?: string | null
-  relatedRegionRemoteKey?: string | null
   startsAt?: string | null
   endsAt?: string | null
   resetRule?: string | null
@@ -359,7 +358,6 @@ export interface UpdateChecklistItemInput {
   parentTitle?: string | null
   mapNodeKind?: MapNodeKind | null
   parentRemoteKey?: string | null
-  relatedRegionRemoteKey?: string | null
   startsAt?: string | null
   endsAt?: string | null
   resetRule?: string | null

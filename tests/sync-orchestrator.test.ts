@@ -235,22 +235,82 @@ describe('SyncOrchestrator', () => {
     expect(result).toMatchObject({
       requestedScope: 'personal_data',
       requestedTarget: 'exploration',
-      status: 'success'
+      status: 'partial'
     })
     expect(database.getSyncSettings('genshin')).toMatchObject({
-      status: 'success',
+      status: 'stale',
       lastScope: null
     })
     expect(progress.map((update) => update.phase)).toEqual([
       'fetching',
       'structuring',
       'merging',
-      'completed'
+      'verifying'
     ])
     expect(progress.at(-1)).toMatchObject({
-      status: 'completed',
-      message: '同步完成'
+      status: 'running'
     })
+  })
+
+  it('地图首次个人同步先准备规范目录，再按唯一名称与层级机械绑定进度', async () => {
+    database = new AppDatabase(':memory:')
+    const accountScope = `miyoushe:${'8'.repeat(64)}`
+    const prepareCatalog = vi.fn(async () => {
+      database!.mergeSyncedItems('genshin', 'public_schedule', [{
+        remoteKey: 'catalog:genshin:liyue',
+        category: 'exploration',
+        title: '璃月',
+        mapNodeKind: 'region'
+      }], new Date().toISOString(), true, { identityPolicy: 'remote-key-only' })
+      database!.recordCatalogCoverage(
+        'genshin',
+        'exploration',
+        'public_schedule',
+        'complete'
+      )
+    })
+    const orchestrator = new SyncOrchestrator(database, {
+      publicSchedule: {},
+      personalData: {
+        genshin: {
+          sync: async () => ({
+            items: [],
+            reviewCandidates: [{
+              target: 'exploration',
+              kind: 'personal-map-progress',
+              payload: {
+                provider: 'miyoushe',
+                officialId: '6',
+                officialTitle: '璃月',
+                observedNodeKind: 'region',
+                observedProgress: 86
+              }
+            }],
+            accountScope,
+            message: '个人地图数据已读取'
+          })
+        }
+      }
+    }, undefined, prepareCatalog)
+
+    const result = await orchestrator.syncPersonalOnly('genshin', 'exploration')
+
+    expect(prepareCatalog).toHaveBeenCalledWith('genshin', 'exploration')
+    expect(result).toMatchObject({
+      requestedTarget: 'exploration',
+      status: 'success',
+      sources: [expect.objectContaining({ pendingReview: 0, updated: 1 })]
+    })
+    const map = database.listChecklistItems('genshin').find(
+      (item) => item.remoteKey === 'catalog:genshin:liyue'
+    )!
+    expect(map).toMatchObject({ title: '璃月', progressPercent: 86 })
+    expect(database.getSourceBinding(
+      'genshin',
+      'miyoushe',
+      'personal-map-progress',
+      '6'
+    )).toMatchObject({ itemId: map.id, bindingKind: 'mechanical' })
   })
 
   it('模糊个人数据只进入 Codex 核验队列，不直接写入或冒充同步成功', async () => {
@@ -345,5 +405,37 @@ describe('SyncOrchestrator', () => {
       (item) => item.remoteKey === 'map:cancelled'
     )).toBe(false)
     expect(progress.at(-1)).toEqual({ phase: 'cancelled', status: 'cancelled' })
+  })
+
+  it('应用退出会同时中断所有正在读取的个人同步', async () => {
+    database = new AppDatabase(':memory:')
+    const started: string[] = []
+    const sync = vi.fn(async (
+      gameId,
+      target,
+      _reportProgress,
+      signal?: AbortSignal
+    ) => {
+      started.push(`${gameId}:${target}`)
+      await new Promise<void>((_resolve, reject) => {
+        signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
+      })
+      return { items: [], message: '不应完成' }
+    })
+    const orchestrator = new SyncOrchestrator(database, {
+      publicSchedule: {},
+      personalData: {
+        genshin: { sync },
+        'star-rail': { sync }
+      }
+    })
+
+    const first = orchestrator.syncPersonalOnly('genshin', 'events')
+    const second = orchestrator.syncPersonalOnly('star-rail', 'cycles')
+    await vi.waitFor(() => expect(started).toHaveLength(2))
+    expect(orchestrator.shutdown()).toBe(2)
+
+    await expect(first).resolves.toMatchObject({ status: 'cancelled' })
+    await expect(second).resolves.toMatchObject({ status: 'cancelled' })
   })
 })
