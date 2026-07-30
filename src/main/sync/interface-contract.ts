@@ -15,7 +15,8 @@ const DEFAULT_REQUEST_CONTEXT: SyncRequestContext = {
 const tasksContract: SyncSectionContract = {
   target: 'tasks',
   purpose: '校准当前游戏版本窗口，供主线任务和支线任务显示同一版本结束倒计时。',
-  inventoryScope: '当前正在运行的正式游戏版本。',
+  inventoryScope:
+    '当前正在运行的正式游戏版本及其全服版本结束时刻；版本阶段、卡池阶段和单个活动窗口不属于版本窗口。',
   itemShapes: [{
     name: '当前版本固定任务',
     categories: ['main_quest', 'side_quest'],
@@ -38,14 +39,17 @@ const tasksContract: SyncSectionContract = {
   completionCriteria: [
     '恰好提交“主线任务”和“支线任务”两项。',
     '两项使用完全相同的 startsAt、endsAt、periodKey、scheduleKind=fixed_window 和 timeZone。',
-    '时间覆盖当前版本，而不是已经结束或尚未开始的其他版本。'
+    '时间覆盖当前版本，而不是已经结束或尚未开始的其他版本。',
+    '正例是官方版本更新公告、版本专题或能够证明整个版本起止时间的排期资料；反例是下半卡池开始时间、单个活动结束时间、维护补偿领取期限和前瞻直播时间。',
+    '若官方公告出现延期、提前更新或来源时区不明，必须交叉核验最新公告与服务器时区；仍不能确认整个版本结束时刻时不得猜测或提交。'
   ]
 }
 
 const eventsContract: SyncSectionContract = {
   target: 'events',
   purpose: '建立当前有效及官方已公布即将开始的限时活动清单和倒计时。',
-  inventoryScope: '全部正在进行的限时活动，以及官方已经公布的即将开始限时活动。',
+  inventoryScope:
+    '全部正在进行的限时活动，以及官方已经公布的即将开始限时活动。这里的“活动”是面向玩家、具有独立官方活动名称和整体参与窗口的活动容器，包括限时签到、战斗、剧情、经营或小游戏活动；不是活动内部的单个阶段、关卡、任务或奖励节点。',
   itemShapes: [{
     name: '限时活动',
     categories: ['limited_event'],
@@ -69,16 +73,21 @@ const eventsContract: SyncSectionContract = {
   }],
   completionCriteria: [
     '先完成活动目录枚举，再逐项补齐字段，不能只搜索到少数热门活动就结束。',
+    '限时活动正例：具有独立官方活动名称、整体开始时间和整体结束时间的限时签到、限时玩法或限时剧情活动。',
+    '限时活动反例：活动内部的每日阶段、单个关卡、剧情任务、活动商店、奖励档位、版本前瞻、维护公告、兑换码和角色或武器卡池；这些不能作为新的活动清单项。',
+    '同一活动的预告页、规则页、玩法页和奖励页只是同一活动的不同资料，不得分别建项；标题应使用活动容器的官方本地化总名称。',
     '限时活动必须同时具有准确 startsAt 和 endsAt；开始后界面自动由“距离开始”切换为“剩余”。',
     '每个活动必须具有 1 至 5 个符合 requestContext.outputLocale 的玩法标签；无法核验时使用该语言的未知表达。',
-    '同一活动只能保留一个语义记录；名称或标点不同但实际相同时使用 matchItemId。'
+    '同一活动只能保留一个语义记录；名称或标点不同但实际相同时使用 matchItemId。',
+    '如果无法确认某个名称是整体活动还是内部阶段，或不同页面是否属于同一活动，必须结合官方活动规则、时间窗口和至少一个独立可靠来源交叉核验；仍无法确认则不得猜测或提交。'
   ]
 }
 
 const cyclesContract: SyncSectionContract = {
   target: 'cycles',
   purpose: '校准当前主要周期挑战的名称、周期窗口与模式身份；固定周常由应用机械维护。',
-  inventoryScope: '当前正在进行或官方已经公布下一期的全部主要周期挑战模式。',
+  inventoryScope:
+    '当前正在进行或官方已经公布下一期的全部主要周期挑战模式及其当期实例。周期挑战是具有独立模式入口、重复结算周期和个人挑战进度的主要常驻终局玩法；单层、单节点、单阶段或当期增益不是独立模式。',
   itemShapes: [
     {
       name: '周期挑战',
@@ -105,7 +114,12 @@ const cyclesContract: SyncSectionContract = {
   ],
   completionCriteria: [
     '软件会机械补齐固定周一重置的“周常”，Codex 重点检索所有主要周期挑战。',
+    '模式正例：原神“深境螺旋”“幻想真境剧诗”、星铁“混沌回忆”“虚构叙事”“末日幻影”、绝区零“式舆防卫战”“危局强袭战”等具有独立入口和重复周期的主要挑战。',
+    '模式反例：某一层、节点、关卡、难度、当期增益、敌人阵容、奖励档位、周常首领、体力副本或限时活动挑战；这些不能作为新的周期模式。',
     '每种周期挑战使用稳定 modeKey；每一期使用独立 periodKey 和 remoteKey。',
+    '同一模式的本期标题、副标题或期数属于 periodKey 对应的周期实例，不得因为标题变化创建新的 modeKey；不同模式即使时间窗相同也不得合并。',
+    '周期 startsAt/endsAt 必须是该期挑战开放与结算窗口，不是奖励领取期限、单个阶段开放时间或版本结束时间。',
+    '无法确认某内容是独立周期模式还是模式内部阶段时，必须交叉核验官方玩法入口、周期说明和可靠社区资料；仍无法确认则不得猜测或提交。',
     '深渊类事项不设置自动 recurrenceRule；新一期是新记录。'
   ]
 }
@@ -157,7 +171,8 @@ const explorationContract: SyncSectionContract = {
     '完整枚举全部一级地区与具有独立探索度的独立地图；普通二级子区域不提交。',
     '一级地区正例：原神的“璃月”“稻妻”、星铁的“匹诺康尼”、鸣潮的“瑝珑”“黑海岸”“黎那汐塔”等顶层主地区。正例只用于说明目录层级，仍须检索当前游戏的实际开放目录。',
     '一级地区反例：主地区内部的城市、山脉、台地、港口或探索报告区域，例如鸣潮“云陵谷”“今州城”等；网页仅把某地点称为 region，不能证明它是本清单所需的一级地区。',
-    '独立地图正例是具有独立地图入口或独立探索度、且不属于普通主地区子区域的地图，例如原神“渊下宫”；不能仅凭名称特殊或 Wiki 单独建页判定为 independent。',
+    '独立地图正例：原神“渊下宫”“层岩巨渊·地下矿区”等在地图导航或官方社区探索统计中具有独立入口或独立探索度的地图。正例只用于说明层级，仍须核验当前游戏的实际目录。',
+    '独立地图反例：普通主地区内部仅有单独名称、传送层级、攻略页面或局部探索度的城市、山脉、台地、港口和任务场景；不能仅凭名称特殊、Wiki 单独建页或地图可单独缩放判定为 independent。',
     '每个 region 或 independent 都必须用能够证明其目录层级的资料核验；单个 Wiki 地区页、攻略页或“探索报告”页只能证明名称存在，不能单独证明一级层级。',
     '无法确认某地点是否属于一级地区或独立地图时，继续用官方地图导航、官方社区战绩目录及至少一个独立可靠来源交叉核验；仍无法确认则不得猜测、不得提交，并将该目标保留为未完成。',
     '地图清单只使用 region 与 independent；不创建 subregion、group 或通用世界根节点。',
@@ -179,7 +194,7 @@ export function getPublicSyncContract(
   requestContext: SyncRequestContext = DEFAULT_REQUEST_CONTEXT
 ): PublicSyncContract {
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     authority: 'interface_contract',
     decisionAuthority: 'codex',
     executorPolicy: 'mechanical_validation_only',
@@ -206,13 +221,13 @@ export function getPublicSyncContract(
     fieldSemantics: {
       matchItemId: '与 matchCandidates 中现有事项语义相同时使用其 itemId；真正新增时省略。',
       remoteKey: '同一逻辑事项稳定、可重复同步的机器身份；周期挑战的每一期使用独立 remoteKey。',
-      category: 'Codex 根据资料语义选择的最终版块分类。',
+      category: 'Codex 根据资料语义选择最终版块分类；页面或接口的栏目名只是证据，不能代替活动容器、周期模式或地图层级的实际语义判断。',
       title: `由 ${requestContext.outputLocale} 官方本地化资料确认的游戏内名称，不自行翻译。`,
       activityTags: `1 至 5 个使用 ${requestContext.outputLocale} 展示的实际玩法标签；无法核验时使用该语言的“未知”表达。`,
       startsAt: '活动或周期开始的绝对时刻，ISO-8601 且包含 Z 或明确 UTC 偏移量。',
       endsAt: '活动或周期结束的绝对时刻，ISO-8601 且包含 Z 或明确 UTC 偏移量。',
-      periodKey: '版本或周期实例身份；同一期稳定，不同周期不能复用。',
-      modeKey: '跨周期稳定的玩法模式身份。',
+      periodKey: '版本或周期实例身份；同一期稳定，不同周期不能复用。周期挑战的标题、副标题或期数变化通常属于 periodKey，而不是新的 modeKey。',
+      modeKey: '跨周期稳定的玩法模式身份；单层、节点、阶段、难度、增益或奖励档位不能拥有独立 modeKey。',
       mapNodeKind:
         '地图节点语义：当前清单只接受一级主地区 region 与独立地图 independent。region 必须是游戏地图顶层导航、顶层世界选择或官方社区顶层探索统计中的主地区；原神“璃月/稻妻”、星铁“匹诺康尼”、鸣潮“瑝珑/黑海岸/黎那汐塔”是层级正例，鸣潮“云陵谷/今州城”等主地区内部探索区域是反例。网页泛称 region、单独 Wiki 页面或单独探索度不能证明一级层级。无法确认时必须交叉核验，仍不确定则不提交，禁止猜测。个人接口返回的 parentId、层级或节点类型只是观测证据，不能单独覆盖公开规范目录的节点类型。',
       titleSourceUrl: `能够核验 ${requestContext.outputLocale} 官方本地化名称的直接页面。`,
@@ -285,8 +300,16 @@ export function getSemanticReviewContract(
       ]
     }
   }
+  const identitySemantics: Record<PersonalSyncTarget, string> = {
+    events:
+      '活动候选必须对应具有独立官方名称和整体参与窗口的活动容器。限时签到、限时玩法和限时剧情活动是正例；每日阶段、单个关卡、剧情任务、活动商店、奖励档位、规则页和卡池是反例。个人接口若返回内部阶段，应匹配其活动容器而不是新建活动；无法确认容器身份时交叉核验，仍不确定则拒绝，禁止猜测。',
+    cycles:
+      '周期候选必须区分稳定模式与当期实例。深境螺旋、幻想真境剧诗、混沌回忆、虚构叙事、末日幻影、式舆防卫战和危局强袭战是模式正例；楼层、节点、关卡、难度、当期增益和奖励档位是反例。同一模式的标题变化属于 periodKey；无法确认是否为独立模式时交叉核验，仍不确定则拒绝，禁止猜测。',
+    exploration:
+      '地图候选只允许对应一级主地区或独立地图。一级地区正例包括璃月、稻妻、匹诺康尼、瑝珑、黑海岸和黎那汐塔；独立地图正例包括渊下宫、层岩巨渊·地下矿区；云陵谷、今州城等主地区内部探索区域及普通城市、山脉、台地、港口是反例。无法确认层级时交叉核验，仍不确定则拒绝，禁止猜测。'
+  }
   return {
-    schemaVersion: 6,
+    schemaVersion: 7,
     authority: 'interface_contract',
     decisionAuthority: 'codex',
     executorPolicy: 'mechanical_validation_only',
@@ -297,6 +320,7 @@ export function getSemanticReviewContract(
     conditionalFields: targetFields[target].conditional,
     fieldSemantics: {
       catalogPrerequisite: '个人接口只提供观测值与进度，不决定最终清单目录。应用仅在当前版块的公开规范清单覆盖度为 complete 后开放本候选；空目录或不完整目录会先由公开资料任务建立规范项目，再将个人来源 ID 绑定到规范项目。',
+      itemIdentity: identitySemantics[target],
       matchCandidates: '当前版块已有同步清单或与当前地图记录机械筛出的相关子集。提交前必须逐项完成身份核对；个人接口的简称、总称和 provider remoteKey 只是观察值，不代表新事项。新增前必须比较同类别候选的标题核心语义、startsAt/endsAt 时间窗和界面倒计时：名称明显重复且时间窗重叠，或倒计时相同/接近时，默认是同一事项，除非有明确证据证明它们是不同玩法。',
       matchCandidateScope: 'complete_target 表示返回当前版块全部候选；relevant_map_subset 表示地图版块已按当前名称和父级关系机械缩小范围；bound_item 表示该官方 ID 已有 Codex 确认的持久映射，只返回规范承载项。筛选只减少无关上下文，不替代 Codex 对本次状态语义的判断。',
       duplicateDetection: '同一 category 下，公开全称与个人简称、玩法名与节点后缀、标点或语序差异不能制造新事项。标题核心名称相同并且时间窗重叠或倒计时相同/接近，是强重复信号；必须优先匹配现有 public_schedule 项。只有能够说明两者实际玩法不同的明确证据，才允许省略 matchItemId 新建。',
@@ -307,7 +331,7 @@ export function getSemanticReviewContract(
       completionRule: '仅活动提交 completed 时使用。fieldPath 必须指向本次 payload.observedStatus 下的一个原始字段，并列出明确的完成值与未完成值；规则必须能机械复现本次结论，确认后会绑定到该来源接口与官方 ID，后续同步直接复用。',
       progressPercent: '仅地图探索使用，范围 0 到 100。',
       mapNodeKind:
-        '地图候选只允许绑定或建立一级主地区 region 与独立地图 independent。一级主地区是地图顶层导航、顶层世界选择或官方社区顶层探索统计中的主地区，例如原神“璃月/稻妻”、星铁“匹诺康尼”、鸣潮“瑝珑/黑海岸/黎那汐塔”；鸣潮“云陵谷/今州城”等内部探索区域不是一级地区。个人接口或 Wiki 使用 region 一词不能单独决定层级；无法与公开规范目录匹配时必须交叉核验，仍无法确认则拒绝候选，禁止猜测或把普通子区域新增为 region。',
+        '地图候选只允许绑定或建立一级主地区 region 与独立地图 independent。一级主地区是地图顶层导航、顶层世界选择或官方社区顶层探索统计中的主地区；独立地图必须在地图导航或官方社区探索统计中具有独立入口或独立探索度。原神“璃月/稻妻”、星铁“匹诺康尼”、鸣潮“瑝珑/黑海岸/黎那汐塔”是一级层级正例，原神“渊下宫”“层岩巨渊·地下矿区”是独立地图正例，鸣潮“云陵谷/今州城”等内部探索区域是反例。个人接口或 Wiki 使用 region 一词不能单独决定层级；无法与公开规范目录匹配时必须交叉核验，仍无法确认则拒绝候选，禁止猜测或把普通子区域新增为 region。',
       category: 'Codex 可纠正解析器初始分类；应用不再二次解释业务语义。',
       title: `使用 ${requestContext.outputLocale} 的官方本地化名称。`,
       activityTags: `使用 ${requestContext.outputLocale} 的玩法标签。`,

@@ -2744,7 +2744,7 @@ describe('AppDatabase', () => {
         userTimeZone: 'America/Los_Angeles'
       },
       contract: {
-        schemaVersion: 4,
+        schemaVersion: 5,
         decisionAuthority: 'codex',
         executorPolicy: 'mechanical_validation_only'
       }
