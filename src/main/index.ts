@@ -47,6 +47,7 @@ import {
 import { createKuroCommunityPersonalAdapter } from './sync/kuro-community-client'
 import { encodeKuroCommunityCredential } from './sync/kuro-community-credential'
 import { SyncOrchestrator } from './sync/orchestrator'
+import { syncPersonalBeforeCatalogBootstrap } from './sync/personal-catalog-bootstrap'
 import { restoreRelaunchOptions } from './relaunch'
 import { migrateLegacyAppData, resolveAppDataPaths } from './data-paths'
 import { getFixedWeeklyBootstrap } from './sync/public-sync-bootstrap'
@@ -168,9 +169,49 @@ async function queueAiScheduleSync(
   requestContext: SyncRequestContext = {
     outputLocale: 'zh-CN',
     userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-  }
+  },
+  queuedJobScope: SyncScope = scope
 ): Promise<SyncResult> {
   if (!appDatabase) throw new Error('数据库尚未初始化')
+  if (scope === 'public_and_personal') {
+    const catalogComplete =
+      target !== 'all' &&
+      target !== 'tasks' &&
+      appDatabase.isCatalogComplete(gameId, target)
+    return syncPersonalBeforeCatalogBootstrap({
+      catalogComplete,
+      syncPersonal: async () => {
+        if (syncOrchestrator) {
+          return syncOrchestrator.syncPersonalOnly(gameId, target, requestContext)
+        }
+        const timestamp = new Date().toISOString()
+        return {
+          gameId,
+          requestedScope: 'personal_data',
+          requestedTarget: target,
+          status: 'error',
+          startedAt: timestamp,
+          finishedAt: timestamp,
+          sources: [{
+            source: 'personal_data',
+            status: 'error',
+            message: '个人数据同步服务尚未初始化',
+            added: 0,
+            updated: 0,
+            preserved: 0
+          }],
+          message: '个人数据同步服务尚未初始化'
+        }
+      },
+      queueCatalog: () => queueAiScheduleSync(
+        gameId,
+        'public_schedule',
+        target,
+        requestContext,
+        'public_and_personal'
+      )
+    })
+  }
   const startedAt = new Date().toISOString()
   const sources: SyncResult['sources'] = []
   const fixedWeeklyMerge = target === 'all' || target === 'cycles'
@@ -191,7 +232,7 @@ async function queueAiScheduleSync(
     const plugin = detectCodexPlugin()
     const job = appDatabase.createAiScheduleJob(
       gameId,
-      scope,
+      queuedJobScope,
       new Date(),
       plugin.installed,
       target,
@@ -239,41 +280,13 @@ async function queueAiScheduleSync(
     })
   }
 
-  if (scope === 'public_and_personal') {
-    const personal = syncOrchestrator
-      ? await syncOrchestrator.syncPersonalData(gameId, target, requestContext)
-      : {
-          source: 'personal_data' as const,
-          status: 'error' as const,
-          message: '个人数据同步服务尚未初始化',
-          added: 0,
-          updated: 0,
-          preserved: 0
-        }
-    sources.push(personal)
-    const publicPending = sources[0]?.status === 'skipped'
-    const combinedMessage = `${personal.message}；${publicPending ? '公开资料任务等待 AI 处理' : '公开资料任务未能排队'}`
-    const personalStatus = personal.status === 'verification_required'
-      ? 'verification_required'
-      : personal.status === 'success'
-        ? 'idle'
-        : 'error'
-    appDatabase.recordSyncOutcome(
-      gameId,
-      personalStatus,
-      combinedMessage,
-      personal.status === 'success'
-    )
-  } else if (sources[0]?.status === 'error') {
+  if (sources[0]?.status === 'error') {
     appDatabase.recordSyncAttempt(gameId, scope)
     appDatabase.recordSyncOutcome(gameId, 'error', sources[0].message, false)
   }
 
-  const hasPersonalSuccess = sources.some(
-    (source) => source.source === 'personal_data' && source.status === 'success'
-  )
   const publicStatus = sources[0]?.status
-  const finalStatus: SyncResult['status'] = publicStatus === 'error' && !hasPersonalSuccess
+  const finalStatus: SyncResult['status'] = publicStatus === 'error'
     ? 'error'
     : sources.every((source) => source.status === 'success')
       ? 'success'

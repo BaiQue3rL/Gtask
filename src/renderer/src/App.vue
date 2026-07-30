@@ -38,6 +38,10 @@ import {
   CODEX_PROXY_WARNING,
   isCodexConnectionRetry
 } from './codex-proxy-diagnostic'
+import {
+  credentialProviderForSyncResult,
+  credentialProviderFromSyncMessage
+} from './sync-credential-notice'
 import genshinIcon from './assets/games/genshin.jpg'
 import starRailIcon from './assets/games/star-rail.jpg'
 import zenlessIcon from './assets/games/zenless.jpg'
@@ -170,7 +174,11 @@ const activeSyncRequests = ref(new Set<string>())
 const syncSettings = ref<SyncSettings | null>(null)
 const syncTargetStates = ref<SyncTargetState[]>([])
 const personalSyncTargets = ref<PersonalSyncTarget[]>([])
-const syncNotice = ref<{ status: SyncResult['status']; message: string } | null>(null)
+const syncNotice = ref<{
+  status: SyncResult['status']
+  message: string
+  credentialProvider?: CredentialProvider | null
+} | null>(null)
 const clockNow = ref(Date.now())
 const editorOpen = ref(false)
 const recycleBinOpen = ref(false)
@@ -292,11 +300,9 @@ const personalPlatform = computed(() =>
   selectedGameId.value === 'wuthering-waves' ? '库街区' : '米游社'
 )
 const syncNoticeCredentialProvider = computed<CredentialProvider | null>(() => {
+  if (syncNotice.value?.credentialProvider) return syncNotice.value.credentialProvider
   const message = syncNotice.value?.message ?? ''
-  if (!message.includes('尚未登录')) return null
-  if (message.includes('米游社')) return 'miyoushe'
-  if (message.includes('库街区')) return 'kuro-community'
-  return null
+  return credentialProviderFromSyncMessage(message)
 })
 const incompleteCount = computed(() => items.value.filter((item) => !item.completed).length)
 const globalSyncState = computed(() => syncTargetStates.value.find((state) => state.target === 'all'))
@@ -1367,7 +1373,12 @@ async function runPersonalSync(target: SyncTarget): Promise<void> {
       userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
     })
     if (selectedGameId.value === gameId) {
-      syncNotice.value = { status: result.status, message: displaySyncMessage(result.message) }
+      const credentialProvider = credentialProviderForSyncResult(result)
+      syncNotice.value = {
+        status: result.status,
+        message: displaySyncMessage(result.message),
+        credentialProvider
+      }
       const pendingReview = result.sources.reduce(
         (count, source) => count + (source.pendingReview ?? 0),
         0
@@ -1379,6 +1390,7 @@ async function runPersonalSync(target: SyncTarget): Promise<void> {
         await refreshSemanticReviewProgress(target)
       }
       await Promise.all([loadItems(), loadSyncSettings(), loadSyncTargetStates()])
+      if (credentialProvider) await openCredentialSettings(credentialProvider)
     }
   } catch (error) {
     if (selectedGameId.value === gameId) showError(error)
