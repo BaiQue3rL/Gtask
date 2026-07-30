@@ -1,10 +1,12 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   prepareCodexPluginMarketplace,
-  prepareStableMcpElectronRuntime
+  prepareStableMcpElectronRuntime,
+  refreshCodexMcpLauncher
 } from '../src/main/ai/codex-plugin-installer'
 
 const temporaryDirectories: string[] = []
@@ -81,10 +83,34 @@ describe('Codex plugin installer', () => {
       args: ['/d', '/c', prepared.launcherPath],
       cwd: integrationDirectory
     })
+    expect(launcher).not.toContain('start ""')
+    expect(launcher).toContain(`if not exist "${executablePath}" exit /b 2`)
+    expect(launcher).toContain(`if not exist "${mcpScriptPath}" exit /b 3`)
     expect(launcher).toContain(
-      `start "" /wait /b "${executablePath}" "${mcpScriptPath}" --database "${databasePath}"`
+      `"${executablePath}" "${mcpScriptPath}" --database "${databasePath}"`
     )
     expect(decodeURIComponent(prepared.deeplink)).toContain(personalMarketplacePath)
+  })
+
+  it.runIf(process.platform === 'win32')('missing MCP runtime exits silently without invoking Windows start', () => {
+    const root = mkdtempSync(join(tmpdir(), 'gacha-codex-launcher-'))
+    temporaryDirectories.push(root)
+    const launcherPath = refreshCodexMcpLauncher({
+      integrationDirectory: root,
+      executablePath: join(root, 'missing-runtime', 'gtask-mcp-node.exe'),
+      mcpScriptPath: join(root, 'missing-runtime', 'local-mcp-server-cli.js'),
+      databasePath: join(root, 'data', 'gacha-task-manager.sqlite'),
+      commandShellPath: process.env.ComSpec ?? 'C:\\Windows\\System32\\cmd.exe'
+    })
+
+    const result = spawnSync(
+      process.env.ComSpec ?? 'C:\\Windows\\System32\\cmd.exe',
+      ['/d', '/c', launcherPath],
+      { encoding: 'utf8', windowsHide: true, timeout: 5_000 }
+    )
+
+    expect(result.status).toBe(2)
+    expect(result.error).toBeUndefined()
   })
 
   it('preserves unrelated personal marketplace plugins', () => {

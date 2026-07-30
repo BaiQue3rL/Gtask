@@ -103,7 +103,9 @@ export function refreshCodexMcpLauncher(options: CodexMcpLauncherOptions): strin
     'chcp 65001 >nul',
     'setlocal',
     'set "ELECTRON_RUN_AS_NODE=1"',
-    `start "" /wait /b "${executablePath}" "${mcpScriptPath}" --database "${databasePath}"`,
+    `if not exist "${executablePath}" exit /b 2`,
+    `if not exist "${mcpScriptPath}" exit /b 3`,
+    `"${executablePath}" "${mcpScriptPath}" --database "${databasePath}"`,
     'exit /b %errorlevel%',
     ''
   ].join('\r\n'), 'utf8')
