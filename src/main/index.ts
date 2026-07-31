@@ -50,7 +50,15 @@ import { syncPersonalBeforeCatalogBootstrap } from './sync/personal-catalog-boot
 import { restoreRelaunchOptions } from './relaunch'
 import { migrateLegacyAppData, resolveAppDataPaths } from './data-paths'
 import { getFixedWeeklyBootstrap } from './sync/public-sync-bootstrap'
-import { getBundledMapCatalog } from './sync/map-catalog'
+import {
+  getBundledMapCatalog,
+  getBundledMapCatalogVerifiedAt
+} from './sync/map-catalog'
+import {
+  evaluateMapCatalogFreshness,
+  selectRelevantVersionWindow,
+  type MapCatalogAuditReason
+} from './sync/map-catalog-freshness'
 import {
   getPersonalSyncTargets,
   supportsPersonalSyncTarget
@@ -257,25 +265,41 @@ async function queueAiScheduleSync(
     })
   }
   const startedAt = new Date().toISOString()
+  let mapAuditReason: MapCatalogAuditReason | null = null
+  let mapMerge: { added: number; updated: number; preserved: number } | null = null
   if (target === 'exploration') {
-    const merge = maintainBundledMapCatalog(appDatabase, gameId)
-    const message = `地图目录已同步：新增 ${merge.added}，更新 ${merge.updated}`
-    appDatabase.recordSyncAttempt(gameId, scope)
-    appDatabase.recordSyncOutcome(gameId, 'success', message, true)
-    return {
-      gameId,
-      requestedScope: scope,
-      requestedTarget: target,
-      status: 'success',
-      startedAt,
-      finishedAt: new Date().toISOString(),
-      sources: [{
-        source: 'public_schedule',
+    const reference = new Date()
+    mapMerge = maintainBundledMapCatalog(appDatabase, gameId, reference, false)
+    const freshness = evaluateMapCatalogFreshness({
+      bundledVerifiedAt: getBundledMapCatalogVerifiedAt(gameId),
+      lastCodexAuditAt: appDatabase.getLastCompletedCatalogAuditAt(gameId, 'exploration'),
+      versionWindow: selectRelevantVersionWindow(
+        appDatabase.listChecklistItems(gameId),
+        reference
+      ),
+      reference
+    })
+    mapAuditReason = freshness.reason
+    if (!freshness.shouldAudit) {
+      const message = `地图基准目录已同步：新增 ${mapMerge.added}，更新 ${mapMerge.updated}；当前版本无需增量核验`
+      appDatabase.recordSyncAttempt(gameId, scope)
+      appDatabase.recordSyncTargetSuccess(gameId, target, reference)
+      appDatabase.recordSyncOutcome(gameId, 'success', message, true)
+      return {
+        gameId,
+        requestedScope: scope,
+        requestedTarget: target,
         status: 'success',
-        message,
-        ...merge
-      }],
-      message
+        startedAt,
+        finishedAt: new Date().toISOString(),
+        sources: [{
+          source: 'public_schedule',
+          status: 'success',
+          message,
+          ...mapMerge
+        }],
+        message
+      }
     }
   }
   const sources: SyncResult['sources'] = []
@@ -286,13 +310,13 @@ async function queueAiScheduleSync(
         getFixedWeeklyBootstrap(gameId, target)
       )
     : null
-  let bootstrapMerge = fixedWeeklyMerge
+  let bootstrapMerge = mapMerge ?? (fixedWeeklyMerge
     ? {
         added: fixedWeeklyMerge.added,
         updated: fixedWeeklyMerge.updated,
         preserved: fixedWeeklyMerge.preserved
       }
-    : null
+    : null)
   try {
     const plugin = detectCodexPlugin()
     const job = appDatabase.createAiScheduleJob(
@@ -328,6 +352,13 @@ async function queueAiScheduleSync(
     const localMessages = [
       fixedWeeklyMerge
         ? `固定周常已维护（新增 ${fixedWeeklyMerge.added}，更新 ${fixedWeeklyMerge.updated}）`
+        : '',
+      mapMerge
+        ? `地图基准目录已维护（新增 ${mapMerge.added}，更新 ${mapMerge.updated}）；${mapAuditReason === 'version_started'
+          ? '检测到新版本，正在核验增量'
+          : mapAuditReason === 'version_boundary_reached'
+            ? '检测到版本边界，正在核验增量'
+            : '目录距离上次核验较久，正在核验增量'}`
         : ''
     ].filter(Boolean)
     sources.push({

@@ -89,6 +89,9 @@ describe('同步接口契约', () => {
     expect(exploration.itemShapes[0].forbiddenFields).toEqual(
       expect.arrayContaining(['progressPercent', 'completed'])
     )
+    expect(exploration.inventoryScope).toContain('matchCandidates')
+    expect(exploration.inventoryScope).toContain('不要重新提交')
+    expect(exploration.completionCriteria.join('；')).toContain('允许提交空 items')
     expect(exploration.inventoryScope).toContain('一级主地区')
     expect(exploration.completionCriteria.join('；')).toContain('璃月')
     expect(exploration.completionCriteria.join('；')).toContain('匹诺康尼')

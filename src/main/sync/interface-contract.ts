@@ -126,9 +126,9 @@ const cyclesContract: SyncSectionContract = {
 
 const explorationContract: SyncSectionContract = {
   target: 'exploration',
-  purpose: '维护游戏当前已开放的两级地图目录，供个人数据随后按稳定来源 ID 合并探索度。',
+  purpose: '以应用提供的已核验地图基准目录为基础，只核验新版本带来的增量、改名与归属修正，供个人数据随后按稳定来源 ID 合并探索度。',
   inventoryScope:
-    '全部当前已正式开放的一级主地区，以及明确归属于某个一级主地区的二级地区。地图只有这两种层级；任何特殊入口、地下区域或箱庭区域也必须按真实归属表示为 region 或 subregion。',
+    'matchCandidates 是应用当前完整的已核验基准目录。联网确认基准核验后新正式开放但尚未列出的一级主地区及二级地区，并检查可靠资料明确指出的改名或归属修正；不要重新提交未变化的既有目录。地图只有 region 与 subregion 两层。',
   itemShapes: [{
     name: '地图目录节点',
     categories: ['exploration'],
@@ -163,7 +163,8 @@ const explorationContract: SyncSectionContract = {
     ]
   }],
   completionCriteria: [
-    '完整枚举全部一级主地区及其二级地区；同一地点只能出现一次。',
+    '先把 matchCandidates 视为已核验基准，按当前正式版本检查是否存在缺失的新增地区、官方改名或父级归属修正；没有变化时允许提交空 items 表示本次增量核验通过。',
+    '只提交新增或确需修正的目录节点，不重复回写未变化节点；同一地点只能出现一次。',
     'region 只表示顶层主地区，例如原神“璃月”“稻妻”、星铁“匹诺康尼”、鸣潮“瑝珑”“黑海岸”“黎那汐塔”。',
     'subregion 表示归属于某个一级主地区的具体地区，例如原神“层岩巨渊·地下矿区”归于“璃月”，鸣潮“云陵谷”“今州城”归于“瑝珑”。',
     '地下区域、特殊入口或箱庭区域也只作为 subregion，并必须给出唯一 parentRemoteKey；不得复制为根节点。',
@@ -212,6 +213,7 @@ export function getPublicSyncContract(
     ],
     fieldSemantics: {
       matchItemId: '与 matchCandidates 中现有事项语义相同时使用其 itemId；真正新增时省略。',
+      catalogBaseline: '地图任务的 matchCandidates 是应用已维护的完整基准目录。本次只需联网查找基准之后的增量、改名或归属修正；没有变化时提交空 items 即可完成核验，不得为了凑数重复提交全部目录。',
       remoteKey: '同一逻辑事项稳定、可重复同步的机器身份；周期挑战的每一期使用独立 remoteKey。',
       category: 'Codex 根据资料语义选择最终版块分类；页面或接口的栏目名只是证据，不能代替活动容器、周期模式或地图层级的实际语义判断。',
       title: `由 ${requestContext.outputLocale} 官方本地化资料确认的游戏内名称，不自行翻译。`,

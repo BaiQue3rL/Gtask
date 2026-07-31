@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { createHash } from 'node:crypto'
 import {
   getBundledMapCatalog,
-  getBundledMapCatalogCounts
+  getBundledMapCatalogCounts,
+  getBundledMapCatalogVerifiedAt
 } from '../src/main/sync/map-catalog'
 import { SUPPORTED_GAME_IDS } from '../src/shared/contracts'
 
@@ -38,6 +39,7 @@ describe('bundled map catalog', () => {
   it('keeps stable machine identities between reads', () => {
     for (const gameId of SUPPORTED_GAME_IDS) {
       expect(getBundledMapCatalog(gameId)).toEqual(getBundledMapCatalog(gameId))
+      expect(Number.isNaN(Date.parse(getBundledMapCatalogVerifiedAt(gameId)))).toBe(false)
     }
   })
 

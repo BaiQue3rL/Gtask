@@ -7,6 +7,13 @@ interface MapRegionDefinition {
   subregions: readonly string[]
 }
 
+const MAP_CATALOG_VERIFIED_AT: Record<GameId, string> = {
+  genshin: '2026-07-30T00:00:00+08:00',
+  'star-rail': '2026-07-30T00:00:00+08:00',
+  zenless: '2026-07-30T00:00:00+08:00',
+  'wuthering-waves': '2026-07-30T00:00:00+08:00'
+}
+
 /**
  * Bundled canonical map catalog.
  *
@@ -339,6 +346,10 @@ export function getBundledMapCatalog(gameId: GameId): NormalizedSyncItem[] {
       })
     ]
   })
+}
+
+export function getBundledMapCatalogVerifiedAt(gameId: GameId): string {
+  return new Date(MAP_CATALOG_VERIFIED_AT[gameId]).toISOString()
 }
 
 export function getBundledMapCatalogCounts(gameId: GameId): {

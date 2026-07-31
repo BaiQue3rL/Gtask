@@ -2945,6 +2945,39 @@ describe('AppDatabase', () => {
     expect(database.getSyncSettings('genshin').lastScope).toBe('public_and_personal')
   })
 
+  it('separately records the last completed Codex catalog audit', () => {
+    database = new AppDatabase(':memory:')
+    const requestedAt = new Date('2026-07-31T00:00:00.000Z')
+    const completedAt = new Date('2026-07-31T00:02:00.000Z')
+    const job = database.createAiScheduleJob(
+      'star-rail',
+      'public_schedule',
+      requestedAt,
+      true,
+      'exploration'
+    )
+    database.registerAiScheduleAgent('map-audit-agent', '地图增量核验 Agent', requestedAt)
+    database.claimAiScheduleJob('map-audit-agent', requestedAt)
+
+    expect(database.getLastCompletedCatalogAuditAt('star-rail', 'exploration')).toBeNull()
+
+    database.applyAiScheduleJob(
+      job.id,
+      'map-audit-agent',
+      [],
+      [],
+      completedAt,
+      [],
+      [],
+      [],
+      'zh-CN'
+    )
+
+    expect(database.getLastCompletedCatalogAuditAt('star-rail', 'exploration'))
+      .toBe(completedAt.toISOString())
+    expect(database.getLastCompletedCatalogAuditAt('genshin', 'exploration')).toBeNull()
+  })
+
   it('同一游戏的不同版块任务可同时排队且不会互相覆盖', () => {
     database = new AppDatabase(':memory:')
     const reference = new Date('2026-07-26T14:00:00.000Z')

@@ -466,6 +466,18 @@ export class AppDatabase {
     }))
   }
 
+  getLastCompletedCatalogAuditAt(gameId: GameId, target: SyncTarget): string | null {
+    const row = this.database.prepare(`
+      SELECT MAX(completed_at) AS completedAt
+      FROM ai_schedule_jobs
+      WHERE game_id = ?
+        AND status = 'completed'
+        AND completed_at IS NOT NULL
+        AND (target = ? OR target = 'all')
+    `).get(gameId, target) as { completedAt: string | null } | undefined
+    return row?.completedAt ?? null
+  }
+
   recordCatalogCoverage(
     gameId: GameId,
     target: SyncTarget,
