@@ -13,6 +13,4 @@ Thumbs.db
 *.sqlite-wal
 __pycache__/
 *.pyc
-tmp/game-sync-deps/
-tmp/*.out
-tmp/*.err
+tmp/
