@@ -1907,6 +1907,89 @@ describe('AppDatabase', () => {
     expect(database.listArchivedChecklistItems('star-rail')).toHaveLength(1)
   })
 
+  it('keeps a synced completed item deleted across personal and public refreshes', () => {
+    database = new AppDatabase(':memory:')
+    database.recordCatalogCoverage('genshin', 'exploration', 'public_schedule', 'complete')
+    const publicItem = {
+      remoteKey: 'public-map:test-region',
+      category: 'exploration' as const,
+      title: 'Test Region',
+      mapNodeKind: 'region' as const
+    }
+    database.mergeSyncedItems('genshin', 'public_schedule', [publicItem])
+    const accountScope = `miyoushe:${'d'.repeat(64)}`
+    const personalDraft = {
+      target: 'exploration' as const,
+      kind: 'personal-map-progress',
+      payload: {
+        provider: 'miyoushe',
+        officialId: 'test-region-id',
+        officialTitle: 'Test Region',
+        observedNodeKind: 'region',
+        observedProgress: 100
+      }
+    }
+
+    expect(database.resolveKnownPersonalDrafts(
+      'genshin',
+      accountScope,
+      [personalDraft]
+    )).toEqual({ reviewCandidates: [], added: 0, applied: 1, preserved: 0 })
+    expect(database.archiveCompletedSection('genshin', ['exploration'])).toBe(1)
+
+    expect(database.resolveKnownPersonalDrafts(
+      'genshin',
+      accountScope,
+      [personalDraft]
+    )).toEqual({ reviewCandidates: [], added: 0, applied: 0, preserved: 1 })
+    expect(database.emptyRecycleBin('genshin')).toBe(1)
+
+    expect(database.resolveKnownPersonalDrafts(
+      'genshin',
+      accountScope,
+      [personalDraft]
+    )).toEqual({ reviewCandidates: [], added: 0, applied: 0, preserved: 1 })
+    expect(database.queueSemanticReviewCandidates(
+      'genshin',
+      'personal_sync',
+      [personalDraft],
+      new Date('2026-07-31T12:00:00.000Z'),
+      { outputLocale: 'zh-CN', userTimeZone: 'Asia/Shanghai' },
+      accountScope
+    )).toEqual({ queued: 0, pending: 0 })
+
+    expect(database.mergeSyncedItems('genshin', 'public_schedule', [publicItem]))
+      .toMatchObject({ added: 0, preserved: 1 })
+    expect(database.listChecklistItems('genshin').some(
+      (item) => item.remoteKey === publicItem.remoteKey
+    )).toBe(false)
+  })
+
+  it('changes the checklist revision only for checklist item writes', () => {
+    database = new AppDatabase(':memory:')
+    const initialRevision = database.getChecklistRevision()
+    database.registerAiScheduleAgent(
+      'revision-agent',
+      'Revision Agent',
+      new Date('2026-07-31T12:00:00.000Z')
+    )
+    database.createAiScheduleJob(
+      'star-rail',
+      'public_schedule',
+      new Date('2026-07-31T12:00:01.000Z'),
+      false,
+      'events'
+    )
+    expect(database.getChecklistRevision()).toBe(initialRevision)
+
+    database.createChecklistItem({
+      gameId: 'star-rail',
+      category: 'custom',
+      title: 'Revision marker'
+    })
+    expect(database.getChecklistRevision()).not.toBe(initialRevision)
+  })
+
   it('版更校时只更新时间，同版本保留状态，新版本和到期时重置任务', () => {
     database = new AppDatabase(':memory:')
     const quest = (category: 'main_quest' | 'side_quest') =>

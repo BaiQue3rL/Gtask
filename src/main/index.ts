@@ -1119,11 +1119,15 @@ if (!app.requestSingleInstanceLock()) {
       }
     }, 60_000)
     let lastDataVersion = appDatabase.getDataVersion()
+    let lastChecklistRevision = appDatabase.getChecklistRevision()
     externalChangeTimer = setInterval(() => {
       try {
         const currentDataVersion = appDatabase?.getDataVersion() ?? lastDataVersion
         if (currentDataVersion === lastDataVersion) return
         lastDataVersion = currentDataVersion
+        const currentChecklistRevision = appDatabase?.getChecklistRevision() ?? lastChecklistRevision
+        if (currentChecklistRevision === lastChecklistRevision) return
+        lastChecklistRevision = currentChecklistRevision
         mainWindow?.webContents.send('checklist:changed')
       } catch (error) {
         reportBackgroundError('数据库变更检测', error)

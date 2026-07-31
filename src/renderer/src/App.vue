@@ -28,6 +28,7 @@ import type {
 import { readHiddenGameIds, writeHiddenGameIds } from './game-visibility'
 import { kuroRoleKey } from './kuro-role-key'
 import { compareChecklistItems } from './checklist-sort'
+import { resolveAdaptiveColumnLayout } from './adaptive-column-layout'
 import {
   buildMapTreeRows,
   collectMapBranchKeys,
@@ -78,6 +79,9 @@ const panelColumns: ChecklistPanel[][] = [
   [panels[1]],
   [panels[3]]
 ]
+const checklistColumnRefSetters = panelColumns.map((_, index) => (element: unknown) => {
+  setChecklistColumnElement(element instanceof Element ? element : null, index)
+})
 
 const categoryLabels: Record<ChecklistCategory, string> = {
   main_quest: '主线任务',
@@ -533,9 +537,23 @@ function captureChecklistScroll(): ChecklistScrollSnapshot {
 }
 
 function measureNaturalColumnHeight(element: HTMLElement): number {
+  const wasConstrained = element.classList.contains('checklist-column-constrained')
+  const previousHeight = element.style.getPropertyValue('--adaptive-column-height')
+  const previousPriority = element.style.getPropertyPriority('--adaptive-column-height')
+  if (wasConstrained) {
+    element.classList.remove('checklist-column-constrained')
+    element.style.removeProperty('--adaptive-column-height')
+  }
   const hiddenListHeight = [...element.querySelectorAll<HTMLElement>('.item-list')]
     .reduce((total, list) => total + Math.max(0, list.scrollHeight - list.clientHeight), 0)
-  return element.scrollHeight + hiddenListHeight
+  const naturalHeight = element.scrollHeight + hiddenListHeight
+  if (wasConstrained) {
+    element.classList.add('checklist-column-constrained')
+    if (previousHeight) {
+      element.style.setProperty('--adaptive-column-height', previousHeight, previousPriority)
+    }
+  }
+  return naturalHeight
 }
 
 function updateAdaptiveColumnLayout(): void {
@@ -546,22 +564,18 @@ function updateAdaptiveColumnLayout(): void {
     return
   }
   const heights = columns.map((element) => measureNaturalColumnHeight(element!))
-  const shorterHeight = Math.min(...heights)
-  const longerIndex = heights[0] > heights[1] ? 0 : 1
-  const minimumUsefulHeight = Math.max(
-    480,
-    Math.round((workspaceElement.value?.clientHeight ?? 800) * 0.55)
-  )
-  if (
-    shorterHeight < minimumUsefulHeight ||
-    Math.abs(heights[0] - heights[1]) < 120
-  ) {
+  const layout = resolveAdaptiveColumnLayout(heights)
+  if (!layout) {
     adaptiveColumnHeight.value = null
     constrainedColumnIndex.value = null
     return
   }
-  adaptiveColumnHeight.value = Math.round(shorterHeight)
-  constrainedColumnIndex.value = longerIndex
+  if (
+    adaptiveColumnHeight.value === layout.height &&
+    constrainedColumnIndex.value === layout.constrainedIndex
+  ) return
+  adaptiveColumnHeight.value = layout.height
+  constrainedColumnIndex.value = layout.constrainedIndex
 }
 
 function scheduleAdaptiveColumnLayout(): void {
@@ -583,8 +597,9 @@ function startAdaptiveColumnObserver(): void {
 
 function setChecklistColumnElement(element: Element | null, index: number): void {
   const previous = checklistColumnElements[index]
-  if (previous && previous !== element) adaptiveResizeObserver?.unobserve(previous)
   const htmlElement = element instanceof HTMLElement ? element : null
+  if (previous === htmlElement) return
+  if (previous) adaptiveResizeObserver?.unobserve(previous)
   checklistColumnElements[index] = htmlElement
   if (htmlElement && index < 2) adaptiveResizeObserver?.observe(htmlElement)
   scheduleAdaptiveColumnLayout()
@@ -1932,7 +1947,7 @@ function showError(error: unknown): void {
           <div
             v-for="(column, columnIndex) in panelColumns"
             :key="columnIndex"
-            :ref="(element) => setChecklistColumnElement(element as Element | null, columnIndex)"
+            :ref="checklistColumnRefSetters[columnIndex]"
             class="checklist-column"
             :class="{
               'checklist-column-wide': columnIndex === panelColumns.length - 1,

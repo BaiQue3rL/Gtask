@@ -78,7 +78,7 @@ const DEFAULT_GAMES: GameSummary[] = [
   }
 ]
 
-export const CURRENT_SCHEMA_VERSION = 25
+export const CURRENT_SCHEMA_VERSION = 26
 
 const AI_AGENT_MAX_AGE_MS = 5 * 60 * 1000
 const AI_JOB_CLAIM_MAX_AGE_MS = 15 * 60 * 1000
@@ -393,6 +393,15 @@ export class AppDatabase {
   getDataVersion(): number {
     const row = this.database.prepare('PRAGMA data_version').get() as { data_version: number }
     return Number(row.data_version)
+  }
+
+  getChecklistRevision(): string {
+    const rows = this.database.prepare(`
+      SELECT id, updated_at AS updatedAt, archived
+      FROM checklist_items
+      ORDER BY id
+    `).all() as Array<{ id: string; updatedAt: string; archived: number }>
+    return createHash('sha256').update(stableJson(rows)).digest('hex')
   }
 
   readConsistently<T>(operation: () => T): T {
@@ -736,6 +745,22 @@ export class AppDatabase {
         }
         if (!draft.kind.trim() || draft.kind.length > 100) throw new Error('语义核验类型格式不正确')
         assertSanitizedSemanticPayload(draft.payload)
+        const sourceIdentity = source === 'personal_sync'
+          ? readSemanticSourceIdentity(draft.kind, draft.payload)
+          : null
+        if (
+          sourceIdentity &&
+          this.hasSyncDeletionTombstone(
+            gameId,
+            this.sourceBindingDeletionKey(
+              sourceIdentity.provider,
+              sourceIdentity.endpoint,
+              sourceIdentity.externalId
+            )
+          )
+        ) {
+          continue
+        }
         const payloadJson = stableJson(draft.payload)
         if (payloadJson.length > 20_000) throw new Error('语义核验候选内容过大')
         const fingerprint = createHash('sha256')
@@ -1101,11 +1126,25 @@ export class AppDatabase {
       let preserved = 0
       for (const draft of drafts) {
         let createdThisDraft = false
+        const identity = readSemanticSourceIdentity(draft.kind, draft.payload)
+        if (
+          identity &&
+          this.hasSyncDeletionTombstone(
+            gameId,
+            this.sourceBindingDeletionKey(
+              identity.provider,
+              identity.endpoint,
+              identity.externalId
+            )
+          )
+        ) {
+          preserved += 1
+          continue
+        }
         if (!this.isCatalogComplete(gameId, draft.target)) {
           remaining.push(draft)
           continue
         }
-        const identity = readSemanticSourceIdentity(draft.kind, draft.payload)
         if (!identity) {
           remaining.push(draft)
           continue
@@ -1119,6 +1158,10 @@ export class AppDatabase {
         let item = binding
           ? this.findActiveChecklistItem(binding.itemId, gameId)
           : null
+        if (binding && !item && this.isArchivedChecklistItem(binding.itemId, gameId)) {
+          preserved += 1
+          continue
+        }
         let hasConflictingMechanicalBinding = false
         if (
           item &&
@@ -3184,11 +3227,66 @@ export class AppDatabase {
   }
 
   emptyRecycleBin(gameId: GameId): number {
-    const result = this.database.prepare(`
-      DELETE FROM checklist_items
-      WHERE game_id = ? AND archived = 1
-    `).run(gameId)
-    return Number(result.changes)
+    return this.runTransaction(() => {
+      const archived = this.database.prepare(`
+        SELECT id, category, remote_key AS remoteKey, source
+        FROM checklist_items
+        WHERE game_id = ? AND archived = 1
+      `).all(gameId) as Array<{
+        id: string
+        category: ChecklistCategory
+        remoteKey: string | null
+        source: ChecklistSource
+      }>
+      if (archived.length === 0) return 0
+      const insertTombstone = this.database.prepare(`
+        INSERT INTO sync_deletion_tombstones(
+          game_id, identity_key, category, deleted_at
+        ) VALUES (?, ?, ?, ?)
+        ON CONFLICT(game_id, identity_key) DO UPDATE SET
+          category = excluded.category,
+          deleted_at = excluded.deleted_at
+      `)
+      const bindings = this.database.prepare(`
+        SELECT provider, endpoint, external_id AS externalId
+        FROM source_bindings
+        WHERE game_id = ? AND item_id = ?
+      `)
+      const now = new Date().toISOString()
+      for (const item of archived) {
+        if (item.source === 'manual') continue
+        if (item.remoteKey) {
+          insertTombstone.run(
+            gameId,
+            this.catalogDeletionKey(item.remoteKey),
+            item.category,
+            now
+          )
+        }
+        const itemBindings = bindings.all(gameId, item.id) as Array<{
+          provider: string
+          endpoint: string
+          externalId: string
+        }>
+        for (const binding of itemBindings) {
+          insertTombstone.run(
+            gameId,
+            this.sourceBindingDeletionKey(
+              binding.provider,
+              binding.endpoint,
+              binding.externalId
+            ),
+            item.category,
+            now
+          )
+        }
+      }
+      this.database.prepare(`
+        DELETE FROM checklist_items
+        WHERE game_id = ? AND archived = 1
+      `).run(gameId)
+      return archived.length
+    })
   }
 
   archiveChecklistItems(ids: string[]): number {
@@ -3295,6 +3393,11 @@ export class AppDatabase {
           Date.parse(item.startsAt!) > Date.parse(syncedAt)
         if (seenRemoteKeys.has(remoteKey)) throw new Error(`同步数据包含重复标识：${remoteKey}`)
         seenRemoteKeys.add(remoteKey)
+
+        if (this.hasSyncDeletionTombstone(gameId, this.catalogDeletionKey(remoteKey))) {
+          result.preserved += 1
+          continue
+        }
 
         const identity = this.findSyncIdentity(
           gameId,
@@ -3744,6 +3847,34 @@ export class AppDatabase {
       item.periodKey ?? null,
       source
     ) as { id: string; archived: number; source: ChecklistSource } | undefined
+  }
+
+  private catalogDeletionKey(remoteKey: string): string {
+    return `catalog:${remoteKey}`
+  }
+
+  private sourceBindingDeletionKey(
+    provider: string,
+    endpoint: string,
+    externalId: string
+  ): string {
+    return `binding:${provider}:${endpoint}:${externalId}`
+  }
+
+  private hasSyncDeletionTombstone(gameId: GameId, identityKey: string): boolean {
+    return Boolean(this.database.prepare(`
+      SELECT 1
+      FROM sync_deletion_tombstones
+      WHERE game_id = ? AND identity_key = ?
+    `).get(gameId, identityKey))
+  }
+
+  private isArchivedChecklistItem(itemId: string, gameId: GameId): boolean {
+    return Boolean(this.database.prepare(`
+      SELECT 1
+      FROM checklist_items
+      WHERE id = ? AND game_id = ? AND archived = 1
+    `).get(itemId, gameId))
   }
 
   private archiveEquivalentPersonalEventDuplicates(
@@ -4965,6 +5096,28 @@ export class AppDatabase {
         );
         INSERT OR IGNORE INTO codex_worker_settings(singleton) VALUES (1);
         INSERT INTO schema_migrations(version) VALUES (25);
+        COMMIT;
+      `)
+    }
+
+    const migration26 = this.database
+      .prepare('SELECT version FROM schema_migrations WHERE version = 26')
+      .get()
+
+    if (!migration26) {
+      this.database.exec(`
+        BEGIN;
+        CREATE TABLE IF NOT EXISTS sync_deletion_tombstones (
+          game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+          identity_key TEXT NOT NULL,
+          category TEXT NOT NULL CHECK (category IN (
+            'main_quest', 'side_quest', 'limited_event',
+            'weekly', 'endgame', 'exploration', 'custom'
+          )),
+          deleted_at TEXT NOT NULL,
+          PRIMARY KEY(game_id, identity_key)
+        );
+        INSERT INTO schema_migrations(version) VALUES (26);
         COMMIT;
       `)
     }
