@@ -781,7 +781,7 @@ describe('本地 MCP server', () => {
         remoteKey: 'event:public:anti-fraud'
       })],
       contract: {
-        schemaVersion: 8,
+        schemaVersion: 9,
         authority: 'interface_contract',
         target: 'events',
         requestContext: {

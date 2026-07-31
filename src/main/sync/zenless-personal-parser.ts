@@ -1,4 +1,8 @@
-import type { NormalizedSyncItem, SemanticReviewDraft } from './types'
+import {
+  officialPersonalFactAuthority,
+  type NormalizedSyncItem,
+  type SemanticReviewDraft
+} from './types'
 import { finiteNumber } from './numbers'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -45,6 +49,12 @@ export function extractZenlessExplorationReviewCandidates(value: unknown): Seman
       target: 'exploration',
       kind: 'personal-map-progress',
       payload: {
+        factAuthority: officialPersonalFactAuthority(
+          'identity',
+          'localized_title',
+          'progress',
+          'hierarchy'
+        ),
         provider: 'miyoushe',
         officialId: `group:${groupId}`,
         officialTitle: groupName,
@@ -67,6 +77,12 @@ export function extractZenlessExplorationReviewCandidates(value: unknown): Seman
         target: 'exploration',
         kind: 'personal-map-progress',
         payload: {
+          factAuthority: officialPersonalFactAuthority(
+            'identity',
+            'localized_title',
+            'progress',
+            'hierarchy'
+          ),
           provider: 'miyoushe',
           officialId: `area:${areaId}`,
           officialTitle: areaName,
@@ -132,6 +148,11 @@ export function extractZenlessEventReviewCandidates(value: unknown): SemanticRev
       target: 'events',
       kind: 'personal-item-semantics',
       payload: {
+        factAuthority: officialPersonalFactAuthority(
+          'identity',
+          'localized_title',
+          'time_window'
+        ),
         sourceContext: 'miyoushe-zenless-event-calendar',
         officialEventId: id,
         title,

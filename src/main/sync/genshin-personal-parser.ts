@@ -1,4 +1,8 @@
-import type { NormalizedSyncItem, SemanticReviewDraft } from './types'
+import {
+  officialPersonalFactAuthority,
+  type NormalizedSyncItem,
+  type SemanticReviewDraft
+} from './types'
 import { finiteNumber } from './numbers'
 
 export interface GenshinPersonalPayload {
@@ -35,6 +39,11 @@ export function extractGenshinEventReviewCandidates(value: unknown): SemanticRev
       target: 'events',
       kind: 'personal-item-semantics',
       payload: {
+        factAuthority: officialPersonalFactAuthority(
+          'identity',
+          'localized_title',
+          'time_window'
+        ),
         sourceContext: 'miyoushe-genshin-event-calendar',
         officialEventId: id,
         title,
@@ -173,6 +182,12 @@ export function extractGenshinExplorationReviewCandidates(
       target: 'exploration',
       kind: 'personal-map-progress',
       payload: {
+        factAuthority: officialPersonalFactAuthority(
+          'identity',
+          'localized_title',
+          'progress',
+          'hierarchy'
+        ),
         provider: 'miyoushe',
         officialId: exploration.id,
         officialTitle: exploration.title,
@@ -198,6 +213,12 @@ export function extractGenshinExplorationReviewCandidates(
         target: 'exploration',
         kind: 'personal-map-progress',
         payload: {
+          factAuthority: officialPersonalFactAuthority(
+            'identity',
+            'localized_title',
+            'progress',
+            'hierarchy'
+          ),
           provider: 'miyoushe',
           officialId: `area:${exploration.id}:${areaId}`,
           officialTitle: title,

@@ -111,6 +111,9 @@ describe('同步接口契约', () => {
   })
 
   it('个人进度契约按版块声明最终决策字段', () => {
+    expect(getSemanticReviewContract('events').schemaVersion).toBe(9)
+    expect(getSemanticReviewContract('events').fieldSemantics.factAuthority)
+      .toContain('无需再次联网证明')
     expect(getSemanticReviewContract('events').requiredDecisionFields)
       .toEqual(expect.arrayContaining(['remoteKey', 'category', 'title']))
     expect(getSemanticReviewContract('events').requiredDecisionFields)

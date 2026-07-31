@@ -55,6 +55,44 @@ export interface ActivityTagUpdate {
   unresolvedReason?: string | null
 }
 
+export type OfficialPersonalFact =
+  | 'identity'
+  | 'localized_title'
+  | 'time_window'
+  | 'progress'
+  | 'hierarchy'
+  | 'challenge_record'
+
+/**
+ * Marks facts that came directly from an authenticated official personal-data
+ * endpoint.  This is deliberately narrower than a semantic verdict: for
+ * example an event's status fields may be authentic while their meaning is
+ * still unknown.
+ */
+export function officialPersonalFactAuthority(
+  ...facts: OfficialPersonalFact[]
+): Record<string, unknown> {
+  return {
+    source: 'official_personal_api',
+    facts: [...new Set(facts)]
+  }
+}
+
+export function hasOfficialPersonalFact(
+  payload: Record<string, unknown>,
+  fact: OfficialPersonalFact
+): boolean {
+  const authority = payload.factAuthority
+  return Boolean(
+    authority &&
+    typeof authority === 'object' &&
+    !Array.isArray(authority) &&
+    (authority as Record<string, unknown>).source === 'official_personal_api' &&
+    Array.isArray((authority as Record<string, unknown>).facts) &&
+    ((authority as Record<string, unknown>).facts as unknown[]).includes(fact)
+  )
+}
+
 export interface SemanticReviewDraft {
   target: Exclude<SyncTarget, 'all' | 'tasks'>
   kind: string

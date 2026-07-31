@@ -1,4 +1,8 @@
-import type { NormalizedSyncItem, SemanticReviewDraft } from './types'
+import {
+  officialPersonalFactAuthority,
+  type NormalizedSyncItem,
+  type SemanticReviewDraft
+} from './types'
 import { finiteNumber } from './numbers'
 
 export interface StarRailPersonalPayload {
@@ -58,6 +62,11 @@ export function extractStarRailEventReviewCandidates(value: unknown): SemanticRe
       target: 'events',
       kind: 'personal-item-semantics',
       payload: {
+        factAuthority: officialPersonalFactAuthority(
+          'identity',
+          'localized_title',
+          'time_window'
+        ),
         sourceContext: 'miyoushe-star-rail-event-calendar',
         officialEventId: id,
         title: title.replaceAll('\\n', ' '),

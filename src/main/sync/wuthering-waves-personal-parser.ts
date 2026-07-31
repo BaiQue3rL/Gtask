@@ -1,4 +1,8 @@
-import type { NormalizedSyncItem, SemanticReviewDraft } from './types'
+import {
+  officialPersonalFactAuthority,
+  type NormalizedSyncItem,
+  type SemanticReviewDraft
+} from './types'
 import { finiteNumber } from './numbers'
 
 export interface WutheringWavesPersonalPayload {
@@ -74,6 +78,12 @@ export function extractWutheringWavesExplorationReviewCandidates(
       target: 'exploration',
       kind: 'personal-map-progress',
       payload: {
+        factAuthority: officialPersonalFactAuthority(
+          'identity',
+          'localized_title',
+          'progress',
+          'hierarchy'
+        ),
         provider: 'kuro-community',
         officialId: countryId,
         officialTitle: countryName,
@@ -90,6 +100,12 @@ export function extractWutheringWavesExplorationReviewCandidates(
         target: 'exploration',
         kind: 'personal-map-progress',
         payload: {
+          factAuthority: officialPersonalFactAuthority(
+            'identity',
+            'localized_title',
+            'progress',
+            'hierarchy'
+          ),
           provider: 'kuro-community',
           officialId: `area:${areaId}`,
           officialTitle: areaName,

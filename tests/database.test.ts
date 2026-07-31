@@ -514,6 +514,11 @@ describe('AppDatabase', () => {
     })
     expect(database.listChecklistItems('star-rail').find((item) => item.remoteKey === reviewedItem.remoteKey))
       .toMatchObject({ completed: false, progressPercent: null })
+    expect(database.getSyncSettings('star-rail')).toMatchObject({
+      status: 'success',
+      message: '个人进度同步完成',
+      lastSuccessAt: '2026-07-23T00:00:00.000Z'
+    })
   })
 
   it('活动完成语义不明确时可提交 unknown 并保留用户当前状态', () => {
@@ -1131,7 +1136,7 @@ describe('AppDatabase', () => {
       }],
       new Date('2026-07-28T03:00:00.000Z')
     )
-    expect(resolved).toEqual({ reviewCandidates: [], applied: 1, preserved: 0 })
+    expect(resolved).toEqual({ reviewCandidates: [], added: 0, applied: 1, preserved: 0 })
     expect(database.listChecklistItems('genshin').find((item) => item.id === map.id))
       .toMatchObject({ progressPercent: 88, completed: false })
     expect(database.getPersonalItemState(accountScope, map.id))
@@ -1163,7 +1168,7 @@ describe('AppDatabase', () => {
         }
       }]
     )
-    expect(first).toEqual({ reviewCandidates: [], applied: 1, preserved: 0 })
+    expect(first).toEqual({ reviewCandidates: [], added: 0, applied: 1, preserved: 0 })
     const item = database.listChecklistItems('genshin').find(
       (candidate) => candidate.remoteKey === 'public-map:inazuma'
     )!
@@ -1207,6 +1212,7 @@ describe('AppDatabase', () => {
     )
     expect(providerHierarchyDiffers).toEqual({
       reviewCandidates: [],
+      added: 0,
       applied: 1,
       preserved: 0
     })
@@ -1262,7 +1268,7 @@ describe('AppDatabase', () => {
       }]
     )
 
-    expect(resolution).toEqual({ reviewCandidates: [], applied: 1, preserved: 0 })
+    expect(resolution).toEqual({ reviewCandidates: [], added: 0, applied: 1, preserved: 0 })
     const item = database.listChecklistItems('star-rail').find(
       (candidate) => candidate.modeKey === 'memory-of-chaos'
     )!
@@ -1273,6 +1279,218 @@ describe('AppDatabase', () => {
       'personal-challenge-record',
       'endgame:memory-of-chaos'
     )).toMatchObject({ itemId: item.id, bindingKind: 'mechanical' })
+  })
+
+  it('官方个人地图结构明确时为基准表增量建项并直接写入探索度', () => {
+    database = new AppDatabase(':memory:')
+    database.recordCatalogCoverage('zenless', 'exploration', 'public_schedule', 'complete')
+    database.mergeSyncedItems('zenless', 'public_schedule', [{
+      remoteKey: 'catalog-map:lemnian-hollow',
+      category: 'exploration',
+      title: '莱姆尼安空洞',
+      mapNodeKind: 'region'
+    }])
+    const accountScope = `miyoushe:${'d'.repeat(64)}`
+    const authority = {
+      source: 'official_personal_api',
+      facts: ['identity', 'localized_title', 'progress', 'hierarchy']
+    }
+    const resolution = database.resolveKnownPersonalDrafts(
+      'zenless',
+      accountScope,
+      [{
+        target: 'exploration',
+        kind: 'personal-map-progress',
+        payload: {
+          factAuthority: authority,
+          provider: 'miyoushe',
+          officialId: 'group:21',
+          officialTitle: '莱姆尼安空洞',
+          observedProgress: 64,
+          observedNodeKind: 'region',
+          observedParentId: null,
+          observedParentTitle: null
+        }
+      }, {
+        target: 'exploration',
+        kind: 'personal-map-progress',
+        payload: {
+          factAuthority: authority,
+          provider: 'miyoushe',
+          officialId: 'area:2109',
+          officialTitle: '[空洞]青溟秘境',
+          observedProgress: 77,
+          observedNodeKind: 'subregion',
+          observedParentId: 'group:21',
+          observedParentTitle: '莱姆尼安空洞'
+        }
+      }]
+    )
+
+    expect(resolution).toEqual({
+      reviewCandidates: [],
+      added: 1,
+      applied: 1,
+      preserved: 0
+    })
+    const child = database.listChecklistItems('zenless').find(
+      (item) => item.title === '[空洞]青溟秘境'
+    )!
+    expect(child).toMatchObject({
+      source: 'personal_sync',
+      mapNodeKind: 'subregion',
+      parentRemoteKey: 'catalog-map:lemnian-hollow',
+      progressPercent: 77,
+      completed: false
+    })
+    expect(database.getSourceBinding(
+      'zenless',
+      'miyoushe',
+      'personal-map-progress',
+      'area:2109'
+    )).toMatchObject({ itemId: child.id, bindingKind: 'mechanical' })
+  })
+
+  it('同一周期模式存在历史期数时只按本期时间窗绑定当前实例', () => {
+    database = new AppDatabase(':memory:')
+    database.recordCatalogCoverage('star-rail', 'cycles', 'public_schedule', 'complete')
+    database.mergeSyncedItems('star-rail', 'public_schedule', [{
+      remoteKey: 'cycle:moc:old',
+      category: 'endgame',
+      title: '混沌回忆·旧期',
+      modeKey: 'memory-of-chaos',
+      periodKey: 'public-old',
+      startsAt: '2026-06-01T00:00:00.000Z',
+      endsAt: '2026-06-30T00:00:00.000Z'
+    }, {
+      remoteKey: 'cycle:moc:current',
+      category: 'endgame',
+      title: '混沌回忆·本期',
+      modeKey: 'memory-of-chaos',
+      periodKey: 'public-current',
+      startsAt: '2026-07-01T00:00:00.000Z',
+      endsAt: '2026-08-01T00:00:00.000Z'
+    }])
+    const resolution = database.resolveKnownPersonalDrafts(
+      'star-rail',
+      `miyoushe:${'1'.repeat(64)}`,
+      [{
+        target: 'cycles',
+        kind: 'personal-challenge-record',
+        payload: {
+          provider: 'miyoushe',
+          observedRemoteKey: 'endgame:memory-of-chaos',
+          observedTitle: '混沌回忆',
+          observedHasChallengeRecord: true,
+          observedStartsAt: '2026-07-01T00:00:00.000Z',
+          observedEndsAt: '2026-08-01T00:00:00.000Z',
+          observedPeriodKey: 'star-rail:memory-of-chaos:88',
+          observedModeKey: 'memory-of-chaos'
+        }
+      }]
+    )
+
+    expect(resolution).toEqual({
+      reviewCandidates: [],
+      added: 0,
+      applied: 1,
+      preserved: 0
+    })
+    const cycles = database.listChecklistItems('star-rail').filter(
+      (item) => item.modeKey === 'memory-of-chaos'
+    )
+    expect(cycles.find((item) => item.remoteKey === 'cycle:moc:old')?.completed).toBe(false)
+    const current = cycles.find((item) => item.remoteKey === 'cycle:moc:current')!
+    expect(current.completed).toBe(true)
+    expect(database.getSourceBinding(
+      'star-rail',
+      'miyoushe',
+      'personal-challenge-record',
+      'endgame:memory-of-chaos|period:star-rail:memory-of-chaos:88'
+    )).toMatchObject({ itemId: current.id })
+  })
+
+  it('官方周期模式、时间窗和挑战记录都明确时直接增量建项', () => {
+    database = new AppDatabase(':memory:')
+    database.recordCatalogCoverage('star-rail', 'cycles', 'public_schedule', 'complete')
+    const accountScope = `miyoushe:${'f'.repeat(64)}`
+    const resolution = database.resolveKnownPersonalDrafts(
+      'star-rail',
+      accountScope,
+      [{
+        target: 'cycles',
+        kind: 'personal-challenge-record',
+        payload: {
+          factAuthority: {
+            source: 'official_personal_api',
+            facts: [
+              'identity',
+              'localized_title',
+              'time_window',
+              'challenge_record'
+            ]
+          },
+          provider: 'miyoushe',
+          observedRemoteKey: 'endgame:apocalyptic-shadow',
+          observedTitle: '末日幻影',
+          observedHasChallengeRecord: true,
+          observedStartsAt: '2026-07-20T20:00:00.000Z',
+          observedEndsAt: '2026-08-02T19:59:59.000Z',
+          observedPeriodKey: 'star-rail:apocalyptic-shadow:77',
+          observedModeKey: 'apocalyptic-shadow'
+        }
+      }]
+    )
+
+    expect(resolution).toEqual({
+      reviewCandidates: [],
+      added: 1,
+      applied: 0,
+      preserved: 0
+    })
+    const item = database.listChecklistItems('star-rail').find(
+      (candidate) => candidate.modeKey === 'apocalyptic-shadow'
+    )!
+    expect(item).toMatchObject({
+      title: '末日幻影',
+      completed: true,
+      source: 'personal_sync',
+      periodKey: 'star-rail:apocalyptic-shadow:77'
+    })
+    expect(database.getPersonalItemState(accountScope, item.id))
+      .toMatchObject({ completionState: 'completed' })
+  })
+
+  it('地图来源没有官方事实标记时不自动扩充基准表', () => {
+    database = new AppDatabase(':memory:')
+    database.recordCatalogCoverage('zenless', 'exploration', 'public_schedule', 'complete')
+    const draft = {
+      target: 'exploration' as const,
+      kind: 'personal-map-progress',
+      payload: {
+        provider: 'miyoushe',
+        officialId: 'area:unknown',
+        officialTitle: '无法确认的地区',
+        observedProgress: 50,
+        observedNodeKind: 'region',
+        observedParentId: null
+      }
+    }
+    const resolution = database.resolveKnownPersonalDrafts(
+      'zenless',
+      `miyoushe:${'e'.repeat(64)}`,
+      [draft]
+    )
+
+    expect(resolution).toEqual({
+      reviewCandidates: [draft],
+      added: 0,
+      applied: 0,
+      preserved: 0
+    })
+    expect(database.listChecklistItems('zenless').some(
+      (item) => item.title === '无法确认的地区'
+    )).toBe(false)
   })
 
   it('可分别取消公开任务与个人语义核验并保留精确的 Agent 范围', () => {

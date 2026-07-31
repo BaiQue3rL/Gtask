@@ -1,4 +1,8 @@
-import type { NormalizedSyncItem, SemanticReviewDraft } from './types'
+import {
+  officialPersonalFactAuthority,
+  type NormalizedSyncItem,
+  type SemanticReviewDraft
+} from './types'
 
 export function toCycleReviewCandidates(
   provider: 'miyoushe' | 'kuro-community',
@@ -10,6 +14,12 @@ export function toCycleReviewCandidates(
       target: 'cycles',
       kind: 'personal-challenge-record',
       payload: {
+        factAuthority: officialPersonalFactAuthority(
+          'identity',
+          'localized_title',
+          'time_window',
+          'challenge_record'
+        ),
         provider,
         observedRemoteKey: item.remoteKey,
         observedTitle: item.title,

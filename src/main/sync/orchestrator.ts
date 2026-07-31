@@ -21,6 +21,7 @@ import {
   type SyncAdapterRegistry
 } from './types'
 import { normalizeSyncItems } from './normalization'
+import { filterRelevantSemanticReviewDrafts } from './personal-review-filter'
 
 const PERSONAL_PLATFORM_NAMES: Record<GameId, string> = {
   genshin: '米游社',
@@ -349,8 +350,9 @@ export class SyncOrchestrator {
                 payload: { normalizedItem: item }
               }]
             : []
-        })
+          })
       ]
+      reviewCandidates = filterRelevantSemanticReviewDrafts(reviewCandidates)
       if (
         source === 'personal_data' &&
         result.accountScope &&
@@ -362,6 +364,7 @@ export class SyncOrchestrator {
           reviewCandidates
         )
         reviewCandidates = resolution.reviewCandidates
+        merge.added += resolution.added
         merge.updated += resolution.applied
         merge.preserved += resolution.preserved
       }

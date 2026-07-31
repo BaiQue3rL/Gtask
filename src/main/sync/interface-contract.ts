@@ -296,7 +296,7 @@ export function getSemanticReviewContract(
       '地图候选只对应规范目录中的一级主地区 region 或其二级地区 subregion。云陵谷、今州城、渊下宫、层岩巨渊·地下矿区等具体地点均应匹配到所属一级主地区下的 subregion。无法确认归属时交叉核验，仍不确定则拒绝，禁止猜测。'
   }
   return {
-    schemaVersion: 8,
+    schemaVersion: 9,
     authority: 'interface_contract',
     decisionAuthority: 'codex',
     executorPolicy: 'mechanical_validation_only',
@@ -306,6 +306,7 @@ export function getSemanticReviewContract(
     requiredDecisionFields: targetFields[target].required,
     conditionalFields: targetFields[target].conditional,
     fieldSemantics: {
+      factAuthority: '候选中 factAuthority.source=official_personal_api 时，facts 列出的 identity、localized_title、time_window、progress、hierarchy 或 challenge_record 是已由登录后的官方接口直接提供并由适配器机械校验的事实，无需再次联网证明。它只证明字段值来自官方，不会把未列出的活动完成语义变成已知。',
       catalogPrerequisite: '个人接口只提供观测值与进度，不决定最终清单目录。应用仅在当前版块的公开规范清单覆盖度为 complete 后开放本候选；空目录或不完整目录会先由公开资料任务建立规范项目，再将个人来源 ID 绑定到规范项目。',
       itemIdentity: identitySemantics[target],
       matchCandidates: '当前版块已有同步清单或与当前地图记录机械筛出的相关子集。提交前必须逐项完成身份核对；个人接口的简称、总称和 provider remoteKey 只是观察值，不代表新事项。新增前必须比较同类别候选的标题核心语义、startsAt/endsAt 时间窗和界面倒计时：名称明显重复且时间窗重叠，或倒计时相同/接近时，默认是同一事项，除非有明确证据证明它们是不同玩法。',

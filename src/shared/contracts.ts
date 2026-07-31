@@ -210,7 +210,7 @@ export interface PublicSyncContract {
 }
 
 export interface SemanticReviewContract {
-  schemaVersion: 8
+  schemaVersion: 9
   authority: 'interface_contract'
   decisionAuthority: 'codex'
   executorPolicy: 'mechanical_validation_only'

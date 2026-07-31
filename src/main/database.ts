@@ -32,13 +32,14 @@ import {
   filterRelevantSemanticReviewDrafts,
   isSemanticReviewDraftRelevant
 } from './sync/personal-review-filter'
-import type {
-  ActivityTagUpdate,
-  CodexArchiveDecision,
-  CodexScheduleItem,
-  NormalizedSyncItem,
-  SemanticReviewDraft,
-  SyncMergeResult
+import {
+  hasOfficialPersonalFact,
+  type ActivityTagUpdate,
+  type CodexArchiveDecision,
+  type CodexScheduleItem,
+  type NormalizedSyncItem,
+  type SemanticReviewDraft,
+  type SyncMergeResult
 } from './sync/types'
 
 const DEFAULT_GAMES: GameSummary[] = [
@@ -80,7 +81,7 @@ export const CURRENT_SCHEMA_VERSION = 24
 
 const AI_AGENT_MAX_AGE_MS = 5 * 60 * 1000
 const AI_JOB_CLAIM_MAX_AGE_MS = 15 * 60 * 1000
-const SEMANTIC_REVIEW_PROTOCOL_VERSION = 'codex-authority-v7'
+const SEMANTIC_REVIEW_PROTOCOL_VERSION = 'codex-authority-v8'
 
 export type PersonalCompletionState = 'completed' | 'incomplete' | 'unknown'
 export type SourceBindingKind = 'mechanical' | 'codex' | 'backfill'
@@ -132,6 +133,7 @@ export interface SemanticProfile {
 
 export interface PersonalDraftResolution {
   reviewCandidates: SemanticReviewDraft[]
+  added: number
   applied: number
   preserved: number
 }
@@ -203,7 +205,13 @@ function readSemanticSourceIdentity(
     payload.observedRemoteKey
   ].find((value) => typeof value === 'string' || typeof value === 'number')
   if (!provider || externalId === undefined) return null
-  const normalizedExternalId = String(externalId).trim()
+  const baseExternalId = String(externalId).trim()
+  const observedPeriodKey = typeof payload.observedPeriodKey === 'string'
+    ? payload.observedPeriodKey.trim()
+    : ''
+  const normalizedExternalId = kind === 'personal-challenge-record' && observedPeriodKey
+    ? `${baseExternalId}|period:${observedPeriodKey}`
+    : baseExternalId
   const endpoint = typeof payload.sourceContext === 'string' && payload.sourceContext.trim()
     ? payload.sourceContext.trim()
     : kind.trim()
@@ -289,6 +297,24 @@ function eventTitlesEquivalent(left: string, right: string): boolean {
   if (normalizedLeft === normalizedRight) return true
   if (Math.min(normalizedLeft.length, normalizedRight.length) < 6) return false
   return normalizedLeft.includes(normalizedRight) || normalizedRight.includes(normalizedLeft)
+}
+
+function itemTimeWindowOverlapsPayload(
+  item: ChecklistItem,
+  payload: Record<string, unknown>
+): boolean {
+  const observedStartsAt = typeof payload.observedStartsAt === 'string'
+    ? Date.parse(payload.observedStartsAt)
+    : Number.NaN
+  const observedEndsAt = typeof payload.observedEndsAt === 'string'
+    ? Date.parse(payload.observedEndsAt)
+    : Number.NaN
+  const itemStartsAt = item.startsAt ? Date.parse(item.startsAt) : Number.NaN
+  const itemEndsAt = item.endsAt ? Date.parse(item.endsAt) : Number.NaN
+  if ([observedStartsAt, observedEndsAt, itemStartsAt, itemEndsAt].some(Number.isNaN)) {
+    return false
+  }
+  return observedStartsAt < itemEndsAt && itemStartsAt < observedEndsAt
 }
 
 function normalizeSourceTitle(value: string): string {
@@ -1034,9 +1060,11 @@ export class AppDatabase {
     assertAccountScope(accountScope)
     return this.runTransaction(() => {
       const remaining: SemanticReviewDraft[] = []
+      let added = 0
       let applied = 0
       let preserved = 0
       for (const draft of drafts) {
+        let createdThisDraft = false
         if (!this.isCatalogComplete(gameId, draft.target)) {
           remaining.push(draft)
           continue
@@ -1069,12 +1097,63 @@ export class AppDatabase {
           const modeKey = typeof draft.payload.observedModeKey === 'string'
             ? draft.payload.observedModeKey.trim()
             : ''
-          const matches = modeKey
+          const observedPeriodKey = typeof draft.payload.observedPeriodKey === 'string'
+            ? draft.payload.observedPeriodKey.trim()
+            : ''
+          const modeMatches = modeKey
             ? this.listChecklistItems(gameId).filter(
                 (candidate) =>
                   candidate.category === 'endgame' &&
                   candidate.source !== 'manual' &&
                   candidate.modeKey === modeKey
+              )
+            : []
+          const periodMatches = observedPeriodKey
+            ? modeMatches.filter((candidate) => candidate.periodKey === observedPeriodKey)
+            : []
+          const overlappingMatches = modeMatches.filter((candidate) =>
+            itemTimeWindowOverlapsPayload(candidate, draft.payload)
+          )
+          const matches = periodMatches.length === 1
+            ? periodMatches
+            : overlappingMatches.length === 1
+              ? overlappingMatches
+              : modeMatches.length === 1
+                ? modeMatches
+                : []
+          if (matches.length === 1) {
+            item = matches[0]
+            binding = this.upsertSourceBinding({
+              gameId,
+              ...identity,
+              itemId: item.id,
+              bindingKind: 'mechanical',
+              confidence: 1
+            }, reference)
+          }
+        }
+        if (!item && !hasConflictingMechanicalBinding && draft.target === 'cycles') {
+          const created = this.createTrustedOfficialCycleItem(
+            gameId,
+            identity,
+            draft.payload,
+            reference
+          )
+          if (created) {
+            item = created.item
+            binding = created.binding
+            added += created.added
+            createdThisDraft = created.added > 0
+          }
+        }
+        if (!item && !hasConflictingMechanicalBinding && draft.target === 'events') {
+          const observedTitle = readObservedTitle(draft.payload)
+          const matches = observedTitle
+            ? this.listChecklistItems(gameId).filter(
+                (candidate) =>
+                  candidate.category === 'limited_event' &&
+                  candidate.source !== 'manual' &&
+                  normalizeSourceTitle(candidate.title) === normalizeSourceTitle(observedTitle)
               )
             : []
           if (matches.length === 1) {
@@ -1128,6 +1207,20 @@ export class AppDatabase {
             }, reference)
           }
         }
+        if (!item && !hasConflictingMechanicalBinding && draft.target === 'exploration') {
+          const created = this.createTrustedOfficialMapItem(
+            gameId,
+            identity,
+            draft.payload,
+            reference
+          )
+          if (created) {
+            item = created.item
+            binding = created.binding
+            added += created.added
+            createdThisDraft = created.added > 0
+          }
+        }
         if (!binding || !item) {
           remaining.push(draft)
           continue
@@ -1160,11 +1253,204 @@ export class AppDatabase {
           observed,
           reference
         )
-        applied += result.applied
+        applied += createdThisDraft ? 0 : result.applied
         preserved += result.preserved
       }
-      return { reviewCandidates: remaining, applied, preserved }
+      return { reviewCandidates: remaining, added, applied, preserved }
     })
+  }
+
+  private createTrustedOfficialMapItem(
+    gameId: GameId,
+    identity: { provider: string; endpoint: string; externalId: string },
+    payload: Record<string, unknown>,
+    reference: Date
+  ): { item: ChecklistItem; binding: SourceBinding; added: number } | null {
+    if (
+      !hasOfficialPersonalFact(payload, 'identity') ||
+      !hasOfficialPersonalFact(payload, 'localized_title') ||
+      !hasOfficialPersonalFact(payload, 'progress') ||
+      !hasOfficialPersonalFact(payload, 'hierarchy')
+    ) {
+      return null
+    }
+    const title = readObservedTitle(payload)
+    const mapNodeKind = readObservedMapNodeKind(payload)
+    const observed = readPersonalDraftState({
+      target: 'exploration',
+      kind: 'personal-map-progress',
+      payload
+    })
+    if (!title || !mapNodeKind || !observed || observed.progressPercent === null) {
+      return null
+    }
+
+    let parent: ChecklistItem | null = null
+    if (mapNodeKind === 'subregion') {
+      const parentId = typeof payload.observedParentId === 'string' ||
+        typeof payload.observedParentId === 'number'
+        ? String(payload.observedParentId).trim()
+        : ''
+      if (!parentId) return null
+      const parentBinding = this.getSourceBinding(
+        gameId,
+        identity.provider,
+        identity.endpoint,
+        parentId
+      )
+      parent = parentBinding
+        ? this.findActiveChecklistItem(parentBinding.itemId, gameId)
+        : null
+      if (!parent) {
+        const parentTitle = typeof payload.observedParentTitle === 'string'
+          ? payload.observedParentTitle.trim()
+          : ''
+        const parentMatches = parentTitle
+          ? this.listChecklistItems(gameId).filter(
+              (candidate) =>
+                candidate.category === 'exploration' &&
+                candidate.source !== 'manual' &&
+                candidate.mapNodeKind === 'region' &&
+                normalizeSourceTitle(candidate.title) === normalizeSourceTitle(parentTitle)
+            )
+          : []
+        if (parentMatches.length !== 1) return null
+        parent = parentMatches[0]
+        this.upsertSourceBinding({
+          gameId,
+          provider: identity.provider,
+          endpoint: identity.endpoint,
+          externalId: parentId,
+          itemId: parent.id,
+          bindingKind: 'mechanical',
+          confidence: 1
+        }, reference)
+      }
+      if (
+        parent.category !== 'exploration' ||
+        parent.mapNodeKind !== 'region' ||
+        !parent.remoteKey
+      ) return null
+    } else if (payload.observedParentId !== null && payload.observedParentId !== undefined) {
+      return null
+    }
+
+    const remoteKey = `personal-map:${createHash('sha256')
+      .update(`${identity.provider}|${identity.endpoint}|${identity.externalId}`)
+      .digest('hex')
+      .slice(0, 32)}`
+    const merge = this.mergeSyncedItems(
+      gameId,
+      'personal_sync',
+      [{
+        remoteKey,
+        category: 'exploration',
+        title,
+        progressPercent: observed.progressPercent,
+        mapNodeKind,
+        parentTitle: parent?.title ?? null,
+        parentRemoteKey: parent?.remoteKey ?? null
+      }],
+      reference.toISOString(),
+      false,
+      {
+        codexReviewed: true,
+        identityPolicy: 'remote-key-only'
+      }
+    )
+    const item = this.findActiveChecklistItemByRemoteKey(gameId, remoteKey)
+    if (!item) return null
+    const binding = this.upsertSourceBinding({
+      gameId,
+      ...identity,
+      itemId: item.id,
+      bindingKind: 'mechanical',
+      confidence: 1
+    }, reference)
+    return { item, binding, added: merge.added }
+  }
+
+  private createTrustedOfficialCycleItem(
+    gameId: GameId,
+    identity: { provider: string; endpoint: string; externalId: string },
+    payload: Record<string, unknown>,
+    reference: Date
+  ): { item: ChecklistItem; binding: SourceBinding; added: number } | null {
+    if (
+      !hasOfficialPersonalFact(payload, 'identity') ||
+      !hasOfficialPersonalFact(payload, 'localized_title') ||
+      !hasOfficialPersonalFact(payload, 'time_window') ||
+      !hasOfficialPersonalFact(payload, 'challenge_record') ||
+      !this.getActiveSemanticProfile(gameId, identity.provider, identity.endpoint)
+    ) {
+      return null
+    }
+    const title = readObservedTitle(payload)
+    const modeKey = typeof payload.observedModeKey === 'string'
+      ? payload.observedModeKey.trim()
+      : ''
+    const periodKey = typeof payload.observedPeriodKey === 'string'
+      ? payload.observedPeriodKey.trim()
+      : ''
+    const startsAt = typeof payload.observedStartsAt === 'string'
+      ? payload.observedStartsAt.trim()
+      : ''
+    const endsAt = typeof payload.observedEndsAt === 'string'
+      ? payload.observedEndsAt.trim()
+      : ''
+    const observed = readPersonalDraftState({
+      target: 'cycles',
+      kind: 'personal-challenge-record',
+      payload
+    })
+    if (
+      !title ||
+      !modeKey ||
+      !periodKey ||
+      !startsAt ||
+      !endsAt ||
+      !observed ||
+      Number.isNaN(Date.parse(startsAt)) ||
+      Number.isNaN(Date.parse(endsAt)) ||
+      Date.parse(startsAt) >= Date.parse(endsAt)
+    ) {
+      return null
+    }
+    const remoteKey = `personal-cycle:${createHash('sha256')
+      .update(`${identity.provider}|${identity.endpoint}|${identity.externalId}|${periodKey}`)
+      .digest('hex')
+      .slice(0, 32)}`
+    const merge = this.mergeSyncedItems(
+      gameId,
+      'personal_sync',
+      [{
+        remoteKey,
+        category: 'endgame',
+        title,
+        completed: observed.completionState === 'completed',
+        startsAt,
+        endsAt,
+        periodKey,
+        scheduleKind: 'remote_schedule',
+        modeKey
+      }],
+      reference.toISOString(),
+      false,
+      {
+        codexReviewed: true,
+        identityPolicy: 'remote-key-only'
+      }
+    )
+    const item = this.findActiveChecklistItemByRemoteKey(gameId, remoteKey)
+    if (!item) return null
+    const binding = this.upsertSourceBinding({
+      gameId,
+      ...identity,
+      itemId: item.id,
+      bindingKind: 'mechanical',
+      confidence: 1
+    }, reference)
+    return { item, binding, added: merge.added }
   }
 
   private isPersonalDraftBindingConsistent(
@@ -1185,6 +1471,10 @@ export class AppDatabase {
         ? draft.payload.observedModeKey.trim()
         : ''
       if (observedModeKey && item.modeKey && observedModeKey !== item.modeKey) return false
+    }
+    if (draft.target === 'events') {
+      const observedTitle = readObservedTitle(draft.payload)
+      if (observedTitle && !eventTitlesEquivalent(observedTitle, item.title)) return false
     }
     return true
   }
@@ -1266,7 +1556,7 @@ export class AppDatabase {
 
   claimSemanticReviewBatch(
     agentId: string,
-    limit = 20,
+    limit = 6,
     reference = new Date()
   ): SemanticReviewCandidate[] {
     if (!Number.isInteger(limit) || limit < 1 || limit > 30) {
@@ -1645,6 +1935,48 @@ export class AppDatabase {
     } else {
       this.recordSyncTargetSuccess(gameId, target, reference)
     }
+    if (latestBatch.requestedAt) {
+      this.settlePersonalSyncOutcomeIfDone(gameId, latestBatch.requestedAt, reference)
+    }
+  }
+
+  private settlePersonalSyncOutcomeIfDone(
+    gameId: GameId,
+    requestedAt: string,
+    reference: Date
+  ): void {
+    const unresolved = this.database.prepare(`
+      SELECT 1
+      FROM semantic_review_candidates
+      WHERE game_id = ? AND source = 'personal_sync'
+        AND requested_at = ? AND status IN ('pending', 'claimed')
+      LIMIT 1
+    `).get(gameId, requestedAt)
+    if (unresolved) return
+    const newerUnresolved = this.database.prepare(`
+      SELECT 1
+      FROM semantic_review_candidates
+      WHERE game_id = ? AND source = 'personal_sync'
+        AND requested_at > ? AND status IN ('pending', 'claimed')
+      LIMIT 1
+    `).get(gameId, requestedAt)
+    if (newerUnresolved) return
+    const rejected = this.database.prepare(`
+      SELECT COUNT(*) AS count
+      FROM semantic_review_candidates
+      WHERE game_id = ? AND source = 'personal_sync'
+        AND requested_at = ? AND status = 'rejected'
+    `).get(gameId, requestedAt) as { count: number }
+    const rejectedCount = Number(rejected.count)
+    this.recordSyncOutcome(
+      gameId,
+      rejectedCount > 0 ? 'stale' : 'success',
+      rejectedCount > 0
+        ? `个人进度同步结束；${rejectedCount} 条记录未能可靠确认，已保留原状态`
+        : '个人进度同步完成',
+      rejectedCount === 0,
+      reference
+    )
   }
 
   private getSemanticReviewCandidate(id: string): SemanticReviewCandidate {
