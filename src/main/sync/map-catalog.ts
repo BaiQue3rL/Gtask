@@ -25,10 +25,10 @@ const MAP_CATALOGS: Record<GameId, readonly MapRegionDefinition[]> = {
         '希汐岛',
         '虚海垒',
         '逐浪野',
-        '烟硙山峰',
+        '烟硌山峰',
         '杜南纳深坑',
         '月之高地',
-        '月落海',
+        '月荡海',
         '月之暗面'
       ]
     },
@@ -282,7 +282,7 @@ const MAP_CATALOGS: Record<GameId, readonly MapRegionDefinition[]> = {
         '浮光林',
         '冰原运输港',
         '加拉尔冠阶',
-        '盲望之塬',
+        '盲望之塌',
         '元林遗址',
         '覆海原',
         '落日堤屿',
@@ -295,8 +295,16 @@ const MAP_CATALOGS: Record<GameId, readonly MapRegionDefinition[]> = {
 }
 
 function stableKey(gameId: GameId, kind: 'region' | 'subregion', identity: string): string {
+  // Correcting a reviewed display name must not change its machine identity.
+  // These legacy spellings were shipped in RC30 and may already have official
+  // provider IDs and personal progress bound to their generated keys.
+  const legacyIdentity = new Map<string, string>([
+    ['genshin\0subregion\0挪德卡莱\0烟硌山峰', '挪德卡莱\0烟硙山峰'],
+    ['genshin\0subregion\0挪德卡莱\0月荡海', '挪德卡莱\0月落海'],
+    ['wuthering-waves\0subregion\0罗伊冰原\0盲望之塌', '罗伊冰原\0盲望之塬']
+  ]).get(`${gameId}\0${kind}\0${identity}`) ?? identity
   const digest = createHash('sha256')
-    .update(`${gameId}\0${kind}\0${identity.normalize('NFKC').trim()}`, 'utf8')
+    .update(`${gameId}\0${kind}\0${legacyIdentity.normalize('NFKC').trim()}`, 'utf8')
     .digest('hex')
     .slice(0, 20)
   return `map-catalog:${gameId}:${kind}:${digest}`

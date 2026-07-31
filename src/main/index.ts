@@ -1006,6 +1006,11 @@ if (!app.requestSingleInstanceLock()) {
     }
     try {
       appDatabase = new AppDatabase(databasePath)
+      for (const gameId of SUPPORTED_GAME_IDS) {
+        if (appDatabase.isCatalogComplete(gameId, 'exploration')) {
+          maintainBundledMapCatalog(appDatabase, gameId, new Date(), false)
+        }
+      }
     } catch (error) {
       dialog.showErrorBox(
         '无法打开本地数据库',
@@ -1186,7 +1191,8 @@ function createAppSyncOrchestrator(database: AppDatabase): SyncOrchestrator {
 function maintainBundledMapCatalog(
   database: AppDatabase,
   gameId: GameId,
-  reference = new Date()
+  reference = new Date(),
+  recordSuccess = true
 ): { added: number; updated: number; preserved: number } {
   const merge = database.mergeSyncedItems(
     gameId,
@@ -1197,6 +1203,6 @@ function maintainBundledMapCatalog(
     { identityPolicy: 'remote-key-only' }
   )
   database.recordCatalogCoverage(gameId, 'exploration', 'public_schedule', 'complete')
-  database.recordSyncTargetSuccess(gameId, 'exploration', reference)
+  if (recordSuccess) database.recordSyncTargetSuccess(gameId, 'exploration', reference)
   return merge
 }

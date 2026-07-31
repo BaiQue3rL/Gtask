@@ -397,7 +397,20 @@ class MiyousheChronicleClient {
   }
 }
 
-export class MiyousheZenlessClient extends MiyousheChronicleClient implements ZenlessBattleChronicleClient {}
+export class MiyousheZenlessClient extends MiyousheChronicleClient implements ZenlessBattleChronicleClient {
+  constructor(
+    cookie: string,
+    fetcher: typeof fetch,
+    solveGeetest?: MiyousheGeetestSolver,
+    reportProgress?: SyncProgressReporter,
+    signal?: AbortSignal
+  ) {
+    // The verification ticket is bound to the same stable device identity as
+    // the battle-record request. Without it, ZZZ commonly accepts the slider
+    // but rejects the immediate retry with retcode 10035.
+    super(cookie, fetcher, solveGeetest, true, reportProgress, signal)
+  }
+}
 
 export class MiyousheGenshinClient extends MiyousheChronicleClient implements GenshinBattleChronicleClient {
   constructor(
@@ -519,7 +532,6 @@ export function createMiyousheZenlessPersonalAdapter(
       credential.value,
       fetcher,
       solveGeetest,
-      false,
       reportProgress,
       signal
     )

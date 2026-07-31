@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { createHash } from 'node:crypto'
 import {
   getBundledMapCatalog,
   getBundledMapCatalogCounts
@@ -38,6 +39,31 @@ describe('bundled map catalog', () => {
     for (const gameId of SUPPORTED_GAME_IDS) {
       expect(getBundledMapCatalog(gameId)).toEqual(getBundledMapCatalog(gameId))
     }
+  })
+
+  it('corrects reviewed display names without changing shipped RC30 identities', () => {
+    const expectedLegacyKey = (
+      gameId: 'genshin' | 'wuthering-waves',
+      identity: string
+    ) => `map-catalog:${gameId}:subregion:${createHash('sha256')
+      .update(`${gameId}\0subregion\0${identity}`, 'utf8')
+      .digest('hex')
+      .slice(0, 20)}`
+
+    const genshin = getBundledMapCatalog('genshin')
+    expect(genshin.find((item) => item.title === '月荡海')?.remoteKey).toBe(
+      expectedLegacyKey('genshin', '挪德卡莱\0月落海')
+    )
+    expect(genshin.find((item) => item.title === '烟硌山峰')?.remoteKey).toBe(
+      expectedLegacyKey('genshin', '挪德卡莱\0烟硙山峰')
+    )
+    expect(genshin.some((item) => ['月落海', '烟硙山峰'].includes(item.title))).toBe(false)
+
+    const wutheringWaves = getBundledMapCatalog('wuthering-waves')
+    expect(wutheringWaves.find((item) => item.title === '盲望之塌')?.remoteKey).toBe(
+      expectedLegacyKey('wuthering-waves', '罗伊冰原\0盲望之塬')
+    )
+    expect(wutheringWaves.some((item) => item.title === '盲望之塬')).toBe(false)
   })
 
   it('keeps the reviewed first-level catalog and representative parent bindings', () => {

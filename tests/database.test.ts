@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AppDatabase, CURRENT_SCHEMA_VERSION } from '../src/main/database'
+import { getBundledMapCatalog } from '../src/main/sync/map-catalog'
 
 let database: AppDatabase | null = null
 let temporaryDirectory: string | null = null
@@ -3487,6 +3488,77 @@ describe('AppDatabase', () => {
 
     expect(result.archived).toBe(2)
     expect(database.listChecklistItems('zenless').some((item) => item.id === child.id)).toBe(false)
+  })
+
+  it('基准地图改名时沿用稳定 ID 并吸收已核验个人项的绑定与进度', () => {
+    database = new AppDatabase(':memory:')
+    const catalog = getBundledMapCatalog('genshin')
+    const parent = catalog.find((item) => item.title === '挪德卡莱')!
+    const corrected = catalog.find((item) => item.title === '月荡海')!
+    database.mergeSyncedItems('genshin', 'public_schedule', [
+      parent,
+      { ...corrected, title: '月落海' }
+    ], '2026-07-31T09:00:00.000Z', true, { identityPolicy: 'remote-key-only' })
+    const canonicalBefore = database.listChecklistItems('genshin')
+      .find((item) => item.remoteKey === corrected.remoteKey)!
+
+    database.mergeSyncedItems('genshin', 'personal_sync', [{
+      ...corrected,
+      remoteKey: 'area:17:title:月荡海',
+      modeKey: 'area:17:title:月荡海',
+      progressPercent: 30.8
+    }], '2026-07-31T10:00:00.000Z', true, {
+      codexReviewed: true,
+      identityPolicy: 'remote-key-only'
+    })
+    const duplicate = database.listChecklistItems('genshin')
+      .find((item) => item.remoteKey === 'area:17:title:月荡海')!
+    const accountScope = `miyoushe:${'a'.repeat(64)}`
+    database.upsertSourceBinding({
+      gameId: 'genshin',
+      provider: 'miyoushe',
+      endpoint: 'personal-map-progress',
+      externalId: 'area:17',
+      itemId: duplicate.id,
+      bindingKind: 'codex',
+      confidence: 1
+    }, new Date('2026-07-31T10:00:00.000Z'))
+    database.upsertPersonalItemState({
+      accountScope,
+      gameId: 'genshin',
+      itemId: duplicate.id,
+      provider: 'miyoushe',
+      endpoint: 'personal-map-progress',
+      externalId: 'area:17',
+      completionState: 'incomplete',
+      progressPercent: 30.8,
+      observedAt: '2026-07-31T10:00:00.000Z'
+    }, new Date('2026-07-31T10:00:00.000Z'))
+
+    database.mergeSyncedItems('genshin', 'public_schedule', [corrected],
+      '2026-07-31T11:00:00.000Z', true, { identityPolicy: 'remote-key-only' })
+
+    const canonicalAfter = database.listChecklistItems('genshin')
+      .find((item) => item.remoteKey === corrected.remoteKey)!
+    expect(canonicalAfter).toMatchObject({
+      id: canonicalBefore.id,
+      title: '月荡海',
+      progressPercent: 30.8,
+      completed: false
+    })
+    expect(database.getSourceBinding(
+      'genshin',
+      'miyoushe',
+      'personal-map-progress',
+      'area:17'
+    )?.itemId).toBe(canonicalAfter.id)
+    expect(database.getPersonalItemState(accountScope, canonicalAfter.id)).toMatchObject({
+      progressPercent: 30.8,
+      itemId: canonicalAfter.id
+    })
+    expect(database.listArchivedChecklistItems('genshin').some(
+      (item) => item.id === duplicate.id
+    )).toBe(true)
   })
 
   it('原神周期同步接受 Codex 判定的清单并自动补齐周常', () => {

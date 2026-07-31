@@ -74,6 +74,31 @@ describe('MiyousheZenlessClient', () => {
     expect(headers.get('ds')).toMatch(/^\d+,\d+,[0-9a-f]{32}$/)
   })
 
+  it('uses one stable device identity for ZZZ battle records and verification', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(response({ retcode: 0, data: { list: [
+        { game_biz: 'nap_cn', game_uid: '10194867', region: 'prod_gf_cn' }
+      ] } }))
+      .mockResolvedValueOnce(response({ retcode: 0, data: { device_fp: 'verified-device-fp' } }))
+      .mockResolvedValueOnce(response({ retcode: 0, data: { area_collections: [] } }))
+    const client = new MiyousheZenlessClient(
+      'account_id_v2=123456; cookie_token_v2=secret',
+      fetcher
+    )
+
+    await expect(client.getZenlessExploration()).resolves.toEqual({ area_collections: [] })
+
+    expect(String(fetcher.mock.calls[1][0])).toBe(
+      'https://public-data-api.mihoyo.com/device-fp/api/getFp'
+    )
+    const fingerprintBody = JSON.parse(String(fetcher.mock.calls[1][1]?.body)) as {
+      device_id: string
+    }
+    const recordHeaders = new Headers(fetcher.mock.calls[2][1]?.headers)
+    expect(recordHeaders.get('x-rpc-device_id')).toBe(fingerprintBody.device_id.toLowerCase())
+    expect(recordHeaders.get('x-rpc-device_fp')).toBe('verified-device-fp')
+  })
+
   it('maps Geetest and invalid sessions to verification_required errors', async () => {
     const geetestFetcher = vi.fn<typeof fetch>().mockResolvedValue(
       response({ retcode: 10035, message: 'Verification is required', data: null })
@@ -254,7 +279,6 @@ describe('MiyousheZenlessClient', () => {
       'cookie=secret',
       fetcher,
       solver,
-      false,
       (update) => progress.push(update)
     )
 

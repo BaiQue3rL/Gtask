@@ -3139,6 +3139,14 @@ export class AppDatabase {
             syncedAt
           )
         }
+        if (item.category === 'exploration' && source === 'public_schedule') {
+          this.absorbEquivalentPersonalMapDuplicates(
+            gameId,
+            current.id,
+            item,
+            syncedAt
+          )
+        }
         if (completionProtected) result.preserved += 1
       }
       if (manageTransaction) this.database.exec('COMMIT')
@@ -3415,6 +3423,144 @@ export class AppDatabase {
       WHERE id = ? AND source = 'personal_sync' AND archived = 0
     `)
     for (const id of ids) statement.run(syncedAt, id)
+  }
+
+  private absorbEquivalentPersonalMapDuplicates(
+    gameId: GameId,
+    preservedId: string,
+    item: NormalizedSyncItem,
+    syncedAt: string
+  ): void {
+    const candidates = this.database.prepare(`
+      SELECT id, progress_percent AS progressPercent, completed,
+        completed_at AS completedAt, last_synced_at AS lastSyncedAt,
+        updated_at AS updatedAt
+      FROM checklist_items
+      WHERE game_id = ?
+        AND id <> ?
+        AND category = 'exploration'
+        AND source = 'personal_sync'
+        AND archived = 0
+        AND title = ?
+        AND COALESCE(map_node_kind, 'region') = ?
+        AND (
+          (? IS NULL AND parent_remote_key IS NULL)
+          OR (
+            ? IS NOT NULL
+            AND (parent_remote_key = ? OR parent_title = ?)
+          )
+        )
+    `).all(
+      gameId,
+      preservedId,
+      item.title,
+      item.mapNodeKind ?? 'region',
+      item.parentRemoteKey ?? null,
+      item.parentRemoteKey ?? null,
+      item.parentRemoteKey ?? null,
+      item.parentTitle ?? null
+    ) as Array<{
+      id: string
+      progressPercent: number | null
+      completed: number
+      completedAt: string | null
+      lastSyncedAt: string | null
+      updatedAt: string
+    }>
+    if (candidates.length === 0) return
+
+    const moveBinding = this.database.prepare(`
+      UPDATE source_bindings
+      SET item_id = ?, updated_at = ?
+      WHERE game_id = ? AND item_id = ?
+    `)
+    const moveObservation = this.database.prepare(`
+      UPDATE sync_observations
+      SET item_id = ?
+      WHERE game_id = ? AND item_id = ?
+    `)
+    const archive = this.database.prepare(`
+      UPDATE checklist_items
+      SET archived = 1, updated_at = ?
+      WHERE id = ? AND source = 'personal_sync' AND archived = 0
+    `)
+    for (const candidate of candidates) {
+      const states = this.database.prepare(`
+        SELECT account_scope AS accountScope, provider, endpoint,
+          external_id AS externalId, completion_state AS completionState,
+          progress_percent AS progressPercent, observed_at AS observedAt,
+          updated_at AS updatedAt
+        FROM personal_item_states
+        WHERE game_id = ? AND item_id = ?
+      `).all(gameId, candidate.id) as Array<{
+        accountScope: string
+        provider: string
+        endpoint: string
+        externalId: string
+        completionState: PersonalCompletionState
+        progressPercent: number | null
+        observedAt: string
+        updatedAt: string
+      }>
+      for (const state of states) {
+        const existing = this.getPersonalItemState(state.accountScope, preservedId)
+        if (!existing || Date.parse(state.observedAt) >= Date.parse(existing.observedAt)) {
+          this.upsertPersonalItemState({
+            accountScope: state.accountScope,
+            gameId,
+            itemId: preservedId,
+            provider: state.provider,
+            endpoint: state.endpoint,
+            externalId: state.externalId,
+            completionState: state.completionState,
+            progressPercent: state.progressPercent,
+            observedAt: state.observedAt
+          }, new Date(state.updatedAt))
+        }
+      }
+      this.database.prepare(`
+        DELETE FROM personal_item_states WHERE game_id = ? AND item_id = ?
+      `).run(gameId, candidate.id)
+      moveBinding.run(preservedId, syncedAt, gameId, candidate.id)
+      moveObservation.run(preservedId, gameId, candidate.id)
+      archive.run(syncedAt, candidate.id)
+    }
+
+    const latestState = this.database.prepare(`
+      SELECT progress_percent AS progressPercent, completion_state AS completionState,
+        observed_at AS observedAt
+      FROM personal_item_states
+      WHERE game_id = ? AND item_id = ? AND progress_percent IS NOT NULL
+      ORDER BY observed_at DESC
+      LIMIT 1
+    `).get(gameId, preservedId) as {
+      progressPercent: number
+      completionState: PersonalCompletionState
+      observedAt: string
+    } | undefined
+    const fallback = candidates
+      .filter((candidate) => candidate.progressPercent !== null)
+      .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))[0]
+    const progressPercent = latestState?.progressPercent ?? fallback?.progressPercent
+    if (progressPercent === undefined || progressPercent === null) return
+    const completed = latestState
+      ? latestState.completionState === 'completed' || progressPercent === 100
+      : Boolean(fallback?.completed) || progressPercent === 100
+    this.database.prepare(`
+      UPDATE checklist_items
+      SET progress_percent = ?, completed = ?,
+        completed_at = CASE WHEN ? = 1 THEN COALESCE(completed_at, ?) ELSE NULL END,
+        last_synced_at = COALESCE(?, last_synced_at), updated_at = ?
+      WHERE id = ? AND archived = 0
+    `).run(
+      progressPercent,
+      completed ? 1 : 0,
+      completed ? 1 : 0,
+      latestState?.observedAt ?? fallback?.completedAt ?? syncedAt,
+      latestState?.observedAt ?? fallback?.lastSyncedAt ?? null,
+      syncedAt,
+      preservedId
+    )
   }
 
   resetDueWeeklyItems(reference = new Date()): number {
