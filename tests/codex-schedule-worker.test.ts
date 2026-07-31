@@ -2,11 +2,13 @@ import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import { describe, expect, it } from 'vitest'
 import type { ChildProcess, spawn } from 'node:child_process'
+import type { CodexWorkerPreferences } from '../src/shared/contracts'
 import {
   CODEX_SCHEDULE_WORKER_AGENT_ID,
   CodexDynamicConcurrencyController,
   CodexScheduleWorker,
   CodexScheduleWorkerPool,
+  codexWorkerInferenceArguments,
   codexWorkerTransportArguments,
   codexScheduleWorkerAgentId,
   desiredCodexWorkerCount,
@@ -92,6 +94,19 @@ describe('Codex schedule worker', () => {
     expect(args).toContain(
       'model_providers.gacha-chatgpt-http.base_url="https://chatgpt.com/backend-api/codex"'
     )
+  })
+
+  it('applies Gtask-only model and reasoning overrides without changing global config', () => {
+    expect(codexWorkerInferenceArguments()).toEqual([])
+    expect(codexWorkerInferenceArguments({
+      model: 'gpt-5.6-sol',
+      reasoningEffort: 'ultra'
+    })).toEqual([
+      '--model',
+      'gpt-5.6-sol',
+      '-c',
+      'model_reasoning_effort="ultra"'
+    ])
   })
 
   it('prefers an explicit Codex CLI path', () => {
@@ -199,6 +214,43 @@ describe('Codex schedule worker', () => {
       message: '未找到本机 Codex CLI；请先安装或登录 Codex 后重试',
       executablePath: null
     })
+  })
+
+  it('reads the latest Gtask inference preference for every new worker launch', () => {
+    const children: FakeChildProcess[] = []
+    const launches: string[][] = []
+    let preferences: CodexWorkerPreferences = {
+      model: 'gpt-5.6-sol',
+      reasoningEffort: 'high'
+    }
+    const spawnProcess = ((_command: string, args: readonly string[] = []) => {
+      launches.push([...args])
+      const child = new FakeChildProcess()
+      children.push(child)
+      return child as unknown as ChildProcess
+    }) as unknown as typeof spawn
+    const worker = new CodexScheduleWorker({
+      workingDirectory: 'C:\\GachaData',
+      findExecutable: () => 'C:\\Codex\\codex.exe',
+      spawnProcess,
+      resolvePreferences: () => preferences
+    })
+
+    worker.start()
+    expect(launches[0]).toEqual(expect.arrayContaining([
+      '--model',
+      'gpt-5.6-sol',
+      'model_reasoning_effort="high"'
+    ]))
+    children[0].exitCode = 0
+    children[0].emit('exit', 0)
+    preferences = { model: 'gpt-5.6-terra', reasoningEffort: 'ultra' }
+    worker.start()
+    expect(launches[1]).toEqual(expect.arrayContaining([
+      '--model',
+      'gpt-5.6-terra',
+      'model_reasoning_effort="ultra"'
+    ]))
   })
 
   it('starts up to the dynamic ceiling with uniquely identified workers', () => {

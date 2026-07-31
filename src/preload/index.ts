@@ -18,6 +18,9 @@ const gachaApi: GachaApi = {
   openCodexPlugin: () => ipcRenderer.invoke('codex-plugin:open'),
   updateCodexPlugin: () => ipcRenderer.invoke('codex-plugin:update'),
   repairCodexConnection: (mode) => ipcRenderer.invoke('codex-proxy:repair', mode),
+  getCodexWorkerPreferences: () => ipcRenderer.invoke('codex-worker:get-preferences'),
+  updateCodexWorkerPreferences: (preferences) =>
+    ipcRenderer.invoke('codex-worker:update-preferences', preferences),
   listGames: () => ipcRenderer.invoke('games:list'),
   listChecklistItems: (gameId) => ipcRenderer.invoke('checklist:list', gameId),
   listArchivedChecklistItems: (gameId) => ipcRenderer.invoke('checklist:list-archived', gameId),

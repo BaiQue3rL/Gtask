@@ -10,6 +10,7 @@ import type {
   ActivityTagEnrichmentTarget,
   AiScheduleAgentStatus,
   AiScheduleJob,
+  CodexWorkerPreferences,
   CreateChecklistItemInput,
   GameId,
   GameSummary,
@@ -77,7 +78,7 @@ const DEFAULT_GAMES: GameSummary[] = [
   }
 ]
 
-export const CURRENT_SCHEMA_VERSION = 24
+export const CURRENT_SCHEMA_VERSION = 25
 
 const AI_AGENT_MAX_AGE_MS = 5 * 60 * 1000
 const AI_JOB_CLAIM_MAX_AGE_MS = 15 * 60 * 1000
@@ -433,6 +434,29 @@ export class AppDatabase {
         (row as { initialGuideDismissed: number }).initialGuideDismissed
       )
     }
+  }
+
+  getCodexWorkerPreferences(): CodexWorkerPreferences {
+    const row = this.database.prepare(`
+      SELECT model, reasoning_effort AS reasoningEffort
+      FROM codex_worker_settings
+      WHERE singleton = 1
+    `).get() as CodexWorkerPreferences | undefined
+    if (!row) throw new Error('Codex 后台设置不存在')
+    return row
+  }
+
+  updateCodexWorkerPreferences(
+    preferences: CodexWorkerPreferences,
+    reference = new Date()
+  ): CodexWorkerPreferences {
+    const result = this.database.prepare(`
+      UPDATE codex_worker_settings
+      SET model = ?, reasoning_effort = ?, updated_at = ?
+      WHERE singleton = 1
+    `).run(preferences.model, preferences.reasoningEffort, reference.toISOString())
+    if (result.changes !== 1) throw new Error('Codex 后台设置不存在')
+    return this.getCodexWorkerPreferences()
   }
 
   dismissInitialSyncGuide(gameId: GameId, reference = new Date()): SyncSettings {
@@ -4918,6 +4942,29 @@ export class AppDatabase {
             related_region_remote_key = NULL
         WHERE category = 'exploration';
         INSERT INTO schema_migrations(version) VALUES (24);
+        COMMIT;
+      `)
+    }
+
+    const migration25 = this.database
+      .prepare('SELECT version FROM schema_migrations WHERE version = 25')
+      .get()
+
+    if (!migration25) {
+      this.database.exec(`
+        BEGIN;
+        CREATE TABLE IF NOT EXISTS codex_worker_settings (
+          singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+          model TEXT NOT NULL DEFAULT 'inherit'
+            CHECK (model IN ('inherit', 'gpt-5.6-sol', 'gpt-5.6-terra')),
+          reasoning_effort TEXT NOT NULL DEFAULT 'inherit'
+            CHECK (reasoning_effort IN (
+              'inherit', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'
+            )),
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT OR IGNORE INTO codex_worker_settings(singleton) VALUES (1);
+        INSERT INTO schema_migrations(version) VALUES (25);
         COMMIT;
       `)
     }

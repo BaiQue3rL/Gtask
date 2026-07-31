@@ -1,6 +1,8 @@
 import {
   CHECKLIST_CATEGORIES,
   CHECKLIST_SECTIONS,
+  CODEX_REASONING_EFFORTS,
+  CODEX_WORKER_MODELS,
   CREDENTIAL_PROVIDERS,
   MAP_NODE_KINDS,
   SCHEDULE_KINDS,
@@ -10,6 +12,7 @@ import {
   SUPPORTED_GAME_IDS,
   type ChecklistCategory,
   type ChecklistSection,
+  type CodexWorkerPreferences,
   type CredentialProvider,
   type CreateChecklistItemInput,
   type GameId,
@@ -265,4 +268,26 @@ export function parseExternalUrl(value: unknown): string {
   }
   if (!['http:', 'https:'].includes(url.protocol)) throw new Error('仅允许打开 HTTP/HTTPS 链接')
   return url.toString()
+}
+
+export function parseCodexWorkerPreferences(value: unknown): CodexWorkerPreferences {
+  if (!isRecord(value)) throw new Error('Codex 后台设置格式不正确')
+  if (
+    typeof value.model !== 'string' ||
+    !CODEX_WORKER_MODELS.includes(value.model as CodexWorkerPreferences['model'])
+  ) {
+    throw new Error('不支持的 Codex 后台模型')
+  }
+  if (
+    typeof value.reasoningEffort !== 'string' ||
+    !CODEX_REASONING_EFFORTS.includes(
+      value.reasoningEffort as CodexWorkerPreferences['reasoningEffort']
+    )
+  ) {
+    throw new Error('不支持的 Codex 推理强度')
+  }
+  return {
+    model: value.model as CodexWorkerPreferences['model'],
+    reasoningEffort: value.reasoningEffort as CodexWorkerPreferences['reasoningEffort']
+  }
 }

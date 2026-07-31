@@ -77,6 +77,7 @@ import {
 } from '../shared/contracts'
 import {
   parseChecklistSection,
+  parseCodexWorkerPreferences,
   parseCredentialProvider,
   parseExternalUrl,
   parseCreateChecklistItem,
@@ -193,6 +194,10 @@ function createCodexWorkerPool(): CodexScheduleWorkerPool {
     workingDirectory: app.getPath('userData'),
     env: codexWorkerEnvironment,
     transportMode: codexWorkerTransportMode,
+    resolvePreferences: () => appDatabase?.getCodexWorkerPreferences() ?? {
+      model: 'inherit',
+      reasoningEffort: 'inherit'
+    },
     onEvent: handleCodexScheduleWorkerEvent
   })
 }
@@ -660,6 +665,14 @@ function registerIpcHandlers(): void {
       ...appDatabase.getAiScheduleAgentStatus(),
       codexPluginInstalled: detectCodexPlugin({ appMarketplacePath }).installed
     }
+  })
+  ipcMain.handle('codex-worker:get-preferences', () => {
+    if (!appDatabase) throw new Error('数据库尚未初始化')
+    return appDatabase.getCodexWorkerPreferences()
+  })
+  ipcMain.handle('codex-worker:update-preferences', (_event, value: unknown) => {
+    if (!appDatabase) throw new Error('数据库尚未初始化')
+    return appDatabase.updateCodexWorkerPreferences(parseCodexWorkerPreferences(value))
   })
   ipcMain.handle('ai-schedule:get-active-job', (
     _event,

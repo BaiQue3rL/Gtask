@@ -36,6 +36,24 @@ export type ScheduleKind = (typeof SCHEDULE_KINDS)[number]
 export const CREDENTIAL_PROVIDERS = ['miyoushe', 'kuro-community'] as const
 export type CredentialProvider = (typeof CREDENTIAL_PROVIDERS)[number]
 
+export const CODEX_WORKER_MODELS = ['inherit', 'gpt-5.6-sol', 'gpt-5.6-terra'] as const
+export type CodexWorkerModel = (typeof CODEX_WORKER_MODELS)[number]
+export const CODEX_REASONING_EFFORTS = [
+  'inherit',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+  'ultra'
+] as const
+export type CodexReasoningEffort = (typeof CODEX_REASONING_EFFORTS)[number]
+
+export interface CodexWorkerPreferences {
+  model: CodexWorkerModel
+  reasoningEffort: CodexReasoningEffort
+}
+
 export interface CredentialStatus {
   provider: CredentialProvider
   stored: boolean
@@ -443,6 +461,10 @@ export interface GachaApi {
   repairCodexConnection: (
     mode: CodexConnectionRepairMode
   ) => Promise<CodexConnectionRepairResult>
+  getCodexWorkerPreferences: () => Promise<CodexWorkerPreferences>
+  updateCodexWorkerPreferences: (
+    preferences: CodexWorkerPreferences
+  ) => Promise<CodexWorkerPreferences>
   listGames: () => Promise<GameSummary[]>
   listChecklistItems: (gameId: GameId) => Promise<ChecklistItem[]>
   listArchivedChecklistItems: (gameId: GameId) => Promise<ChecklistItem[]>

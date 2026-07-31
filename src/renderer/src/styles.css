@@ -345,6 +345,14 @@ h2 { margin: 0; font-size: 19px; }
 .ai-provider-heading span { color: #728aa7; font-size: 11px; }
 .ai-provider-heading button, .secret-input-row button { flex: 0 0 auto; padding: 7px 11px; border-radius: 6px; cursor: pointer; }
 .ai-provider-heading button:disabled, .secret-input-row button:disabled { cursor: not-allowed; opacity: 0.4; }
+.codex-runtime-settings { display: grid; gap: 10px; margin-top: 2px; padding-top: 12px; border-top: 1px solid rgba(55, 83, 113, .68); }
+.codex-runtime-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.codex-runtime-grid label { display: grid; gap: 6px; margin: 0; color: #8fa5bf; font-size: 11px; }
+.codex-runtime-grid select { box-sizing: border-box; width: 100%; height: var(--control-height); padding: 0 30px 0 11px; border: 1px solid #345270; border-radius: 7px; outline: none; color: #dce9f8; background: #09192e; }
+.codex-runtime-grid select:focus { border-color: #5d91d3; }
+.codex-runtime-footer { display: flex; min-height: var(--control-height); align-items: center; justify-content: space-between; gap: 12px; }
+.codex-runtime-footer span { min-width: 0; color: #7189a7; font-size: 11px; line-height: 1.45; }
+.settings-action-button { box-sizing: border-box; flex: 0 0 auto; width: 96px; height: var(--control-height); padding: 0 12px; border-radius: 7px; cursor: pointer; }
 .secret-input-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; }
 .secret-input-row input { min-width: 0; }
 .connection-note { margin: 0; font-size: 11px; }

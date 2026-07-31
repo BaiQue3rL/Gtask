@@ -17,6 +17,22 @@ afterEach(() => {
 })
 
 describe('AppDatabase', () => {
+  it('持久化仅供 Gtask 后台使用的 Codex 推理设置', () => {
+    database = new AppDatabase(':memory:')
+    expect(database.getCodexWorkerPreferences()).toEqual({
+      model: 'inherit',
+      reasoningEffort: 'inherit'
+    })
+
+    expect(database.updateCodexWorkerPreferences({
+      model: 'gpt-5.6-terra',
+      reasoningEffort: 'xhigh'
+    })).toEqual({
+      model: 'gpt-5.6-terra',
+      reasoningEffort: 'xhigh'
+    })
+  })
+
   it('新用户只初始化四款游戏的主线和支线状态', () => {
     database = new AppDatabase(':memory:')
 

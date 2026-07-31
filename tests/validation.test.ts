@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   parseChecklistSection,
+  parseCodexWorkerPreferences,
   parseCreateChecklistItem,
   parseExternalUrl,
   parseGameId,
@@ -50,6 +51,25 @@ describe('清单 IPC 参数校验', () => {
     expect(parseSyncScope('public_and_personal')).toBe('public_and_personal')
     expect(() => parseSyncRunMode('startup')).toThrow('不支持的同步运行模式')
     expect(() => parseSyncScope('personal_only')).toThrow('不支持的同步范围')
+  })
+
+  it('只接受 Gtask 支持的 Codex 模型与推理强度', () => {
+    expect(parseCodexWorkerPreferences({
+      model: 'gpt-5.6-sol',
+      reasoningEffort: 'high'
+    })).toEqual({ model: 'gpt-5.6-sol', reasoningEffort: 'high' })
+    expect(parseCodexWorkerPreferences({
+      model: 'inherit',
+      reasoningEffort: 'inherit'
+    })).toEqual({ model: 'inherit', reasoningEffort: 'inherit' })
+    expect(() => parseCodexWorkerPreferences({
+      model: 'unknown-model',
+      reasoningEffort: 'high'
+    })).toThrow('不支持的 Codex 后台模型')
+    expect(() => parseCodexWorkerPreferences({
+      model: 'gpt-5.6-terra',
+      reasoningEffort: 'extreme'
+    })).toThrow('不支持的 Codex 推理强度')
   })
 
   it('拒绝非法时间和结束早于开始的事项', () => {

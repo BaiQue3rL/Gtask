@@ -8,6 +8,7 @@ import type {
   ChecklistCategory,
   ChecklistItem,
   ChecklistSection,
+  CodexWorkerPreferences,
   CreateChecklistItemInput,
   CredentialProvider,
   CredentialStatus,
@@ -213,6 +214,12 @@ const codexRepairStage = ref<'none' | 'proxy_applied' | 'https_applied'>('none')
 const codexRepairBusy = ref(false)
 const codexPluginBusy = ref(false)
 const codexPluginMessage = ref('')
+const codexWorkerPreferences = ref<CodexWorkerPreferences>({
+  model: 'inherit',
+  reasoningEffort: 'inherit'
+})
+const codexWorkerPreferencesBusy = ref(false)
+const codexWorkerPreferencesMessage = ref('')
 let miyousheLoginTimer: number | null = null
 let semanticReviewTimer: number | null = null
 const personalReviewTotals = new Map<string, number>()
@@ -919,10 +926,15 @@ async function loadArchivedItems(): Promise<void> {
 async function openSettings(): Promise<void> {
   settingsOpen.value = true
   try {
-    ;[credentialStatuses.value, backups.value] = await Promise.all([
+    const [statuses, listedBackups, preferences] = await Promise.all([
       window.gacha.listCredentialStatuses(),
-      window.gacha.listBackups()
+      window.gacha.listBackups(),
+      window.gacha.getCodexWorkerPreferences()
     ])
+    credentialStatuses.value = statuses
+    backups.value = listedBackups
+    codexWorkerPreferences.value = preferences
+    codexWorkerPreferencesMessage.value = ''
   } catch (error) {
     showError(error)
   }
@@ -1194,6 +1206,23 @@ async function updateCodexPlugin(): Promise<void> {
     showError(error)
   } finally {
     codexPluginBusy.value = false
+  }
+}
+
+async function saveCodexWorkerPreferences(): Promise<void> {
+  if (codexWorkerPreferencesBusy.value) return
+  codexWorkerPreferencesBusy.value = true
+  codexWorkerPreferencesMessage.value = '正在保存…'
+  try {
+    codexWorkerPreferences.value = await window.gacha.updateCodexWorkerPreferences(
+      codexWorkerPreferences.value
+    )
+    codexWorkerPreferencesMessage.value = '已保存，新启动的后台同步任务将使用此设置。'
+  } catch (error) {
+    codexWorkerPreferencesMessage.value = ''
+    showError(error)
+  } finally {
+    codexWorkerPreferencesBusy.value = false
   }
 }
 
@@ -2269,6 +2298,39 @@ function showError(error: unknown): void {
                 : aiScheduleAgent?.codexPluginInstalled
                   ? '已安装 · 同步时将自动启动 Codex'
                   : '未安装或未启用' }}</span>
+            </div>
+          </div>
+          <div class="codex-runtime-settings">
+            <div class="codex-runtime-grid">
+              <label>
+                <span>后台模型</span>
+                <select v-model="codexWorkerPreferences.model">
+                  <option value="inherit">跟随 Codex 默认</option>
+                  <option value="gpt-5.6-sol">GPT-5.6-Sol · 准确优先</option>
+                  <option value="gpt-5.6-terra">GPT-5.6-Terra · 速度均衡</option>
+                </select>
+              </label>
+              <label>
+                <span>推理强度</span>
+                <select v-model="codexWorkerPreferences.reasoningEffort">
+                  <option value="inherit">跟随 Codex 默认</option>
+                  <option value="low">低</option>
+                  <option value="medium">中</option>
+                  <option value="high">高</option>
+                  <option value="xhigh">极高</option>
+                  <option value="max">最大</option>
+                  <option value="ultra">Ultra</option>
+                </select>
+              </label>
+            </div>
+            <div class="codex-runtime-footer">
+              <span>{{ codexWorkerPreferencesMessage || '仅影响 Gtask 后台任务，不修改 Codex 全局配置。' }}</span>
+              <button
+                class="primary-button settings-action-button"
+                type="button"
+                :disabled="codexWorkerPreferencesBusy"
+                @click="saveCodexWorkerPreferences"
+              >{{ codexWorkerPreferencesBusy ? '保存中…' : '保存设置' }}</button>
             </div>
           </div>
           <div v-if="!aiScheduleAgent?.codexPluginInstalled" class="codex-setup-guide">

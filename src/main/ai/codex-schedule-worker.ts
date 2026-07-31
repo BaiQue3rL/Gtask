@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { delimiter, join } from 'node:path'
+import type { CodexWorkerPreferences } from '../../shared/contracts'
 
 export const CODEX_SCHEDULE_WORKER_AGENT_ID = 'gacha-app-background-worker'
 export const MIN_CODEX_SCHEDULE_WORKERS = 2
@@ -158,6 +159,7 @@ export interface CodexScheduleWorkerOptions {
   findExecutable?: () => string | null
   spawnProcess?: typeof spawn
   onEvent?: (event: CodexScheduleWorkerEvent) => void
+  resolvePreferences?: () => CodexWorkerPreferences
 }
 
 export function codexWorkerTransportArguments(
@@ -178,6 +180,17 @@ export function codexWorkerTransportArguments(
     '-c',
     'model_providers.gacha-chatgpt-http.supports_websockets=false'
   ]
+}
+
+export function codexWorkerInferenceArguments(
+  preferences: CodexWorkerPreferences = { model: 'inherit', reasoningEffort: 'inherit' }
+): string[] {
+  const args: string[] = []
+  if (preferences.model !== 'inherit') args.push('--model', preferences.model)
+  if (preferences.reasoningEffort !== 'inherit') {
+    args.push('-c', `model_reasoning_effort="${preferences.reasoningEffort}"`)
+  }
+  return args
 }
 
 export interface CodexScheduleWorkerLaunchResult {
@@ -344,6 +357,10 @@ export class CodexScheduleWorker {
 
     this.stopped = false
     const spawnProcess = this.options.spawnProcess ?? spawn
+    const preferences = this.options.resolvePreferences?.() ?? {
+      model: 'inherit' as const,
+      reasoningEffort: 'inherit' as const
+    }
     const child = spawnProcess(executablePath, [
       'exec',
       '--ephemeral',
@@ -351,6 +368,7 @@ export class CodexScheduleWorker {
       '--color',
       'never',
       ...codexWorkerTransportArguments(this.options.transportMode),
+      ...codexWorkerInferenceArguments(preferences),
       '--sandbox',
       'read-only',
       '-c',
