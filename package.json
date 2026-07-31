@@ -1,6 +1,6 @@
 {
   "name": "gtask",
-  "version": "0.1.0-rc.33",
+  "version": "1.0.0",
   "description": "可扩展的本地游戏任务与进度清单",
   "main": "./out/main/index.js",
   "author": "Gtask contributors",
@@ -16,7 +16,9 @@
     "preview": "electron-vite preview",
     "package:dir": "pnpm build && pnpm licenses:generate && electron-builder --dir",
     "package:portable": "pnpm build && pnpm licenses:generate && electron-builder --win portable",
-    "release:verify": "node scripts/verify-portable-release.mjs"
+    "package:installer": "pnpm build && pnpm licenses:generate && electron-builder --win nsis",
+    "release:verify": "node scripts/verify-portable-release.mjs",
+    "release:verify-installer": "node scripts/verify-installer-release.mjs"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "1.29.0",
@@ -60,11 +62,21 @@
     "win": {
       "icon": "build/icon.ico",
       "target": [
-        "portable"
+        "nsis"
       ]
     },
     "portable": {
       "artifactName": "${productName}-${version}-portable.${ext}"
+    },
+    "nsis": {
+      "artifactName": "${productName}-${version}-setup.${ext}",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Gtask",
+      "runAfterFinish": false,
+      "deleteAppDataOnUninstall": false
     }
   },
   "packageManager": "pnpm@11.9.0",

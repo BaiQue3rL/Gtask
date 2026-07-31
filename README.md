@@ -26,8 +26,12 @@ pnpm dev
 pnpm typecheck
 pnpm build
 pnpm package:portable
+pnpm package:installer
 pnpm release:verify
+pnpm release:verify-installer
 ```
+
+正式 Windows 安装包使用 NSIS 生成，默认安装到当前用户目录，并创建桌面与开始菜单中的 `Gtask` 快捷方式。
 
 构建后可通过标准输入调用本地 JSON 命令接口：
 
