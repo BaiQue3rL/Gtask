@@ -29,6 +29,12 @@ export interface NormalizedSyncItem {
   timeZone?: string | null
   modeKey?: string | null
   recurrenceRule?: string | null
+  /** Stable identity supplied by an authenticated official endpoint. */
+  sourceIdentity?: {
+    provider: 'miyoushe' | 'kuro-community' | string
+    endpoint: string
+    externalId: string
+  }
 }
 
 export interface CodexScheduleItem extends NormalizedSyncItem {
@@ -102,6 +108,9 @@ export interface SemanticReviewDraft {
 export interface SyncAdapterOutput {
   items: NormalizedSyncItem[]
   reviewCandidates?: SemanticReviewDraft[]
+  /** A partial personal response must never replace the active snapshot. */
+  snapshotCompleteness?: 'complete' | 'partial'
+  adapterVersion?: string
   /**
    * Opaque, one-way account/role scope used to keep personal states isolated.
    * It must never contain a raw UID, role id, Cookie or token.

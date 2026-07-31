@@ -29,12 +29,11 @@ class FakeChildProcess extends EventEmitter {
 }
 
 describe('Codex schedule worker', () => {
-  it('uses a bounded reusable worker group for semantic-review queues', () => {
-    expect(desiredCodexWorkerCount(0, 51)).toBe(2)
-    expect(desiredCodexWorkerCount(1, 51)).toBe(3)
-    expect(desiredCodexWorkerCount(4, 51)).toBe(6)
-    expect(desiredCodexWorkerCount(10, 10, 2)).toBe(2)
-    expect(desiredCodexWorkerCount(0, 0)).toBe(0)
+  it('uses a bounded reusable worker group only for public-data jobs', () => {
+    expect(desiredCodexWorkerCount(0)).toBe(0)
+    expect(desiredCodexWorkerCount(1)).toBe(1)
+    expect(desiredCodexWorkerCount(4)).toBe(4)
+    expect(desiredCodexWorkerCount(10, 2)).toBe(2)
   })
 
   it('ramps concurrency up after stable completions and backs off on pressure', () => {
@@ -45,7 +44,7 @@ describe('Codex schedule worker', () => {
       cooldownMs: 1_000
     })
 
-    expect(controller.desiredWorkers(10, 0)).toBe(2)
+    expect(controller.desiredWorkers(10)).toBe(2)
     expect(controller.recordHealthyCompletion(true, 0)).toBe(2)
     expect(controller.recordHealthyCompletion(true, 1)).toBe(3)
     expect(controller.recordHealthyCompletion(true, 2)).toBe(3)
@@ -55,7 +54,7 @@ describe('Codex schedule worker', () => {
     expect(controller.recordHealthyCompletion(true, 12)).toBe(2)
     expect(controller.recordHealthyCompletion(true, 1_011)).toBe(2)
     expect(controller.recordHealthyCompletion(true, 1_012)).toBe(3)
-    expect(controller.desiredWorkers(10, 0, 0.1)).toBe(1)
+    expect(controller.desiredWorkers(10, 0.1)).toBe(1)
   })
 
   it('keeps the parent process environment when worker-specific proxy variables are empty', () => {

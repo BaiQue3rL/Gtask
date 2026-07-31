@@ -713,12 +713,18 @@ function formatSyncTimestamp(timestamp: string): string {
 }
 
 function syncStateTimestamp(state: SyncTargetState | undefined): string | null {
+  if (state?.status === 'success') return state.lastSuccessAt
   return state?.lastAttemptAt ?? state?.lastSuccessAt ?? null
 }
 
 function syncStateLabel(state: SyncTargetState | undefined): string {
   if (!state || (!state.lastAttemptAt && !state.lastSuccessAt)) return '未同步'
-  if (state.status === 'success') return '已同步'
+  const source = state.catalogSource === 'personal_data'
+    ? '个人数据'
+    : state.catalogSource === 'public_schedule'
+      ? '公开资料'
+      : null
+  if (state.status === 'success') return source ? `已同步 · ${source}` : '已同步'
   if (state.status === 'stale') return '部分同步'
   if (state.status === 'error') return '同步失败'
   if (state.status === 'verification_required') return '待验证'
@@ -1816,7 +1822,7 @@ function showError(error: unknown): void {
             class="sync-indicator"
             :class="syncStateClass(globalSyncState)"
             :title="syncStateTimestamp(globalSyncState)
-              ? `最后全局尝试：${new Date(syncStateTimestamp(globalSyncState)!).toLocaleString()}`
+              ? `同步时间：${new Date(syncStateTimestamp(globalSyncState)!).toLocaleString()}`
               : '尚未完成全局同步'"
           >
             <strong>全局清单 · {{ syncStateLabel(globalSyncState) }}</strong>
@@ -1979,7 +1985,7 @@ function showError(error: unknown): void {
                     class="section-sync-indicator"
                     :class="syncStateClass(syncTargetState(panel.syncTarget))"
                     :title="syncStateTimestamp(syncTargetState(panel.syncTarget))
-                      ? `最后同步尝试：${new Date(syncStateTimestamp(syncTargetState(panel.syncTarget))!).toLocaleString()}`
+                      ? `同步时间：${new Date(syncStateTimestamp(syncTargetState(panel.syncTarget))!).toLocaleString()}`
                       : '该版块尚未同步'"
                   >
                     {{ syncStateLabel(syncTargetState(panel.syncTarget)) }}

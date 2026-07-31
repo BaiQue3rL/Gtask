@@ -6,7 +6,7 @@ This file is an AI entry point. It is intentionally concise; users are not expec
 
 - Product: **Gtask**, a Windows Electron + Vue 3 + TypeScript + SQLite desktop application for game task, event, recurring-challenge, and map-exploration checklists.
 - Current built-in games: Genshin Impact (`genshin`), Honkai: Star Rail (`star-rail`), Zenless Zone Zero (`zenless`), and Wuthering Waves (`wuthering-waves`). The architecture must remain extensible and user-facing copy must not imply the product can never support more games.
-- Codex is the business-semantic authority for uncertain public-data and personal-data meaning. Application code performs deterministic collection, identity binding, validation, transactions, and protected-data enforcement.
+- Codex is the business-semantic authority for public-data research. Authenticated personal data uses complete adapter-owned snapshots; application code performs deterministic collection, official-ID binding, validation, atomic source switching, and protected-data enforcement. Never reintroduce automatic public/personal fusion.
 - Read `docs/sync-architecture-redesign.md` before changing synchronization architecture. Read `docs/next-session.md` for the latest handoff state.
 - Preserve unrelated user changes and untracked research directories. Never reset or delete the database, credentials, backups, release artifacts, or test references unless the user explicitly requests it.
 

@@ -6,30 +6,17 @@ import type { CodexWorkerPreferences } from '../../shared/contracts'
 export const CODEX_SCHEDULE_WORKER_AGENT_ID = 'gacha-app-background-worker'
 export const MIN_CODEX_SCHEDULE_WORKERS = 2
 export const MAX_CODEX_SCHEDULE_WORKERS = 6
-export const MAX_CODEX_SEMANTIC_REVIEW_WORKERS = 2
 export const CODEX_CONCURRENCY_COOLDOWN_MS = 2 * 60 * 1000
 export const CODEX_STABLE_COMPLETIONS_TO_SCALE_UP = 2
 
 export function desiredCodexWorkerCount(
   activePublicJobs: number,
-  activeSemanticReviews: number,
   maxWorkers = MAX_CODEX_SCHEDULE_WORKERS
 ): number {
   const capacity = Math.max(0, Math.floor(maxWorkers))
   const publicJobs = Math.max(0, Math.floor(activePublicJobs))
-  const semanticReviews = Math.max(0, Math.floor(activeSemanticReviews))
-  if (capacity === 0 || publicJobs + semanticReviews === 0) return 0
-  if (publicJobs === 0) {
-    return Math.min(semanticReviews, MAX_CODEX_SEMANTIC_REVIEW_WORKERS, capacity)
-  }
-  if (semanticReviews === 0) return Math.min(publicJobs, capacity)
-  const reviewWorkers = Math.min(
-    semanticReviews,
-    MAX_CODEX_SEMANTIC_REVIEW_WORKERS,
-    Math.max(1, capacity - 1)
-  )
-  const publicWorkers = Math.min(publicJobs, Math.max(0, capacity - reviewWorkers))
-  return publicWorkers + reviewWorkers
+  if (capacity === 0 || publicJobs === 0) return 0
+  return Math.min(publicJobs, capacity)
 }
 
 export interface CodexDynamicConcurrencyOptions {
@@ -99,7 +86,6 @@ export class CodexDynamicConcurrencyController {
 
   desiredWorkers(
     activePublicJobs: number,
-    activeSemanticReviews: number,
     availableMemoryRatio = 1
   ): number {
     const normalizedMemory = Number.isFinite(availableMemoryRatio)
@@ -114,7 +100,6 @@ export class CodexDynamicConcurrencyController {
           : this.maxWorkers
     return desiredCodexWorkerCount(
       activePublicJobs,
-      activeSemanticReviews,
       Math.min(this.limit, memoryLimit)
     )
   }
@@ -218,12 +203,11 @@ function backgroundPrompt(agentId: string): string {
 请使用固定 Agent ID“${agentId}”、名称“Gtask 后台 Codex”登记联网能力。
 领取任务后先读取 job.contract；它是当前版块所需数据、字段语义和完成条件的唯一权威来源。先按契约建立完整目录，再逐项检索必需字段，不要从提示词猜字段要求。
 必须按 job.contract.requestContext 的 outputLocale 和 userTimeZone 组织结果，并在提交时原样回传 contentLocale。
-处理个人同步语义候选时，以候选携带的接口契约和 matchCandidates 为准。factAuthority 明确列出的官方接口事实无需重新联网证明；只研究尚未确定的事项身份冲突、分类或完成字段语义。应用只会在当前版块的规范清单已经建立后开放候选；由你判断是匹配已有规范项目还是经核验后新增，确认是同一事项时填写 matchItemId，确认存在同步重复项时使用 archiveItems 保留最合适的规范承载项。
 只领取一项公开资料任务并完整处理，严格按技能要求更新每个阶段的用户可见进度；已领取任务必须提交或明确失败。
 若 target=all，先提交已核验版块以安全保存；只要工具返回 remainingTargets 或任务仍为 claimed，就继续使用 Codex 原生联网检索自主补齐，不得把部分结果宣布为完成。
-公开资料任务根据结果自由调整关键词和来源，只有确实穷尽有用检索后才能明确失败。个人语义候选采用与风险相称的核验：优先复用官方事实和现有绑定；少量交叉核验仍不能可靠消除歧义时立即拒绝该条并保留原状态，不得为了单条候选无限检索。
+公开资料任务根据结果自由调整关键词和来源，只有确实穷尽有用检索后才能明确失败。个人进度由 Gtask 官方接口适配器在本地按完整快照处理，不属于本 Agent 的任务，也不得尝试与公开清单融合。
 本 Worker 的失败只允许结束自己领取的任务，不得领取、失败或结束其他 Worker 的任务。
-完成该任务后处理当前可领取的待核验语义候选，随后退出；不要继续领取第二项公开资料任务。`
+完成该任务后退出；不要领取第二项公开资料任务。`
 }
 
 export function findCodexCli(options: CodexCliDiscoveryOptions = {}): string | null {

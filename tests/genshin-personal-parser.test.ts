@@ -319,13 +319,14 @@ describe('Genshin personal parsing', () => {
       expect.objectContaining({ message: '正在读取幽境危战战绩', current: 4, total: 5 }),
       expect.objectContaining({ message: '正在读取原神活动进度', current: 5, total: 5 })
     ])
-    expect(result.items).toHaveLength(0)
-    expect(result.reviewCandidates).toHaveLength(6)
+    expect(result.items).toHaveLength(6)
+    expect(result.snapshotCompleteness).toBe('complete')
+    expect(result.items.every((item) => item.sourceIdentity)).toBe(true)
     order.length = 0
     const eventsOnly = await adapter.sync('genshin', 'events')
     expect(order).toEqual(['events'])
-    expect(eventsOnly.items).toHaveLength(0)
-    expect(eventsOnly.reviewCandidates).toHaveLength(1)
+    expect(eventsOnly.items).toHaveLength(1)
+    expect(eventsOnly.items[0]).toMatchObject({ category: 'limited_event', title: '砺行修远' })
     await expect(adapter.sync('zenless')).rejects.toThrow('不能用于其他游戏')
   })
 
@@ -340,13 +341,10 @@ describe('Genshin personal parsing', () => {
 
     const progress: Array<{ message: string }> = []
     const partial = await adapter.sync('genshin', 'cycles', (update) => progress.push(update))
-    expect(partial.items).toEqual([])
-    expect(partial.reviewCandidates).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        target: 'cycles',
-        payload: expect.objectContaining({ observedModeKey: 'imaginarium-theater' })
-      })
+    expect(partial.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: 'endgame', modeKey: 'imaginarium-theater' })
     ]))
+    expect(partial.snapshotCompleteness).toBe('partial')
     expect(partial.message).toContain('部分成功 1/3')
     expect(progress).toEqual(expect.arrayContaining([
       expect.objectContaining({ message: '深境螺旋战绩读取失败，继续下一项' }),

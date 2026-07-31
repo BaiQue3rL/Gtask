@@ -10,7 +10,7 @@ import {
   parseWutheringWavesPersonalData
 } from './wuthering-waves-personal-parser'
 import type { SyncAdapter, SyncAdapterOutput, SyncProgressReporter } from './types'
-import { toCycleReviewCandidates } from './cycle-review'
+import { personalMapsFromCandidates, withPersonalIdentity } from './personal-snapshot'
 
 export interface WutheringWavesCommunityClient {
   getExploration: () => Promise<unknown>
@@ -65,14 +65,16 @@ export class WutheringWavesPersonalAdapter implements SyncAdapter {
     const cycleItems = hasCycleData
       ? parseWutheringWavesPersonalData({ tower, slash, matrix })
       : []
+    const explorationCandidates = exploration === undefined
+      ? []
+      : extractWutheringWavesExplorationReviewCandidates(exploration)
     return {
-      items: [],
-      reviewCandidates: exploration === undefined
-        ? toCycleReviewCandidates('kuro-community', cycleItems)
-        : [
-            ...extractWutheringWavesExplorationReviewCandidates(exploration),
-            ...toCycleReviewCandidates('kuro-community', cycleItems)
-          ],
+      items: [
+        ...personalMapsFromCandidates('kuro-community', explorationCandidates),
+        ...withPersonalIdentity(cycleItems, 'kuro-community', 'personal-challenge-record')
+      ],
+      snapshotCompleteness: outcomes.every((outcome) => outcome.succeeded) ? 'complete' : 'partial',
+      adapterVersion: 'wuthering-waves-personal-v1',
       message: (target === 'exploration'
         ? '鸣潮地图探索度已同步'
         : target === 'cycles'

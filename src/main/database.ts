@@ -78,7 +78,7 @@ const DEFAULT_GAMES: GameSummary[] = [
   }
 ]
 
-export const CURRENT_SCHEMA_VERSION = 26
+export const CURRENT_SCHEMA_VERSION = 27
 
 const AI_AGENT_MAX_AGE_MS = 5 * 60 * 1000
 const AI_JOB_CLAIM_MAX_AGE_MS = 15 * 60 * 1000
@@ -1939,7 +1939,7 @@ export class AppDatabase {
       exploration: ['exploration']
     }
     return this.listChecklistItems(gameId).filter(
-      (item) => item.source !== 'manual' && categories[target].includes(item.category)
+      (item) => item.source === 'personal_sync' && categories[target].includes(item.category)
     )
   }
 
@@ -2599,6 +2599,15 @@ export class AppDatabase {
       : missingTargets
     const now = reference.toISOString()
     const { merge, archived } = this.runTransaction(() => {
+      for (const coveredTarget of coveredTargets) {
+        if (coveredTarget !== 'tasks') {
+          this.activateChecklistSourceInTransaction(
+            job.gameId,
+            coveredTarget,
+            'public_schedule'
+          )
+        }
+      }
       const result = this.mergeSyncedItems(
         job.gameId,
         'public_schedule',
@@ -2821,7 +2830,7 @@ export class AppDatabase {
     }
     const matchCandidates = this.listChecklistItems(row.gameId)
       .filter((item) =>
-        item.source !== 'manual' &&
+        item.source === 'public_schedule' &&
         targetCategories[row.target].includes(item.category)
       )
       .map((item) => ({
@@ -2866,6 +2875,7 @@ export class AppDatabase {
       FROM checklist_items
       WHERE game_id = ?
         AND category = 'limited_event'
+        AND source = 'public_schedule'
         AND archived = 0
         AND (ends_at IS NULL OR julianday(ends_at) > julianday(?))
       ORDER BY COALESCE(starts_at, created_at), created_at
@@ -3332,6 +3342,256 @@ export class AppDatabase {
     return Number(result.changes)
   }
 
+  /**
+   * Switches one section to a complete authenticated snapshot.  Public and
+   * personal rows are deliberately not reconciled: the selected source owns
+   * the section until the user explicitly chooses the other source.
+   */
+  replacePersonalSnapshot(
+    gameId: GameId,
+    target: PersonalSyncTarget,
+    accountScope: string,
+    items: NormalizedSyncItem[],
+    adapterVersion: string,
+    reference = new Date()
+  ): SyncMergeResult {
+    assertAccountScope(accountScope)
+    if (!adapterVersion.trim() || adapterVersion.length > 100) {
+      throw new Error('个人数据适配器版本格式不正确')
+    }
+    const expectedCategories: Record<PersonalSyncTarget, ChecklistCategory[]> = {
+      events: ['limited_event'],
+      cycles: ['endgame'],
+      exploration: ['exploration']
+    }
+    if (items.some((item) => !expectedCategories[target].includes(item.category))) {
+      throw new Error('个人快照包含了不属于当前版块的数据')
+    }
+    const identities = new Set<string>()
+    for (const item of items) {
+      if (!item.sourceIdentity) throw new Error(`个人事项“${item.title}”缺少官方来源标识`)
+      assertSourceIdentity(
+        item.sourceIdentity.provider,
+        item.sourceIdentity.endpoint,
+        item.sourceIdentity.externalId
+      )
+      const identity = `${item.sourceIdentity.provider}\u0000${item.sourceIdentity.endpoint}\u0000${item.sourceIdentity.externalId}`
+      if (identities.has(identity)) throw new Error(`个人快照包含重复官方标识：${item.title}`)
+      identities.add(identity)
+      this.assertTimeWindow(item.startsAt ?? null, item.endsAt ?? null)
+      if (
+        item.category === 'limited_event' && item.completed === true &&
+        item.startsAt && Date.parse(item.startsAt) > reference.getTime()
+      ) {
+        throw new Error(`尚未开始的活动“${item.title}”不能标记为已完成`)
+      }
+    }
+    this.assertStandaloneMapStructure(items)
+
+    return this.runTransaction(() => {
+      const now = reference.toISOString()
+      const snapshotId = randomUUID()
+      this.database.prepare(`
+        INSERT INTO personal_sync_snapshots(
+          id, game_id, target, account_scope, adapter_version,
+          item_count, activated_at, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        snapshotId,
+        gameId,
+        target,
+        accountScope,
+        adapterVersion.trim(),
+        items.length,
+        now,
+        now
+      )
+
+      const categories = expectedCategories[target]
+      const placeholders = categories.map(() => '?').join(', ')
+      // Any old Codex decision for the superseded dataset must be unable to write later.
+      this.database.prepare(`
+        UPDATE semantic_review_candidates
+        SET status = 'rejected', completed_at = ?, claimed_at = NULL, agent_id = NULL,
+            message = '个人数据源已切换，旧核验任务已取消', updated_at = ?
+        WHERE game_id = ? AND target = ? AND status IN ('pending', 'claimed')
+      `).run(now, now, gameId, target)
+
+      // Remove the competing public/manual ordinary checklist, including archived rows.
+      // Fixed quests, weekly and custom items are outside these category sets.
+      this.database.prepare(`
+        DELETE FROM checklist_items
+        WHERE game_id = ? AND category IN (${placeholders}) AND source <> 'personal_sync'
+      `).run(gameId, ...categories)
+      this.database.prepare(`
+        DELETE FROM sync_deletion_tombstones
+        WHERE game_id = ? AND category IN (${placeholders})
+      `).run(gameId, ...categories)
+
+      if (target !== 'events') {
+        this.database.prepare(`
+          UPDATE checklist_items
+          SET manual_completion_locked = 0
+          WHERE game_id = ? AND category IN (${placeholders}) AND source = 'personal_sync'
+        `).run(gameId, ...categories)
+      }
+
+      const merge = this.mergeSyncedItems(
+        gameId,
+        'personal_sync',
+        items,
+        now,
+        false,
+        { codexReviewed: true, identityPolicy: 'remote-key-only' }
+      )
+      const remoteKeys = items.map((item) => item.remoteKey)
+      if (remoteKeys.length === 0) {
+        this.database.prepare(`
+          DELETE FROM checklist_items
+          WHERE game_id = ? AND category IN (${placeholders}) AND source = 'personal_sync'
+        `).run(gameId, ...categories)
+      } else {
+        const keyPlaceholders = remoteKeys.map(() => '?').join(', ')
+        this.database.prepare(`
+          DELETE FROM checklist_items
+          WHERE game_id = ? AND category IN (${placeholders}) AND source = 'personal_sync'
+            AND remote_key NOT IN (${keyPlaceholders})
+        `).run(gameId, ...categories, ...remoteKeys)
+      }
+
+      const findItem = this.database.prepare(`
+        SELECT id FROM checklist_items
+        WHERE game_id = ? AND source = 'personal_sync' AND remote_key = ? AND archived = 0
+      `)
+      const bind = this.database.prepare(`
+        INSERT INTO source_bindings(
+          game_id, provider, endpoint, external_id, item_id,
+          binding_kind, confidence, state_rule_json, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, 'mechanical', 1, NULL, ?, ?)
+        ON CONFLICT(game_id, provider, endpoint, external_id) DO UPDATE SET
+          item_id = excluded.item_id,
+          binding_kind = 'mechanical',
+          confidence = 1,
+          state_rule_json = NULL,
+          updated_at = excluded.updated_at
+      `)
+      const markSnapshot = this.database.prepare(`
+        UPDATE checklist_items
+        SET source_snapshot_id = ?, last_synced_at = ?, updated_at = ?
+        WHERE id = ?
+      `)
+      for (const item of items) {
+        const row = findItem.get(gameId, item.remoteKey) as { id: string } | undefined
+        if (!row || !item.sourceIdentity) throw new Error(`个人事项“${item.title}”写入失败`)
+        markSnapshot.run(snapshotId, now, now, row.id)
+        bind.run(
+          gameId,
+          item.sourceIdentity.provider,
+          item.sourceIdentity.endpoint,
+          item.sourceIdentity.externalId,
+          row.id,
+          now,
+          now
+        )
+      }
+
+      if (target === 'cycles') this.ensureFixedWeeklyItem(gameId, reference)
+      this.database.prepare(`
+        INSERT INTO sync_target_states(
+          game_id, target, last_success_at, last_attempt_at, status,
+          catalog_coverage, catalog_source, active_account_scope, active_snapshot_id
+        ) VALUES (?, ?, ?, ?, 'success', 'complete', 'personal_data', ?, ?)
+        ON CONFLICT(game_id, target) DO UPDATE SET
+          last_success_at = excluded.last_success_at,
+          last_attempt_at = excluded.last_attempt_at,
+          status = 'success',
+          catalog_coverage = 'complete',
+          catalog_source = 'personal_data',
+          active_account_scope = excluded.active_account_scope,
+          active_snapshot_id = excluded.active_snapshot_id
+      `).run(gameId, target, now, now, accountScope, snapshotId)
+      if (target === 'exploration') this.assertActiveMapReferences(gameId)
+      return merge
+    })
+  }
+
+  activateChecklistSource(
+    gameId: GameId,
+    target: PersonalSyncTarget,
+    source: 'public_schedule'
+  ): void {
+    this.runTransaction(() => this.activateChecklistSourceInTransaction(gameId, target, source))
+  }
+
+  replacePublicCatalog(
+    gameId: GameId,
+    target: SyncTarget,
+    items: NormalizedSyncItem[],
+    syncedAt = new Date().toISOString(),
+    options: SyncMergeOptions = {}
+  ): SyncMergeResult {
+    return this.runTransaction(() => {
+      const targets: PersonalSyncTarget[] = target === 'all'
+        ? ['events', 'cycles', 'exploration']
+        : target === 'events' || target === 'cycles' || target === 'exploration'
+          ? [target]
+          : []
+      for (const selected of targets) {
+        this.activateChecklistSourceInTransaction(gameId, selected, 'public_schedule')
+      }
+      return this.mergeSyncedItems(
+        gameId,
+        'public_schedule',
+        items,
+        syncedAt,
+        false,
+        options
+      )
+    })
+  }
+
+  private activateChecklistSourceInTransaction(
+    gameId: GameId,
+    target: PersonalSyncTarget,
+    source: 'public_schedule'
+  ): void {
+    const categories: Record<PersonalSyncTarget, ChecklistCategory[]> = {
+      events: ['limited_event'],
+      cycles: ['endgame'],
+      exploration: ['exploration']
+    }
+    const selected = categories[target]
+    const placeholders = selected.map(() => '?').join(', ')
+    const now = new Date().toISOString()
+    this.database.prepare(`
+      UPDATE semantic_review_candidates
+      SET status = 'rejected', completed_at = ?, claimed_at = NULL, agent_id = NULL,
+          message = '清单已切换为公开资料，旧个人核验任务已取消', updated_at = ?
+      WHERE game_id = ? AND target = ? AND status IN ('pending', 'claimed')
+    `).run(now, now, gameId, target)
+    this.database.prepare(`
+      DELETE FROM checklist_items
+      WHERE game_id = ? AND category IN (${placeholders}) AND source = 'personal_sync'
+    `).run(gameId, ...selected)
+    const hasPublic = Boolean(this.database.prepare(`
+      SELECT 1 FROM checklist_items
+      WHERE game_id = ? AND category IN (${placeholders})
+        AND source = 'public_schedule' AND archived = 0 LIMIT 1
+    `).get(gameId, ...selected))
+    this.database.prepare(`
+      INSERT INTO sync_target_states(
+        game_id, target, status, catalog_coverage, catalog_source,
+        active_account_scope, active_snapshot_id
+      ) VALUES (?, ?, 'idle', ?, ?, NULL, NULL)
+      ON CONFLICT(game_id, target) DO UPDATE SET
+        status = 'idle',
+        catalog_coverage = excluded.catalog_coverage,
+        catalog_source = excluded.catalog_source,
+        active_account_scope = NULL,
+        active_snapshot_id = NULL
+    `).run(gameId, target, hasPublic ? 'partial' : 'empty', source)
+  }
+
   mergeSyncedItems(
     gameId: GameId,
     source: Exclude<ChecklistSource, 'manual'>,
@@ -3642,11 +3902,10 @@ export class AppDatabase {
         FROM checklist_items
         WHERE game_id = ?
           AND remote_key = ?
-          AND source <> 'manual'
-        ORDER BY CASE WHEN source = 'public_schedule' THEN 0 ELSE 1 END,
-          updated_at DESC
+          AND source = ?
+        ORDER BY updated_at DESC
         LIMIT 1
-      `).get(gameId, remoteKey) as {
+      `).get(gameId, remoteKey, source) as {
         id: string
         archived: number
         source: ChecklistSource
@@ -3659,7 +3918,7 @@ export class AppDatabase {
         FROM checklist_items
         WHERE game_id = ?
           AND category = 'exploration'
-          AND source <> 'manual'
+          AND source = ?
           AND (
             remote_key = ?
             OR (? IS NOT NULL AND mode_key = ?)
@@ -3672,6 +3931,7 @@ export class AppDatabase {
         LIMIT 1
       `).get(
         gameId,
+        source,
         remoteKey,
         item.modeKey ?? null,
         item.modeKey ?? null,
@@ -3689,7 +3949,7 @@ export class AppDatabase {
         FROM checklist_items
         WHERE game_id = ?
           AND category = 'limited_event'
-          AND source <> 'manual'
+          AND source = ?
           AND (
             remote_key = ?
             OR (? IS NOT NULL AND mode_key = ?)
@@ -3703,6 +3963,7 @@ export class AppDatabase {
           )
       `).all(
         gameId,
+        source,
         remoteKey,
         item.modeKey ?? null,
         item.modeKey ?? null,
@@ -3747,7 +4008,7 @@ export class AppDatabase {
         FROM checklist_items
         WHERE game_id = ?
           AND category = 'endgame'
-          AND source <> 'manual'
+          AND source = ?
           AND (
             (remote_key = ? AND period_key IS ?)
             OR (? IS NOT NULL AND mode_key = ? AND period_key IS ?)
@@ -3768,6 +4029,7 @@ export class AppDatabase {
         LIMIT 1
       `).get(
         gameId,
+        source,
         remoteKey,
         item.periodKey ?? null,
         item.modeKey ?? null,
@@ -3794,7 +4056,7 @@ export class AppDatabase {
         FROM checklist_items
         WHERE game_id = ?
           AND category = 'endgame'
-          AND source <> 'manual'
+          AND source = ?
           AND (
             remote_key = ?
             OR (? IS NOT NULL AND mode_key = ?)
@@ -3810,6 +4072,7 @@ export class AppDatabase {
         LIMIT 1
       `).get(
         gameId,
+        source,
         remoteKey,
         item.modeKey ?? null,
         item.modeKey ?? null,
@@ -3830,7 +4093,7 @@ export class AppDatabase {
           remote_key = ?
           OR (? IS NOT NULL AND mode_key = ? AND category = ?)
         )
-        AND source <> 'manual'
+        AND source = ?
       ORDER BY CASE WHEN remote_key = ? THEN 0 ELSE 1 END,
         CASE WHEN ? IS NOT NULL AND period_key = ? THEN 0 ELSE 1 END,
         CASE WHEN source = ? THEN 0 ELSE 1 END,
@@ -3842,6 +4105,7 @@ export class AppDatabase {
       item.modeKey ?? null,
       item.modeKey ?? null,
       item.category,
+      source,
       remoteKey,
       item.periodKey ?? null,
       item.periodKey ?? null,
@@ -5122,6 +5386,53 @@ export class AppDatabase {
       `)
     }
 
+    const migration27 = this.database
+      .prepare('SELECT version FROM schema_migrations WHERE version = 27')
+      .get()
+
+    if (!migration27) {
+      const checklistColumns = new Set(
+        (this.database.prepare('PRAGMA table_info(checklist_items)').all() as Array<{ name: string }>)
+          .map((column) => column.name)
+      )
+      const targetColumns = new Set(
+        (this.database.prepare('PRAGMA table_info(sync_target_states)').all() as Array<{ name: string }>)
+          .map((column) => column.name)
+      )
+      this.database.exec(`
+        BEGIN;
+        ${checklistColumns.has('source_snapshot_id')
+          ? ''
+          : 'ALTER TABLE checklist_items ADD COLUMN source_snapshot_id TEXT;'}
+        ${targetColumns.has('active_account_scope')
+          ? ''
+          : 'ALTER TABLE sync_target_states ADD COLUMN active_account_scope TEXT;'}
+        ${targetColumns.has('active_snapshot_id')
+          ? ''
+          : 'ALTER TABLE sync_target_states ADD COLUMN active_snapshot_id TEXT;'}
+        CREATE TABLE IF NOT EXISTS personal_sync_snapshots (
+          id TEXT PRIMARY KEY,
+          game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+          target TEXT NOT NULL CHECK (target IN ('events', 'cycles', 'exploration')),
+          account_scope TEXT NOT NULL,
+          adapter_version TEXT NOT NULL,
+          item_count INTEGER NOT NULL CHECK (item_count >= 0),
+          activated_at TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS personal_sync_snapshots_target
+          ON personal_sync_snapshots(game_id, target, activated_at DESC);
+        UPDATE semantic_review_candidates
+        SET status = 'rejected', completed_at = CURRENT_TIMESTAMP,
+            claimed_at = NULL, agent_id = NULL,
+            message = '个人同步已升级为完整快照，旧融合核验任务已停用',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE status IN ('pending', 'claimed');
+        INSERT INTO schema_migrations(version) VALUES (27);
+        COMMIT;
+      `)
+    }
+
     const versionRow = this.database
       .prepare('SELECT MAX(version) AS version FROM schema_migrations')
       .get() as { version: number | null }
@@ -5310,6 +5621,29 @@ export class AppDatabase {
         now
       )
     }
+  }
+
+  private ensureFixedWeeklyItem(gameId: GameId, reference = new Date()): void {
+    const period = getWeeklyPeriod(reference, 1, 'Asia/Shanghai')
+    const now = reference.toISOString()
+    this.database.prepare(`
+      INSERT OR IGNORE INTO checklist_items(
+        id, game_id, category, title, completed, starts_at, ends_at,
+        reset_rule, period_key, schedule_kind, reset_weekday, timezone,
+        source, remote_key, last_synced_at, created_at, updated_at
+      ) VALUES (?, ?, 'weekly', '周常', 0, ?, ?, '每周一重置', ?, 'weekly', 1,
+        'Asia/Shanghai', 'public_schedule', ?, ?, ?, ?)
+    `).run(
+      `${gameId}:weekly`,
+      gameId,
+      period.startsAt,
+      period.endsAt,
+      period.key,
+      `weekly:${gameId}`,
+      now,
+      now,
+      now
+    )
   }
 
   private consolidateFixedWeeklyItems(): void {
@@ -5735,6 +6069,32 @@ export class AppDatabase {
         if (parent?.mapNodeKind !== 'region') {
           throw new Error(`二级地区“${item.title}”的上级必须是一级主地区`)
         }
+      }
+    }
+  }
+
+  private assertStandaloneMapStructure(items: NormalizedSyncItem[]): void {
+    const maps = items.filter((item) => item.category === 'exploration')
+    if (maps.length === 0) return
+    const byKey = new Map<string, NormalizedSyncItem>()
+    for (const item of maps) {
+      if (byKey.has(item.remoteKey)) {
+        throw new Error(`个人地图快照包含重复标识：${item.remoteKey}`)
+      }
+      byKey.set(item.remoteKey, item)
+      if (item.parentRemoteKey === item.remoteKey) throw new Error('地图节点不能以自身为上级')
+      if (item.mapNodeKind === 'region' && item.parentRemoteKey) {
+        throw new Error(`一级主地区“${item.title}”不能包含上级地区`)
+      }
+      if (item.mapNodeKind === 'subregion' && !item.parentRemoteKey) {
+        throw new Error(`二级地区“${item.title}”必须指定一级主地区`)
+      }
+    }
+    for (const item of maps) {
+      if (!item.parentRemoteKey) continue
+      const parent = byKey.get(item.parentRemoteKey)
+      if (!parent || parent.mapNodeKind !== 'region') {
+        throw new Error(`二级地区“${item.title}”的上级必须是同一快照中的一级主地区`)
       }
     }
   }

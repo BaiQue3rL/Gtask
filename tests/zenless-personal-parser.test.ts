@@ -276,18 +276,20 @@ describe('绝区零个人战绩解析', () => {
       expect.objectContaining({ message: '正在读取绝区零活动进度', current: 3, total: 4 }),
       expect.objectContaining({ message: '正在读取绝区零区域探索进度', current: 4, total: 4 })
     ])
-    expect(output.items).toHaveLength(0)
-    expect(output.reviewCandidates).toHaveLength(5)
+    expect(output.items).toHaveLength(5)
+    expect(output.snapshotCompleteness).toBe('complete')
     order.length = 0
     const eventsOnly = await adapter.sync('zenless', 'events')
     expect(order).toEqual(['events'])
-    expect(eventsOnly.items).toHaveLength(0)
-    expect(eventsOnly.reviewCandidates).toHaveLength(1)
+    expect(eventsOnly.items).toHaveLength(1)
     order.length = 0
     const exploration = await adapter.sync('zenless', 'exploration')
     expect(order).toEqual(['exploration'])
-    expect(exploration.items).toEqual([])
-    expect(exploration.reviewCandidates).toHaveLength(2)
+    expect(exploration.items).toHaveLength(2)
+    expect(exploration.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ mapNodeKind: 'region' }),
+      expect.objectContaining({ mapNodeKind: 'subregion' })
+    ]))
     await expect(adapter.sync('genshin')).rejects.toThrow('不能用于其他游戏')
   })
 
@@ -305,13 +307,10 @@ describe('绝区零个人战绩解析', () => {
     })
     const progress: Array<{ message: string }> = []
     const partial = await adapter.sync('zenless', 'cycles', (update) => progress.push(update))
-    expect(partial.items).toEqual([])
-    expect(partial.reviewCandidates).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        target: 'cycles',
-        payload: expect.objectContaining({ observedModeKey: 'shiyu-defense' })
-      })
+    expect(partial.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: 'endgame', modeKey: 'shiyu-defense' })
     ]))
+    expect(partial.snapshotCompleteness).toBe('partial')
     expect(partial.message).toContain('部分成功 1/2')
     expect(progress).toEqual(expect.arrayContaining([
       expect.objectContaining({ message: '危局强袭战战绩读取失败，继续下一项' })

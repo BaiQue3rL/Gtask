@@ -46,7 +46,6 @@ import {
 import { createKuroCommunityPersonalAdapter } from './sync/kuro-community-client'
 import { encodeKuroCommunityCredential } from './sync/kuro-community-credential'
 import { SyncOrchestrator } from './sync/orchestrator'
-import { syncPersonalBeforeCatalogBootstrap } from './sync/personal-catalog-bootstrap'
 import { restoreRelaunchOptions } from './relaunch'
 import { migrateLegacyAppData, resolveAppDataPaths } from './data-paths'
 import { getFixedWeeklyBootstrap } from './sync/public-sync-bootstrap'
@@ -227,47 +226,9 @@ async function queueAiScheduleSync(
 ): Promise<SyncResult> {
   if (!appDatabase) throw new Error('数据库尚未初始化')
   if (scope === 'public_and_personal') {
-    const catalogComplete =
-      target !== 'all' &&
-      target !== 'tasks' &&
-      appDatabase.isCatalogComplete(gameId, target)
-    return syncPersonalBeforeCatalogBootstrap({
-      catalogComplete,
-      isCatalogComplete: () =>
-        target !== 'all' &&
-        target !== 'tasks' &&
-        Boolean(appDatabase?.isCatalogComplete(gameId, target)),
-      syncPersonal: async () => {
-        if (syncOrchestrator) {
-          return syncOrchestrator.syncPersonalOnly(gameId, target, requestContext)
-        }
-        const timestamp = new Date().toISOString()
-        return {
-          gameId,
-          requestedScope: 'personal_data',
-          requestedTarget: target,
-          status: 'error',
-          startedAt: timestamp,
-          finishedAt: timestamp,
-          sources: [{
-            source: 'personal_data',
-            status: 'error',
-            message: '个人数据同步服务尚未初始化',
-            added: 0,
-            updated: 0,
-            preserved: 0
-          }],
-          message: '个人数据同步服务尚未初始化'
-        }
-      },
-      queueCatalog: () => queueAiScheduleSync(
-        gameId,
-        'public_schedule',
-        target,
-        requestContext,
-        'public_and_personal'
-      )
-    })
+    if (!syncOrchestrator) throw new Error('个人数据同步服务尚未初始化')
+    if (target === 'tasks') throw new Error('任务版块不支持同步个人进度')
+    return syncOrchestrator.syncPersonalOnly(gameId, target, requestContext)
   }
   const startedAt = new Date().toISOString()
   let mapAuditReason: MapCatalogAuditReason | null = null
@@ -431,11 +392,8 @@ function handleCodexScheduleWorkerEvent(event: CodexScheduleWorkerEvent): void {
     const healthyExit =
       event.exitCode === 0 &&
       event.message === 'Codex 自动处理进程已结束' &&
-      requeuedJobs === 0 &&
-      requeuedReviews === 0
-    const hasBacklog =
-      appDatabase.listActiveAiScheduleJobs().length +
-      appDatabase.getActiveSemanticReviewCount() > 0
+      requeuedJobs === 0
+    const hasBacklog = appDatabase.listActiveAiScheduleJobs().length > 0
     if (healthyExit) codexConcurrency.recordHealthyCompletion(hasBacklog)
     else codexConcurrency.recordBackpressure()
     if (requeuedJobs > 0 || requeuedReviews > 0) {
@@ -464,11 +422,9 @@ function startCodexWorkersForActiveJobs():
   | null {
   if (!appDatabase || !codexScheduleWorkerPool) return null
   const activeJobs = appDatabase.listActiveAiScheduleJobs().length
-  const activeReviews = appDatabase.getActiveSemanticReviewCount()
   const memoryRatio = totalmem() > 0 ? freemem() / totalmem() : 1
   const activeWork = codexConcurrency.desiredWorkers(
     activeJobs,
-    activeReviews,
     memoryRatio
   )
   if (activeWork === 0) return null
@@ -862,18 +818,11 @@ function registerIpcHandlers(): void {
     if (!supportsPersonalSyncTarget(parsedGameId, parsedTarget)) {
       throw new Error('当前游戏的个人数据接口不提供该版块进度')
     }
-    const result = appDatabase.isCatalogComplete(parsedGameId, parsedTarget)
-      ? await syncOrchestrator.syncPersonalOnly(
-          parsedGameId,
-          parsedTarget,
-          parsedRequestContext
-        )
-      : await queueAiScheduleSync(
-          parsedGameId,
-          'public_and_personal',
-          parsedTarget,
-          parsedRequestContext
-        )
+    const result = await syncOrchestrator.syncPersonalOnly(
+      parsedGameId,
+      parsedTarget,
+      parsedRequestContext
+    )
     if (result.sources.some((source) => (source.pendingReview ?? 0) > 0)) {
       startCodexWorkersForActiveJobs()
     }
@@ -1051,7 +1000,13 @@ if (!app.requestSingleInstanceLock()) {
     try {
       appDatabase = new AppDatabase(databasePath)
       for (const gameId of SUPPORTED_GAME_IDS) {
-        if (appDatabase.isCatalogComplete(gameId, 'exploration')) {
+        const explorationState = appDatabase.getSyncTargetStates(gameId).find(
+          (state) => state.target === 'exploration'
+        )
+        if (
+          explorationState?.catalogCoverage === 'complete' &&
+          explorationState.catalogSource === 'public_schedule'
+        ) {
           maintainBundledMapCatalog(appDatabase, gameId, new Date(), false)
         }
       }
@@ -1162,13 +1117,8 @@ function createAppSyncOrchestrator(database: AppDatabase): SyncOrchestrator {
   const reportProgress = (progress: SyncProgressUpdate): void => {
     mainWindow?.webContents.send('sync:progress', progress)
   }
-  const preparePersonalCatalog = (gameId: GameId, target: SyncTarget): void => {
-    if (target === 'exploration' || target === 'all') {
-      maintainBundledMapCatalog(database, gameId)
-    }
-  }
   if (!credentialVault) {
-    return new SyncOrchestrator(database, undefined, reportProgress, preparePersonalCatalog)
+    return new SyncOrchestrator(database, undefined, reportProgress)
   }
   const fetcher = createElectronNetFetcher(net.fetch)
   return new SyncOrchestrator(database, {
@@ -1233,7 +1183,7 @@ function createAppSyncOrchestrator(database: AppDatabase): SyncOrchestrator {
         )
       )
     }
-  }, reportProgress, preparePersonalCatalog)
+  }, reportProgress)
 }
 
 function maintainBundledMapCatalog(
@@ -1242,12 +1192,11 @@ function maintainBundledMapCatalog(
   reference = new Date(),
   recordSuccess = true
 ): { added: number; updated: number; preserved: number } {
-  const merge = database.mergeSyncedItems(
+  const merge = database.replacePublicCatalog(
     gameId,
-    'public_schedule',
+    'exploration',
     getBundledMapCatalog(gameId),
     reference.toISOString(),
-    true,
     { identityPolicy: 'remote-key-only' }
   )
   database.recordCatalogCoverage(gameId, 'exploration', 'public_schedule', 'complete')

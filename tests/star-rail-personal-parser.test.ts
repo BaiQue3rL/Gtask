@@ -192,13 +192,13 @@ describe('Star Rail personal parsing', () => {
       current: 5,
       total: 5
     })
-    expect(result.items).toHaveLength(0)
-    expect(result.reviewCandidates).toHaveLength(5)
+    expect(result.items).toHaveLength(5)
+    expect(result.snapshotCompleteness).toBe('complete')
     order.length = 0
     const eventsOnly = await adapter.sync('star-rail', 'events')
     expect(order).toEqual(['events'])
-    expect(eventsOnly.items).toEqual([])
-    expect(eventsOnly.reviewCandidates).toHaveLength(1)
+    expect(eventsOnly.items).toHaveLength(1)
+    expect(eventsOnly.items[0]).toMatchObject({ category: 'limited_event' })
     expect(eventsOnly.message).toBe('星铁活动进度已读取')
     order.length = 0
     const exploration = await adapter.sync('star-rail', 'exploration')
@@ -217,13 +217,10 @@ describe('Star Rail personal parsing', () => {
     })
     const progress: Array<{ message: string }> = []
     const partial = await adapter.sync('star-rail', 'cycles', (update) => progress.push(update))
-    expect(partial.items).toEqual([])
-    expect(partial.reviewCandidates).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        target: 'cycles',
-        payload: expect.objectContaining({ observedModeKey: 'memory-of-chaos' })
-      })
+    expect(partial.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: 'endgame', modeKey: 'memory-of-chaos' })
     ]))
+    expect(partial.snapshotCompleteness).toBe('partial')
     expect(partial.message).toContain('部分成功 1/4')
     expect(progress).toEqual(expect.arrayContaining([
       expect.objectContaining({ message: '虚构叙事战绩读取失败，继续下一项' }),

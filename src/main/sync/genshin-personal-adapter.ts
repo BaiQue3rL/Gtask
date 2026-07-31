@@ -11,7 +11,11 @@ import {
   type PersonalRequestOutcome
 } from './personal-sync-settler'
 import type { SyncAdapter, SyncAdapterOutput, SyncProgressReporter } from './types'
-import { toCycleReviewCandidates } from './cycle-review'
+import {
+  personalEventsFromCandidates,
+  personalMapsFromCandidates,
+  withPersonalIdentity
+} from './personal-snapshot'
 
 export interface GenshinBattleChronicleClient {
   getProfile: () => Promise<unknown>
@@ -81,12 +85,13 @@ export class GenshinPersonalAdapter implements SyncAdapter {
           })
       : []
     return {
-      items: [],
-      reviewCandidates: [
-        ...eventCandidates,
-        ...explorationCandidates,
-        ...toCycleReviewCandidates('miyoushe', cycleItems)
+      items: [
+        ...personalEventsFromCandidates('genshin', 'miyoushe', eventCandidates),
+        ...personalMapsFromCandidates('miyoushe', explorationCandidates),
+        ...withPersonalIdentity(cycleItems, 'miyoushe', 'personal-challenge-record')
       ],
+      snapshotCompleteness: outcomes.every((outcome) => outcome.succeeded) ? 'complete' : 'partial',
+      adapterVersion: 'genshin-personal-v1',
       message: (target === 'events'
         ? '原神活动进度已读取'
         : target === 'exploration'

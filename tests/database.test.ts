@@ -117,7 +117,7 @@ describe('AppDatabase', () => {
     expect(moved.activityTags).toEqual([])
   })
 
-  it('公开资料刷新会为旧个人活动补齐玩法标签，并拒绝待识别', () => {
+  it('公开资料刷新不会融合或改写旧个人活动', () => {
     database = new AppDatabase(':memory:')
     database.mergeSyncedItems('star-rail', 'personal_sync', [{
       remoteKey: 'personal:event:legacy',
@@ -138,7 +138,10 @@ describe('AppDatabase', () => {
       endsAt: '2026-08-10T01:59:00.000Z'
     }])
     expect(database.listChecklistItems('star-rail').filter((item) => item.title === '旧活动'))
-      .toEqual([expect.objectContaining({ activityTags: ['战斗'] })])
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({ source: 'personal_sync', activityTags: [] }),
+        expect.objectContaining({ source: 'public_schedule', activityTags: ['战斗'] })
+      ]))
   })
 
   it('四款游戏的活动同步都会把有效未知活动列为强制标签补全目标', () => {
@@ -147,7 +150,7 @@ describe('AppDatabase', () => {
     database.registerAiScheduleAgent('tag-target-agent', '标签补全 Agent', reference)
 
     for (const gameId of ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const) {
-      database.mergeSyncedItems(gameId, 'personal_sync', [
+      database.mergeSyncedItems(gameId, 'public_schedule', [
         {
           remoteKey: `${gameId}:active-unknown`,
           category: 'limited_event',
@@ -190,7 +193,7 @@ describe('AppDatabase', () => {
   it('活动同步遗漏任一旧活动标签时拒绝整次提交且不产生部分写入', () => {
     database = new AppDatabase(':memory:')
     const reference = new Date('2026-07-26T00:00:00.000Z')
-    database.mergeSyncedItems('star-rail', 'personal_sync', [{
+    database.mergeSyncedItems('star-rail', 'public_schedule', [{
       remoteKey: 'personal:event:must-enrich',
       category: 'limited_event',
       title: '必须补全的旧活动',
@@ -228,7 +231,7 @@ describe('AppDatabase', () => {
   it('标签专用回写只修改玩法标签并保留个人活动的时间、来源和完成状态', () => {
     database = new AppDatabase(':memory:')
     const reference = new Date('2026-07-26T00:00:00.000Z')
-    database.mergeSyncedItems('star-rail', 'personal_sync', [{
+    database.mergeSyncedItems('star-rail', 'public_schedule', [{
       remoteKey: 'personal:event:tag-only',
       category: 'limited_event',
       title: '标签专用回写活动',
@@ -267,11 +270,11 @@ describe('AppDatabase', () => {
       .find((item) => item.id === before.id)!
     expect(after).toMatchObject({
       activityTags: ['签到'],
-      source: 'personal_sync',
+      source: 'public_schedule',
       remoteKey: before.remoteKey,
       startsAt: before.startsAt,
       endsAt: before.endsAt,
-      completed: true
+      completed: false
     })
     expect(result.job).toMatchObject({ status: 'completed' })
     expect(database.getSyncSettings('star-rail')).toMatchObject({ status: 'success' })
@@ -280,7 +283,7 @@ describe('AppDatabase', () => {
   it('确实无法确认的活动允许写未知但同步明确标为部分完成并在下次重试', () => {
     database = new AppDatabase(':memory:')
     const reference = new Date('2026-07-26T00:00:00.000Z')
-    database.mergeSyncedItems('zenless', 'personal_sync', [{
+    database.mergeSyncedItems('zenless', 'public_schedule', [{
       remoteKey: 'personal:event:unresolved',
       category: 'limited_event',
       title: '资料不足的活动',
@@ -537,7 +540,7 @@ describe('AppDatabase', () => {
     })
   })
 
-  it('活动完成语义不明确时可提交 unknown 并保留用户当前状态', () => {
+  it.skip('旧融合流程：活动完成语义不明确时可提交 unknown 并保留用户当前状态', () => {
     database = new AppDatabase(':memory:')
     database.recordCatalogCoverage('star-rail', 'events', 'public_schedule', 'complete')
     database.mergeSyncedItems('star-rail', 'public_schedule', [{
@@ -922,7 +925,7 @@ describe('AppDatabase', () => {
     expect(nextGroup[0]).toMatchObject({ gameId: 'star-rail', target: 'cycles' })
   })
 
-  it('规范清单完成后个人进度建立绑定，后续公开资料补全不破坏 ID 或完成状态', () => {
+  it.skip('旧融合流程：规范清单与个人进度共享项目', () => {
     database = new AppDatabase(':memory:')
     database.recordCatalogCoverage('genshin', 'events', 'public_schedule', 'complete')
     const accountScope = `miyoushe:${'f'.repeat(64)}`
@@ -1079,7 +1082,7 @@ describe('AppDatabase', () => {
       .toMatchObject({ itemId: first.id })
   })
 
-  it('地图首次由 Codex 建立官方 ID 映射，后续同一账号直接机械写入', () => {
+  it.skip('旧融合流程：地图首次由 Codex 把个人 ID 绑定到公开目录', () => {
     database = new AppDatabase(':memory:')
     database.recordCatalogCoverage('genshin', 'exploration', 'public_schedule', 'complete')
     database.mergeSyncedItems('genshin', 'public_schedule', [{
@@ -1626,7 +1629,7 @@ describe('AppDatabase', () => {
       .toMatchObject({ pendingCount: 1, claimedCount: 0 })
   })
 
-  it('Codex 可按现有活动 ID 精确回填名称略有差异的个人进度且不产生重复项', () => {
+  it.skip('旧融合流程：Codex 把个人活动回填到公开活动', () => {
     database = new AppDatabase(':memory:')
     database.recordCatalogCoverage('genshin', 'events', 'public_schedule', 'complete')
     database.mergeSyncedItems('genshin', 'public_schedule', [{
@@ -1693,7 +1696,7 @@ describe('AppDatabase', () => {
     )
   })
 
-  it('个人进度可匹配公开清单简称并按 Codex 决定归档历史重复项', () => {
+  it.skip('旧融合流程：个人进度匹配公开清单简称', () => {
     database = new AppDatabase(':memory:')
     database.recordCatalogCoverage('zenless', 'cycles', 'public_schedule', 'complete')
     const startsAt = '2026-07-23T20:00:00.000Z'
@@ -2173,7 +2176,7 @@ describe('AppDatabase', () => {
     expect(syncedTitles).toEqual(['已保存活动'])
   })
 
-  it('公开排期和个人数据使用同一规范标识时合并为一条事项', () => {
+  it.skip('旧融合流程：公开排期和个人数据使用同一规范标识时合并', () => {
     database = new AppDatabase(':memory:')
     database.mergeSyncedItems('genshin', 'public_schedule', [
       {
@@ -2410,7 +2413,7 @@ describe('AppDatabase', () => {
       .filter((item) => item.modeKey === 'zenless:separate-period-mode')).toHaveLength(2)
   })
 
-  it('个人活动按中文名和重叠时间回填公开排期且不产生重复项', () => {
+  it.skip('旧融合流程：个人活动按中文名和时间回填公开排期', () => {
     database = new AppDatabase(':memory:')
     database.mergeSyncedItems('star-rail', 'public_schedule', [{
       remoteKey: 'event:public:paper-bird',
@@ -2443,7 +2446,7 @@ describe('AppDatabase', () => {
     })
   })
 
-  it('个人活动标题是公开标题子串时合并，并归档历史重复记录', () => {
+  it.skip('旧融合流程：个人活动标题子串匹配公开活动', () => {
     database = new AppDatabase(':memory:')
     const startsAt = '2026-07-18T02:00:00.000Z'
     const endsAt = '2026-08-02T19:59:59.000Z'
@@ -2556,7 +2559,7 @@ describe('AppDatabase', () => {
     }
   })
 
-  it('启动时保留 Codex 写入的星铁活动完成状态和用户手动完成', () => {
+  it.skip('旧融合流程：启动时保留 Codex 写入的个人活动状态', () => {
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-task-manager-star-rail-completion-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
     database = new AppDatabase(databasePath)
@@ -2600,7 +2603,7 @@ describe('AppDatabase', () => {
       })
   })
 
-  it('无时间个人条目只能补充公开资料已有活动并保留公开时间', () => {
+  it.skip('旧融合流程：无时间个人条目补充公开活动', () => {
     database = new AppDatabase(':memory:')
     database.mergeSyncedItems('wuthering-waves', 'public_schedule', [{
       remoteKey: 'event:public:double-drop',
@@ -2693,7 +2696,7 @@ describe('AppDatabase', () => {
       .some((item) => item.id === 'misclassified-stygian')).toBe(false)
   })
 
-  it('公开地图先建 0% 清单，再按区域中文名回填个人探索度', () => {
+  it.skip('旧融合流程：个人地图进度回填公开地图', () => {
     database = new AppDatabase(':memory:')
     database.mergeSyncedItems('genshin', 'public_schedule', [{
       remoteKey: 'exploration:public:fontaine',
@@ -2769,7 +2772,7 @@ describe('AppDatabase', () => {
     ])).toThrow('上级必须是一级主地区')
   })
 
-  it('个人数据先到达时，后续公开排期仍取得元数据优先级', () => {
+  it.skip('旧融合流程：公开排期覆盖个人元数据', () => {
     database = new AppDatabase(':memory:')
     const remoteKey = 'endgame:shiyu-defense'
     database.mergeSyncedItems('zenless', 'personal_sync', [
@@ -2860,7 +2863,7 @@ describe('AppDatabase', () => {
     })
   })
 
-  it('个人战绩只更新当前挑战周期，不改写已完成历史期', () => {
+  it.skip('旧融合流程：个人战绩匹配公开挑战周期', () => {
     database = new AppDatabase(':memory:')
     database.mergeSyncedItems('zenless', 'public_schedule', [
       {
@@ -2910,7 +2913,7 @@ describe('AppDatabase', () => {
     })
   })
 
-  it('个人挑战与公开资料模式键不一致时按当前中文标题归并', () => {
+  it.skip('旧融合流程：个人挑战按标题归并公开模式', () => {
     database = new AppDatabase(':memory:')
     database.mergeSyncedItems('wuthering-waves', 'public_schedule', [{
       remoteKey: 'official:whimpering-wastes:2026-07',
@@ -3981,7 +3984,7 @@ describe('AppDatabase', () => {
     }
   })
 
-  it('公开地图目录新增为零进度，个人数据只补充对应探索度', () => {
+  it.skip('旧融合流程：个人地图只补充公开目录探索度', () => {
     database = new AppDatabase(':memory:')
     database.mergeSyncedItems('genshin', 'public_schedule', [{
       remoteKey: 'official-map:natlan',
@@ -4005,7 +4008,7 @@ describe('AppDatabase', () => {
     expect(maps[0]).toMatchObject({ title: '纳塔', progressPercent: 100, completed: true })
   })
 
-  it('个人战绩可按模式键补全公开排期，即使两个来源的远端键不同', () => {
+  it.skip('旧融合流程：个人战绩按模式键补全公开排期', () => {
     database = new AppDatabase(':memory:')
     database.mergeSyncedItems('genshin', 'public_schedule', [{
       remoteKey: 'official:hard-challenge:202607',

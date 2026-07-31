@@ -4,438 +4,229 @@ import { SyncOrchestrator } from '../src/main/sync/orchestrator'
 import { SyncVerificationRequiredError } from '../src/main/sync/types'
 
 let database: AppDatabase | null = null
+const accountScope = `miyoushe:${'8'.repeat(64)}`
 
 afterEach(() => {
   database?.close()
   database = null
 })
 
+function personalMap(progressPercent: number) {
+  return {
+    remoteKey: 'personal-map:miyoushe:6',
+    category: 'exploration' as const,
+    title: '璃月',
+    completed: progressPercent === 100,
+    progressPercent,
+    mapNodeKind: 'region' as const,
+    sourceIdentity: {
+      provider: 'miyoushe',
+      endpoint: 'personal-map-progress',
+      externalId: '6'
+    }
+  }
+}
+
 describe('SyncOrchestrator', () => {
-  it('公开排期和个人数据按顺序执行并汇总结果', async () => {
+  it('公开清单和个人清单由用户选择切换，不再自动融合', async () => {
     database = new AppDatabase(':memory:')
-    const order: string[] = []
-    const publicSync = vi.fn(async () => {
-      order.push('public')
-      return {
-        items: [
-          {
-            remoteKey: 'event:summer',
-            category: 'limited_event' as const,
-            title: '夏日活动'
-          }
-        ],
-        message: '公开排期已同步'
-      }
+    const custom = database.createChecklistItem({
+      gameId: 'genshin', category: 'custom', title: '自定义养成计划'
     })
-    const personalSync = vi.fn(async () => {
-      order.push('personal')
-      return {
-        items: [
-          {
-            remoteKey: 'abyss:current',
-            category: 'endgame' as const,
-            title: '深境螺旋',
-            completed: true
-          }
-        ],
-        message: '个人数据已同步'
-      }
+    database.createChecklistItem({
+      gameId: 'genshin', category: 'exploration', title: '用户手填地图'
     })
-    const orchestrator = new SyncOrchestrator(database, {
-      publicSchedule: { genshin: { sync: publicSync } },
-      personalData: { genshin: { sync: personalSync } }
-    })
-    database.recordCatalogCoverage('genshin', 'cycles', 'public_schedule', 'complete')
-
-    const result = await orchestrator.syncGame('genshin', 'public_and_personal')
-
-    expect(order).toEqual(['public', 'personal'])
-    expect(publicSync).toHaveBeenCalledWith(
-      'genshin',
-      'all',
-      expect.any(Function),
-      undefined
-    )
-    expect(personalSync).toHaveBeenCalledWith(
-      'genshin',
-      'all',
-      expect.any(Function),
-      undefined
-    )
-    expect(result.status).toBe('success')
-    expect(result.sources.map((source) => source.added)).toEqual([1, 1])
-    expect(database.listChecklistItems('genshin')).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ title: '夏日活动', source: 'public_schedule', completed: false }),
-        expect.objectContaining({ title: '深境螺旋', source: 'personal_sync', completed: true })
-      ])
-    )
-    expect(database.getSyncSettings('genshin').status).toBe('success')
-  })
-
-  it('未接入适配器时明确返回错误而不伪造同步成功', async () => {
-    database = new AppDatabase(':memory:')
-    const orchestrator = new SyncOrchestrator(database)
-
-    const result = await orchestrator.syncGame('wuthering-waves', 'public_and_personal')
-
-    expect(result.status).toBe('error')
-    expect(result.sources).toHaveLength(2)
-    expect(result.message).toContain('公开资料适配器尚未接入')
-    expect(result.message).toContain('库街区个人数据适配器尚未接入')
-    expect(database.getSyncSettings('wuthering-waves').status).toBe('error')
-  })
-
-  it('版块同步只合并目标版块内的数据', async () => {
-    database = new AppDatabase(':memory:')
-    const orchestrator = new SyncOrchestrator(database, {
-      publicSchedule: {
-        genshin: {
-          sync: async () => ({
-            items: [
-              { remoteKey: 'event:one', category: 'limited_event', title: '目标活动' },
-              { remoteKey: 'map:one', category: 'exploration', title: '不应写入的地图' }
-            ],
-            message: '混合数据'
-          })
-        }
-      },
-      personalData: {}
-    })
-
-    const result = await orchestrator.syncGame('genshin', 'public_schedule', 'events')
-    expect(result.requestedTarget).toBe('events')
-    expect(database.listChecklistItems('genshin').some((item) => item.title === '目标活动')).toBe(true)
-    expect(database.listChecklistItems('genshin').some((item) => item.title === '不应写入的地图')).toBe(false)
-  })
-
-  it('个人数据需要验证时保留公开排期成功结果并标记验证状态', async () => {
-    database = new AppDatabase(':memory:')
-    const orchestrator = new SyncOrchestrator(database, {
-      publicSchedule: {
-        genshin: { sync: async () => ({ items: [], message: '公开排期已同步' }) }
-      },
-      personalData: {
-        genshin: {
-          sync: async () => {
-            throw new SyncVerificationRequiredError('米游社登录已失效或需要 Geetest 验证')
-          }
-        }
-      }
-    })
-
-    const result = await orchestrator.syncGame('genshin', 'public_and_personal')
-
-    expect(result.status).toBe('partial')
-    expect(result.sources).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ source: 'public_schedule', status: 'success' }),
-        expect.objectContaining({ source: 'personal_data', status: 'verification_required' })
-      ])
-    )
-    expect(database.getSyncSettings('genshin')).toMatchObject({
-      status: 'verification_required'
-    })
-    expect(database.getSyncSettings('genshin').lastSuccessAt).not.toBeNull()
-  })
-
-  it('同一游戏的并发刷新复用正在执行的任务，避免重复请求和写入', async () => {
-    database = new AppDatabase(':memory:')
-    let release!: () => void
-    const gate = new Promise<void>((resolve) => {
-      release = resolve
-    })
-    const adapter = vi.fn(async () => {
-      await gate
-      return { items: [], message: '完成' }
-    })
-    const orchestrator = new SyncOrchestrator(database, {
-      publicSchedule: { zenless: { sync: adapter } },
-      personalData: {}
-    })
-
-    const first = orchestrator.syncGame('zenless', 'public_schedule')
-    const second = orchestrator.syncGame('zenless', 'public_schedule')
-    release()
-    const [firstResult, secondResult] = await Promise.all([first, second])
-
-    expect(adapter).toHaveBeenCalledTimes(1)
-    expect(secondResult).toEqual(firstResult)
-  })
-
-  it('可单独运行个人适配器并复用同一游戏的并发请求', async () => {
-    database = new AppDatabase(':memory:')
-    let release!: () => void
-    const gate = new Promise<void>((resolve) => {
-      release = resolve
-    })
-    const personal = vi.fn(async () => {
-      await gate
-      return {
-        items: [{
-          remoteKey: 'endgame:shiyu-defense',
-          category: 'endgame' as const,
-          title: '式舆防卫战',
-          completed: true
-        }],
-        message: '绝区零个人数据已同步'
-      }
-    })
-    const orchestrator = new SyncOrchestrator(database, {
-      publicSchedule: {},
-      personalData: { zenless: { sync: personal } }
-    })
-    database.recordCatalogCoverage('zenless', 'cycles', 'public_schedule', 'complete')
-
-    const first = orchestrator.syncPersonalData('zenless')
-    const second = orchestrator.syncPersonalData('zenless')
-    release()
-    const [firstResult, secondResult] = await Promise.all([first, second])
-
-    expect(personal).toHaveBeenCalledTimes(1)
-    expect(secondResult).toEqual(firstResult)
-    expect(firstResult).toMatchObject({ source: 'personal_data', status: 'success', added: 1 })
-    expect(database.listChecklistItems('zenless')).toEqual(expect.arrayContaining([
-      expect.objectContaining({ title: '式舆防卫战', completed: true, source: 'personal_sync' })
-    ]))
-  })
-
-  it('同步进度只运行个人适配器并记录独立结果', async () => {
-    database = new AppDatabase(':memory:')
-    const progress: Array<{ phase: string; status: string; message: string }> = []
-    const publicSync = vi.fn(async () => ({ items: [], message: '不应运行' }))
+    const publicSync = vi.fn(async () => ({
+      items: [{ remoteKey: 'map:public:liyue', category: 'exploration' as const, title: '璃月' }],
+      message: '公开资料已同步'
+    }))
     const personalSync = vi.fn(async () => ({
-      items: [{
-        remoteKey: 'map:fontaine',
-        category: 'exploration' as const,
-        title: '枫丹',
-        progressPercent: 72
-      }],
+      items: [personalMap(86)],
+      accountScope,
+      snapshotCompleteness: 'complete' as const,
+      adapterVersion: 'test-v1',
       message: '个人进度已同步'
     }))
     const orchestrator = new SyncOrchestrator(database, {
       publicSchedule: { genshin: { sync: publicSync } },
       personalData: { genshin: { sync: personalSync } }
-    }, (update) => progress.push({
-      phase: update.phase,
-      status: update.status,
-      message: update.message
+    })
+
+    await orchestrator.syncGame('genshin', 'public_schedule', 'exploration')
+    expect(database.listChecklistItems('genshin').some((item) => item.source === 'public_schedule'))
+      .toBe(true)
+    const personal = await orchestrator.syncPersonalOnly('genshin', 'exploration')
+
+    expect(personal.status).toBe('success')
+    expect(publicSync).toHaveBeenCalledTimes(1)
+    expect(database.listChecklistItems('genshin').filter((item) => item.category === 'exploration'))
+      .toEqual([expect.objectContaining({ title: '璃月', source: 'personal_sync', progressPercent: 86 })])
+    expect(database.listChecklistItems('genshin')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: custom.id, title: '自定义养成计划' }),
+      expect.objectContaining({ id: 'genshin:main_quest' }),
+      expect.objectContaining({ id: 'genshin:side_quest' })
+    ]))
+    expect(database.getSourceBinding('genshin', 'miyoushe', 'personal-map-progress', '6'))
+      .toMatchObject({ bindingKind: 'mechanical', confidence: 1 })
+    expect(database.getSyncTargetStates('genshin')).toContainEqual(expect.objectContaining({
+      target: 'exploration', catalogSource: 'personal_data', catalogCoverage: 'complete'
     }))
-    database.recordCatalogCoverage('genshin', 'exploration', 'public_schedule', 'complete')
+  })
 
-    const result = await orchestrator.syncPersonalOnly('genshin', 'exploration')
+  it('同步进度不调用公开适配器或旧目录准备器', async () => {
+    database = new AppDatabase(':memory:')
+    const publicSync = vi.fn(async () => ({ items: [], message: '不应运行' }))
+    const prepare = vi.fn()
+    const orchestrator = new SyncOrchestrator(database, {
+      publicSchedule: { genshin: { sync: publicSync } },
+      personalData: { genshin: { sync: async () => ({
+        items: [personalMap(72)], accountScope,
+        snapshotCompleteness: 'complete', adapterVersion: 'test-v1', message: '完成'
+      }) } }
+    }, undefined, prepare)
 
+    await expect(orchestrator.syncPersonalOnly('genshin', 'exploration'))
+      .resolves.toMatchObject({ status: 'success' })
     expect(publicSync).not.toHaveBeenCalled()
-    expect(personalSync).toHaveBeenCalledWith(
-      'genshin',
-      'exploration',
-      expect.any(Function),
-      expect.any(AbortSignal)
-    )
-    expect(result).toMatchObject({
-      requestedScope: 'personal_data',
-      requestedTarget: 'exploration',
-      status: 'partial'
-    })
-    expect(database.getSyncSettings('genshin')).toMatchObject({
-      status: 'stale',
-      lastScope: null
-    })
-    expect(progress.map((update) => update.phase)).toEqual([
-      'fetching',
-      'structuring',
-      'merging',
-      'verifying'
-    ])
-    expect(progress.at(-1)).toMatchObject({
-      status: 'running'
-    })
+    expect(prepare).not.toHaveBeenCalled()
   })
 
-  it('地图首次个人同步先准备规范目录，再按唯一名称与层级机械绑定进度', async () => {
+  it('部分个人响应不会修改上一份完整快照', async () => {
     database = new AppDatabase(':memory:')
-    const accountScope = `miyoushe:${'8'.repeat(64)}`
-    const prepareCatalog = vi.fn(async () => {
-      database!.mergeSyncedItems('genshin', 'public_schedule', [{
-        remoteKey: 'catalog:genshin:liyue',
-        category: 'exploration',
-        title: '璃月',
-        mapNodeKind: 'region'
-      }], new Date().toISOString(), true, { identityPolicy: 'remote-key-only' })
-      database!.recordCatalogCoverage(
-        'genshin',
-        'exploration',
-        'public_schedule',
-        'complete'
-      )
-    })
+    let partial = false
     const orchestrator = new SyncOrchestrator(database, {
       publicSchedule: {},
-      personalData: {
-        genshin: {
-          sync: async () => ({
-            items: [],
-            reviewCandidates: [{
-              target: 'exploration',
-              kind: 'personal-map-progress',
-              payload: {
-                provider: 'miyoushe',
-                officialId: '6',
-                officialTitle: '璃月',
-                observedNodeKind: 'region',
-                observedProgress: 86
-              }
-            }],
-            accountScope,
-            message: '个人地图数据已读取'
-          })
-        }
-      }
-    }, undefined, prepareCatalog)
+      personalData: { genshin: { sync: async () => ({
+        items: [personalMap(partial ? 12 : 66)], accountScope,
+        snapshotCompleteness: partial ? 'partial' : 'complete',
+        adapterVersion: 'test-v1', message: '读取完成'
+      }) } }
+    })
+    await orchestrator.syncPersonalOnly('genshin', 'exploration')
+    partial = true
+    const second = await orchestrator.syncPersonalOnly('genshin', 'exploration')
 
+    expect(second.status).toBe('error')
+    expect(second.message).toContain('已保留上次个人清单')
+    expect(database.listChecklistItems('genshin').find((item) => item.title === '璃月'))
+      .toMatchObject({ progressPercent: 66 })
+  })
+
+  it('完整个人快照移除已不在官方结果中的旧项并保留稳定项目 ID', async () => {
+    database = new AppDatabase(':memory:')
+    const first = database.replacePersonalSnapshot('genshin', 'exploration', accountScope, [
+      personalMap(20),
+      {
+        ...personalMap(30), remoteKey: 'personal-map:miyoushe:7', title: '蒙德',
+        sourceIdentity: { provider: 'miyoushe', endpoint: 'personal-map-progress', externalId: '7' }
+      }
+    ], 'test-v1')
+    expect(first.added).toBe(2)
+    const stableId = database.listChecklistItems('genshin').find((item) => item.title === '璃月')!.id
+
+    database.replacePersonalSnapshot('genshin', 'exploration', accountScope, [personalMap(100)], 'test-v1')
+    const maps = database.listChecklistItems('genshin').filter((item) => item.category === 'exploration')
+    expect(maps).toHaveLength(1)
+    expect(maps[0]).toMatchObject({ id: stableId, progressPercent: 100, completed: true })
+  })
+
+  it('活动状态语义未知时不猜完成，但同一官方活动保留用户手工状态', () => {
+    database = new AppDatabase(':memory:')
+    const event = {
+      remoteKey: 'personal-event:miyoushe:event-api:1',
+      category: 'limited_event' as const,
+      title: '官方活动',
+      sourceIdentity: { provider: 'miyoushe', endpoint: 'event-api', externalId: '1' }
+    }
+    database.replacePersonalSnapshot('genshin', 'events', accountScope, [event], 'test-v1')
+    const item = database.listChecklistItems('genshin').find((candidate) => candidate.title === '官方活动')!
+    database.updateChecklistItem({ id: item.id, completed: true })
+    database.replacePersonalSnapshot('genshin', 'events', accountScope, [event], 'test-v1')
+    expect(database.listChecklistItems('genshin').find((candidate) => candidate.id === item.id))
+      .toMatchObject({ completed: true })
+  })
+
+  it('个人周期快照替换挑战但始终保留固定周常', () => {
+    database = new AppDatabase(':memory:')
+    database.replacePersonalSnapshot('genshin', 'cycles', accountScope, [{
+      remoteKey: 'endgame:spiral-abyss',
+      category: 'endgame',
+      title: '深境螺旋',
+      completed: true,
+      periodKey: 'genshin:spiral-abyss:42',
+      sourceIdentity: {
+        provider: 'miyoushe',
+        endpoint: 'personal-challenge-record',
+        externalId: 'endgame:spiral-abyss|period:genshin:spiral-abyss:42'
+      }
+    }], 'test-v1')
+    expect(database.listChecklistItems('genshin')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'genshin:weekly', category: 'weekly' }),
+      expect.objectContaining({ title: '深境螺旋', source: 'personal_sync', completed: true })
+    ]))
+  })
+
+  it('凭据验证失败时保留现有清单', async () => {
+    database = new AppDatabase(':memory:')
+    database.replacePersonalSnapshot('genshin', 'exploration', accountScope, [personalMap(40)], 'test-v1')
+    const orchestrator = new SyncOrchestrator(database, {
+      publicSchedule: {},
+      personalData: { genshin: { sync: async () => {
+        throw new SyncVerificationRequiredError('米游社凭据已失效')
+      } } }
+    })
     const result = await orchestrator.syncPersonalOnly('genshin', 'exploration')
-
-    expect(prepareCatalog).toHaveBeenCalledWith('genshin', 'exploration')
-    expect(result).toMatchObject({
-      requestedTarget: 'exploration',
-      status: 'success',
-      sources: [expect.objectContaining({ pendingReview: 0, updated: 1 })]
-    })
-    const map = database.listChecklistItems('genshin').find(
-      (item) => item.remoteKey === 'catalog:genshin:liyue'
-    )!
-    expect(map).toMatchObject({ title: '璃月', progressPercent: 86 })
-    expect(database.getSourceBinding(
-      'genshin',
-      'miyoushe',
-      'personal-map-progress',
-      '6'
-    )).toMatchObject({ itemId: map.id, bindingKind: 'mechanical' })
+    expect(result.sources[0].status).toBe('verification_required')
+    expect(database.listChecklistItems('genshin').find((item) => item.title === '璃月'))
+      .toMatchObject({ progressPercent: 40 })
   })
 
-  it('模糊个人数据只进入 Codex 核验队列，不直接写入或冒充同步成功', async () => {
+  it('公开资料读取失败时不提前清除当前个人清单', async () => {
     database = new AppDatabase(':memory:')
-    const progress: Array<{ phase: string; status: string; message: string }> = []
+    database.replacePersonalSnapshot('genshin', 'exploration', accountScope, [personalMap(44)], 'test-v1')
     const orchestrator = new SyncOrchestrator(database, {
-      publicSchedule: {},
-      personalData: {
-        'star-rail': {
-          sync: async () => ({
-            items: [],
-            reviewCandidates: [{
-              target: 'events',
-              kind: 'personal-item-semantics',
-              payload: {
-                officialEventId: '6011',
-                title: '反贪「砖」家',
-                observedStatus: { allFinished: true }
-              }
-            }],
-            message: '原始状态已脱敏'
-          })
-        }
-      }
-    }, (update) => progress.push({
-      phase: update.phase,
-      status: update.status,
-      message: update.message
-    }))
-    const result = await orchestrator.syncPersonalOnly('star-rail', 'events')
-
-    expect(result).toMatchObject({
-      status: 'partial',
-      sources: [expect.objectContaining({ pendingReview: 1 })]
+      publicSchedule: { genshin: { sync: async () => { throw new Error('联网失败') } } },
+      personalData: {}
     })
-    expect(result.message).toContain('1 条状态正在由 Codex 核验，核验前保留原清单')
-    expect(progress.at(-1)).toMatchObject({
-      phase: 'verifying',
-      status: 'running',
-      message: '个人数据已读取，Codex 正在核验 1 条状态'
-    })
-    expect(database.getSyncTargetStates('star-rail')).toContainEqual(
-      expect.objectContaining({
-        target: 'events',
-        status: 'stale',
-        catalogCoverage: 'partial',
-        catalogSource: 'personal_data'
-      })
-    )
-    expect(database.listChecklistItems('star-rail').some((item) => item.title === '反贪「砖」家'))
-      .toBe(false)
+    await expect(orchestrator.syncGame('genshin', 'public_schedule', 'exploration'))
+      .resolves.toMatchObject({ status: 'error' })
+    expect(database.listChecklistItems('genshin').find((item) => item.title === '璃月'))
+      .toMatchObject({ source: 'personal_sync', progressPercent: 44 })
   })
 
-  it('取消个人同步会中断适配器且不会合并任何数据', async () => {
+  it('取消个人同步会中断适配器且不写入数据', async () => {
     database = new AppDatabase(':memory:')
-    const progress: Array<{ phase: string; status: string }> = []
-    const personalSync = vi.fn(async (
-      _gameId,
-      _target,
-      _reportProgress,
-      signal?: AbortSignal
-    ) => {
+    const sync = vi.fn(async (_gameId, _target, _progress, signal?: AbortSignal) => {
       await new Promise<void>((_resolve, reject) => {
         signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
       })
-      return {
-        items: [{
-          remoteKey: 'map:cancelled',
-          category: 'exploration' as const,
-          title: '不应写入',
-          progressPercent: 88
-        }],
-        message: '不应完成'
-      }
+      return { items: [personalMap(88)], accountScope, snapshotCompleteness: 'complete' as const, message: '完成' }
     })
     const orchestrator = new SyncOrchestrator(database, {
-      publicSchedule: {},
-      personalData: { genshin: { sync: personalSync } }
-    }, (update) => progress.push({
-      phase: update.phase,
-      status: update.status
-    }))
-
+      publicSchedule: {}, personalData: { genshin: { sync } }
+    })
     const operation = orchestrator.syncPersonalOnly('genshin', 'exploration')
-    await vi.waitFor(() => expect(personalSync).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(sync).toHaveBeenCalledOnce())
     expect(orchestrator.cancelPersonalSync('genshin', 'exploration')).toBe(true)
-    const result = await operation
-
-    expect(result.status).toBe('cancelled')
-    expect(result.sources[0]).toMatchObject({ status: 'cancelled', added: 0, updated: 0 })
-    expect(database.listChecklistItems('genshin').some(
-      (item) => item.remoteKey === 'map:cancelled'
-    )).toBe(false)
-    expect(progress.at(-1)).toEqual({ phase: 'cancelled', status: 'cancelled' })
+    await expect(operation).resolves.toMatchObject({ status: 'cancelled' })
+    expect(database.listChecklistItems('genshin').some((item) => item.category === 'exploration')).toBe(false)
   })
 
-  it('应用退出会同时中断所有正在读取的个人同步', async () => {
+  it('同一目标的并发个人同步复用请求，应用退出取消全部任务', async () => {
     database = new AppDatabase(':memory:')
-    const started: string[] = []
-    const sync = vi.fn(async (
-      gameId,
-      target,
-      _reportProgress,
-      signal?: AbortSignal
-    ) => {
-      started.push(`${gameId}:${target}`)
-      await new Promise<void>((_resolve, reject) => {
-        signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
-      })
-      return { items: [], message: '不应完成' }
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const sync = vi.fn(async () => {
+      await gate
+      return { items: [personalMap(55)], accountScope, snapshotCompleteness: 'complete' as const, message: '完成' }
     })
     const orchestrator = new SyncOrchestrator(database, {
-      publicSchedule: {},
-      personalData: {
-        genshin: { sync },
-        'star-rail': { sync }
-      }
+      publicSchedule: {}, personalData: { genshin: { sync } }
     })
-
-    const first = orchestrator.syncPersonalOnly('genshin', 'events')
-    const second = orchestrator.syncPersonalOnly('star-rail', 'cycles')
-    await vi.waitFor(() => expect(started).toHaveLength(2))
-    expect(orchestrator.shutdown()).toBe(2)
-
-    await expect(first).resolves.toMatchObject({ status: 'cancelled' })
-    await expect(second).resolves.toMatchObject({ status: 'cancelled' })
+    const first = orchestrator.syncPersonalData('genshin', 'exploration')
+    const second = orchestrator.syncPersonalData('genshin', 'exploration')
+    release()
+    expect(await second).toEqual(await first)
+    expect(sync).toHaveBeenCalledOnce()
   })
 })

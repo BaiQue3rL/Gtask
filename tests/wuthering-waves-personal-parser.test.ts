@@ -151,17 +151,11 @@ describe('鸣潮个人进度解析', () => {
       (update) => progress.push(update)
     )
     expect(order).toEqual(['tower', 'slash', 'matrix'])
-    expect(output.items).toEqual([])
-    expect(output.reviewCandidates).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        target: 'cycles',
-        payload: expect.objectContaining({ observedModeKey: 'tower-of-adversity' })
-      }),
-      expect.objectContaining({
-        target: 'cycles',
-        payload: expect.objectContaining({ observedModeKey: 'endstate-matrix' })
-      })
+    expect(output.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: 'endgame', modeKey: 'tower-of-adversity' }),
+      expect.objectContaining({ category: 'endgame', modeKey: 'endstate-matrix' })
     ]))
+    expect(output.snapshotCompleteness).toBe('partial')
     expect(output.message).toContain('部分成功 2/3')
     expect(progress).toEqual(expect.arrayContaining([
       expect.objectContaining({ message: '正在读取逆境深塔战绩', current: 1, total: 3 }),

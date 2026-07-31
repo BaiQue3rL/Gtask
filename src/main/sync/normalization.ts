@@ -52,6 +52,16 @@ function optionalActivityTags(value: unknown): string[] | undefined {
   return uniqueTags
 }
 
+function optionalSourceIdentity(value: unknown): NormalizedSyncItem['sourceIdentity'] {
+  if (value === undefined) return undefined
+  if (!isRecord(value)) throw new Error('个人数据来源标识格式不正确')
+  return {
+    provider: requiredString(value.provider, '个人数据平台', 80),
+    endpoint: requiredString(value.endpoint, '个人数据接口', 160),
+    externalId: requiredString(value.externalId, '个人数据官方标识', 300)
+  }
+}
+
 export function normalizeSyncItem(value: unknown): NormalizedSyncItem {
   if (!isRecord(value)) throw new Error('同步事项格式不正确')
   if (
@@ -125,7 +135,8 @@ export function normalizeSyncItem(value: unknown): NormalizedSyncItem {
     resetWeekday: value.resetWeekday as number | null | undefined,
     timeZone: nullableString(value.timeZone, '同步时区'),
     modeKey: nullableString(value.modeKey, '同步模式标识'),
-    recurrenceRule: null
+    recurrenceRule: null,
+    sourceIdentity: optionalSourceIdentity(value.sourceIdentity)
   }
 }
 

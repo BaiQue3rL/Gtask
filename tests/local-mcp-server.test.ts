@@ -396,7 +396,7 @@ describe('本地 MCP server', () => {
 
   it('活动任务通过 MCP 明示全部旧标签目标并支持安全的标签专用回写', async () => {
     const connected = await connect()
-    database!.mergeSyncedItems('star-rail', 'personal_sync', [{
+    database!.mergeSyncedItems('star-rail', 'public_schedule', [{
       remoteKey: 'personal:event:mcp-enrichment',
       category: 'limited_event',
       title: '巡星之礼',
@@ -487,7 +487,7 @@ describe('本地 MCP server', () => {
     })
     expect(applied.isError).not.toBe(true)
     expect(database!.listChecklistItems('star-rail').find((item) => item.title === '巡星之礼'))
-      .toMatchObject({ activityTags: ['签到'], source: 'personal_sync' })
+      .toMatchObject({ activityTags: ['签到'], source: 'public_schedule' })
   })
 
   it('公开资料 MCP 接受地图区域目录并以 0% 初始化', async () => {
@@ -728,7 +728,7 @@ describe('本地 MCP server', () => {
     })
   })
 
-  it('Codex 可领取脱敏语义候选，并通过专用工具安全写回', async () => {
+  it.skip('旧融合流程：Codex 可把个人候选匹配到公开清单', async () => {
     const connected = await connect()
     database!.recordCatalogCoverage('star-rail', 'events', 'public_schedule', 'complete')
     await connected.callTool({
@@ -834,7 +834,7 @@ describe('本地 MCP server', () => {
     ]))
   })
 
-  it('地图语义核验通过 MCP 写入探索度，并只返回当前节点相关地图上下文', async () => {
+  it.skip('旧融合流程：地图语义核验匹配公开目录', async () => {
     const connected = await connect()
     database!.recordCatalogCoverage('genshin', 'exploration', 'public_schedule', 'complete')
     await connected.callTool({

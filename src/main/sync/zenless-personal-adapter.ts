@@ -11,7 +11,11 @@ import {
   type PersonalRequestOutcome
 } from './personal-sync-settler'
 import type { SyncAdapter, SyncAdapterOutput, SyncProgressReporter } from './types'
-import { toCycleReviewCandidates } from './cycle-review'
+import {
+  personalEventsFromCandidates,
+  personalMapsFromCandidates,
+  withPersonalIdentity
+} from './personal-snapshot'
 
 export interface ZenlessBattleChronicleClient {
   getShiyuDefense: () => Promise<unknown>
@@ -76,12 +80,13 @@ export class ZenlessPersonalAdapter implements SyncAdapter {
       ? []
       : extractZenlessExplorationReviewCandidates(exploration)
     return {
-      items: [],
-      reviewCandidates: [
-        ...eventCandidates,
-        ...toCycleReviewCandidates('miyoushe', cycleItems),
-        ...explorationCandidates
+      items: [
+        ...personalEventsFromCandidates('zenless', 'miyoushe', eventCandidates),
+        ...withPersonalIdentity(cycleItems, 'miyoushe', 'personal-challenge-record'),
+        ...personalMapsFromCandidates('miyoushe', explorationCandidates)
       ],
+      snapshotCompleteness: outcomes.every((outcome) => outcome.succeeded) ? 'complete' : 'partial',
+      adapterVersion: 'zenless-personal-v1',
       message: (target === 'events'
         ? '绝区零活动进度已读取'
         : target === 'exploration'

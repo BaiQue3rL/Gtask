@@ -1,6 +1,6 @@
 import type {
-  ChecklistCategory,
   GameId,
+  PersonalSyncTarget,
   SyncResult,
   SyncProgressUpdate,
   SyncScope,
@@ -15,13 +15,12 @@ import {
   SyncCancelledError,
   SyncVerificationRequiredError,
   throwIfSyncCancelled,
-  type SemanticReviewDraft,
   type SyncAdapter,
   type SyncAdapterProgress,
   type SyncAdapterRegistry
 } from './types'
 import { normalizeSyncItems } from './normalization'
-import { filterRelevantSemanticReviewDrafts } from './personal-review-filter'
+import { getPersonalSyncTargets } from './personal-sync-capabilities'
 
 const PERSONAL_PLATFORM_NAMES: Record<GameId, string> = {
   genshin: '米游社',
@@ -42,10 +41,9 @@ export class SyncOrchestrator {
     private readonly database: AppDatabase,
     private readonly adapters: SyncAdapterRegistry = { publicSchedule: {}, personalData: {} },
     private readonly onProgress?: (progress: SyncProgressUpdate) => void,
-    private readonly preparePersonalCatalog?: (
-      gameId: GameId,
-      target: SyncTarget
-    ) => void | Promise<void>
+    // Kept temporarily for binary/source compatibility with older callers.
+    // Personal snapshots no longer invoke public-catalog preparation.
+    _obsoletePreparePersonalCatalog?: (gameId: GameId, target: SyncTarget) => void | Promise<void>
   ) {}
 
   syncGame(gameId: GameId, scope: SyncScope, target: SyncTarget = 'all'): Promise<SyncResult> {
@@ -281,129 +279,89 @@ export class SyncOrchestrator {
       throwIfSyncCancelled(signal)
       const result = await adapter.sync(gameId, target, reportProgress, signal)
       throwIfSyncCancelled(signal)
-      if (source === 'personal_data') {
-        await this.preparePersonalCatalog?.(gameId, target)
-        throwIfSyncCancelled(signal)
-      }
       reportProgress({
         phase: 'structuring',
         message: '数据读取完成，正在整理可写入内容',
         current: null,
         total: null
       })
-      const checklistSource = source === 'public_schedule' ? 'public_schedule' : 'personal_sync'
-      const targetCategories: Partial<Record<SyncTarget, ChecklistCategory[]>> = {
+      const targetCategories = {
         tasks: ['main_quest', 'side_quest'],
         events: ['limited_event'],
         cycles: ['weekly', 'endgame'],
         exploration: ['exploration']
-      }
-      const categories = targetCategories[target]
+      } as const
+      const categories = target === 'all' ? undefined : targetCategories[target]
       const normalizedItems = normalizeSyncItems(result.items).filter(
-        (item) => !categories || categories.includes(item.category)
+        (item) => !categories || (categories as readonly string[]).includes(item.category)
       )
-      const personalTargetByCategory: Partial<Record<ChecklistCategory, Exclude<SyncTarget, 'all' | 'tasks'>>> = {
-        limited_event: 'events',
-        weekly: 'cycles',
-        endgame: 'cycles',
-        exploration: 'exploration'
-      }
-      const explicitReviewTargets = new Set(
-        (result.reviewCandidates ?? []).map((candidate) => candidate.target)
-      )
-      const directlyMergeableItems = source === 'personal_data'
-        ? normalizedItems.filter((item) => {
-            // Personal map payloads are observations, not catalog definitions.
-            // Their progress is applied through a source binding below.
-            if (item.category === 'exploration') return false
-            const itemTarget = personalTargetByCategory[item.category]
-            return !itemTarget || this.database.isCatalogComplete(gameId, itemTarget)
-          })
-        : normalizedItems
-      const deferredPersonalItems = source === 'personal_data'
-        ? normalizedItems.filter((item) => {
-            if (directlyMergeableItems.includes(item)) return false
-            const itemTarget = personalTargetByCategory[item.category]
-            return Boolean(itemTarget && !explicitReviewTargets.has(itemTarget))
-          })
-        : []
       throwIfSyncCancelled(signal)
       reportProgress({
         phase: 'merging',
-        message: '内容整理完成，正在安全合并清单',
+        message: source === 'personal_data'
+          ? '内容整理完成，正在切换为官方个人清单'
+          : '内容整理完成，正在写入公开清单',
         current: 1,
         total: 1
       })
-      const merge = this.database.mergeSyncedItems(
-        gameId,
-        checklistSource,
-        directlyMergeableItems
-      )
-      let reviewCandidates = [
-        ...(result.reviewCandidates ?? []),
-        ...deferredPersonalItems.flatMap((item): SemanticReviewDraft[] => {
-          const itemTarget = personalTargetByCategory[item.category]
-          return itemTarget
-            ? [{
-                target: itemTarget,
-                kind: 'normalized-personal-item',
-                payload: { normalizedItem: item }
-              }]
+      const merge = { added: 0, updated: 0, preserved: 0 }
+      if (source === 'personal_data') {
+        if (result.snapshotCompleteness === 'partial') {
+          throw new Error('个人接口只返回了部分数据，已保留上次个人清单，请稍后重试')
+        }
+        if (!result.accountScope) throw new Error('个人数据缺少安全账号作用域，请重新登录')
+        if ((result.reviewCandidates?.length ?? 0) > 0) {
+          throw new Error('个人数据适配器未能形成完整快照，已保留上次个人清单')
+        }
+        const personalTargets: PersonalSyncTarget[] = target === 'all'
+          ? getPersonalSyncTargets(gameId)
+          : target === 'events' || target === 'cycles' || target === 'exploration'
+            ? [target]
             : []
-          })
-      ]
-      reviewCandidates = filterRelevantSemanticReviewDrafts(reviewCandidates)
-      if (
-        source === 'personal_data' &&
-        result.accountScope &&
-        reviewCandidates.length > 0
-      ) {
-        const resolution = this.database.resolveKnownPersonalDrafts(
-          gameId,
-          result.accountScope,
-          reviewCandidates
-        )
-        reviewCandidates = resolution.reviewCandidates
-        merge.added += resolution.added
-        merge.updated += resolution.applied
-        merge.preserved += resolution.preserved
-      }
-      throwIfSyncCancelled(signal)
-      const review = this.database.queueSemanticReviewCandidates(
-        gameId,
-        checklistSource,
-        reviewCandidates,
-        new Date(),
-        requestContext,
-        source === 'personal_data' ? result.accountScope ?? null : null
-      )
-      const changes = merge.added + merge.updated
-      if (source === 'personal_data' && (changes > 0 || review.pending > 0)) {
-        this.database.recordCatalogCoverage(gameId, target, 'personal_data', 'partial')
-      } else if (source === 'public_schedule') {
+        if (personalTargets.length === 0) throw new Error('当前版块不支持同步个人进度')
+        const byTarget: Record<PersonalSyncTarget, typeof normalizedItems> = {
+          events: normalizedItems.filter((item) => item.category === 'limited_event'),
+          cycles: normalizedItems.filter((item) => item.category === 'endgame'),
+          exploration: normalizedItems.filter((item) => item.category === 'exploration')
+        }
+        for (const personalTarget of personalTargets) {
+          throwIfSyncCancelled(signal)
+          const replaced = this.database.replacePersonalSnapshot(
+            gameId,
+            personalTarget,
+            result.accountScope,
+            byTarget[personalTarget],
+            result.adapterVersion ?? 'legacy-personal-adapter-v1'
+          )
+          merge.added += replaced.added
+          merge.updated += replaced.updated
+          merge.preserved += replaced.preserved
+        }
+      } else {
+        const merged = this.database.replacePublicCatalog(gameId, target, normalizedItems)
+        merge.added += merged.added
+        merge.updated += merged.updated
+        merge.preserved += merged.preserved
         this.database.recordCatalogCoverage(gameId, target, 'public_schedule', 'complete')
       }
+      throwIfSyncCancelled(signal)
+      const changes = merge.added + merge.updated
       const changeMessage = changes > 0
         ? `新增 ${merge.added}，更新 ${merge.updated}`
         : '无清单变更'
       const preservedMessage = merge.preserved > 0 ? `，保护 ${merge.preserved}` : ''
-      const reviewMessage = review.pending > 0
-        ? `；${review.pending} 条状态正在由 Codex 核验，核验前保留原清单`
-        : ''
       reportProgress({
-        phase: review.pending > 0 ? 'verifying' : 'completed',
-        status: review.pending > 0 ? 'running' : 'completed',
-        message: review.pending > 0
-          ? `个人数据已读取，Codex 正在核验 ${review.pending} 条状态`
-          : '同步完成',
-        current: review.pending > 0 ? 0 : 1,
-        total: review.pending > 0 ? review.pending : 1
+        phase: 'completed',
+        status: 'completed',
+        message: '同步完成',
+        current: 1,
+        total: 1
       })
       return {
         source,
         status: 'success',
-        message: `${result.message}（${changeMessage}${preservedMessage}）${reviewMessage}`,
-        pendingReview: review.pending,
+        message: `${result.message}（${changeMessage}${preservedMessage}）`,
+        pendingReview: 0,
         ...merge
       }
     } catch (error) {
