@@ -40,6 +40,7 @@ import {
   CODEX_PROXY_WARNING,
   isCodexConnectionRetry
 } from './codex-proxy-diagnostic'
+import { toCodexWorkerPreferencesIpcPayload } from './codex-worker-preferences'
 import {
   credentialProviderForSyncResult,
   credentialProviderFromSyncMessage
@@ -1236,7 +1237,7 @@ async function saveCodexWorkerPreferences(): Promise<void> {
   codexWorkerPreferencesMessage.value = '正在保存…'
   try {
     codexWorkerPreferences.value = await window.gacha.updateCodexWorkerPreferences(
-      codexWorkerPreferences.value
+      toCodexWorkerPreferencesIpcPayload(codexWorkerPreferences.value)
     )
     codexWorkerPreferencesMessage.value = '已保存，新启动的后台同步任务将使用此设置。'
   } catch (error) {
