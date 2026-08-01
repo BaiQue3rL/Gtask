@@ -304,7 +304,7 @@ export class SyncOrchestrator {
         current: 1,
         total: 1
       })
-      const merge = { added: 0, updated: 0, preserved: 0 }
+      const merge = { added: 0, updated: 0, preserved: 0, expiredRemoved: 0 }
       if (source === 'personal_data') {
         if (result.snapshotCompleteness === 'partial') {
           throw new Error('个人接口只返回了部分数据，已保留上次个人清单，请稍后重试')
@@ -331,11 +331,14 @@ export class SyncOrchestrator {
             personalTarget,
             result.accountScope,
             byTarget[personalTarget],
-            result.adapterVersion ?? 'legacy-personal-adapter-v1'
+            result.adapterVersion ?? 'legacy-personal-adapter-v1',
+            new Date(),
+            requestContext
           )
           merge.added += replaced.added
           merge.updated += replaced.updated
           merge.preserved += replaced.preserved
+          merge.expiredRemoved += replaced.expiredRemoved ?? 0
         }
       } else {
         const merged = this.database.replacePublicCatalog(gameId, target, normalizedItems)
@@ -350,6 +353,9 @@ export class SyncOrchestrator {
         ? `新增 ${merge.added}，更新 ${merge.updated}`
         : '无清单变更'
       const preservedMessage = merge.preserved > 0 ? `，保护 ${merge.preserved}` : ''
+      const expiredMessage = (merge.expiredRemoved ?? 0) > 0
+        ? `，淘汰到期 ${merge.expiredRemoved}`
+        : ''
       reportProgress({
         phase: 'completed',
         status: 'completed',
@@ -360,7 +366,7 @@ export class SyncOrchestrator {
       return {
         source,
         status: 'success',
-        message: `${result.message}（${changeMessage}${preservedMessage}）`,
+        message: `${result.message}（${changeMessage}${preservedMessage}${expiredMessage}）`,
         pendingReview: 0,
         ...merge
       }

@@ -2,6 +2,7 @@ import type {
   ChecklistCategory,
   GameId,
   MapNodeKind,
+  PersonalMetadataField,
   ScheduleKind,
   SyncProgressPhase,
   SyncProgressStatus,
@@ -50,6 +51,7 @@ export interface SyncMergeResult {
   added: number
   updated: number
   preserved: number
+  expiredRemoved?: number
 }
 
 export interface ActivityTagUpdate {
@@ -59,6 +61,18 @@ export interface ActivityTagUpdate {
   sourceUrl: string
   confidence: number
   unresolvedReason?: string | null
+}
+
+export interface PersonalMetadataUpdate {
+  itemId: string
+  title: string
+  activityTags?: string[]
+  startsAt?: string | null
+  endsAt?: string | null
+  unresolvedFields?: PersonalMetadataField[]
+  unresolvedReason?: string | null
+  sourceUrl: string
+  confidence: number
 }
 
 export type OfficialPersonalFact =

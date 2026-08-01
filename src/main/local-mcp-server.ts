@@ -18,7 +18,8 @@ import type {
   ActivityTagUpdate,
   CodexArchiveDecision,
   CodexScheduleItem,
-  NormalizedSyncItem
+  NormalizedSyncItem,
+  PersonalMetadataUpdate
 } from './sync/types'
 import { getSemanticReviewContract } from './sync/interface-contract'
 
@@ -740,6 +741,61 @@ export function createLocalMcpServer(
           contentLocale
         )
         return toolResult({ command: 'apply_public_schedule', ...result })
+      } catch (error) {
+        return toolError(error)
+      }
+    }
+  )
+
+  server.registerTool(
+    'apply_gacha_personal_metadata',
+    {
+      title: '补全个人清单标签与时间',
+      description: '仅按 personal_metadata job.contract 补全既有个人活动的玩法标签及活动/周期事项的缺失起止时间；不能改变完成状态、分类、来源或清单成员。',
+      inputSchema: {
+        agentId: z.string().min(1).max(100),
+        jobId: z.string().uuid(),
+        contentLocale: z.string().min(2).max(35),
+        retrievedAt: isoDateSchema,
+        updates: z.array(z.object({
+          itemId: z.string().min(1).max(100),
+          title: z.string().min(1).max(100),
+          activityTags: z.array(z.string().min(1).max(20)).min(1).max(5).optional(),
+          startsAt: isoDateSchema.nullable().optional(),
+          endsAt: isoDateSchema.nullable().optional(),
+          unresolvedFields: z.array(z.enum(['activityTags', 'startsAt', 'endsAt'])).max(3).optional(),
+          unresolvedReason: z.string().min(1).max(500).nullable().optional(),
+          sourceUrl: httpUrlSchema,
+          confidence: z.number().min(0).max(1)
+        }).strict()).min(1).max(100),
+        evidence: z.array(z.object({
+          url: httpUrlSchema,
+          platform: z.string().min(1).max(100),
+          publisher: z.string().min(1).max(100),
+          official: z.boolean(),
+          language: z.string().min(2).max(35),
+          publishedAt: isoDateSchema.nullable().optional(),
+          note: z.string().max(500).optional()
+        }).strict()).min(1).max(100)
+      },
+      annotations: { destructiveHint: false, openWorldHint: true }
+    },
+    async ({ agentId, jobId, contentLocale, retrievedAt, updates, evidence }) => {
+      try {
+        const normalizedEvidence = evidence.map(({ language, ...entry }) => ({
+          ...entry,
+          note: [entry.note, `页面语言：${language}`].filter(Boolean).join('；')
+        }))
+        return toolResult({
+          command: 'apply_personal_metadata',
+          ...database.applyPersonalMetadataJob(
+            jobId,
+            agentId,
+            updates as PersonalMetadataUpdate[],
+            { retrievedAt, evidence: normalizedEvidence },
+            contentLocale
+          )
+        })
       } catch (error) {
         return toolError(error)
       }

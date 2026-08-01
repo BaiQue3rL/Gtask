@@ -255,7 +255,7 @@ const publicSyncProgresses = computed<SyncProgressUpdate[]>(() =>
   activeAiJobs.value.map((job) => ({
     gameId: job.gameId,
     target: job.target,
-    source: 'public_schedule',
+    source: job.jobKind === 'personal_metadata' ? 'personal_data' : 'public_schedule',
     phase: job.progressPhase,
     status: job.status === 'pending' ? 'waiting' : 'running',
     message: job.message ?? (job.status === 'pending' ? '等待 Codex 接单' : 'Codex 正在处理'),
@@ -265,7 +265,7 @@ const publicSyncProgresses = computed<SyncProgressUpdate[]>(() =>
   }))
 )
 const publicSyncProgress = computed<SyncProgressUpdate | null>(() =>
-  publicSyncProgresses.value[0] ?? null
+  publicSyncProgresses.value.find((progress) => progress.source === 'public_schedule') ?? null
 )
 const liveSyncProgress = computed(() =>
   [
@@ -291,7 +291,9 @@ watch(() => activeAiJob.value?.id, (jobId, previousJobId) => {
   dismissedCodexProxyJobId.value = ''
 })
 const hasActivePublicSync = computed(() =>
-  activeAiJobs.value.some((job) => job.gameId === selectedGameId.value)
+  activeAiJobs.value.some((job) =>
+    job.gameId === selectedGameId.value && job.jobKind === 'public_catalog'
+  )
 )
 const syncing = computed(() =>
   [...activeSyncRequests.value].some((key) => key.startsWith(`${selectedGameId.value}:`))
@@ -787,6 +789,7 @@ async function refreshSemanticReviewProgress(
         const catalogJobActive = activeAiJobs.value.some(
           (job) =>
             job.gameId === gameId &&
+            job.jobKind === 'public_catalog' &&
             (job.target === target || job.target === 'all')
         )
         if (waitingForCatalog && !catalogJobActive) {
@@ -1320,7 +1323,8 @@ function isSyncRequestActive(
 
 function hasActivePublicSyncForTarget(target: SyncTarget): boolean {
   return activeAiJobs.value.some(
-    (job) => job.target === target || job.target === 'all' || target === 'all'
+    (job) => job.jobKind === 'public_catalog' &&
+      (job.target === target || job.target === 'all' || target === 'all')
   )
 }
 
@@ -1328,7 +1332,9 @@ function hasActivePersonalSyncForTarget(target: PersonalSyncTarget): boolean {
   const progress = personalSyncProgressByKey.value[
     personalProgressKey(selectedGameId.value, target)
   ]
-  return isSyncRequestActive('personal_data', target) || Boolean(
+  return activeAiJobs.value.some((job) =>
+    job.jobKind === 'personal_metadata' && job.target === target
+  ) || isSyncRequestActive('personal_data', target) || Boolean(
     progress && ['waiting', 'running', 'verification_required'].includes(progress.status)
   )
 }
@@ -1353,6 +1359,14 @@ async function cancelSync(progress: SyncProgressUpdate): Promise<void> {
     )
     activeAiJob.value = activeAiJobs.value[0] ?? null
   } else if (progress.target !== 'all' && progress.target !== 'tasks') {
+    activeAiJobs.value = activeAiJobs.value.filter(
+      (job) => !(
+        job.gameId === progress.gameId &&
+        job.target === progress.target &&
+        job.jobKind === 'personal_metadata'
+      )
+    )
+    activeAiJob.value = activeAiJobs.value[0] ?? null
     const nextProgress = { ...personalSyncProgressByKey.value }
     delete nextProgress[personalProgressKey(progress.gameId, progress.target)]
     personalSyncProgressByKey.value = nextProgress

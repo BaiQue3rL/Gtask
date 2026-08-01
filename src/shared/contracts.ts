@@ -1,5 +1,5 @@
 export const SUPPORTED_GAME_IDS = ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const
-export const GTASK_MCP_PROTOCOL_VERSION = '2026-07-31.1'
+export const GTASK_MCP_PROTOCOL_VERSION = '2026-08-01.1'
 
 export type GameId = (typeof SUPPORTED_GAME_IDS)[number]
 
@@ -100,6 +100,7 @@ export interface BackupSummary {
 }
 
 export type AiScheduleJobStatus = 'pending' | 'claimed' | 'completed' | 'failed'
+export type AiScheduleJobKind = 'public_catalog' | 'personal_metadata'
 export const SYNC_PROGRESS_PHASES = [
   'queued',
   'fetching',
@@ -168,6 +169,23 @@ export interface ActivityTagEnrichmentTarget {
   endsAt: string | null
 }
 
+export type PersonalMetadataField = 'activityTags' | 'startsAt' | 'endsAt'
+
+export interface PersonalMetadataEnrichmentTarget {
+  itemId: string
+  title: string
+  category: Extract<ChecklistCategory, 'limited_event' | 'endgame'>
+  currentTags: string[]
+  startsAt: string | null
+  endsAt: string | null
+  missingFields: PersonalMetadataField[]
+  sourceIdentity: {
+    provider: string
+    endpoint: string
+    externalId: string
+  }
+}
+
 export interface AiScheduleMatchCandidate {
   itemId: string
   category: ChecklistCategory
@@ -214,6 +232,7 @@ export interface SyncRequestContext {
 
 export interface PublicSyncContract {
   schemaVersion: 6
+  jobKind: 'public_catalog'
   authority: 'interface_contract'
   decisionAuthority: 'codex'
   executorPolicy: 'mechanical_validation_only'
@@ -225,6 +244,20 @@ export interface PublicSyncContract {
   submissionRequiredFields: string[]
   fieldSemantics: Record<string, string>
   sections: SyncSectionContract[]
+}
+
+export interface PersonalMetadataContract {
+  schemaVersion: 1
+  jobKind: 'personal_metadata'
+  authority: 'interface_contract'
+  decisionAuthority: 'codex'
+  executorPolicy: 'mechanical_validation_only'
+  allowedMutations: ['update_metadata']
+  target: Extract<PersonalSyncTarget, 'events' | 'cycles'>
+  requestContext: SyncRequestContext
+  workflow: ['inspect_targets', 'research_missing_fields', 'verify', 'submit_metadata']
+  fieldSemantics: Record<string, string>
+  completionCriteria: string[]
 }
 
 export interface SemanticReviewContract {
@@ -242,6 +275,7 @@ export interface SemanticReviewContract {
 
 export interface AiScheduleJob {
   id: string
+  jobKind: AiScheduleJobKind
   gameId: GameId
   scope: SyncScope
   target: SyncTarget
@@ -260,8 +294,9 @@ export interface AiScheduleJob {
   progressTotal: number | null
   progressUpdatedAt: string
   activityTagTargets: ActivityTagEnrichmentTarget[]
+  metadataTargets: PersonalMetadataEnrichmentTarget[]
   matchCandidates: AiScheduleMatchCandidate[]
-  contract: PublicSyncContract
+  contract: PublicSyncContract | PersonalMetadataContract
 }
 
 export type SemanticReviewStatus = 'pending' | 'claimed' | 'approved' | 'rejected'

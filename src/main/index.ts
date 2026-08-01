@@ -312,7 +312,7 @@ async function queueAiScheduleSync(
       throw new Error(launch.message)
     }
     appDatabase.updatePendingAiScheduleJobsMessage(launch.message)
-    const activeJob = appDatabase.getActiveAiScheduleJob(gameId, target) ?? job
+    const activeJob = appDatabase.getActiveAiScheduleJob(gameId, target, 'public_catalog') ?? job
     sendAiJobProgress(activeJob)
     const publicMessage = `${launch.message}（任务 ${job.id.slice(0, 8)}）`
     const localMessages = [
@@ -371,6 +371,37 @@ async function queueAiScheduleSync(
     sources,
     message: sources.map((source) => source.message).join('；')
   }
+}
+
+function queuePersonalMetadataEnrichment(
+  gameId: GameId,
+  target: SyncTarget,
+  requestContext: SyncRequestContext
+): void {
+  if (!appDatabase || (target !== 'events' && target !== 'cycles')) return
+  const plugin = detectCodexPlugin()
+  if (!plugin.installed) return
+  const job = appDatabase.createPersonalMetadataJob(
+    gameId,
+    target,
+    requestContext,
+    new Date(),
+    true
+  )
+  if (!job) return
+  const launch = startCodexWorkersForActiveJobs()
+  if (!launch || launch.status === 'unavailable') {
+    appDatabase.failPendingAiScheduleJob(
+      job.id,
+      launch?.message ?? 'Codex 自动处理服务尚未初始化'
+    )
+    return
+  }
+  sendAiJobProgress(appDatabase.getActiveAiScheduleJob(
+    gameId,
+    target,
+    'personal_metadata'
+  ) ?? job)
 }
 
 function handleCodexScheduleWorkerEvent(event: CodexScheduleWorkerEvent): void {
@@ -442,7 +473,7 @@ function toAiJobProgress(job: AiScheduleJob): SyncProgressUpdate {
   return {
     gameId: job.gameId,
     target: job.target,
-    source: 'public_schedule',
+    source: job.jobKind === 'personal_metadata' ? 'personal_data' : 'public_schedule',
     phase: job.progressPhase,
     status: job.status === 'pending' ? 'waiting' : 'running',
     message: job.message ?? (job.status === 'pending' ? '正在启动本机 Codex' : 'Codex 正在处理'),
@@ -823,6 +854,9 @@ function registerIpcHandlers(): void {
       parsedTarget,
       parsedRequestContext
     )
+    if (result.status === 'success') {
+      queuePersonalMetadataEnrichment(parsedGameId, parsedTarget, parsedRequestContext)
+    }
     if (result.sources.some((source) => (source.pendingReview ?? 0) > 0)) {
       startCodexWorkersForActiveJobs()
     }
@@ -843,7 +877,12 @@ function registerIpcHandlers(): void {
 
     let cancelled = false
     if (source === 'public_schedule') {
-      const result = appDatabase.cancelActiveAiScheduleJob(parsedGameId, parsedTarget)
+      const result = appDatabase.cancelActiveAiScheduleJob(
+        parsedGameId,
+        parsedTarget,
+        new Date(),
+        'public_catalog'
+      )
       if (result?.agentId) codexScheduleWorkerPool?.stopAgent(result.agentId)
       cancelled = Boolean(result)
     } else {
@@ -861,7 +900,14 @@ function registerIpcHandlers(): void {
       for (const agentId of reviews.agentIds) {
         codexScheduleWorkerPool?.stopAgent(agentId)
       }
-      cancelled = adapterCancelled || reviews.cancelled > 0
+      const metadataJob = appDatabase.cancelActiveAiScheduleJob(
+        parsedGameId,
+        parsedTarget,
+        new Date(),
+        'personal_metadata'
+      )
+      if (metadataJob?.agentId) codexScheduleWorkerPool?.stopAgent(metadataJob.agentId)
+      cancelled = adapterCancelled || reviews.cancelled > 0 || Boolean(metadataJob)
     }
 
     const message = cancelled ? '已取消' : '当前没有可取消的同步'

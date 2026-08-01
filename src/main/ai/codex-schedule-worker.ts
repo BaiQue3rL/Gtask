@@ -203,11 +203,11 @@ function backgroundPrompt(agentId: string): string {
 请使用固定 Agent ID“${agentId}”、名称“Gtask 后台 Codex”登记联网能力。
 领取任务后先读取 job.contract；它是当前版块所需数据、字段语义和完成条件的唯一权威来源。先按契约建立完整目录，再逐项检索必需字段，不要从提示词猜字段要求。
 必须按 job.contract.requestContext 的 outputLocale 和 userTimeZone 组织结果，并在提交时原样回传 contentLocale。
-只领取一项公开资料任务并完整处理，严格按技能要求更新每个阶段的用户可见进度；已领取任务必须提交或明确失败。
+只领取一项任务并完整处理，先按 job.jobKind 选择公开清单或个人元数据流程，严格按技能要求更新每个阶段的用户可见进度；已领取任务必须提交或明确失败。
 若 target=all，先提交已核验版块以安全保存；只要工具返回 remainingTargets 或任务仍为 claimed，就继续使用 Codex 原生联网检索自主补齐，不得把部分结果宣布为完成。
-公开资料任务根据结果自由调整关键词和来源，只有确实穷尽有用检索后才能明确失败。个人进度由 Gtask 官方接口适配器在本地按完整快照处理，不属于本 Agent 的任务，也不得尝试与公开清单融合。
+公开资料任务根据结果自由调整关键词和来源，只有确实穷尽有用检索后才能明确失败。个人完成状态与清单成员由 Gtask 官方接口适配器按完整快照处理；personal_metadata 任务只补契约列出的标签和时间，不得尝试与公开清单融合。
 本 Worker 的失败只允许结束自己领取的任务，不得领取、失败或结束其他 Worker 的任务。
-完成该任务后退出；不要领取第二项公开资料任务。`
+完成该任务后退出；不要领取第二项任务。`
 }
 
 export function findCodexCli(options: CodexCliDiscoveryOptions = {}): string | null {

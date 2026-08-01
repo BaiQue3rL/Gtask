@@ -4054,6 +4054,207 @@ describe('AppDatabase', () => {
     })
   })
 
+  it('四款游戏会机械淘汰已到期的个人活动和周期并阻止同一身份复活', () => {
+    database = new AppDatabase(':memory:')
+    const reference = new Date('2026-08-01T12:00:00.000Z')
+    const accountScope = `official:${'a'.repeat(64)}`
+    for (const gameId of ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const) {
+      for (const target of ['events', 'cycles'] as const) {
+        const category = target === 'events' ? 'limited_event' as const : 'endgame' as const
+        const identity = {
+          provider: gameId === 'wuthering-waves' ? 'kuro-community' : 'miyoushe',
+          endpoint: `test-${target}`,
+          externalId: `${gameId}-${target}-expired`
+        }
+        const expired = {
+          remoteKey: `personal:${gameId}:${target}:expired`,
+          category,
+          title: `${gameId} 已到期${target}`,
+          startsAt: '2026-07-01T00:00:00.000Z',
+          endsAt: '2026-07-31T23:59:59.000Z',
+          sourceIdentity: identity
+        }
+        const first = database.replacePersonalSnapshot(
+          gameId,
+          target,
+          accountScope,
+          [expired],
+          'test-v1',
+          reference
+        )
+        expect(first.expiredRemoved).toBe(0)
+        expect(database.listChecklistItems(gameId).some((item) => item.title === expired.title))
+          .toBe(false)
+
+        database.replacePersonalSnapshot(
+          gameId,
+          target,
+          accountScope,
+          [{ ...expired, startsAt: null, endsAt: null }],
+          'test-v1',
+          reference
+        )
+        expect(database.listChecklistItems(gameId).some((item) => item.title === expired.title))
+          .toBe(false)
+
+        database.replacePersonalSnapshot(
+          gameId,
+          target,
+          accountScope,
+          [{
+            ...expired,
+            title: `${gameId} 官方延期${target}`,
+            endsAt: '2026-08-20T00:00:00.000Z'
+          }],
+          'test-v1',
+          reference
+        )
+        expect(database.listChecklistItems(gameId)).toEqual(expect.arrayContaining([
+          expect.objectContaining({ title: `${gameId} 官方延期${target}`, source: 'personal_sync' })
+        ]))
+      }
+    }
+  })
+
+  it('个人活动先建表再由 Codex 补全标签和时间，并在下次快照复用缓存', () => {
+    database = new AppDatabase(':memory:')
+    const reference = new Date('2026-08-01T12:00:00.000Z')
+    const accountScope = `miyoushe:${'b'.repeat(64)}`
+    const event = {
+      remoteKey: 'personal-event:miyoushe:event-api:metadata-1',
+      category: 'limited_event' as const,
+      title: '待补全活动',
+      sourceIdentity: {
+        provider: 'miyoushe',
+        endpoint: 'event-api',
+        externalId: 'metadata-1'
+      }
+    }
+    database.replacePersonalSnapshot('genshin', 'events', accountScope, [event], 'test-v1', reference)
+    database.registerAiScheduleAgent('metadata-agent', '元数据 Agent', reference)
+    const queued = database.createPersonalMetadataJob(
+      'genshin',
+      'events',
+      { outputLocale: 'zh-CN', userTimeZone: 'Asia/Shanghai' },
+      reference
+    )!
+    expect(queued).toMatchObject({ jobKind: 'personal_metadata', target: 'events' })
+    expect(queued.metadataTargets).toEqual([
+      expect.objectContaining({
+        title: '待补全活动',
+        missingFields: ['activityTags', 'startsAt', 'endsAt']
+      })
+    ])
+    const claimed = database.claimAiScheduleJob('metadata-agent', reference)!
+    const target = claimed.metadataTargets[0]
+    database.applyPersonalMetadataJob(
+      claimed.id,
+      'metadata-agent',
+      [{
+        itemId: target.itemId,
+        title: target.title,
+        activityTags: ['战斗', '解谜'],
+        startsAt: '2026-08-01T10:00:00+08:00',
+        endsAt: '2026-08-20T03:59:00+08:00',
+        sourceUrl: 'https://example.com/cn/event-metadata',
+        confidence: 0.98
+      }],
+      { evidence: ['test'] },
+      'zh-CN',
+      reference
+    )
+    expect(database.listChecklistItems('genshin').find((item) => item.title === '待补全活动'))
+      .toMatchObject({
+        activityTags: ['战斗', '解谜'],
+        startsAt: '2026-08-01T10:00:00+08:00',
+        endsAt: '2026-08-20T03:59:00+08:00',
+        completed: false,
+        source: 'personal_sync'
+      })
+
+    database.replacePersonalSnapshot(
+      'genshin',
+      'events',
+      accountScope,
+      [event],
+      'test-v1',
+      new Date('2026-08-02T12:00:00.000Z')
+    )
+    expect(database.listChecklistItems('genshin').find((item) => item.title === '待补全活动'))
+      .toMatchObject({
+        activityTags: ['战斗', '解谜'],
+        startsAt: '2026-08-01T10:00:00+08:00',
+        endsAt: '2026-08-20T03:59:00+08:00'
+      })
+  })
+
+  it('到期个人事项会从回收站硬删除而不是继续保留', () => {
+    database = new AppDatabase(':memory:')
+    const accountScope = `miyoushe:${'d'.repeat(64)}`
+    const identity = { provider: 'miyoushe', endpoint: 'event-api', externalId: 'archive-expired' }
+    database.replacePersonalSnapshot('genshin', 'events', accountScope, [{
+      remoteKey: 'personal-event:archive-expired',
+      category: 'limited_event',
+      title: '即将到期活动',
+      endsAt: '2026-08-10T00:00:00.000Z',
+      sourceIdentity: identity
+    }], 'test-v1', new Date('2026-08-01T00:00:00.000Z'))
+    const item = database.listChecklistItems('genshin').find(
+      (candidate) => candidate.title === '即将到期活动'
+    )!
+    database.archiveChecklistItem(item.id)
+    expect(database.listArchivedChecklistItems('genshin')).toHaveLength(1)
+
+    const result = database.replacePersonalSnapshot('genshin', 'events', accountScope, [{
+      remoteKey: 'personal-event:archive-expired',
+      category: 'limited_event',
+      title: '即将到期活动',
+      endsAt: '2026-08-10T00:00:00.000Z',
+      sourceIdentity: identity
+    }], 'test-v1', new Date('2026-08-11T00:00:00.000Z'))
+    expect(result.expiredRemoved).toBe(1)
+    expect(database.listArchivedChecklistItems('genshin')).toEqual([])
+    expect(() => database!.restoreChecklistItem(item.id)).toThrow('不存在')
+  })
+
+  it('个人周期缺失时间也进入相同元数据补全任务', () => {
+    database = new AppDatabase(':memory:')
+    const reference = new Date('2026-08-01T12:00:00.000Z')
+    database.replacePersonalSnapshot(
+      'star-rail',
+      'cycles',
+      `miyoushe:${'c'.repeat(64)}`,
+      [{
+        remoteKey: 'personal-cycle:star-rail:memory:42',
+        category: 'endgame',
+        title: '混沌回忆·第42期',
+        completed: true,
+        periodKey: '42',
+        modeKey: 'memory-of-chaos',
+        sourceIdentity: {
+          provider: 'miyoushe',
+          endpoint: 'personal-challenge-record',
+          externalId: 'memory-of-chaos|period:42'
+        }
+      }],
+      'test-v1',
+      reference
+    )
+    database.registerAiScheduleAgent('cycle-metadata-agent', '周期元数据 Agent', reference)
+    const job = database.createPersonalMetadataJob(
+      'star-rail',
+      'cycles',
+      { outputLocale: 'zh-CN', userTimeZone: 'Asia/Shanghai' },
+      reference
+    )!
+    expect(job.metadataTargets).toEqual([
+      expect.objectContaining({
+        title: '混沌回忆·第42期',
+        missingFields: ['startsAt', 'endsAt']
+      })
+    ])
+  })
+
   it('旧程序拒绝打开更高版本数据库，避免降级写入', () => {
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-newer-schema-test-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')

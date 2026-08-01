@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   getPublicSyncContract,
+  getPersonalMetadataContract,
   getSemanticReviewContract
 } from '../src/main/sync/interface-contract'
 
@@ -133,6 +134,19 @@ describe('同步接口契约', () => {
       .toContain('periodKey')
     expect(getSemanticReviewContract('exploration').fieldSemantics.itemIdentity)
       .toContain('层岩巨渊·地下矿区')
+  })
+
+  it('个人元数据契约只允许补标签和缺失时间', () => {
+    const events = getPersonalMetadataContract('events')
+    expect(events).toMatchObject({
+      jobKind: 'personal_metadata',
+      allowedMutations: ['update_metadata'],
+      executorPolicy: 'mechanical_validation_only'
+    })
+    expect(events.fieldSemantics.activityTags).toContain('zh-CN')
+    expect(events.completionCriteria.join('；')).toContain('不得修改 completed')
+    expect(getPersonalMetadataContract('cycles').completionCriteria.join('；'))
+      .toContain('周期事项只补齐缺失起止时间')
   })
 
   it('个人同步把同名且倒计时重叠的周期项视为强重复信号', () => {

@@ -58,6 +58,7 @@ describe('本地 MCP server', () => {
       'approve_gacha_semantic_review',
       'reject_gacha_semantic_review',
       'apply_gacha_public_schedule',
+      'apply_gacha_personal_metadata',
       'fail_gacha_schedule_job'
     ])
     const updateTool = tools.tools.find((tool) => tool.name === 'update_gacha_item')

@@ -1,5 +1,6 @@
 import type {
   PersonalSyncTarget,
+  PersonalMetadataContract,
   PublicSyncContract,
   SemanticReviewContract,
   SyncRequestContext,
@@ -188,6 +189,7 @@ export function getPublicSyncContract(
 ): PublicSyncContract {
   return {
     schemaVersion: 6,
+    jobKind: 'public_catalog',
     authority: 'interface_contract',
     decisionAuthority: 'codex',
     executorPolicy: 'mechanical_validation_only',
@@ -232,6 +234,39 @@ export function getPublicSyncContract(
     sections: target === 'all'
       ? [tasksContract, eventsContract, cyclesContract]
       : [sectionContracts[target]]
+  }
+}
+
+export function getPersonalMetadataContract(
+  target: Extract<PersonalSyncTarget, 'events' | 'cycles'>,
+  requestContext: SyncRequestContext = DEFAULT_REQUEST_CONTEXT
+): PersonalMetadataContract {
+  return {
+    schemaVersion: 1,
+    jobKind: 'personal_metadata',
+    authority: 'interface_contract',
+    decisionAuthority: 'codex',
+    executorPolicy: 'mechanical_validation_only',
+    allowedMutations: ['update_metadata'],
+    target,
+    requestContext,
+    workflow: ['inspect_targets', 'research_missing_fields', 'verify', 'submit_metadata'],
+    fieldSemantics: {
+      metadataTargets: '已经由登录后的官方个人接口建立并绑定稳定身份的清单项。只研究每项 missingFields，不重建清单、不改变分类、不新增或删除事项。',
+      activityTags: `仅活动使用。提交 1 至 5 个 ${requestContext.outputLocale} 玩法标签；确实无法核验时提交该语言的“未知”，不得自行翻译或混入其他语言。`,
+      startsAt: '活动或周期实例的整体开始绝对时刻，必须是包含 Z 或明确 UTC 偏移量的 ISO-8601；不是单阶段、领奖或版本窗口时间。',
+      endsAt: '活动或周期实例的整体结束绝对时刻，必须是包含 Z 或明确 UTC 偏移量的 ISO-8601；不是单阶段、领奖或版本窗口时间。',
+      unresolvedFields: '充分检索后仍无法可靠确认的时间字段。只能保留为空，不能猜测；activityTags 不允许 unresolved，无法核验时写“未知”。',
+      sourceUrl: '能够直接支持本次标签或时间结论的 HTTP(S) 页面。',
+      confidence: 'Codex 对本项元数据结论的 0 到 1 置信度。'
+    },
+    completionCriteria: [
+      '逐项覆盖 metadataTargets 中列出的全部 missingFields；不得提交目标未要求的字段。',
+      '限时活动补齐中文玩法标签及缺失起止时间；周期事项只补齐缺失起止时间。',
+      '同一目标只提交一次。时间无法核验时列入 unresolvedFields 并说明原因，不得编造。',
+      '不得修改 completed、progressPercent、title、category、source、remoteKey、父子结构或清单成员。',
+      '如果核验出的 endsAt 已经过期，仍提交真实结束时间；应用会机械执行到期淘汰和不可恢复标记。'
+    ]
   }
 }
 
