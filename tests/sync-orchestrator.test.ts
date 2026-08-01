@@ -130,6 +130,60 @@ describe('SyncOrchestrator', () => {
     expect(maps[0]).toMatchObject({ id: stableId, progressPercent: 100, completed: true })
   })
 
+  it('个人同步跳过回收站项目并更新当前列表，清空回收站后允许完整重建', () => {
+    database = new AppDatabase(':memory:')
+    const mondstadt = {
+      ...personalMap(20),
+      remoteKey: 'personal-map:miyoushe:7',
+      title: '蒙德',
+      sourceIdentity: {
+        provider: 'miyoushe',
+        endpoint: 'personal-map-progress',
+        externalId: '7'
+      }
+    }
+    database.replacePersonalSnapshot(
+      'genshin',
+      'exploration',
+      accountScope,
+      [personalMap(100), mondstadt],
+      'test-v1'
+    )
+    expect(database.archiveCompletedSection('genshin', ['exploration'])).toBe(1)
+
+    expect(() => database!.replacePersonalSnapshot(
+      'genshin',
+      'exploration',
+      accountScope,
+      [personalMap(100), { ...mondstadt, progressPercent: 80 }],
+      'test-v1'
+    )).not.toThrow()
+    expect(database.listArchivedChecklistItems('genshin')).toEqual([
+      expect.objectContaining({ title: '璃月', progressPercent: 100 })
+    ])
+    expect(database.listChecklistItems('genshin').filter(
+      (item) => item.category === 'exploration'
+    )).toEqual([
+      expect.objectContaining({ title: '蒙德', progressPercent: 80 })
+    ])
+
+    expect(database.emptyRecycleBin('genshin')).toBe(1)
+    database.replacePersonalSnapshot(
+      'genshin',
+      'exploration',
+      accountScope,
+      [personalMap(100), { ...mondstadt, progressPercent: 80 }],
+      'test-v1'
+    )
+    expect(database.listArchivedChecklistItems('genshin')).toEqual([])
+    expect(database.listChecklistItems('genshin').filter(
+      (item) => item.category === 'exploration'
+    )).toEqual(expect.arrayContaining([
+      expect.objectContaining({ title: '璃月', progressPercent: 100 }),
+      expect.objectContaining({ title: '蒙德', progressPercent: 80 })
+    ]))
+  })
+
   it('活动状态语义未知时不猜完成，但同一官方活动保留用户手工状态', () => {
     database = new AppDatabase(':memory:')
     const event = {

@@ -3417,11 +3417,13 @@ export class AppDatabase {
         WHERE game_id = ? AND target = ? AND status IN ('pending', 'claimed')
       `).run(now, now, gameId, target)
 
-      // Remove the competing public/manual ordinary checklist, including archived rows.
+      // Replace only the active competing checklist. Rows in the recycle bin are
+      // an explicit user choice and remain untouched until restored or emptied.
       // Fixed quests, weekly and custom items are outside these category sets.
       this.database.prepare(`
         DELETE FROM checklist_items
-        WHERE game_id = ? AND category IN (${placeholders}) AND source <> 'personal_sync'
+        WHERE game_id = ? AND category IN (${placeholders})
+          AND source <> 'personal_sync' AND archived = 0
       `).run(gameId, ...categories)
       this.database.prepare(`
         DELETE FROM sync_deletion_tombstones
@@ -3448,20 +3450,24 @@ export class AppDatabase {
       if (remoteKeys.length === 0) {
         this.database.prepare(`
           DELETE FROM checklist_items
-          WHERE game_id = ? AND category IN (${placeholders}) AND source = 'personal_sync'
+          WHERE game_id = ? AND category IN (${placeholders})
+            AND source = 'personal_sync' AND archived = 0
         `).run(gameId, ...categories)
       } else {
         const keyPlaceholders = remoteKeys.map(() => '?').join(', ')
         this.database.prepare(`
           DELETE FROM checklist_items
           WHERE game_id = ? AND category IN (${placeholders}) AND source = 'personal_sync'
+            AND archived = 0
             AND remote_key NOT IN (${keyPlaceholders})
         `).run(gameId, ...categories, ...remoteKeys)
       }
 
       const findItem = this.database.prepare(`
-        SELECT id FROM checklist_items
-        WHERE game_id = ? AND source = 'personal_sync' AND remote_key = ? AND archived = 0
+        SELECT id, archived FROM checklist_items
+        WHERE game_id = ? AND source = 'personal_sync' AND remote_key = ?
+        ORDER BY archived ASC, updated_at DESC
+        LIMIT 1
       `)
       const bind = this.database.prepare(`
         INSERT INTO source_bindings(
@@ -3481,8 +3487,15 @@ export class AppDatabase {
         WHERE id = ?
       `)
       for (const item of items) {
-        const row = findItem.get(gameId, item.remoteKey) as { id: string } | undefined
+        const row = findItem.get(gameId, item.remoteKey) as {
+          id: string
+          archived: number
+        } | undefined
         if (!row || !item.sourceIdentity) throw new Error(`个人事项“${item.title}”写入失败`)
+        // An archived row deliberately stays in the recycle bin and is not part
+        // of the active snapshot. Emptying the recycle bin removes it, after
+        // which a later complete personal snapshot may recreate the item.
+        if (row.archived === 1) continue
         markSnapshot.run(snapshotId, now, now, row.id)
         bind.run(
           gameId,
@@ -3571,7 +3584,8 @@ export class AppDatabase {
     `).run(now, now, gameId, target)
     this.database.prepare(`
       DELETE FROM checklist_items
-      WHERE game_id = ? AND category IN (${placeholders}) AND source = 'personal_sync'
+      WHERE game_id = ? AND category IN (${placeholders})
+        AND source = 'personal_sync' AND archived = 0
     `).run(gameId, ...selected)
     const hasPublic = Boolean(this.database.prepare(`
       SELECT 1 FROM checklist_items
