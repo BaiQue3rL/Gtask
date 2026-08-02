@@ -2,26 +2,33 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import * as z from 'zod/v4'
 import {
   CHECKLIST_CATEGORIES,
+  CODEX_REASONING_EFFORTS,
+  CODEX_WORKER_MODELS,
   GTASK_MCP_PROTOCOL_VERSION,
   MAP_NODE_KINDS,
   SYNC_PROGRESS_PHASES,
   SUPPORTED_GAME_IDS,
   type ChecklistCategory,
   type ChecklistItem,
-  type GameId,
-  type SemanticReviewCandidate
+  type GameId
 } from '../shared/contracts'
-import type { AppDatabase, PersonalCompletionRule } from './database'
+import type { AppDatabase } from './database'
+import {
+  ACTIVITY_TAG_DIMENSIONS,
+  ACTIVITY_TAG_TAXONOMY_VERSION,
+  MAX_AI_ACTIVITY_TAGS,
+  MIN_AI_ACTIVITY_TAGS,
+  isValidActivityTagId
+} from './activity-tags'
 import { listBackups } from './backup'
 import { LocalCommandService, type LocalCommandResult } from './local-command-service'
 import type {
   ActivityTagUpdate,
   CodexArchiveDecision,
   CodexScheduleItem,
-  NormalizedSyncItem,
-  PersonalMetadataUpdate
+  PersonalMetadataUpdate,
+  PersonalReviewResolution
 } from './sync/types'
-import { getSemanticReviewContract } from './sync/interface-contract'
 
 const gameIdSchema = z.enum(SUPPORTED_GAME_IDS)
 const categorySchema = z.enum(CHECKLIST_CATEGORIES)
@@ -57,11 +64,15 @@ const httpUrlSchema = z.string().max(500).url().refine((value) => {
   const protocol = new URL(value).protocol
   return protocol === 'https:' || protocol === 'http:'
 }, '只允许 HTTP/HTTPS 来源')
+const activityTagIdSchema = z.string().min(1).max(80).refine(
+  (value) => isValidActivityTagId(value),
+  '活动标签必须引用 contract.activityTagCatalog 中已注册的稳定 ID'
+)
 
 const checklistFields = {
   category: categorySchema,
   title: z.string().min(1).max(100),
-  activityTags: z.array(z.string().min(1).max(20)).max(5).optional(),
+  activityTags: z.array(z.string().min(1).max(80)).max(5).optional(),
   progressPercent: nullableProgressSchema,
   parentTitle: nullableTextSchema,
   mapNodeKind: mapNodeKindSchema.nullable().optional(),
@@ -88,98 +99,6 @@ function toolError(error: unknown) {
   return {
     content: [{ type: 'text' as const, text: message }],
     isError: true
-  }
-}
-
-function normalizeSemanticMatchTitle(value: unknown): string {
-  return typeof value === 'string'
-    ? value.normalize('NFKC').toLocaleLowerCase('zh-CN').replace(/[\p{P}\p{S}\s]+/gu, '')
-    : ''
-}
-
-function semanticMatchTitlesOverlap(left: string, right: string): boolean {
-  return left === right ||
-    (Math.min(left.length, right.length) >= 2 && (left.includes(right) || right.includes(left)))
-}
-
-function selectSemanticReviewMatchCandidates(
-  candidate: SemanticReviewCandidate,
-  candidates: ChecklistItem[]
-): ChecklistItem[] {
-  if (candidate.target !== 'exploration') return candidates
-  const title = normalizeSemanticMatchTitle(
-    candidate.payload.officialTitle ?? candidate.payload.observedTitle ?? candidate.payload.title
-  )
-  if (!title) return candidates
-  const directMatches = candidates.filter((item) =>
-    semanticMatchTitlesOverlap(title, normalizeSemanticMatchTitle(item.title))
-  )
-  if (directMatches.length === 0) return candidates
-
-  const relatedRemoteKeys = new Set(directMatches.flatMap((item) => [
-    item.remoteKey,
-    item.parentRemoteKey
-  ]).filter((value): value is string => Boolean(value)))
-  const relatedTitles = new Set([
-    normalizeSemanticMatchTitle(candidate.payload.observedParentTitle),
-    ...directMatches.map((item) => normalizeSemanticMatchTitle(item.parentTitle))
-  ].filter(Boolean))
-  return candidates.filter((item) =>
-    directMatches.includes(item) ||
-    (item.remoteKey !== null && relatedRemoteKeys.has(item.remoteKey)) ||
-    relatedTitles.has(normalizeSemanticMatchTitle(item.title))
-  )
-}
-
-function semanticReviewMatchCandidateProjection(item: ChecklistItem): Record<string, unknown> {
-  return Object.fromEntries(Object.entries({
-    itemId: item.id,
-    category: item.category,
-    title: item.title,
-    activityTags: item.activityTags,
-    source: item.source,
-    remoteKey: item.remoteKey,
-    progressPercent: item.progressPercent,
-    modeKey: item.modeKey,
-    periodKey: item.periodKey,
-    startsAt: item.startsAt,
-    endsAt: item.endsAt,
-    resetRule: item.resetRule,
-    scheduleKind: item.scheduleKind,
-    resetWeekday: item.resetWeekday,
-    timeZone: item.timeZone,
-    recurrenceRule: item.recurrenceRule,
-    parentTitle: item.parentTitle,
-    mapNodeKind: item.mapNodeKind,
-    parentRemoteKey: item.parentRemoteKey,
-    completed: item.completed,
-    manualCompletionLocked: item.manualCompletionLocked
-  }).filter(([, value]) => value !== null && value !== undefined))
-}
-
-function semanticReviewClaimEntry(
-  database: AppDatabase,
-  candidate: SemanticReviewCandidate
-): Record<string, unknown> {
-  const allMatchCandidates = database.listSemanticReviewMatchCandidates(
-    candidate.gameId,
-    candidate.target
-  )
-  const boundMatchCandidate = database.getBoundSemanticReviewItem(candidate)
-  const selectedMatchCandidates = boundMatchCandidate
-    ? [boundMatchCandidate]
-    : selectSemanticReviewMatchCandidates(candidate, allMatchCandidates)
-  return {
-    candidate,
-    matchCandidateScope: boundMatchCandidate
-      ? 'bound_item'
-      : candidate.target === 'exploration' &&
-          selectedMatchCandidates.length < allMatchCandidates.length
-        ? 'relevant_map_subset'
-        : 'complete_target',
-    matchCandidateCount: selectedMatchCandidates.length,
-    targetMatchCandidateCount: allMatchCandidates.length,
-    matchCandidates: selectedMatchCandidates.map(semanticReviewMatchCandidateProjection)
   }
 }
 
@@ -283,7 +202,7 @@ export function createLocalMcpServer(
         id: z.string().min(1).max(100),
         category: categorySchema.optional(),
         title: z.string().min(1).max(100).optional(),
-        activityTags: z.array(z.string().min(1).max(20)).max(5).optional(),
+        activityTags: z.array(z.string().min(1).max(80)).max(5).optional(),
         completed: z.boolean().optional(),
         progressPercent: nullableProgressSchema,
         parentTitle: nullableTextSchema,
@@ -406,13 +325,26 @@ export function createLocalMcpServer(
     'claim_gacha_schedule_job',
     {
       title: '领取公开资料检索任务',
-      description: '领取用户从“刷新清单”发起的最早任务。返回的 job.contract 是当前版块所需数据、字段语义和完成条件的权威机器可读契约；Codex 应先读取契约再联网检索。无任务时返回 null。',
-      inputSchema: { agentId: z.string().min(1).max(100) },
+      description: '领取用户从“同步公开数据”发起的最早任务。返回的 job.contract 是当前版块所需数据、字段语义和完成条件的权威机器可读契约；Codex 应先读取契约再联网检索。无任务时返回 null。',
+      inputSchema: {
+        agentId: z.string().min(1).max(100),
+        jobId: z.string().uuid().optional(),
+        model: z.enum(CODEX_WORKER_MODELS).optional(),
+        reasoningEffort: z.enum(CODEX_REASONING_EFFORTS).optional()
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true }
     },
-    async ({ agentId }) => {
+    async ({ agentId, jobId, model, reasoningEffort }) => {
       try {
-        return toolResult({ command: 'claim_schedule_job', job: database.claimAiScheduleJob(agentId) })
+        return toolResult({
+          command: 'claim_schedule_job',
+          job: database.claimAiScheduleJob(
+            agentId,
+            new Date(),
+            jobId,
+            model && reasoningEffort ? { model, reasoningEffort } : undefined
+          )
+        })
       } catch (error) {
         return toolError(error)
       }
@@ -423,7 +355,7 @@ export function createLocalMcpServer(
     'update_gacha_schedule_job_progress',
     {
       title: '更新公开资料同步进度',
-      description: '把 Codex 当前的检索、核验、整理、重试或写入阶段实时显示在 Gtask 中。',
+      description: '记录 Codex 当前的结构化阶段、数量与内部诊断。Gtask 只按 phase/current/total 生成固定用户文案，不直接展示 message。',
       inputSchema: {
         agentId: z.string().min(1).max(100),
         jobId: z.string().uuid(),
@@ -454,179 +386,42 @@ export function createLocalMcpServer(
   )
 
   server.registerTool(
-    'claim_gacha_semantic_review',
+    'register_gacha_activity_tag',
     {
-      title: '领取同步语义核验候选',
-      description: '领取一条已脱敏的清单或个人进度候选，并返回该目标的机器可读 review contract。只包含判断所需字段，不包含 Cookie、Token、UID 或账号信息。',
-      inputSchema: { agentId: z.string().min(1).max(100) },
-      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true }
-    },
-    async ({ agentId }) => {
-      try {
-        const candidate = database.claimSemanticReviewCandidate(agentId)
-        return toolResult({
-          command: 'claim_semantic_review',
-          contract: candidate
-            ? getSemanticReviewContract(candidate.target, candidate.requestContext)
-            : null,
-          ...(candidate ? semanticReviewClaimEntry(database, candidate) : {
-            candidate: null,
-            matchCandidateScope: null,
-            matchCandidateCount: 0,
-            targetMatchCandidateCount: 0,
-            matchCandidates: []
-          })
-        })
-      } catch (error) {
-        return toolError(error)
-      }
-    }
-  )
-
-  server.registerTool(
-    'claim_gacha_semantic_review_batch',
-    {
-      title: '批量领取同步语义核验候选',
-      description: '从同一次个人同步、同一游戏与版块中领取一个小批次候选。小批次允许多个后台 Worker 分担积压；候选只会在公开规范清单完成后开放，每条仍通过专用通过/拒绝工具独立安全写入。',
+      title: '注册新的活动标签',
+      description: '仅在现有 activityTagCatalog 无法准确描述一种新玩法时使用。注册可复用的 custom.* 稳定标签 ID 后，再在当前任务提交中引用该 ID。',
       inputSchema: {
         agentId: z.string().min(1).max(100),
-        limit: z.number().int().min(1).max(30).default(6)
-      },
-      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true }
-    },
-    async ({ agentId, limit }) => {
-      try {
-        const candidates = database.claimSemanticReviewBatch(agentId, limit)
-        const first = candidates[0] ?? null
-        return toolResult({
-          command: 'claim_semantic_review_batch',
-          contract: first
-            ? getSemanticReviewContract(first.target, first.requestContext)
-            : null,
-          gameId: first?.gameId ?? null,
-          target: first?.target ?? null,
-          count: candidates.length,
-          reviews: candidates.map((candidate) =>
-            semanticReviewClaimEntry(database, candidate)
-          )
-        })
-      } catch (error) {
-        return toolError(error)
-      }
-    }
-  )
-
-  server.registerTool(
-    'approve_gacha_semantic_review',
-    {
-      title: '通过同步语义核验',
-      description: '按领取结果中的 contract 提交 Codex 对名称、分类、时间和个人状态的最终判断。应用仅校验字段类型、目标记录身份和事务安全，不再二次解释业务语义。',
-      inputSchema: {
-        agentId: z.string().min(1).max(100),
-        candidateId: z.string().uuid(),
-        contentLocale: z.string().min(2).max(35),
-        matchItemId: z.string().min(1).max(100).optional()
-          .describe('与 matchCandidates 中同一逻辑事项匹配时必须填写其 itemId'),
-        archiveItems: z.array(z.object({
-          itemId: z.string().min(1).max(100),
-          reason: z.string().min(1).max(500)
-        }).strict()).max(100).optional()
-          .describe('确认错误、重复或失效的当前版块同步项；手动项与固定周常不在候选中'),
-        confidence: z.number().min(0).max(1),
-        completionRule: z.object({
-          fieldPath: z.string().regex(/^observedStatus(?:\.[A-Za-z][A-Za-z0-9_]*)+$/u).max(160),
-          completedValues: z.array(personalRuleValueSchema).min(1).max(20),
-          incompleteValues: z.array(personalRuleValueSchema).max(20)
-        }).strict().optional()
-          .describe('活动提交 completed 时必填；只引用当前候选 observedStatus 下的原始字段，应用保存后可机械复用'),
-        item: z.object({
-          remoteKey: z.string().min(1).max(200),
-          category: categorySchema,
-          title: z.string().min(1).max(100),
-          activityTags: z.array(z.string().min(1).max(20)).max(5).optional()
-            .describe('必须符合 contract.requestContext.outputLocale'),
-          completed: z.boolean().optional(),
-          progressPercent: nullableProgressSchema,
-          parentTitle: nullableTextSchema,
-          mapNodeKind: mapNodeKindSchema.nullable().optional(),
-          parentRemoteKey: nullableTextSchema,
-          startsAt: isoDateSchema.nullable().optional(),
-          endsAt: isoDateSchema.nullable().optional(),
-          resetRule: nullableTextSchema,
-          periodKey: nullableTextSchema,
-          scheduleKind: scheduleKindSchema.nullable().optional(),
-          resetWeekday: z.number().int().min(1).max(7).nullable().optional(),
-          timeZone: nullableTextSchema,
-          modeKey: nullableTextSchema,
-          recurrenceRule: recurrenceRuleSchema,
-          sourceUrl: httpUrlSchema.nullable().optional()
-        }).strict(),
+        jobId: z.string().uuid(),
+        id: z.string().regex(/^custom\.[a-z0-9]+(?:-[a-z0-9]+)*$/).max(80),
+        dimension: z.enum(ACTIVITY_TAG_DIMENSIONS),
+        labels: z.record(z.string().min(2).max(35), z.string().min(1).max(40)),
+        description: z.string().min(4).max(300),
+        aliases: z.array(z.string().min(1).max(40)).max(20).default([]),
+        sourceUrl: httpUrlSchema,
         evidence: z.array(z.object({
           url: httpUrlSchema,
           note: z.string().min(1).max(500)
-        }).strict()).max(20)
-      },
-      annotations: { destructiveHint: true, openWorldHint: true }
-    },
-    async ({
-      agentId,
-      candidateId,
-      contentLocale,
-      matchItemId,
-      archiveItems,
-      completionRule,
-      confidence,
-      item,
-      evidence
-    }) => {
-      try {
-        return toolResult({
-          command: 'approve_semantic_review',
-          ...database.approveSemanticReviewCandidate(
-            candidateId,
-            agentId,
-            item as NormalizedSyncItem,
-            confidence,
-            evidence,
-            new Date(),
-            matchItemId,
-            contentLocale,
-            (archiveItems ?? []) as CodexArchiveDecision[],
-            completionRule as PersonalCompletionRule | undefined
-          )
-        })
-      } catch (error) {
-        return toolError(error)
-      }
-    }
-  )
-
-  server.registerTool(
-    'reject_gacha_semantic_review',
-    {
-      title: '拒绝同步语义核验候选',
-      description: '当字段含义无法证实、资料冲突或不应写入清单时结束候选，保留现有清单不变。',
-      inputSchema: {
-        agentId: z.string().min(1).max(100),
-        candidateId: z.string().uuid(),
-        message: z.string().min(1).max(500),
-        evidence: z.array(z.object({
-          url: httpUrlSchema,
-          note: z.string().min(1).max(500)
-        }).strict()).max(20).default([])
+        }).strict()).min(1).max(20)
       },
       annotations: { destructiveHint: false, openWorldHint: true }
     },
-    async ({ agentId, candidateId, message, evidence }) => {
+    async ({ agentId, jobId, id, dimension, labels, description, aliases, sourceUrl, evidence }) => {
       try {
         return toolResult({
-          command: 'reject_semantic_review',
-          candidate: database.rejectSemanticReviewCandidate(
-            candidateId,
+          command: 'register_activity_tag',
+          taxonomyVersion: ACTIVITY_TAG_TAXONOMY_VERSION,
+          tag: database.registerActivityTagForJob({
+            jobId,
             agentId,
-            message,
+            id,
+            dimension,
+            labels,
+            description,
+            aliases,
+            sourceUrl,
             evidence
-          )
+          })
         })
       } catch (error) {
         return toolError(error)
@@ -653,8 +448,9 @@ export function createLocalMcpServer(
           category: publicScheduleCategorySchema,
           title: z.string().min(1).max(100),
           titleSourceUrl: httpUrlSchema,
-          activityTags: z.array(z.string().min(1).max(20)).max(5).optional()
-            .describe('必须符合 job.contract.requestContext.outputLocale'),
+          activityTags: z.array(activityTagIdSchema)
+            .min(MIN_AI_ACTIVITY_TAGS).max(MAX_AI_ACTIVITY_TAGS).optional()
+            .describe('可选；只有资料明确支持时才提交稳定 ID，没有可靠依据时留空'),
           parentTitle: z.string().max(200).nullable().optional(),
           mapNodeKind: mapNodeKindSchema.nullable().optional(),
           parentRemoteKey: z.string().max(200).nullable().optional(),
@@ -675,8 +471,9 @@ export function createLocalMcpServer(
         activityTagUpdates: z.array(z.object({
           itemId: z.string().min(1).max(100),
           title: z.string().min(1).max(100),
-          activityTags: z.array(z.string().min(1).max(20)).min(1).max(5)
-            .describe('必须符合 job.contract.requestContext.outputLocale'),
+          activityTags: z.array(activityTagIdSchema)
+            .min(MIN_AI_ACTIVITY_TAGS).max(MAX_AI_ACTIVITY_TAGS)
+            .describe('只提交资料明确支持的稳定 ID；无需覆盖全部待补目标'),
           sourceUrl: httpUrlSchema,
           confidence: z.number().min(0).max(1),
           unresolvedReason: z.string().max(500).nullable().optional()
@@ -711,13 +508,15 @@ export function createLocalMcpServer(
       evidence
     }) => {
       try {
+        const claimedJob = database.getAiScheduleJobById(jobId)
         if (
           items.length === 0 &&
           (activityTagUpdates?.length ?? 0) === 0 &&
           (archiveItems?.length ?? 0) === 0 &&
-          (verifiedEmptyTargets?.length ?? 0) === 0
+          (verifiedEmptyTargets?.length ?? 0) === 0 &&
+          claimedJob.activityTagTargets.length === 0
         ) {
-          throw new Error('公开资料提交必须包含排期事项或活动标签补全结果')
+          throw new Error('公开数据提交没有包含可处理的清单结果')
         }
         const normalizedItems: CodexScheduleItem[] = items.map(({
           confidence: _confidence,
@@ -760,7 +559,13 @@ export function createLocalMcpServer(
         updates: z.array(z.object({
           itemId: z.string().min(1).max(100),
           title: z.string().min(1).max(100),
-          activityTags: z.array(z.string().min(1).max(20)).min(1).max(5).optional(),
+          activityTags: z.array(activityTagIdSchema)
+            .min(MIN_AI_ACTIVITY_TAGS).max(MAX_AI_ACTIVITY_TAGS).optional(),
+          activityTagEvidence: z.array(z.object({
+            tagId: activityTagIdSchema,
+            sourceUrl: httpUrlSchema,
+            note: z.string().min(1).max(300)
+          }).strict()).min(1).max(MAX_AI_ACTIVITY_TAGS).optional(),
           startsAt: isoDateSchema.nullable().optional(),
           endsAt: isoDateSchema.nullable().optional(),
           unresolvedFields: z.array(z.enum(['activityTags', 'startsAt', 'endsAt'])).max(3).optional(),
@@ -776,7 +581,7 @@ export function createLocalMcpServer(
           language: z.string().min(2).max(35),
           publishedAt: isoDateSchema.nullable().optional(),
           note: z.string().max(500).optional()
-        }).strict()).min(1).max(100)
+        }).strict()).max(100).default([])
       },
       annotations: { destructiveHint: false, openWorldHint: true }
     },
@@ -792,10 +597,95 @@ export function createLocalMcpServer(
             jobId,
             agentId,
             updates as PersonalMetadataUpdate[],
-            { retrievedAt, evidence: normalizedEvidence },
+            {
+              retrievedAt,
+              evidence: normalizedEvidence,
+              activityTagEvidence: updates.flatMap((update) =>
+                (update.activityTagEvidence ?? []).map((entry) => ({
+                  itemId: update.itemId,
+                  title: update.title,
+                  ...entry
+                }))
+              )
+            },
             contentLocale
           )
         })
+      } catch (error) {
+        return toolError(error)
+      }
+    }
+  )
+
+  server.registerTool(
+    'apply_gacha_personal_review',
+    {
+      title: '提交个人数据异常核验',
+      description: '按 personal_review job.contract 逐项解决个人数据语义异常。活动清单已先行建立，本工具按稳定官方 ID 后台修正；结构不完整的地图等异常仍在整批解决后激活。',
+      inputSchema: {
+        agentId: z.string().min(1).max(100),
+        jobId: z.string().uuid(),
+        contentLocale: z.string().min(2).max(35),
+        retrievedAt: isoDateSchema,
+        resolutions: z.array(z.object({
+          candidateId: z.string().uuid(),
+          decision: z.enum(['include', 'exclude']),
+          eventScope: z.enum(['limited', 'permanent', 'unknown']).optional(),
+          reason: z.string().min(1).max(500),
+          title: z.string().min(1).max(100).optional(),
+          activityTags: z.array(activityTagIdSchema)
+            .min(MIN_AI_ACTIVITY_TAGS).max(MAX_AI_ACTIVITY_TAGS).optional()
+            .describe('个人异常审核通常省略此字段，由后续 personal_metadata 任务补标'),
+          completed: z.boolean().optional(),
+          completionRule: z.object({
+            fieldPath: z.string().regex(/^observedStatus(?:\.[A-Za-z][A-Za-z0-9_]*)+$/u).max(160),
+            completedValues: z.array(personalRuleValueSchema).min(1).max(20),
+            incompleteValues: z.array(personalRuleValueSchema).max(20)
+          }).strict().nullable().optional(),
+          startsAt: isoDateSchema.nullable().optional(),
+          endsAt: isoDateSchema.nullable().optional(),
+          modeKey: z.string().min(1).max(200).nullable().optional(),
+          periodKey: z.string().min(1).max(200).nullable().optional(),
+          mapNodeKind: mapNodeKindSchema.nullable().optional(),
+          parentExternalId: z.string().min(1).max(300).nullable().optional(),
+          sourceUrl: httpUrlSchema.nullable().optional(),
+          confidence: z.number().min(0).max(1)
+        }).strict()).min(1).max(100),
+        evidence: z.array(z.object({
+          url: httpUrlSchema,
+          platform: z.string().min(1).max(100),
+          publisher: z.string().min(1).max(100),
+          official: z.boolean(),
+          language: z.string().min(2).max(35),
+          publishedAt: isoDateSchema.nullable().optional(),
+          note: z.string().max(500).optional()
+        }).strict()).max(100).default([])
+      },
+      annotations: { destructiveHint: true, openWorldHint: true }
+    },
+    async ({ agentId, jobId, contentLocale, retrievedAt, resolutions, evidence }) => {
+      try {
+        const normalizedEvidence = evidence.map(({ language, ...entry }) => ({
+          ...entry,
+          note: [entry.note, `页面语言：${language}`].filter(Boolean).join('；')
+        }))
+        const result = database.applyPersonalReviewJob(
+          jobId,
+          agentId,
+          resolutions as PersonalReviewResolution[],
+          { retrievedAt, evidence: normalizedEvidence },
+          contentLocale
+        )
+        if (result.job.target === 'events' || result.job.target === 'cycles') {
+          database.createPersonalMetadataJob(
+            result.job.gameId,
+            result.job.target,
+            result.job.requestContext,
+            new Date(),
+            true
+          )
+        }
+        return toolResult({ command: 'apply_personal_review', ...result })
       } catch (error) {
         return toolError(error)
       }

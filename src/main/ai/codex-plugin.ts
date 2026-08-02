@@ -17,6 +17,15 @@ export interface CodexPluginDetectionOptions {
   appMarketplacePath?: string
 }
 
+export const CODEX_PLUGIN_REQUIRED_MESSAGE =
+  'Codex 同步插件未安装或未启用；请先完成插件安装'
+
+export function isCodexPluginUsable(
+  status: Pick<CodexPluginStatus, 'installed'>
+): boolean {
+  return status.installed === true
+}
+
 export function detectCodexPlugin(
   options: CodexPluginDetectionOptions = {}
 ): CodexPluginStatus {

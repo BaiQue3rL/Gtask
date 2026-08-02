@@ -85,6 +85,7 @@ describe('鸣潮个人进度解析', () => {
     })).toMatchObject({
       title: '逆境深塔',
       completed: true,
+      startsAt: null,
       endsAt: null,
       modeKey: 'tower-of-adversity'
     })
@@ -96,13 +97,24 @@ describe('鸣潮个人进度解析', () => {
         allScore: 0,
         challengeList: [{ score: 1, halfList: [] }]
       }]
-    })).toMatchObject({ title: '冥歌海墟', completed: true })
+    })).toMatchObject({
+      title: '冥歌海墟',
+      completed: true,
+      startsAt: null,
+      endsAt: null
+    })
 
     expect(parseWutheringWavesMatrix({
       isUnlock: true,
       endTime: 1787183999,
       modeDetails: [{ hasRecord: true, score: 0, teams: [] }]
-    })).toMatchObject({ title: '终焉矩阵', completed: true })
+    })).toMatchObject({
+      title: '终焉矩阵',
+      completed: true,
+      startsAt: null,
+      endsAt: null,
+      periodKey: 'wuthering-waves:endstate-matrix:current'
+    })
   })
 
   it('完全没有碰过挑战时保持未完成', () => {

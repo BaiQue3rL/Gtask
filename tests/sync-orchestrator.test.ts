@@ -28,6 +28,137 @@ function personalMap(progressPercent: number) {
 }
 
 describe('SyncOrchestrator', () => {
+  it('公开入口可机械检测同一版块正在读取个人数据并等待来源互斥', async () => {
+    database = new AppDatabase(':memory:')
+    let release: ((value: {
+      items: ReturnType<typeof personalMap>[]
+      accountScope: string
+      snapshotCompleteness: 'complete'
+      adapterVersion: string
+      message: string
+    }) => void) | null = null
+    const pending = new Promise<{
+      items: ReturnType<typeof personalMap>[]
+      accountScope: string
+      snapshotCompleteness: 'complete'
+      adapterVersion: string
+      message: string
+    }>((resolve) => { release = resolve })
+    const orchestrator = new SyncOrchestrator(database, {
+      publicSchedule: {},
+      personalData: {
+        genshin: { sync: async () => await pending }
+      }
+    })
+
+    const operation = orchestrator.syncPersonalData('genshin', 'exploration')
+    expect(orchestrator.isPersonalSyncActive('genshin', 'exploration')).toBe(true)
+    expect(orchestrator.isPersonalSyncActive('genshin')).toBe(true)
+    release!({
+      items: [personalMap(50)],
+      accountScope,
+      snapshotCompleteness: 'complete',
+      adapterVersion: 'test-v1',
+      message: '读取完成'
+    })
+    await operation
+    expect(orchestrator.isPersonalSyncActive('genshin', 'exploration')).toBe(false)
+  })
+
+  it.each([
+    ['genshin', ['深境螺旋', '幻想真境剧诗', '幽境危战']],
+    ['star-rail', ['混沌回忆', '虚构叙事', '末日幻影', '异相仲裁']],
+    ['zenless', ['式舆防卫战', '危局强袭战']],
+    ['wuthering-waves', ['逆境深塔', '冥歌海墟', '终焉矩阵']]
+  ] as const)('个人接口未返回挑战记录时由本地目录补齐 %s 全部模式', async (
+    gameId,
+    expectedTitles
+  ) => {
+    database = new AppDatabase(':memory:')
+    const orchestrator = new SyncOrchestrator(database, {
+      publicSchedule: {},
+      personalData: {
+        [gameId]: {
+          sync: async () => ({
+            items: [],
+            accountScope,
+            snapshotCompleteness: 'complete',
+            adapterVersion: 'test-v1',
+            message: '官方当前没有挑战记录'
+          })
+        }
+      }
+    })
+
+    await expect(orchestrator.syncPersonalOnly(gameId, 'cycles'))
+      .resolves.toMatchObject({ status: 'success' })
+    const cycles = database.listChecklistItems(gameId).filter(
+      (item) => item.category === 'endgame'
+    )
+    expect(cycles.map((item) => item.title).sort()).toEqual(
+      [...expectedTitles].sort()
+    )
+    expect(cycles.every((item) => item.source === 'personal_sync' && !item.completed)).toBe(true)
+  })
+
+  it.each([
+    ['genshin', 'imaginarium-theater', '幻想真境剧诗',
+      ['深境螺旋', '幻想真境剧诗', '幽境危战'], 31],
+    ['wuthering-waves', 'endstate-matrix', '终焉矩阵',
+      ['逆境深塔', '冥歌海墟', '终焉矩阵'], 28]
+  ] as const)('接口只返回已过期记录时仍建立 %s 当前期完整清单', async (
+    gameId,
+    modeKey,
+    title,
+    expectedTitles,
+    durationDays
+  ) => {
+    database = new AppDatabase(':memory:')
+    const now = Date.now()
+    const endsAt = new Date(now - 60 * 60 * 1000)
+    const startsAt = new Date(endsAt.getTime() - durationDays * 24 * 60 * 60 * 1000)
+    const orchestrator = new SyncOrchestrator(database, {
+      publicSchedule: {},
+      personalData: {
+        [gameId]: {
+          sync: async () => ({
+            items: [{
+              remoteKey: `endgame:${modeKey}`,
+              category: 'endgame' as const,
+              title,
+              completed: true,
+              modeKey,
+              periodKey: `${gameId}:${modeKey}:expired`,
+              startsAt: startsAt.toISOString(),
+              endsAt: endsAt.toISOString(),
+              sourceIdentity: {
+                provider: gameId === 'wuthering-waves' ? 'kuro-community' : 'miyoushe',
+                endpoint: 'personal-challenge-record',
+                externalId: `${modeKey}:expired`
+              }
+            }],
+            accountScope,
+            snapshotCompleteness: 'complete' as const,
+            adapterVersion: 'test-v1',
+            message: '官方仍返回上一期记录'
+          })
+        }
+      }
+    })
+
+    await expect(orchestrator.syncPersonalOnly(gameId, 'cycles'))
+      .resolves.toMatchObject({ status: 'success' })
+    const cycles = database.listChecklistItems(gameId).filter(
+      (item) => item.category === 'endgame'
+    )
+    const current = cycles.find((item) => item.modeKey === modeKey)!
+
+    expect(cycles.map((item) => item.title).sort()).toEqual([...expectedTitles].sort())
+    expect(current).toMatchObject({ title, completed: false, source: 'personal_sync' })
+    expect(Date.parse(current.startsAt!)).toBeLessThanOrEqual(Date.now())
+    expect(Date.parse(current.endsAt!)).toBeGreaterThan(Date.now())
+  })
+
   it('公开清单和个人清单由用户选择切换，不再自动融合', async () => {
     database = new AppDatabase(':memory:')
     const custom = database.createChecklistItem({
@@ -112,6 +243,69 @@ describe('SyncOrchestrator', () => {
       .toMatchObject({ progressPercent: 66 })
   })
 
+  it('个人活动先激活官方快照，再把语义异常交给 Codex 后台修正', async () => {
+    database = new AppDatabase(':memory:')
+    database.replacePersonalSnapshot(
+      'genshin',
+      'events',
+      accountScope,
+      [{
+        remoteKey: 'personal-event:miyoushe:event-api:old',
+        category: 'limited_event',
+        title: '旧个人活动',
+        activityTags: ['战斗'],
+        endsAt: '2026-09-01T00:00:00.000Z',
+        sourceIdentity: { provider: 'miyoushe', endpoint: 'event-api', externalId: 'old' }
+      }],
+      'test-v1',
+      new Date('2026-08-01T00:00:00.000Z')
+    )
+    const proposed = {
+      remoteKey: 'personal-event:miyoushe:event-api:new',
+      category: 'limited_event' as const,
+      title: '待核验新活动',
+      endsAt: '2026-09-10T00:00:00.000Z',
+      sourceIdentity: { provider: 'miyoushe', endpoint: 'event-api', externalId: 'new' }
+    }
+    const orchestrator = new SyncOrchestrator(database, {
+      publicSchedule: {},
+      personalData: { genshin: { sync: async () => ({
+        items: [proposed],
+        reviewCandidates: [{
+          target: 'events',
+          kind: 'personal-item-semantics',
+          payload: {
+            provider: 'miyoushe', sourceContext: 'event-api', officialEventId: 'new',
+            title: proposed.title, observedStatus: { isFinished: false },
+            reviewIssues: ['classification'], proposedItem: proposed
+          }
+        }],
+        accountScope,
+        snapshotCompleteness: 'complete',
+        adapterVersion: 'test-v2',
+        message: '个人活动已读取'
+      }) } }
+    })
+    const result = await orchestrator.syncPersonalOnly(
+      'genshin',
+      'events',
+      { outputLocale: 'zh-CN', userTimeZone: 'Asia/Shanghai' }
+    )
+    expect(result).toMatchObject({
+      status: 'success',
+      sources: [expect.objectContaining({
+        pendingReview: 1,
+        reviewMode: 'background'
+      })]
+    })
+    expect(database.listChecklistItems('genshin').some((item) => item.title === '旧个人活动'))
+      .toBe(false)
+    expect(database.listChecklistItems('genshin').some((item) => item.title === proposed.title))
+      .toBe(true)
+    expect(database.getActiveAiScheduleJob('genshin', 'events', 'personal_review'))
+      .toMatchObject({ reviewTargets: [expect.objectContaining({ kind: 'personal-item-semantics' })] })
+  })
+
   it('完整个人快照移除已不在官方结果中的旧项并保留稳定项目 ID', async () => {
     database = new AppDatabase(':memory:')
     const first = database.replacePersonalSnapshot('genshin', 'exploration', accountScope, [
@@ -130,7 +324,7 @@ describe('SyncOrchestrator', () => {
     expect(maps[0]).toMatchObject({ id: stableId, progressPercent: 100, completed: true })
   })
 
-  it('个人同步跳过回收站项目并更新当前列表，清空回收站后允许完整重建', () => {
+  it('个人同步项不可进入回收站且手动回收站与快照更新隔离', () => {
     database = new AppDatabase(':memory:')
     const mondstadt = {
       ...personalMap(20),
@@ -149,7 +343,15 @@ describe('SyncOrchestrator', () => {
       [personalMap(100), mondstadt],
       'test-v1'
     )
-    expect(database.archiveCompletedSection('genshin', ['exploration'])).toBe(1)
+    expect(database.archiveCompletedSection('genshin', ['exploration'])).toBe(0)
+    const syncedLiyue = database.listChecklistItems('genshin').find((item) => item.title === '璃月')!
+    expect(() => database!.archiveChecklistItem(syncedLiyue.id)).toThrow('系统清单由同步维护，不能删除')
+    const manual = database.createChecklistItem({
+      gameId: 'genshin',
+      category: 'custom',
+      title: '稍后恢复的手动事项'
+    })
+    database.archiveChecklistItem(manual.id)
 
     expect(() => database!.replacePersonalSnapshot(
       'genshin',
@@ -159,22 +361,16 @@ describe('SyncOrchestrator', () => {
       'test-v1'
     )).not.toThrow()
     expect(database.listArchivedChecklistItems('genshin')).toEqual([
-      expect.objectContaining({ title: '璃月', progressPercent: 100 })
+      expect.objectContaining({ title: '稍后恢复的手动事项', source: 'manual' })
     ])
     expect(database.listChecklistItems('genshin').filter(
       (item) => item.category === 'exploration'
-    )).toEqual([
+    )).toEqual(expect.arrayContaining([
+      expect.objectContaining({ title: '璃月', progressPercent: 100 }),
       expect.objectContaining({ title: '蒙德', progressPercent: 80 })
-    ])
+    ]))
 
     expect(database.emptyRecycleBin('genshin')).toBe(1)
-    database.replacePersonalSnapshot(
-      'genshin',
-      'exploration',
-      accountScope,
-      [personalMap(100), { ...mondstadt, progressPercent: 80 }],
-      'test-v1'
-    )
     expect(database.listArchivedChecklistItems('genshin')).toEqual([])
     expect(database.listChecklistItems('genshin').filter(
       (item) => item.category === 'exploration'

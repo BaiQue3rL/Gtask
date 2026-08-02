@@ -55,21 +55,30 @@ describe('清单 IPC 参数校验', () => {
 
   it('只接受 Gtask 支持的 Codex 模型与推理强度', () => {
     expect(parseCodexWorkerPreferences({
+      strategy: 'fixed',
       model: 'gpt-5.6-sol',
       reasoningEffort: 'high'
-    })).toEqual({ model: 'gpt-5.6-sol', reasoningEffort: 'high' })
-    expect(parseCodexWorkerPreferences({
+    })).toEqual({ strategy: 'fixed', model: 'gpt-5.6-sol', reasoningEffort: 'high' })
+    expect(() => parseCodexWorkerPreferences({
+      strategy: 'smart',
       model: 'inherit',
       reasoningEffort: 'inherit'
-    })).toEqual({ model: 'inherit', reasoningEffort: 'inherit' })
+    })).toThrow('不支持的 Codex 后台调度策略')
     expect(() => parseCodexWorkerPreferences({
+      strategy: 'fixed',
       model: 'unknown-model',
       reasoningEffort: 'high'
     })).toThrow('不支持的 Codex 后台模型')
     expect(() => parseCodexWorkerPreferences({
+      strategy: 'fixed',
       model: 'gpt-5.6-terra',
       reasoningEffort: 'extreme'
     })).toThrow('不支持的 Codex 推理强度')
+    expect(() => parseCodexWorkerPreferences({
+      strategy: 'dynamic',
+      model: 'gpt-5.6-terra',
+      reasoningEffort: 'medium'
+    })).toThrow('不支持的 Codex 后台调度策略')
   })
 
   it('拒绝非法时间和结束早于开始的事项', () => {
@@ -117,7 +126,7 @@ describe('清单 IPC 参数校验', () => {
         title: '玩法标签测试',
         activityTags: [' 战斗 ', '跑酷', '战斗']
       }).activityTags
-    ).toEqual(['战斗', '跑酷'])
+    ).toEqual(['combat', 'parkour'])
 
     expect(() =>
       parseUpdateChecklistItem({

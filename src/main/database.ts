@@ -17,9 +17,7 @@ import type {
   GameSummary,
   PersonalSyncTarget,
   PersonalMetadataEnrichmentTarget,
-  SemanticReviewCandidate,
-  SemanticReviewDecisionSummary,
-  SemanticReviewSummary,
+  PersonalReviewTarget,
   SyncProgressPhase,
   SyncScope,
   SyncTarget,
@@ -29,12 +27,25 @@ import type {
   SyncRequestContext,
   UpdateChecklistItemInput
 } from '../shared/contracts'
-import { getPersonalMetadataContract, getPublicSyncContract } from './sync/interface-contract'
-import { normalizeActivityTags } from './activity-tags'
 import {
-  filterRelevantSemanticReviewDrafts,
-  isSemanticReviewDraftRelevant
-} from './sync/personal-review-filter'
+  getPersonalMetadataContract,
+  getPersonalReviewContract,
+  getPublicSyncContract
+} from './sync/interface-contract'
+import {
+  ACTIVITY_TAG_DIMENSIONS,
+  ACTIVITY_TAG_TAXONOMY_VERSION,
+  MAX_AI_ACTIVITY_TAGS,
+  MIN_AI_ACTIVITY_TAGS,
+  activityTagsMeetQualityContract,
+  configureRuntimeActivityTags,
+  listActivityTagDefinitions,
+  localizeActivityTags,
+  normalizeActivityTags,
+  type ActivityTagDefinition,
+  type ActivityTagDimension
+} from './activity-tags'
+import { findCycleMode, nextCyclePeriod } from './sync/cycle-catalog'
 import {
   hasOfficialPersonalFact,
   type ActivityTagUpdate,
@@ -42,6 +53,7 @@ import {
   type CodexScheduleItem,
   type NormalizedSyncItem,
   type PersonalMetadataUpdate,
+  type PersonalReviewResolution,
   type SemanticReviewDraft,
   type SyncMergeResult
 } from './sync/types'
@@ -81,14 +93,15 @@ const DEFAULT_GAMES: GameSummary[] = [
   }
 ]
 
-export const CURRENT_SCHEMA_VERSION = 28
+// Gtask 1.0 ships one clean schema baseline. Closed-test databases are disposable,
+// so the release does not carry a historical migration ladder or legacy tables.
+export const CURRENT_SCHEMA_VERSION = 1
 
 const AI_AGENT_MAX_AGE_MS = 5 * 60 * 1000
 const AI_JOB_CLAIM_MAX_AGE_MS = 15 * 60 * 1000
-const SEMANTIC_REVIEW_PROTOCOL_VERSION = 'codex-authority-v8'
 
 export type PersonalCompletionState = 'completed' | 'incomplete' | 'unknown'
-export type SourceBindingKind = 'mechanical' | 'codex' | 'backfill'
+export type SourceBindingKind = 'mechanical' | 'codex'
 type PersonalRuleValue = string | number | boolean
 
 export interface PersonalCompletionRule {
@@ -108,38 +121,6 @@ export interface SourceBinding {
   stateRule: PersonalCompletionRule | null
   createdAt: string
   updatedAt: string
-}
-
-export interface PersonalItemState {
-  accountScope: string
-  gameId: GameId
-  itemId: string
-  provider: string
-  endpoint: string
-  externalId: string
-  completionState: PersonalCompletionState
-  progressPercent: number | null
-  observedAt: string
-  updatedAt: string
-}
-
-export interface SemanticProfile {
-  gameId: GameId
-  provider: string
-  endpoint: string
-  profileVersion: string
-  target: PersonalSyncTarget
-  status: 'active' | 'disabled' | 'needs_review'
-  semantics: Record<string, unknown>
-  createdAt: string
-  updatedAt: string
-}
-
-export interface PersonalDraftResolution {
-  reviewCandidates: SemanticReviewDraft[]
-  added: number
-  applied: number
-  preserved: number
 }
 
 interface SyncMergeOptions {
@@ -339,11 +320,40 @@ function readObservedMapNodeKind(
 }
 
 function activityTagsNeedReview(tags: string[]): boolean {
-  return tags.length === 0 || tags.some((tag) =>
-    tag === '待识别' ||
-    tag === '未知' ||
-    tag.toLocaleLowerCase('en-US') === 'unknown'
-  )
+  return !activityTagsMeetQualityContract(tags)
+}
+
+function assertActivityTagEvidence(
+  title: string,
+  tags: string[],
+  evidence: PersonalMetadataUpdate['activityTagEvidence'],
+  outputLocale: string
+): void {
+  // Per-tag notes are optional audit context. Requiring one URL per label made
+  // agents optimize for the submission shape instead of choosing the smallest
+  // accurate semantic set. Source-level evidence remains mandatory.
+  if (!evidence || evidence.length === 0) return
+  const normalizedTags = normalizeActivityTags(tags, outputLocale)
+  if (evidence.length !== normalizedTags.length) {
+    throw new Error(`活动“${title}”必须为每个玩法标签分别提交一条直接资料依据`)
+  }
+  const covered = new Set<string>()
+  for (const entry of evidence) {
+    const [tagId] = normalizeActivityTags([entry.tagId], outputLocale)
+    if (!tagId || tagId === 'unknown' || !normalizedTags.includes(tagId) || covered.has(tagId)) {
+      throw new Error(`活动“${title}”的逐标签依据包含未知、重复或未提交的标签`)
+    }
+    try {
+      const url = new URL(entry.sourceUrl)
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error()
+    } catch {
+      throw new Error(`活动“${title}”的标签“${tagId}”缺少有效资料地址`)
+    }
+    if (!entry.note.trim() || entry.note.trim().length > 300) {
+      throw new Error(`活动“${title}”的标签“${tagId}”缺少简洁的玩法依据`)
+    }
+    covered.add(tagId)
+  }
 }
 
 export class AppDatabase {
@@ -355,24 +365,100 @@ export class AppDatabase {
     try {
       this.database.exec('PRAGMA busy_timeout = 10000; PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;')
       this.migrate()
+      this.loadRuntimeActivityTags()
       this.seedGames()
       this.seedQuestChecklists()
-      this.seedPersonalSemanticProfiles()
-      this.backfillSemanticReviewBindings()
       this.reconcileSyncTargetStates()
       this.ensureWeeklyForInitializedGames()
       this.consolidateFixedWeeklyItems()
       this.normalizeLegacyActivityTags()
-      this.dismissExpiredSemanticReviewCandidates()
       this.normalizeSyncedProgressSafety()
       this.normalizeWeeklySchedules()
       this.resetDueWeeklyItems()
       this.resetDueQuestItems()
+      this.rolloverDueCycleItems()
       this.markStaleSyncStates()
     } catch (error) {
       this.database.close()
       throw error
     }
+  }
+
+  listActivityTagCatalog(): ActivityTagDefinition[] {
+    return listActivityTagDefinitions()
+  }
+
+  registerActivityTagForJob(input: {
+    jobId: string
+    agentId: string
+    id: string
+    dimension: ActivityTagDimension
+    labels: Record<string, string>
+    description: string
+    aliases: string[]
+    sourceUrl: string
+    evidence: unknown
+  }, reference = new Date()): ActivityTagDefinition {
+    const job = this.getAiScheduleJob(input.jobId)
+    if (job.status !== 'claimed' || job.agentId !== input.agentId) {
+      throw new Error('只有当前领取同步任务的 Agent 才能注册活动标签')
+    }
+    const id = input.id.normalize('NFKC').trim().toLocaleLowerCase('en-US')
+    if (!/^custom\.[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) {
+      throw new Error('新增标签 ID 必须使用 custom. 前缀和稳定的英文短横线名称')
+    }
+    if (!ACTIVITY_TAG_DIMENSIONS.includes(input.dimension)) {
+      throw new Error('活动标签维度不受支持')
+    }
+    const labels = Object.fromEntries(Object.entries(input.labels)
+      .map(([locale, label]) => [locale.trim(), label.normalize('NFKC').trim()])
+      .filter(([locale, label]) => locale && label))
+    if (!labels[job.outputLocale] && !labels['zh-CN'] && !labels['en-US']) {
+      throw new Error('新增标签必须提供当前输出语言、中文或英文名称')
+    }
+    const description = input.description.normalize('NFKC').trim()
+    if (description.length < 4 || description.length > 300) {
+      throw new Error('新增标签必须提供清晰、可复用的类型定义')
+    }
+    const aliases = [...new Set(input.aliases.map((alias) => alias.normalize('NFKC').trim())
+      .filter(Boolean))].slice(0, 20)
+    const builtin = listActivityTagDefinitions().find((definition) =>
+      definition.id === id || Object.values(definition.labels).some((label) =>
+        Object.values(labels).includes(label)
+      )
+    )
+    if (builtin) return builtin
+    const now = reference.toISOString()
+    this.database.prepare(`
+      INSERT INTO activity_tag_registry(
+        id, dimension, labels_json, description, aliases_json,
+        source_url, evidence_json, created_by_agent, taxonomy_version,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        dimension = excluded.dimension,
+        labels_json = excluded.labels_json,
+        description = excluded.description,
+        aliases_json = excluded.aliases_json,
+        source_url = excluded.source_url,
+        evidence_json = excluded.evidence_json,
+        taxonomy_version = excluded.taxonomy_version,
+        updated_at = excluded.updated_at
+    `).run(
+      id,
+      input.dimension,
+      JSON.stringify(labels),
+      description,
+      JSON.stringify(aliases),
+      input.sourceUrl,
+      JSON.stringify(input.evidence),
+      input.agentId,
+      ACTIVITY_TAG_TAXONOMY_VERSION,
+      now,
+      now
+    )
+    this.loadRuntimeActivityTags()
+    return this.listActivityTagCatalog().find((definition) => definition.id === id)!
   }
 
   listGames(): GameSummary[] {
@@ -450,12 +536,23 @@ export class AppDatabase {
 
   getCodexWorkerPreferences(): CodexWorkerPreferences {
     const row = this.database.prepare(`
-      SELECT model, reasoning_effort AS reasoningEffort
+      SELECT strategy, model, reasoning_effort AS reasoningEffort
       FROM codex_worker_settings
       WHERE singleton = 1
-    `).get() as CodexWorkerPreferences | undefined
+    `).get() as ({
+      strategy: string
+      model: CodexWorkerPreferences['model']
+      reasoningEffort: CodexWorkerPreferences['reasoningEffort']
+    }) | undefined
     if (!row) throw new Error('Codex 后台设置不存在')
-    return row
+    if (row.strategy !== 'fixed') {
+      return {
+        strategy: 'fixed',
+        model: 'gpt-5.6-sol',
+        reasoningEffort: 'medium'
+      }
+    }
+    return { strategy: 'fixed', model: row.model, reasoningEffort: row.reasoningEffort }
   }
 
   updateCodexWorkerPreferences(
@@ -464,9 +561,14 @@ export class AppDatabase {
   ): CodexWorkerPreferences {
     const result = this.database.prepare(`
       UPDATE codex_worker_settings
-      SET model = ?, reasoning_effort = ?, updated_at = ?
+      SET strategy = ?, model = ?, reasoning_effort = ?, updated_at = ?
       WHERE singleton = 1
-    `).run(preferences.model, preferences.reasoningEffort, reference.toISOString())
+    `).run(
+      'fixed',
+      preferences.model,
+      preferences.reasoningEffort,
+      reference.toISOString()
+    )
     if (result.changes !== 1) throw new Error('Codex 后台设置不存在')
     return this.getCodexWorkerPreferences()
   }
@@ -722,169 +824,6 @@ export class AppDatabase {
     }
   }
 
-  queueSemanticReviewCandidates(
-    gameId: GameId,
-    source: 'public_schedule' | 'personal_sync',
-    drafts: SemanticReviewDraft[],
-    reference = new Date(),
-    requestContext: SyncRequestContext = {
-      outputLocale: 'zh-CN',
-      userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-    },
-    accountScope: string | null = null
-  ): { queued: number; pending: number } {
-    if (accountScope && !/^[a-z0-9-]+:[a-f0-9]{64}$/u.test(accountScope)) {
-      throw new Error('个人账号作用域格式不正确')
-    }
-    const relevantDrafts = filterRelevantSemanticReviewDrafts(drafts, reference)
-    if (relevantDrafts.length > 200) throw new Error('单次语义核验候选不能超过 200 条')
-    const now = reference.toISOString()
-    const fingerprints: string[] = []
-    let queued = 0
-    this.runTransaction(() => {
-      for (const draft of relevantDrafts) {
-        if (!['events', 'cycles', 'exploration'].includes(draft.target)) {
-          throw new Error('语义核验候选版块不受支持')
-        }
-        if (!draft.kind.trim() || draft.kind.length > 100) throw new Error('语义核验类型格式不正确')
-        assertSanitizedSemanticPayload(draft.payload)
-        const sourceIdentity = source === 'personal_sync'
-          ? readSemanticSourceIdentity(draft.kind, draft.payload)
-          : null
-        if (
-          sourceIdentity &&
-          this.hasSyncDeletionTombstone(
-            gameId,
-            this.sourceBindingDeletionKey(
-              sourceIdentity.provider,
-              sourceIdentity.endpoint,
-              sourceIdentity.externalId
-            )
-          )
-        ) {
-          continue
-        }
-        const payloadJson = stableJson(draft.payload)
-        if (payloadJson.length > 20_000) throw new Error('语义核验候选内容过大')
-        const fingerprint = createHash('sha256')
-          .update(
-            `${SEMANTIC_REVIEW_PROTOCOL_VERSION}|${gameId}|${source}|${draft.target}|${draft.kind}|${accountScope ?? 'shared'}|${requestContext.outputLocale}|${requestContext.userTimeZone}|${payloadJson}`
-          )
-          .digest('hex')
-        fingerprints.push(fingerprint)
-        const result = this.database.prepare(`
-          INSERT INTO semantic_review_candidates(
-            id, fingerprint, game_id, source, target, kind, status,
-            payload_json, output_locale, user_timezone, account_scope, requested_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(fingerprint) DO UPDATE SET
-            status = 'pending',
-            payload_json = excluded.payload_json,
-            output_locale = excluded.output_locale,
-            user_timezone = excluded.user_timezone,
-            account_scope = excluded.account_scope,
-            requested_at = excluded.requested_at,
-            claimed_at = NULL,
-            completed_at = NULL,
-            agent_id = NULL,
-            decision_json = NULL,
-            evidence_json = NULL,
-            message = '上次未解决，已按用户本次同步重新排队',
-            updated_at = excluded.updated_at
-          WHERE semantic_review_candidates.status = 'rejected'
-        `).run(
-          randomUUID(),
-          fingerprint,
-          gameId,
-          source,
-          draft.target,
-          draft.kind.trim(),
-          payloadJson,
-          requestContext.outputLocale,
-          requestContext.userTimeZone,
-          accountScope,
-          now,
-          now
-        )
-        queued += Number(result.changes)
-      }
-    })
-    if (fingerprints.length === 0) return { queued: 0, pending: 0 }
-    const placeholders = fingerprints.map(() => '?').join(', ')
-    const row = this.database.prepare(`
-      SELECT COUNT(*) AS count
-      FROM semantic_review_candidates
-      WHERE fingerprint IN (${placeholders})
-        AND status IN ('pending', 'claimed')
-    `).get(...fingerprints) as { count: number }
-    return { queued, pending: Number(row.count) }
-  }
-
-  getSemanticReviewSummary(
-    gameId: GameId,
-    target?: PersonalSyncTarget
-  ): SemanticReviewSummary {
-    const targetFilter = target ? ' AND c.target = ?' : ''
-    const parameters = target ? [gameId, target] : [gameId]
-    const counts = this.database.prepare(`
-      SELECT
-        SUM(CASE WHEN c.status = 'pending' THEN 1 ELSE 0 END) AS pendingCount,
-        SUM(CASE WHEN c.status = 'claimed' THEN 1 ELSE 0 END) AS claimedCount,
-        SUM(CASE
-          WHEN c.status = 'pending'
-            AND c.source = 'personal_sync'
-            AND COALESCE((
-              SELECT s.catalog_coverage
-              FROM sync_target_states s
-              WHERE s.game_id = c.game_id AND s.target = c.target
-            ), 'empty') <> 'complete'
-          THEN 1 ELSE 0
-        END) AS waitingForCatalogCount
-      FROM semantic_review_candidates c
-      WHERE c.game_id = ?${targetFilter}
-    `).get(...parameters) as {
-      pendingCount: number | null
-      claimedCount: number | null
-      waitingForCatalogCount: number | null
-    }
-    const latestDecision = this.database.prepare(`
-      SELECT c.id, c.game_id AS gameId, c.target, c.status,
-        c.completed_at AS completedAt, c.message
-      FROM semantic_review_candidates c
-      WHERE c.game_id = ?${targetFilter}
-        AND c.status IN ('approved', 'rejected') AND c.completed_at IS NOT NULL
-      ORDER BY c.completed_at DESC, c.updated_at DESC
-      LIMIT 1
-    `).get(...parameters) as SemanticReviewDecisionSummary | undefined
-    return {
-      gameId,
-      pendingCount: Number(counts.pendingCount ?? 0),
-      claimedCount: Number(counts.claimedCount ?? 0),
-      waitingForCatalogCount: Number(counts.waitingForCatalogCount ?? 0),
-      latestDecision: latestDecision ?? null
-    }
-  }
-
-  getActiveSemanticReviewCount(): number {
-    const row = this.database.prepare(`
-      SELECT COUNT(*) AS count
-      FROM semantic_review_candidates c
-      WHERE c.status = 'claimed'
-        OR (
-          c.status = 'pending'
-          AND (
-            c.source <> 'personal_sync'
-            OR COALESCE((
-              SELECT s.catalog_coverage
-              FROM sync_target_states s
-              WHERE s.game_id = c.game_id AND s.target = c.target
-            ), 'empty') = 'complete'
-          )
-        )
-    `).get() as { count: number }
-    return Number(row.count)
-  }
-
   getSourceBinding(
     gameId: GameId,
     provider: string,
@@ -977,1115 +916,6 @@ export class AppDatabase {
     )!
   }
 
-  getPersonalItemState(accountScope: string, itemId: string): PersonalItemState | null {
-    assertAccountScope(accountScope)
-    const row = this.database.prepare(`
-      SELECT account_scope AS accountScope, game_id AS gameId, item_id AS itemId,
-        provider, endpoint, external_id AS externalId,
-        completion_state AS completionState, progress_percent AS progressPercent,
-        observed_at AS observedAt, updated_at AS updatedAt
-      FROM personal_item_states
-      WHERE account_scope = ? AND item_id = ?
-    `).get(accountScope, itemId) as PersonalItemState | undefined
-    return row ?? null
-  }
-
-  upsertPersonalItemState(
-    state: Omit<PersonalItemState, 'updatedAt'>,
-    reference = new Date()
-  ): PersonalItemState {
-    assertAccountScope(state.accountScope)
-    assertSourceIdentity(state.provider, state.endpoint, state.externalId)
-    if (
-      state.progressPercent !== null &&
-      (!Number.isFinite(state.progressPercent) ||
-        state.progressPercent < 0 ||
-        state.progressPercent > 100)
-    ) {
-      throw new Error('个人进度百分比必须是 0–100')
-    }
-    const item = this.database.prepare(`
-      SELECT game_id AS gameId FROM checklist_items WHERE id = ?
-    `).get(state.itemId) as { gameId: GameId } | undefined
-    if (!item || item.gameId !== state.gameId) {
-      throw new Error('个人状态指向的清单项不存在或不属于当前游戏')
-    }
-    const now = reference.toISOString()
-    this.database.prepare(`
-      INSERT INTO personal_item_states(
-        account_scope, game_id, item_id, provider, endpoint, external_id,
-        completion_state, progress_percent, observed_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(account_scope, item_id) DO UPDATE SET
-        provider = excluded.provider,
-        endpoint = excluded.endpoint,
-        external_id = excluded.external_id,
-        completion_state = excluded.completion_state,
-        progress_percent = excluded.progress_percent,
-        observed_at = excluded.observed_at,
-        updated_at = excluded.updated_at
-    `).run(
-      state.accountScope,
-      state.gameId,
-      state.itemId,
-      state.provider,
-      state.endpoint,
-      state.externalId,
-      state.completionState,
-      state.progressPercent,
-      state.observedAt,
-      now
-    )
-    return this.getPersonalItemState(state.accountScope, state.itemId)!
-  }
-
-  getSemanticProfile(
-    gameId: GameId,
-    provider: string,
-    endpoint: string,
-    profileVersion: string
-  ): SemanticProfile | null {
-    const row = this.database.prepare(`
-      SELECT game_id AS gameId, provider, endpoint, profile_version AS profileVersion,
-        target, status, semantics_json AS semanticsJson,
-        created_at AS createdAt, updated_at AS updatedAt
-      FROM semantic_profiles
-      WHERE game_id = ? AND provider = ? AND endpoint = ? AND profile_version = ?
-    `).get(gameId, provider, endpoint, profileVersion) as (
-      Omit<SemanticProfile, 'semantics'> & { semanticsJson: string }
-    ) | undefined
-    if (!row) return null
-    const { semanticsJson, ...profile } = row
-    return {
-      ...profile,
-      semantics: JSON.parse(semanticsJson) as Record<string, unknown>
-    }
-  }
-
-  getActiveSemanticProfile(
-    gameId: GameId,
-    provider: string,
-    endpoint: string
-  ): SemanticProfile | null {
-    const row = this.database.prepare(`
-      SELECT profile_version AS profileVersion
-      FROM semantic_profiles
-      WHERE game_id = ? AND provider = ? AND endpoint = ? AND status = 'active'
-      ORDER BY updated_at DESC, profile_version DESC
-      LIMIT 1
-    `).get(gameId, provider, endpoint) as { profileVersion: string } | undefined
-    return row
-      ? this.getSemanticProfile(gameId, provider, endpoint, row.profileVersion)
-      : null
-  }
-
-  upsertSemanticProfile(
-    profile: Omit<SemanticProfile, 'createdAt' | 'updatedAt'>,
-    reference = new Date()
-  ): SemanticProfile {
-    assertSourceIdentity(profile.provider, profile.endpoint, profile.profileVersion)
-    assertSanitizedSemanticPayload(profile.semantics, 'semantics')
-    const now = reference.toISOString()
-    this.database.prepare(`
-      INSERT INTO semantic_profiles(
-        game_id, provider, endpoint, profile_version, target, status,
-        semantics_json, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(game_id, provider, endpoint, profile_version) DO UPDATE SET
-        target = excluded.target,
-        status = excluded.status,
-        semantics_json = excluded.semantics_json,
-        updated_at = excluded.updated_at
-    `).run(
-      profile.gameId,
-      profile.provider,
-      profile.endpoint,
-      profile.profileVersion,
-      profile.target,
-      profile.status,
-      stableJson(profile.semantics),
-      now,
-      now
-    )
-    return this.getSemanticProfile(
-      profile.gameId,
-      profile.provider,
-      profile.endpoint,
-      profile.profileVersion
-    )!
-  }
-
-  resolveKnownPersonalDrafts(
-    gameId: GameId,
-    accountScope: string,
-    drafts: SemanticReviewDraft[],
-    reference = new Date()
-  ): PersonalDraftResolution {
-    assertAccountScope(accountScope)
-    return this.runTransaction(() => {
-      const remaining: SemanticReviewDraft[] = []
-      let added = 0
-      let applied = 0
-      let preserved = 0
-      for (const draft of drafts) {
-        let createdThisDraft = false
-        const identity = readSemanticSourceIdentity(draft.kind, draft.payload)
-        if (
-          identity &&
-          this.hasSyncDeletionTombstone(
-            gameId,
-            this.sourceBindingDeletionKey(
-              identity.provider,
-              identity.endpoint,
-              identity.externalId
-            )
-          )
-        ) {
-          preserved += 1
-          continue
-        }
-        if (!this.isCatalogComplete(gameId, draft.target)) {
-          remaining.push(draft)
-          continue
-        }
-        if (!identity) {
-          remaining.push(draft)
-          continue
-        }
-        let binding = this.getSourceBinding(
-          gameId,
-          identity.provider,
-          identity.endpoint,
-          identity.externalId
-        )
-        let item = binding
-          ? this.findActiveChecklistItem(binding.itemId, gameId)
-          : null
-        if (binding && !item && this.isArchivedChecklistItem(binding.itemId, gameId)) {
-          preserved += 1
-          continue
-        }
-        let hasConflictingMechanicalBinding = false
-        if (
-          item &&
-          binding?.bindingKind !== 'codex' &&
-          !this.isPersonalDraftBindingConsistent(draft, item)
-        ) {
-          item = null
-          binding = null
-          hasConflictingMechanicalBinding = true
-        }
-        if (!item && !hasConflictingMechanicalBinding && draft.target === 'cycles') {
-          const modeKey = typeof draft.payload.observedModeKey === 'string'
-            ? draft.payload.observedModeKey.trim()
-            : ''
-          const observedPeriodKey = typeof draft.payload.observedPeriodKey === 'string'
-            ? draft.payload.observedPeriodKey.trim()
-            : ''
-          const modeMatches = modeKey
-            ? this.listChecklistItems(gameId).filter(
-                (candidate) =>
-                  candidate.category === 'endgame' &&
-                  candidate.source !== 'manual' &&
-                  candidate.modeKey === modeKey
-              )
-            : []
-          const periodMatches = observedPeriodKey
-            ? modeMatches.filter((candidate) => candidate.periodKey === observedPeriodKey)
-            : []
-          const overlappingMatches = modeMatches.filter((candidate) =>
-            itemTimeWindowOverlapsPayload(candidate, draft.payload)
-          )
-          const matches = periodMatches.length === 1
-            ? periodMatches
-            : overlappingMatches.length === 1
-              ? overlappingMatches
-              : modeMatches.length === 1
-                ? modeMatches
-                : []
-          if (matches.length === 1) {
-            item = matches[0]
-            binding = this.upsertSourceBinding({
-              gameId,
-              ...identity,
-              itemId: item.id,
-              bindingKind: 'mechanical',
-              confidence: 1
-            }, reference)
-          }
-        }
-        if (!item && !hasConflictingMechanicalBinding && draft.target === 'cycles') {
-          const created = this.createTrustedOfficialCycleItem(
-            gameId,
-            identity,
-            draft.payload,
-            reference
-          )
-          if (created) {
-            item = created.item
-            binding = created.binding
-            added += created.added
-            createdThisDraft = created.added > 0
-          }
-        }
-        if (!item && !hasConflictingMechanicalBinding && draft.target === 'events') {
-          const observedTitle = readObservedTitle(draft.payload)
-          const matches = observedTitle
-            ? this.listChecklistItems(gameId).filter(
-                (candidate) =>
-                  candidate.category === 'limited_event' &&
-                  candidate.source !== 'manual' &&
-                  normalizeSourceTitle(candidate.title) === normalizeSourceTitle(observedTitle)
-              )
-            : []
-          if (matches.length === 1) {
-            item = matches[0]
-            binding = this.upsertSourceBinding({
-              gameId,
-              ...identity,
-              itemId: item.id,
-              bindingKind: 'mechanical',
-              confidence: 1
-            }, reference)
-          }
-        }
-        if (!item && !hasConflictingMechanicalBinding && draft.target === 'exploration') {
-          const observedTitle = readObservedTitle(draft.payload)
-          const observedNodeKind = readObservedMapNodeKind(draft.payload)
-          const observedParentTitle = typeof draft.payload.observedParentTitle === 'string'
-            ? draft.payload.observedParentTitle.trim()
-            : ''
-          const titleMatches = observedTitle
-            ? this.listChecklistItems(gameId).filter(
-                (candidate) =>
-                  candidate.category === 'exploration' &&
-                  candidate.source !== 'manual' &&
-                  normalizeSourceTitle(candidate.title) === normalizeSourceTitle(observedTitle)
-              )
-            : []
-          // The bundled catalog owns hierarchy. A provider's grouping is only
-          // an observation, so an exact title that is unique in the canonical
-          // catalog can bind even when the provider reports a different level.
-          const matches = titleMatches.length <= 1
-            ? titleMatches
-            : titleMatches.filter(
-                (candidate) =>
-                  (!observedNodeKind || candidate.mapNodeKind === observedNodeKind) &&
-                  (
-                    observedNodeKind !== 'subregion' ||
-                    !observedParentTitle ||
-                    normalizeSourceTitle(candidate.parentTitle ?? '') ===
-                      normalizeSourceTitle(observedParentTitle)
-                  )
-              )
-          if (matches.length === 1) {
-            item = matches[0]
-            binding = this.upsertSourceBinding({
-              gameId,
-              ...identity,
-              itemId: item.id,
-              bindingKind: 'mechanical',
-              confidence: 1
-            }, reference)
-          }
-        }
-        if (!item && !hasConflictingMechanicalBinding && draft.target === 'exploration') {
-          const created = this.createTrustedOfficialMapItem(
-            gameId,
-            identity,
-            draft.payload,
-            reference
-          )
-          if (created) {
-            item = created.item
-            binding = created.binding
-            added += created.added
-            createdThisDraft = created.added > 0
-          }
-        }
-        if (!binding || !item) {
-          remaining.push(draft)
-          continue
-        }
-        if (
-          draft.target === 'cycles' &&
-          !this.getActiveSemanticProfile(gameId, identity.provider, identity.endpoint)
-        ) {
-          remaining.push(draft)
-          continue
-        }
-        const expectedCategories: Record<PersonalSyncTarget, ChecklistCategory[]> = {
-          events: ['limited_event'],
-          cycles: ['endgame', 'weekly'],
-          exploration: ['exploration']
-        }
-        if (!expectedCategories[draft.target].includes(item.category)) {
-          remaining.push(draft)
-          continue
-        }
-        const observed = readPersonalDraftState(draft, binding.stateRule)
-        if (!observed) {
-          remaining.push(draft)
-          continue
-        }
-        const result = this.applyPersonalStateToChecklist(
-          item,
-          accountScope,
-          identity,
-          observed,
-          reference
-        )
-        applied += createdThisDraft ? 0 : result.applied
-        preserved += result.preserved
-      }
-      return { reviewCandidates: remaining, added, applied, preserved }
-    })
-  }
-
-  private createTrustedOfficialMapItem(
-    gameId: GameId,
-    identity: { provider: string; endpoint: string; externalId: string },
-    payload: Record<string, unknown>,
-    reference: Date
-  ): { item: ChecklistItem; binding: SourceBinding; added: number } | null {
-    if (
-      !hasOfficialPersonalFact(payload, 'identity') ||
-      !hasOfficialPersonalFact(payload, 'localized_title') ||
-      !hasOfficialPersonalFact(payload, 'progress') ||
-      !hasOfficialPersonalFact(payload, 'hierarchy')
-    ) {
-      return null
-    }
-    const title = readObservedTitle(payload)
-    const mapNodeKind = readObservedMapNodeKind(payload)
-    const observed = readPersonalDraftState({
-      target: 'exploration',
-      kind: 'personal-map-progress',
-      payload
-    })
-    if (!title || !mapNodeKind || !observed || observed.progressPercent === null) {
-      return null
-    }
-
-    let parent: ChecklistItem | null = null
-    if (mapNodeKind === 'subregion') {
-      const parentId = typeof payload.observedParentId === 'string' ||
-        typeof payload.observedParentId === 'number'
-        ? String(payload.observedParentId).trim()
-        : ''
-      if (!parentId) return null
-      const parentBinding = this.getSourceBinding(
-        gameId,
-        identity.provider,
-        identity.endpoint,
-        parentId
-      )
-      parent = parentBinding
-        ? this.findActiveChecklistItem(parentBinding.itemId, gameId)
-        : null
-      if (!parent) {
-        const parentTitle = typeof payload.observedParentTitle === 'string'
-          ? payload.observedParentTitle.trim()
-          : ''
-        const parentMatches = parentTitle
-          ? this.listChecklistItems(gameId).filter(
-              (candidate) =>
-                candidate.category === 'exploration' &&
-                candidate.source !== 'manual' &&
-                candidate.mapNodeKind === 'region' &&
-                normalizeSourceTitle(candidate.title) === normalizeSourceTitle(parentTitle)
-            )
-          : []
-        if (parentMatches.length !== 1) return null
-        parent = parentMatches[0]
-        this.upsertSourceBinding({
-          gameId,
-          provider: identity.provider,
-          endpoint: identity.endpoint,
-          externalId: parentId,
-          itemId: parent.id,
-          bindingKind: 'mechanical',
-          confidence: 1
-        }, reference)
-      }
-      if (
-        parent.category !== 'exploration' ||
-        parent.mapNodeKind !== 'region' ||
-        !parent.remoteKey
-      ) return null
-    } else if (payload.observedParentId !== null && payload.observedParentId !== undefined) {
-      return null
-    }
-
-    const remoteKey = `personal-map:${createHash('sha256')
-      .update(`${identity.provider}|${identity.endpoint}|${identity.externalId}`)
-      .digest('hex')
-      .slice(0, 32)}`
-    const merge = this.mergeSyncedItems(
-      gameId,
-      'personal_sync',
-      [{
-        remoteKey,
-        category: 'exploration',
-        title,
-        progressPercent: observed.progressPercent,
-        mapNodeKind,
-        parentTitle: parent?.title ?? null,
-        parentRemoteKey: parent?.remoteKey ?? null
-      }],
-      reference.toISOString(),
-      false,
-      {
-        codexReviewed: true,
-        identityPolicy: 'remote-key-only'
-      }
-    )
-    const item = this.findActiveChecklistItemByRemoteKey(gameId, remoteKey)
-    if (!item) return null
-    const binding = this.upsertSourceBinding({
-      gameId,
-      ...identity,
-      itemId: item.id,
-      bindingKind: 'mechanical',
-      confidence: 1
-    }, reference)
-    return { item, binding, added: merge.added }
-  }
-
-  private createTrustedOfficialCycleItem(
-    gameId: GameId,
-    identity: { provider: string; endpoint: string; externalId: string },
-    payload: Record<string, unknown>,
-    reference: Date
-  ): { item: ChecklistItem; binding: SourceBinding; added: number } | null {
-    if (
-      !hasOfficialPersonalFact(payload, 'identity') ||
-      !hasOfficialPersonalFact(payload, 'localized_title') ||
-      !hasOfficialPersonalFact(payload, 'time_window') ||
-      !hasOfficialPersonalFact(payload, 'challenge_record') ||
-      !this.getActiveSemanticProfile(gameId, identity.provider, identity.endpoint)
-    ) {
-      return null
-    }
-    const title = readObservedTitle(payload)
-    const modeKey = typeof payload.observedModeKey === 'string'
-      ? payload.observedModeKey.trim()
-      : ''
-    const periodKey = typeof payload.observedPeriodKey === 'string'
-      ? payload.observedPeriodKey.trim()
-      : ''
-    const startsAt = typeof payload.observedStartsAt === 'string'
-      ? payload.observedStartsAt.trim()
-      : ''
-    const endsAt = typeof payload.observedEndsAt === 'string'
-      ? payload.observedEndsAt.trim()
-      : ''
-    const observed = readPersonalDraftState({
-      target: 'cycles',
-      kind: 'personal-challenge-record',
-      payload
-    })
-    if (
-      !title ||
-      !modeKey ||
-      !periodKey ||
-      !startsAt ||
-      !endsAt ||
-      !observed ||
-      Number.isNaN(Date.parse(startsAt)) ||
-      Number.isNaN(Date.parse(endsAt)) ||
-      Date.parse(startsAt) >= Date.parse(endsAt)
-    ) {
-      return null
-    }
-    const remoteKey = `personal-cycle:${createHash('sha256')
-      .update(`${identity.provider}|${identity.endpoint}|${identity.externalId}|${periodKey}`)
-      .digest('hex')
-      .slice(0, 32)}`
-    const merge = this.mergeSyncedItems(
-      gameId,
-      'personal_sync',
-      [{
-        remoteKey,
-        category: 'endgame',
-        title,
-        completed: observed.completionState === 'completed',
-        startsAt,
-        endsAt,
-        periodKey,
-        scheduleKind: 'remote_schedule',
-        modeKey
-      }],
-      reference.toISOString(),
-      false,
-      {
-        codexReviewed: true,
-        identityPolicy: 'remote-key-only'
-      }
-    )
-    const item = this.findActiveChecklistItemByRemoteKey(gameId, remoteKey)
-    if (!item) return null
-    const binding = this.upsertSourceBinding({
-      gameId,
-      ...identity,
-      itemId: item.id,
-      bindingKind: 'mechanical',
-      confidence: 1
-    }, reference)
-    return { item, binding, added: merge.added }
-  }
-
-  private isPersonalDraftBindingConsistent(
-    draft: SemanticReviewDraft,
-    item: ChecklistItem
-  ): boolean {
-    if (draft.target === 'exploration') {
-      const observedTitle = readObservedTitle(draft.payload)
-      if (
-        observedTitle &&
-        normalizeSourceTitle(observedTitle) !== normalizeSourceTitle(item.title)
-      ) {
-        return false
-      }
-    }
-    if (draft.target === 'cycles') {
-      const observedModeKey = typeof draft.payload.observedModeKey === 'string'
-        ? draft.payload.observedModeKey.trim()
-        : ''
-      if (observedModeKey && item.modeKey && observedModeKey !== item.modeKey) return false
-    }
-    if (draft.target === 'events') {
-      const observedTitle = readObservedTitle(draft.payload)
-      if (observedTitle && !eventTitlesEquivalent(observedTitle, item.title)) return false
-    }
-    return true
-  }
-
-  cancelSemanticReviewCandidates(
-    gameId: GameId,
-    target: PersonalSyncTarget,
-    reference = new Date()
-  ): { cancelled: number; agentIds: string[] } {
-    const rows = this.database.prepare(`
-      SELECT DISTINCT agent_id AS agentId
-      FROM semantic_review_candidates
-      WHERE game_id = ? AND target = ?
-        AND source = 'personal_sync'
-        AND status = 'claimed' AND agent_id IS NOT NULL
-    `).all(gameId, target) as Array<{ agentId: string }>
-    const now = reference.toISOString()
-    const result = this.database.prepare(`
-      UPDATE semantic_review_candidates
-      SET status = 'rejected', completed_at = ?, decision_json = NULL,
-          evidence_json = NULL, message = '用户已取消',
-          agent_id = NULL, claimed_at = NULL, updated_at = ?
-      WHERE game_id = ? AND target = ? AND source = 'personal_sync'
-        AND status IN ('pending', 'claimed')
-    `).run(now, now, gameId, target)
-    const cancelled = Number(result.changes)
-    if (cancelled > 0) {
-      this.settleSemanticReviewTargetIfDone(gameId, target, reference)
-    }
-    return {
-      cancelled,
-      agentIds: rows.map((row) => row.agentId)
-    }
-  }
-
-  cancelAllSemanticReviewCandidates(
-    reference = new Date()
-  ): { cancelled: number; agentIds: string[] } {
-    const rows = this.database.prepare(`
-      SELECT DISTINCT agent_id AS agentId
-      FROM semantic_review_candidates
-      WHERE status = 'claimed' AND agent_id IS NOT NULL
-    `).all() as Array<{ agentId: string }>
-    const now = reference.toISOString()
-    const result = this.database.prepare(`
-      UPDATE semantic_review_candidates
-      SET status = 'rejected', completed_at = ?, decision_json = NULL,
-          evidence_json = NULL, message = '应用已退出，任务已取消',
-          agent_id = NULL, claimed_at = NULL, updated_at = ?
-      WHERE status IN ('pending', 'claimed')
-    `).run(now, now)
-    return {
-      cancelled: Number(result.changes),
-      agentIds: rows.map((row) => row.agentId)
-    }
-  }
-
-  requeueClaimedSemanticReviewsByAgent(
-    agentId: string,
-    message = 'Codex 自动进程已结束，核验任务已重新排队',
-    reference = new Date()
-  ): number {
-    const now = reference.toISOString()
-    const result = this.database.prepare(`
-      UPDATE semantic_review_candidates
-      SET status = 'pending', agent_id = NULL, claimed_at = NULL,
-          message = ?, updated_at = ?
-      WHERE status = 'claimed' AND agent_id = ?
-    `).run(message, now, agentId)
-    return Number(result.changes)
-  }
-
-  claimSemanticReviewCandidate(
-    agentId: string,
-    reference = new Date()
-  ): SemanticReviewCandidate | null {
-    return this.claimSemanticReviewBatch(agentId, 1, reference)[0] ?? null
-  }
-
-  claimSemanticReviewBatch(
-    agentId: string,
-    limit = 6,
-    reference = new Date()
-  ): SemanticReviewCandidate[] {
-    if (!Number.isInteger(limit) || limit < 1 || limit > 30) {
-      throw new Error('语义核验批量大小必须是 1–30')
-    }
-    return this.runTransaction(() => {
-      const agent = this.database.prepare('SELECT name FROM ai_schedule_agents WHERE id = ?').get(agentId)
-      if (!agent) throw new Error('AI 资料 Agent 尚未登记')
-      const now = reference.toISOString()
-      this.database.prepare(`
-        UPDATE ai_schedule_agents SET last_seen_at = ?, updated_at = ? WHERE id = ?
-      `).run(now, now, agentId)
-      const staleBefore = new Date(reference.getTime() - AI_JOB_CLAIM_MAX_AGE_MS).toISOString()
-      this.database.prepare(`
-        UPDATE semantic_review_candidates
-        SET status = 'pending', agent_id = NULL, claimed_at = NULL,
-            message = 'Agent 超时，候选已重新排队', updated_at = ?
-        WHERE status = 'claimed' AND claimed_at < ?
-      `).run(now, staleBefore)
-      const pending = this.database.prepare(`
-        SELECT game_id AS gameId, target, account_scope AS accountScope,
-          requested_at AS requestedAt
-        FROM semantic_review_candidates c
-        WHERE c.status = 'pending'
-          AND (
-            c.source <> 'personal_sync'
-            OR COALESCE((
-              SELECT s.catalog_coverage
-              FROM sync_target_states s
-              WHERE s.game_id = c.game_id AND s.target = c.target
-            ), 'empty') = 'complete'
-          )
-        ORDER BY requested_at ASC
-        LIMIT 1
-      `).get() as {
-        gameId: GameId
-        target: PersonalSyncTarget
-        accountScope: string | null
-        requestedAt: string
-      } | undefined
-      if (!pending) return []
-      const rows = this.database.prepare(`
-        SELECT id
-        FROM semantic_review_candidates
-        WHERE status = 'pending'
-          AND game_id = ?
-          AND target = ?
-          AND account_scope IS ?
-          AND requested_at = ?
-          AND (
-            source <> 'personal_sync'
-            OR COALESCE((
-              SELECT catalog_coverage
-              FROM sync_target_states
-              WHERE game_id = semantic_review_candidates.game_id
-                AND target = semantic_review_candidates.target
-            ), 'empty') = 'complete'
-          )
-        ORDER BY
-          CASE
-            WHEN target = 'exploration'
-              AND json_extract(payload_json, '$.observedParentId') IS NOT NULL
-              THEN 1
-            ELSE 0
-          END,
-          id ASC
-        LIMIT ?
-      `).all(
-        pending.gameId,
-        pending.target,
-        pending.accountScope,
-        pending.requestedAt,
-        limit
-      ) as Array<{ id: string }>
-      const claim = this.database.prepare(`
-        UPDATE semantic_review_candidates
-        SET status = 'claimed', agent_id = ?, claimed_at = ?, updated_at = ?
-        WHERE id = ? AND status = 'pending'
-      `)
-      const claimed: SemanticReviewCandidate[] = []
-      for (const row of rows) {
-        if (claim.run(agentId, now, now, row.id).changes === 1) {
-          claimed.push(this.getSemanticReviewCandidate(row.id))
-        }
-      }
-      return claimed
-    })
-  }
-
-  approveSemanticReviewCandidate(
-    id: string,
-    agentId: string,
-    item: NormalizedSyncItem,
-    confidence: number,
-    evidence: unknown,
-    reference = new Date(),
-    matchItemId?: string,
-    contentLocale?: string,
-    archiveItems: CodexArchiveDecision[] = [],
-    completionRule?: PersonalCompletionRule | null
-  ): {
-    candidate: SemanticReviewCandidate
-    merge: SyncMergeResult
-    archived: number
-  } {
-    if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
-      throw new Error('语义核验置信度格式不正确')
-    }
-    const candidate = this.getSemanticReviewCandidate(id)
-    if (contentLocale && contentLocale !== candidate.requestContext.outputLocale) {
-      throw new Error('提交内容语言与接口请求语言不一致')
-    }
-    if (candidate.status !== 'claimed' || candidate.agentId !== agentId) {
-      throw new Error('语义核验候选未由当前 Agent 领取或已经结束')
-    }
-    if (
-      candidate.source === 'personal_sync' &&
-      !this.isCatalogComplete(candidate.gameId, candidate.target)
-    ) {
-      throw new Error('当前版块的公开规范清单尚未完成，个人进度暂不能写入')
-    }
-    const semanticWritableCategories: ChecklistCategory[] = [
-      'limited_event',
-      'weekly',
-      'endgame',
-      'exploration'
-    ]
-    if (!semanticWritableCategories.includes(item.category)) {
-      throw new Error('个人数据核验只能写入活动、周期事项或地图探索')
-    }
-    if (candidate.source === 'personal_sync') {
-      if (item.category === 'exploration') {
-        if (
-          item.progressPercent === undefined ||
-          item.progressPercent === null ||
-          !Number.isFinite(item.progressPercent) ||
-          item.progressPercent < 0 ||
-          item.progressPercent > 100
-        ) {
-          throw new Error('Codex 必须为个人地图数据提交 0–100 的探索度')
-        }
-        if (item.mapNodeKind !== 'region' && item.mapNodeKind !== 'subregion') {
-          throw new Error('个人地图清单只接受一级主地区或二级地区')
-        }
-      } else if (
-        candidate.target === 'cycles' &&
-        typeof item.completed !== 'boolean'
-      ) {
-        throw new Error('Codex 必须为个人周期事项明确提交完成状态')
-      } else if (
-        candidate.target === 'events' &&
-        typeof item.completed === 'boolean'
-      ) {
-        if (!completionRule) {
-          throw new Error('Codex 提交活动完成状态时必须同时提交可复用的字段语义规则')
-        }
-        assertPersonalCompletionRule(completionRule)
-        const mechanicallyObserved = readPersonalDraftState(
-          {
-            target: candidate.target,
-            kind: candidate.kind,
-            payload: candidate.payload
-          },
-          completionRule
-        )
-        if (
-          !mechanicallyObserved ||
-          (mechanicallyObserved.completionState === 'completed') !== item.completed
-        ) {
-          throw new Error('活动完成规则无法从本次个人原始字段机械复现提交状态')
-        }
-      }
-    }
-    const matchCandidates = this.listSemanticReviewMatchCandidates(
-      candidate.gameId,
-      candidate.target
-    )
-    const matchCandidatesById = new Map(matchCandidates.map((entry) => [entry.id, entry]))
-    let resolvedItem = item
-    if (matchItemId) {
-      const matched = matchCandidatesById.get(matchItemId)
-      if (!matched) throw new Error('指定的清单匹配项不属于当前语义核验版块')
-      if (!matched.remoteKey) throw new Error('指定的清单匹配项缺少稳定远端标识')
-      resolvedItem = {
-        ...item,
-        remoteKey: matched.remoteKey
-      }
-    }
-    const archiveIds = new Set<string>()
-    for (const decision of archiveItems) {
-      if (!decision.reason.trim()) throw new Error('Codex 删除决定必须包含原因')
-      if (archiveIds.has(decision.itemId)) throw new Error('Codex 删除决定包含重复事项')
-      if (decision.itemId === matchItemId) throw new Error('不能删除本次选定的匹配事项')
-      const duplicate = matchCandidatesById.get(decision.itemId)
-      if (!duplicate) throw new Error('Codex 只能删除当前语义核验版块提供的同步事项')
-      if (duplicate.category === 'weekly') throw new Error('固定周常不能由同步流程删除')
-      archiveIds.add(decision.itemId)
-    }
-    return this.runTransaction(() => {
-      const merge = this.mergeSyncedItems(
-        candidate.gameId,
-        candidate.source,
-        [resolvedItem],
-        reference.toISOString(),
-        false,
-        {
-          codexReviewed: true,
-          identityPolicy: 'remote-key-only',
-          outputLocale: candidate.requestContext.outputLocale
-        }
-      )
-      if (candidate.source === 'personal_sync') {
-        const identity = readSemanticSourceIdentity(candidate.kind, candidate.payload)
-        const mergedItem = matchItemId
-          ? this.findActiveChecklistItem(matchItemId, candidate.gameId)
-          : this.findActiveChecklistItemByRemoteKey(candidate.gameId, resolvedItem.remoteKey)
-        if (identity && mergedItem) {
-          this.upsertSourceBinding({
-            gameId: candidate.gameId,
-            ...identity,
-            itemId: mergedItem.id,
-            bindingKind: 'codex',
-            confidence,
-            stateRule: candidate.target === 'events'
-              ? completionRule ?? null
-              : null
-          }, reference)
-          if (candidate.accountScope) {
-            const submittedState = mergedItem.category === 'exploration'
-              ? {
-                  completionState: mergedItem.progressPercent === 100
-                    ? 'completed' as const
-                    : 'incomplete' as const,
-                  progressPercent: mergedItem.progressPercent
-                }
-              : typeof resolvedItem.completed === 'boolean'
-                ? {
-                    completionState: mergedItem.completed
-                      ? 'completed' as const
-                      : 'incomplete' as const,
-                    progressPercent: null
-                  }
-                : {
-                    completionState: 'unknown' as const,
-                    progressPercent: null
-                  }
-            this.applyPersonalStateToChecklist(
-              mergedItem,
-              candidate.accountScope,
-              identity,
-              submittedState,
-              reference
-            )
-          }
-        }
-      }
-      const now = reference.toISOString()
-      const archiveSyncedItem = this.database.prepare(`
-        UPDATE checklist_items
-        SET archived = 1, updated_at = ?
-        WHERE id = ? AND game_id = ? AND archived = 0 AND source <> 'manual'
-      `)
-      let archived = 0
-      for (const decision of archiveItems) {
-        const result = archiveSyncedItem.run(now, decision.itemId, candidate.gameId)
-        if (result.changes !== 1) throw new Error('待删除的重复同步事项已不存在或不允许删除')
-        archived += 1
-      }
-      this.assertActiveMapReferences(candidate.gameId)
-      this.database.prepare(`
-        UPDATE semantic_review_candidates
-        SET status = 'approved', completed_at = ?, decision_json = ?,
-            evidence_json = ?, message = 'Codex 核验通过并已安全写入', updated_at = ?
-        WHERE id = ? AND status = 'claimed' AND agent_id = ?
-      `).run(
-        now,
-        JSON.stringify({
-          item,
-          matchItemId: matchItemId ?? null,
-          archiveItems,
-          confidence,
-          completionRule: completionRule ?? null
-        }),
-        JSON.stringify(evidence),
-        now,
-        id,
-        agentId
-      )
-      this.settleSemanticReviewTargetIfDone(candidate.gameId, candidate.target, reference)
-      return { candidate: this.getSemanticReviewCandidate(id), merge, archived }
-    })
-  }
-
-  listSemanticReviewMatchCandidates(
-    gameId: GameId,
-    target: PersonalSyncTarget
-  ): ChecklistItem[] {
-    const categories: Record<PersonalSyncTarget, ChecklistCategory[]> = {
-      events: ['limited_event'],
-      cycles: ['weekly', 'endgame'],
-      exploration: ['exploration']
-    }
-    return this.listChecklistItems(gameId).filter(
-      (item) => item.source === 'personal_sync' && categories[target].includes(item.category)
-    )
-  }
-
-  getBoundSemanticReviewItem(candidate: SemanticReviewCandidate): ChecklistItem | null {
-    const identity = readSemanticSourceIdentity(candidate.kind, candidate.payload)
-    if (!identity) return null
-    const binding = this.getSourceBinding(
-      candidate.gameId,
-      identity.provider,
-      identity.endpoint,
-      identity.externalId
-    )
-    if (!binding) return null
-    const item = this.findActiveChecklistItem(binding.itemId, candidate.gameId)
-    if (binding.bindingKind === 'codex') return item
-    return item && this.isPersonalDraftBindingConsistent(
-      { target: candidate.target, kind: candidate.kind, payload: candidate.payload },
-      item
-    )
-      ? item
-      : null
-  }
-
-  rejectSemanticReviewCandidate(
-    id: string,
-    agentId: string,
-    message: string,
-    evidence: unknown,
-    reference = new Date()
-  ): SemanticReviewCandidate {
-    if (!message.trim()) throw new Error('拒绝原因不能为空')
-    const now = reference.toISOString()
-    const result = this.database.prepare(`
-      UPDATE semantic_review_candidates
-      SET status = 'rejected', completed_at = ?, evidence_json = ?,
-          message = ?, updated_at = ?
-      WHERE id = ? AND status = 'claimed' AND agent_id = ?
-    `).run(now, JSON.stringify(evidence), message.trim(), now, id, agentId)
-    if (result.changes === 0) throw new Error('语义核验候选未由当前 Agent 领取或已经结束')
-    const candidate = this.getSemanticReviewCandidate(id)
-    this.settleSemanticReviewTargetIfDone(candidate.gameId, candidate.target, reference)
-    return candidate
-  }
-
-  private settleSemanticReviewTargetIfDone(
-    gameId: GameId,
-    target: PersonalSyncTarget,
-    reference: Date
-  ): void {
-    const unsettled = this.database.prepare(`
-      SELECT 1
-      FROM semantic_review_candidates
-      WHERE game_id = ? AND target = ? AND status IN ('pending', 'claimed')
-      LIMIT 1
-    `).get(gameId, target)
-    if (unsettled) return
-    const latestBatch = this.database.prepare(`
-      SELECT MAX(requested_at) AS requestedAt
-      FROM semantic_review_candidates
-      WHERE game_id = ? AND target = ?
-    `).get(gameId, target) as { requestedAt: string | null }
-    const rejected = latestBatch.requestedAt
-      ? this.database.prepare(`
-          SELECT 1
-          FROM semantic_review_candidates
-          WHERE game_id = ? AND target = ? AND requested_at = ? AND status = 'rejected'
-          LIMIT 1
-        `).get(gameId, target, latestBatch.requestedAt)
-      : null
-    if (rejected) {
-      this.recordSyncTargetAttempt(gameId, target, 'stale', reference)
-    } else {
-      this.recordSyncTargetSuccess(gameId, target, reference)
-    }
-    if (latestBatch.requestedAt) {
-      this.settlePersonalSyncOutcomeIfDone(gameId, latestBatch.requestedAt, reference)
-    }
-  }
-
-  private settlePersonalSyncOutcomeIfDone(
-    gameId: GameId,
-    requestedAt: string,
-    reference: Date
-  ): void {
-    const unresolved = this.database.prepare(`
-      SELECT 1
-      FROM semantic_review_candidates
-      WHERE game_id = ? AND source = 'personal_sync'
-        AND requested_at = ? AND status IN ('pending', 'claimed')
-      LIMIT 1
-    `).get(gameId, requestedAt)
-    if (unresolved) return
-    const newerUnresolved = this.database.prepare(`
-      SELECT 1
-      FROM semantic_review_candidates
-      WHERE game_id = ? AND source = 'personal_sync'
-        AND requested_at > ? AND status IN ('pending', 'claimed')
-      LIMIT 1
-    `).get(gameId, requestedAt)
-    if (newerUnresolved) return
-    const rejected = this.database.prepare(`
-      SELECT COUNT(*) AS count
-      FROM semantic_review_candidates
-      WHERE game_id = ? AND source = 'personal_sync'
-        AND requested_at = ? AND status = 'rejected'
-    `).get(gameId, requestedAt) as { count: number }
-    const rejectedCount = Number(rejected.count)
-    this.recordSyncOutcome(
-      gameId,
-      rejectedCount > 0 ? 'stale' : 'success',
-      rejectedCount > 0
-        ? `个人进度同步结束；${rejectedCount} 条记录未能可靠确认，已保留原状态`
-        : '个人进度同步完成',
-      rejectedCount === 0,
-      reference
-    )
-  }
-
-  private getSemanticReviewCandidate(id: string): SemanticReviewCandidate {
-    const row = this.database.prepare(`
-      SELECT c.id, c.game_id AS gameId, c.source, c.target, c.kind, c.status,
-        c.payload_json AS payloadJson, c.requested_at AS requestedAt,
-        c.claimed_at AS claimedAt, c.completed_at AS completedAt,
-        c.agent_id AS agentId, a.name AS agentName, c.message,
-        c.output_locale AS outputLocale, c.user_timezone AS userTimeZone,
-        c.account_scope AS accountScope
-      FROM semantic_review_candidates c
-      LEFT JOIN ai_schedule_agents a ON a.id = c.agent_id
-      WHERE c.id = ?
-    `).get(id) as (Omit<SemanticReviewCandidate, 'payload' | 'requestContext'> & {
-      payloadJson: string
-      outputLocale: string
-      userTimeZone: string
-    }) | undefined
-    if (!row) throw new Error('语义核验候选不存在')
-    const { payloadJson, outputLocale, userTimeZone, ...candidate } = row
-    return {
-      ...candidate,
-      requestContext: { outputLocale, userTimeZone },
-      payload: JSON.parse(payloadJson) as Record<string, unknown>
-    }
-  }
-
   createAiScheduleJob(
     gameId: GameId,
     scope: SyncScope,
@@ -2141,7 +971,7 @@ export class AppDatabase {
         id, game_id, scope, target, user_timezone, output_locale, job_kind, status, requested_at,
         progress_phase, progress_updated_at, message, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, 'public_catalog', 'pending', ?, 'queued', ?,
-        '正在启动本机 Codex', ?)
+        '同步任务正在排队', ?)
     `).run(
       id,
       gameId,
@@ -2211,6 +1041,159 @@ export class AppDatabase {
     return this.getAiScheduleJob(id)
   }
 
+  preparePersonalReviewJob(
+    gameId: GameId,
+    target: PersonalSyncTarget,
+    accountScope: string,
+    items: NormalizedSyncItem[],
+    drafts: SemanticReviewDraft[],
+    adapterVersion: string,
+    requestContext: SyncRequestContext,
+    reference = new Date()
+  ): { job: AiScheduleJob | null; items: NormalizedSyncItem[] } {
+    assertAccountScope(accountScope)
+    if (!adapterVersion.trim() || adapterVersion.length > 100) {
+      throw new Error('个人数据适配器版本格式不正确')
+    }
+    const relevant = drafts.filter((draft) => draft.target === target)
+    if (relevant.length === 0) return { job: null, items }
+
+    const identities = new Set<string>()
+    const reviewedIdentities = new Set<string>()
+    const unresolvedIdentities = new Set<string>()
+    const reviewTargets: PersonalReviewTarget[] = []
+    const cachedItems: NormalizedSyncItem[] = []
+    for (const draft of relevant) {
+      assertSanitizedSemanticPayload(draft.payload)
+      const identity = readSemanticSourceIdentity(draft.kind, draft.payload)
+      if (!identity) throw new Error('个人语义异常缺少可审计的官方来源标识')
+      const identityKey = `${identity.provider}\u0000${identity.endpoint}\u0000${identity.externalId}`
+      if (identities.has(identityKey)) throw new Error('个人语义异常包含重复官方标识')
+      identities.add(identityKey)
+      reviewedIdentities.add(identityKey)
+      const candidateId = randomUUID()
+      const cached = this.database.prepare(`
+        SELECT resolution_json AS resolutionJson
+        FROM personal_review_rules
+        WHERE game_id = ? AND provider = ? AND endpoint = ? AND external_id = ?
+          AND target = ? AND rule_version = 'personal-review-v3'
+      `).get(
+        gameId,
+        identity.provider,
+        identity.endpoint,
+        identity.externalId,
+        target
+      ) as { resolutionJson: string } | undefined
+      if (cached) {
+        try {
+          const resolution = JSON.parse(cached.resolutionJson) as PersonalReviewResolution
+          cachedItems.push(...this.materializePersonalReviewResolution(
+            target,
+            { candidateId, kind: draft.kind, issues: [], payload: draft.payload },
+            {
+              ...resolution,
+              candidateId,
+              // The stored boolean was only the observation at review time.
+              // Reuse the rule against the current official payload instead.
+              completed: undefined
+            },
+            requestContext.outputLocale
+          ))
+          continue
+        } catch {
+          // A stale rule must never block a new official snapshot. Re-review it.
+        }
+      }
+      const rawIssues = Array.isArray(draft.payload.reviewIssues)
+        ? draft.payload.reviewIssues.filter((issue): issue is PersonalReviewTarget['issues'][number] =>
+            typeof issue === 'string' && [
+              'item_identity',
+              'classification',
+              'completion_semantics',
+              'time_window',
+              'hierarchy'
+            ].includes(issue)
+          )
+        : []
+      reviewTargets.push({
+        candidateId,
+        kind: draft.kind,
+        issues: rawIssues.length > 0 ? [...new Set(rawIssues)] : ['item_identity'],
+        payload: draft.payload
+      })
+      unresolvedIdentities.add(identityKey)
+    }
+
+    const baseItems = items.filter((item) => {
+      if (!item.sourceIdentity) return true
+      const key = `${item.sourceIdentity.provider}\u0000${item.sourceIdentity.endpoint}\u0000${item.sourceIdentity.externalId}`
+      return !reviewedIdentities.has(key)
+    })
+    const resolvedItems = [...baseItems, ...cachedItems]
+    if (reviewTargets.length === 0) return { job: null, items: resolvedItems }
+
+    // Authenticated activities are safe to show as a provisional official
+    // snapshot once their stable identity and basic shape pass deterministic
+    // validation. Lifecycle/classification and completion semantics are refined
+    // asynchronously by the review job. Structural map anomalies still block
+    // activation because an invalid parent graph cannot be written safely.
+    const provisionalItems = target === 'events'
+      ? items.filter((item) => {
+          if (!item.sourceIdentity) return false
+          const key = `${item.sourceIdentity.provider}\u0000${item.sourceIdentity.endpoint}\u0000${item.sourceIdentity.externalId}`
+          return unresolvedIdentities.has(key)
+        })
+      : []
+
+    const active = this.getActiveAiScheduleJob(gameId, target, 'personal_review')
+    if (active) throw new Error('该版块仍有同步任务正在处理，请先等待或取消')
+    const id = randomUUID()
+    const now = reference.toISOString()
+    this.runTransaction(() => {
+      this.database.prepare(`
+        INSERT INTO ai_schedule_jobs(
+          id, game_id, scope, target, user_timezone, output_locale, job_kind, status,
+          requested_at, progress_phase, progress_current, progress_total,
+          progress_updated_at, message, updated_at
+        ) VALUES (?, ?, 'public_schedule', ?, ?, ?, 'personal_review', 'pending', ?,
+          'queued', 0, ?, ?, ?, ?)
+      `).run(
+        id,
+        gameId,
+        target,
+        requestContext.userTimeZone,
+        requestContext.outputLocale,
+        now,
+        reviewTargets.length,
+        now,
+        target === 'events'
+          ? '个人活动清单已建立，正在确认活动信息'
+          : '个人数据已暂存，正在确认清单结构',
+        now
+      )
+      this.database.prepare(`
+        INSERT INTO personal_review_batches(
+          job_id, game_id, target, account_scope, adapter_version,
+          base_items_json, review_targets_json, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        id,
+        gameId,
+        target,
+        accountScope,
+        adapterVersion.trim(),
+        stableJson(resolvedItems),
+        stableJson(reviewTargets),
+        now,
+        now
+      )
+    })
+    return {
+      job: this.getAiScheduleJob(id),
+      items: target === 'events' ? [...resolvedItems, ...provisionalItems] : []
+    }
+  }
+
   private completeEmptyPersonalMetadataJobs(
     reference = new Date(),
     gameId?: GameId,
@@ -2237,7 +1220,12 @@ export class AppDatabase {
     return completed
   }
 
-  claimAiScheduleJob(agentId: string, reference = new Date()): AiScheduleJob | null {
+  claimAiScheduleJob(
+    agentId: string,
+    reference = new Date(),
+    jobId?: string,
+    route?: { model: string; reasoningEffort: string }
+  ): AiScheduleJob | null {
     return this.runTransaction(() => {
       const agent = this.database.prepare('SELECT name FROM ai_schedule_agents WHERE id = ?').get(agentId)
       if (!agent) throw new Error('AI 资料 Agent 尚未登记')
@@ -2245,19 +1233,50 @@ export class AppDatabase {
       this.database.prepare(`UPDATE ai_schedule_agents SET last_seen_at = ?, updated_at = ? WHERE id = ?`)
         .run(now, now, agentId)
       this.requeueStaleAiScheduleJobs(reference)
-      const pending = this.database.prepare(`
-        SELECT id FROM ai_schedule_jobs WHERE status = 'pending' ORDER BY requested_at ASC LIMIT 1
-      `).get() as { id: string } | undefined
+      const pending = jobId
+        ? this.database.prepare(`
+            SELECT id FROM ai_schedule_jobs WHERE id = ? AND status = 'pending'
+          `).get(jobId) as { id: string } | undefined
+        : this.database.prepare(`
+            SELECT id FROM ai_schedule_jobs WHERE status = 'pending' ORDER BY requested_at ASC LIMIT 1
+          `).get() as { id: string } | undefined
       if (!pending) return null
-      this.database.prepare(`
+      const result = this.database.prepare(`
         UPDATE ai_schedule_jobs
         SET status = 'claimed', agent_id = ?, claimed_at = ?,
+            attempt_count = attempt_count + 1,
+            assigned_model = ?, assigned_reasoning_effort = ?,
             progress_phase = 'searching', progress_current = 0,
             progress_total = NULL, progress_updated_at = ?,
-            message = 'Codex 已接单，正在准备检索', updated_at = ?
+            message = 'Codex 已接单，正在准备处理', updated_at = ?
         WHERE id = ? AND status = 'pending'
-      `).run(agentId, now, now, now, pending.id)
-      return this.getAiScheduleJob(pending.id)
+      `).run(
+        agentId,
+        now,
+        route?.model ?? null,
+        route?.reasoningEffort ?? null,
+        now,
+        now,
+        pending.id
+      )
+      if (result.changes === 0) return null
+      const claimed = this.getAiScheduleJob(pending.id)
+      this.database.prepare(`
+        INSERT INTO ai_schedule_job_attempts(
+          id, job_id, attempt_number, routing_tier, model, reasoning_effort,
+          agent_id, started_at, outcome
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'running')
+      `).run(
+        randomUUID(),
+        claimed.id,
+        claimed.attemptCount,
+        claimed.routingTier,
+        route?.model ?? 'inherit',
+        route?.reasoningEffort ?? 'inherit',
+        agentId,
+        now
+      )
+      return claimed
     })
   }
 
@@ -2277,6 +1296,10 @@ export class AppDatabase {
       ORDER BY requested_at ASC LIMIT 1
     `).get(...parameters) as { id: string } | undefined
     return row ? this.getAiScheduleJob(row.id) : null
+  }
+
+  getAiScheduleJobById(id: string): AiScheduleJob {
+    return this.getAiScheduleJob(id)
   }
 
   cancelActiveAiScheduleJob(
@@ -2367,6 +1390,26 @@ export class AppDatabase {
     return Number(result.changes)
   }
 
+  updateAiScheduleJobLaunchMessage(
+    jobId: string,
+    message: string,
+    current: number | null = null,
+    total: number | null = null,
+    phase: SyncProgressPhase = 'queued',
+    reference = new Date()
+  ): number {
+    if (!message.trim()) throw new Error('同步进度说明不能为空')
+    const now = reference.toISOString()
+    const result = this.database.prepare(`
+      UPDATE ai_schedule_jobs
+      SET progress_phase = ?,
+          progress_current = ?, progress_total = ?, progress_updated_at = ?,
+          message = ?, updated_at = ?
+      WHERE id = ? AND status IN ('pending', 'claimed')
+    `).run(phase, current, total, now, message.trim(), now, jobId)
+    return Number(result.changes)
+  }
+
   failPendingAiScheduleJobs(message: string, reference = new Date()): number {
     if (!message.trim()) throw new Error('同步失败说明不能为空')
     const now = reference.toISOString()
@@ -2401,6 +1444,7 @@ export class AppDatabase {
 
   failPendingAiScheduleJob(jobId: string, message: string, reference = new Date()): AiScheduleJob {
     if (!message.trim()) throw new Error('同步失败说明不能为空')
+    const pending = this.getAiScheduleJob(jobId)
     const now = reference.toISOString()
     const result = this.database.prepare(`
       UPDATE ai_schedule_jobs
@@ -2410,7 +1454,12 @@ export class AppDatabase {
       WHERE id = ? AND status = 'pending'
     `).run(now, message.trim(), now, now, jobId)
     if (result.changes === 0) throw new Error('待处理的 AI 资料任务不存在或已经被领取')
-    return this.getAiScheduleJob(jobId)
+    const failed = this.getAiScheduleJob(jobId)
+    if (pending.jobKind === 'public_catalog') {
+      this.recordSyncOutcome(pending.gameId, 'error', message.trim(), false, reference)
+      this.recordSyncTargetAttempt(pending.gameId, pending.target, 'error', reference)
+    }
+    return failed
   }
 
   failClaimedAiScheduleJobsByAgent(
@@ -2451,7 +1500,6 @@ export class AppDatabase {
   }
 
   maintainAiScheduleJobs(reference = new Date()): { requeued: number; expired: number } {
-    this.dismissExpiredSemanticReviewCandidates(reference)
     this.completeEmptyPersonalMetadataJobs(reference)
     const requeued = this.requeueStaleAiScheduleJobs(reference)
     const expired = this.expireUnclaimedAiScheduleJobs(reference)
@@ -2593,15 +1641,16 @@ export class AppDatabase {
     }
     const invalidEventTags = items.find((item) =>
       item.category === 'limited_event' &&
+      item.activityTags !== undefined &&
       (
         !Array.isArray(item.activityTags) ||
-        item.activityTags.length === 0 ||
-        item.activityTags.length > 5 ||
-        item.activityTags.some((tag) => !tag.trim() || tag.length > 20 || tag === '待识别')
+        (item.activityTags.length > 0 && !activityTagsMeetQualityContract(item.activityTags))
       )
     )
     if (invalidEventTags) {
-      throw new Error(`活动“${invalidEventTags.title}”必须提供 1 到 5 个有效玩法标签`)
+      throw new Error(
+        `活动“${invalidEventTags.title}”提交的玩法标签无效；没有可靠依据时应留空`
+      )
     }
     const invalidEndgame = items.find((item) =>
       item.category === 'endgame' &&
@@ -2637,12 +1686,14 @@ export class AppDatabase {
         if (submittedIds.has(update.itemId)) throw new Error(`活动“${update.title}”重复提交标签`)
         submittedIds.add(update.itemId)
         if (update.title !== target.title) throw new Error(`活动标签回写目标“${update.title}”已经变化`)
-        if (!Array.isArray(update.activityTags) || update.activityTags.length === 0 ||
-          update.activityTags.length > 5) {
-          throw new Error(`活动“${update.title}”必须提供 1 到 5 个玩法标签`)
+        if (!Array.isArray(update.activityTags) ||
+          !activityTagsMeetQualityContract(update.activityTags, job.requestContext.outputLocale)) {
+          throw new Error(
+            `活动“${update.title}”必须提供 ${MIN_AI_ACTIVITY_TAGS} 到 ${MAX_AI_ACTIVITY_TAGS} 个有证据、含核心玩法的标签`
+          )
         }
-        const tags = [...new Set(update.activityTags.map((tag) => tag.trim()).filter(Boolean))]
-        if (tags.length !== update.activityTags.length || tags.some((tag) => tag.length > 20)) {
+        const tags = normalizeActivityTags(update.activityTags, job.requestContext.outputLocale)
+        if (!activityTagsMeetQualityContract(tags, job.requestContext.outputLocale)) {
           throw new Error(`活动“${update.title}”的玩法标签格式不正确`)
         }
         if (!Number.isFinite(update.confidence) || update.confidence < 0 || update.confidence > 1) {
@@ -2654,15 +1705,6 @@ export class AppDatabase {
         } catch {
           throw new Error(`活动“${update.title}”缺少有效的标签核验来源`)
         }
-      }
-      const missingTargets = requiredTagTargets.filter((target) => !submittedIds.has(target.itemId))
-      if (missingTargets.length > 0) {
-        throw new Error(
-          `活动标签补全遗漏 ${missingTargets.length} 项：${missingTargets
-            .slice(0, 6)
-            .map((target) => target.title)
-            .join('、')}${missingTargets.length > 6 ? '等' : ''}`
-        )
       }
     }
     const includesCycles = job.target === 'cycles' || items.some(
@@ -2754,14 +1796,13 @@ export class AppDatabase {
         )
         if (result.changes !== 1) throw new Error(`活动“${update.title}”已不存在，无法补全标签`)
       }
-      const archiveSyncedItem = this.database.prepare(`
-        UPDATE checklist_items
-        SET archived = 1, updated_at = ?
+      const removeSyncedItem = this.database.prepare(`
+        DELETE FROM checklist_items
         WHERE id = ? AND game_id = ? AND archived = 0 AND source <> 'manual'
       `)
       let archived = 0
       for (const decision of archiveItems) {
-        const result = archiveSyncedItem.run(now, decision.itemId, job.gameId)
+        const result = removeSyncedItem.run(decision.itemId, job.gameId)
         if (result.changes !== 1) throw new Error('待删除的同步事项已不存在或不允许删除')
         archived += 1
       }
@@ -2769,7 +1810,11 @@ export class AppDatabase {
       return { merge: result, archived }
     })
     const unresolvedActivityCount = (job.target === 'events' || job.target === 'all')
-      ? this.listActivityTagEnrichmentTargets(job.gameId, now).length
+      ? this.listActivityTagEnrichmentTargets(
+          job.gameId,
+          now,
+          job.requestContext.outputLocale
+        ).length
       : 0
     const targetNames: Record<Exclude<SyncTarget, 'all'>, string> = {
       tasks: '任务',
@@ -2939,23 +1984,50 @@ export class AppDatabase {
       }
       for (const field of target.missingFields) {
         if (field === 'activityTags') {
-          if (unresolved.has(field)) throw new Error(`活动“${update.title}”无法核验玩法时必须写“未知”`)
+          if (unresolved.has(field)) continue
           const tags = normalizeActivityTags(update.activityTags ?? [], contentLocale)
-          if (tags.length < 1 || tags.length > 5 || tags.some((tag) => !tag || tag.length > 20)) {
-            throw new Error(`活动“${update.title}”必须提供 1 到 5 个有效玩法标签`)
+          if (!activityTagsMeetQualityContract(tags, contentLocale)) {
+            throw new Error(
+              `活动“${update.title}”必须提供 ${MIN_AI_ACTIVITY_TAGS} 到 ${MAX_AI_ACTIVITY_TAGS} 个有证据、含核心玩法的有效标签`
+            )
           }
+          assertActivityTagEvidence(
+            update.title,
+            tags,
+            update.activityTagEvidence,
+            contentLocale
+          )
         } else if ((update[field] === undefined || update[field] === null) && !unresolved.has(field)) {
           throw new Error(`事项“${update.title}”遗漏字段 ${field}`)
         }
       }
       if (unresolved.size > 0 && !update.unresolvedReason?.trim()) {
-        throw new Error(`事项“${update.title}”的未解决时间字段必须说明原因`)
+        throw new Error(`事项“${update.title}”的未确认字段必须说明原因`)
+      }
+      if (
+        target.category === 'endgame' &&
+        (unresolved.has('startsAt') || unresolved.has('endsAt'))
+      ) {
+        throw new Error(`周期挑战“${update.title}”必须补齐当前期完整时间，不能提交未知时间`)
       }
       for (const field of ['startsAt', 'endsAt'] as const) {
         const value = update[field]
         if (value === undefined || value === null) continue
         if (!/(?:Z|[+-]\d{2}:?\d{2})$/i.test(value) || Number.isNaN(Date.parse(value))) {
           throw new Error(`事项“${update.title}”的 ${field} 必须是带时区的绝对时间`)
+        }
+      }
+      if (target.category === 'endgame') {
+        const startsAt = update.startsAt ?? target.startsAt
+        const endsAt = update.endsAt ?? target.endsAt
+        if (!startsAt || !endsAt) {
+          throw new Error(`周期挑战“${update.title}”必须补齐当前期完整起止时间`)
+        }
+        if (
+          Date.parse(startsAt) > reference.getTime() ||
+          Date.parse(endsAt) <= reference.getTime()
+        ) {
+          throw new Error(`周期挑战“${update.title}”必须提交当前正在进行的一期，不能提交过期或未来周期`)
         }
       }
     }
@@ -2994,7 +2066,9 @@ export class AppDatabase {
         } catch {
           currentTags = []
         }
-        const activityTags = target.missingFields.includes('activityTags')
+        const unresolvedFields = new Set(update.unresolvedFields ?? [])
+        const activityTags = target.missingFields.includes('activityTags') &&
+          !unresolvedFields.has('activityTags')
           ? normalizeActivityTags(update.activityTags ?? [], contentLocale)
           : normalizeActivityTags(currentTags, contentLocale)
         const startsAt = target.missingFields.includes('startsAt') && update.startsAt !== undefined
@@ -3060,6 +2134,19 @@ export class AppDatabase {
             job.gameId
           )
           updated += Number(result.changes)
+          if (current.category === 'endgame' && startsAt && endsAt) {
+            // A verified current window is the only point at which an expiry
+            // tombstone for a stable provider identity may be released.
+            this.database.prepare(`
+              DELETE FROM personal_expiry_tombstones
+              WHERE game_id = ? AND provider = ? AND endpoint = ? AND external_id = ?
+            `).run(
+              job.gameId,
+              target.sourceIdentity.provider,
+              target.sourceIdentity.endpoint,
+              target.sourceIdentity.externalId
+            )
+          }
         }
         unresolved += update.unresolvedFields?.length ?? 0
       }
@@ -3073,6 +2160,11 @@ export class AppDatabase {
             progress_updated_at = ?, updated_at = ?
         WHERE id = ? AND status = 'claimed' AND agent_id = ?
       `).run(now, JSON.stringify(evidence), message, now, now, jobId, agentId)
+      // The MCP worker opens the same database in a separate process. Its
+      // startup reconciliation marks an active metadata job as idle/syncing.
+      // Once the bounded metadata write commits, settle the section back to a
+      // successful terminal state so the renderer does not remain on “同步中”.
+      this.recordSyncTargetSuccess(job.gameId, job.target, reference)
     })
     return {
       job: this.getAiScheduleJob(jobId),
@@ -3080,6 +2172,269 @@ export class AppDatabase {
       expiredRemoved,
       unresolved
     }
+  }
+
+  applyPersonalReviewJob(
+    jobId: string,
+    agentId: string,
+    resolutions: PersonalReviewResolution[],
+    evidence: unknown,
+    contentLocale: string,
+    reference = new Date()
+  ): { job: AiScheduleJob; merge: SyncMergeResult } {
+    const job = this.getAiScheduleJob(jobId)
+    if (job.jobKind !== 'personal_review') {
+      throw new Error('当前任务不是个人数据异常核验任务')
+    }
+    if (job.status !== 'claimed' || job.agentId !== agentId) {
+      throw new Error('个人数据异常任务未由当前 Agent 领取或已经结束')
+    }
+    if (contentLocale !== job.requestContext.outputLocale) {
+      throw new Error('提交内容语言与接口请求语言不一致')
+    }
+    const batch = this.database.prepare(`
+      SELECT account_scope AS accountScope, adapter_version AS adapterVersion,
+        base_items_json AS baseItemsJson, review_targets_json AS reviewTargetsJson
+      FROM personal_review_batches WHERE job_id = ?
+    `).get(jobId) as {
+      accountScope: string
+      adapterVersion: string
+      baseItemsJson: string
+      reviewTargetsJson: string
+    } | undefined
+    if (!batch) throw new Error('个人数据异常暂存批次不存在')
+    const targets = JSON.parse(batch.reviewTargetsJson) as PersonalReviewTarget[]
+    const baseItems = JSON.parse(batch.baseItemsJson) as NormalizedSyncItem[]
+    const targetIds = new Set(targets.map((target) => target.candidateId))
+    if (targetIds.size !== targets.length || resolutions.length !== targets.length) {
+      throw new Error('必须逐项提交本批次全部个人数据异常')
+    }
+    const resolutionById = new Map<string, PersonalReviewResolution>()
+    for (const resolution of resolutions) {
+      if (!targetIds.has(resolution.candidateId) || resolutionById.has(resolution.candidateId)) {
+        throw new Error('个人数据异常提交包含未知或重复 candidateId')
+      }
+      resolutionById.set(resolution.candidateId, resolution)
+    }
+    const resolvedItems: NormalizedSyncItem[] = []
+    for (const target of targets) {
+      resolvedItems.push(...this.materializePersonalReviewResolution(
+        job.target as PersonalSyncTarget,
+        target,
+        resolutionById.get(target.candidateId)!,
+        contentLocale
+      ))
+    }
+    const finalItems = [...baseItems, ...resolvedItems]
+    if (job.target === 'exploration') {
+      const titleByRemoteKey = new Map(finalItems.map((item) => [item.remoteKey, item.title]))
+      for (const item of finalItems) {
+        if (item.category !== 'exploration' || item.mapNodeKind !== 'subregion') continue
+        item.parentTitle = item.parentRemoteKey
+          ? titleByRemoteKey.get(item.parentRemoteKey) ?? item.parentTitle ?? null
+          : null
+      }
+    }
+    const now = reference.toISOString()
+    const merge = this.runTransaction(() => {
+      for (const target of targets) {
+        const resolution = resolutionById.get(target.candidateId)!
+        const identity = readSemanticSourceIdentity(target.kind, target.payload)
+        if (!identity) throw new Error('个人语义异常缺少可缓存的官方身份')
+        this.database.prepare(`
+          INSERT INTO personal_review_rules(
+            game_id, provider, endpoint, external_id, target, rule_version,
+            resolution_json, evidence_json, confidence, verified_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, 'personal-review-v3', ?, ?, ?, ?, ?)
+          ON CONFLICT(game_id, provider, endpoint, external_id, target) DO UPDATE SET
+            rule_version = excluded.rule_version,
+            resolution_json = excluded.resolution_json,
+            evidence_json = excluded.evidence_json,
+            confidence = excluded.confidence,
+            verified_at = excluded.verified_at,
+            updated_at = excluded.updated_at
+        `).run(
+          job.gameId,
+          identity.provider,
+          identity.endpoint,
+          identity.externalId,
+          job.target,
+          stableJson(resolution),
+          stableJson(evidence),
+          resolution.confidence,
+          now,
+          now
+        )
+      }
+      const replaced = this.replacePersonalSnapshot(
+        job.gameId,
+        job.target as PersonalSyncTarget,
+        batch.accountScope,
+        finalItems,
+        batch.adapterVersion,
+        reference,
+        job.requestContext,
+        false
+      )
+      this.database.prepare(`
+        UPDATE ai_schedule_jobs
+        SET status = 'completed', completed_at = ?, evidence_json = ?,
+            message = ?, progress_phase = 'completed',
+            progress_current = progress_total, progress_updated_at = ?, updated_at = ?
+        WHERE id = ? AND status = 'claimed' AND agent_id = ?
+      `).run(
+        now,
+        stableJson(evidence),
+        `个人数据异常核验完成：处理 ${targets.length} 项`,
+        now,
+        now,
+        jobId,
+        agentId
+      )
+      return replaced
+    })
+    return { job: this.getAiScheduleJob(jobId), merge }
+  }
+
+  private materializePersonalReviewResolution(
+    target: PersonalSyncTarget,
+    review: PersonalReviewTarget,
+    resolution: PersonalReviewResolution,
+    outputLocale: string
+  ): NormalizedSyncItem[] {
+    if (!resolution.reason.trim() || resolution.reason.length > 500) {
+      throw new Error('个人数据异常决定必须包含简洁理由')
+    }
+    if (!Number.isFinite(resolution.confidence) || resolution.confidence < 0 || resolution.confidence > 1) {
+      throw new Error('个人数据异常决定的置信度格式不正确')
+    }
+    if (target === 'events') {
+      if (!resolution.eventScope) {
+        throw new Error('个人活动异常必须明确 limited、permanent 或 unknown 生命周期')
+      }
+      if (resolution.eventScope === 'limited' && resolution.decision !== 'include') {
+        throw new Error('已确认的限时活动必须使用 include')
+      }
+      if (resolution.eventScope !== 'limited' && resolution.decision !== 'exclude') {
+        throw new Error('常驻或仍无法确认的内容不能进入限时活动清单')
+      }
+    }
+    if (resolution.decision === 'exclude') return []
+    const identity = readSemanticSourceIdentity(review.kind, review.payload)
+    if (!identity) throw new Error('个人数据异常缺少官方来源标识')
+    const proposed = review.payload.proposedItem &&
+      typeof review.payload.proposedItem === 'object' &&
+      !Array.isArray(review.payload.proposedItem)
+      ? review.payload.proposedItem as Partial<NormalizedSyncItem>
+      : {}
+    const officialTitle = typeof review.payload.title === 'string'
+      ? review.payload.title.trim()
+      : typeof review.payload.officialTitle === 'string'
+        ? review.payload.officialTitle.trim()
+        : ''
+    const title = officialTitle || resolution.title?.trim() || proposed.title?.trim() || ''
+    if (!title) throw new Error('Codex 必须为保留的个人事项提交名称')
+
+    if (target === 'events') {
+      const activityTags = normalizeActivityTags(resolution.activityTags ?? [], outputLocale)
+      if (activityTags.length > 0 && !activityTagsMeetQualityContract(activityTags, outputLocale)) {
+        throw new Error(
+          `个人活动“${title}”若在异常审核中提交标签，必须提供 ${MIN_AI_ACTIVITY_TAGS} 到 ${MAX_AI_ACTIVITY_TAGS} 个有证据、含核心玩法的标签；也可省略并交给后续元数据任务`
+        )
+      }
+      let completed: boolean | undefined
+      if (resolution.completionRule) {
+        assertPersonalCompletionRule(resolution.completionRule)
+        const state = readPersonalDraftState(
+          { target: 'events', kind: review.kind, payload: review.payload },
+          resolution.completionRule
+        )
+        if (state) completed = state.completionState === 'completed'
+      }
+      if (resolution.completed !== undefined && completed !== resolution.completed) {
+        throw new Error(`活动“${title}”的完成规则无法机械复现提交状态`)
+      }
+      return [{
+        remoteKey: proposed.remoteKey ??
+          `personal-event:${identity.provider}:${identity.endpoint}:${identity.externalId}`,
+        category: 'limited_event',
+        title,
+        activityTags,
+        completed,
+        startsAt: proposed.startsAt ?? resolution.startsAt ?? null,
+        endsAt: proposed.endsAt ?? resolution.endsAt ?? null,
+        scheduleKind: 'fixed_window',
+        modeKey: proposed.modeKey ?? resolution.modeKey ?? `official-event-${identity.externalId}`,
+        sourceUrl: resolution.sourceUrl ?? proposed.sourceUrl ?? null,
+        sourceIdentity: identity
+      }]
+    }
+
+    if (target === 'exploration') {
+      const progress = review.payload.observedProgress
+      if (typeof progress !== 'number' || !Number.isFinite(progress) || progress < 0 || progress > 100) {
+        throw new Error(`个人地图“${title}”缺少可信探索度`)
+      }
+      const mapNodeKind = resolution.mapNodeKind ?? proposed.mapNodeKind
+      if (mapNodeKind !== 'region' && mapNodeKind !== 'subregion') {
+        throw new Error(`个人地图“${title}”缺少一级/二级层级决定`)
+      }
+      const parentExternalId = resolution.parentExternalId ?? (
+        typeof review.payload.observedParentId === 'string' ||
+        typeof review.payload.observedParentId === 'number'
+          ? String(review.payload.observedParentId).trim()
+          : null
+      )
+      if (mapNodeKind === 'region' && parentExternalId) {
+        throw new Error(`一级地图“${title}”不能包含父级`)
+      }
+      if (mapNodeKind === 'subregion' && !parentExternalId) {
+        throw new Error(`二级地图“${title}”必须提交一级父地区官方 ID`)
+      }
+      return [{
+        remoteKey: `personal-map:${identity.provider}:${identity.externalId}`,
+        category: 'exploration',
+        title,
+        completed: progress === 100,
+        progressPercent: progress,
+        parentTitle: typeof review.payload.observedParentTitle === 'string'
+          ? review.payload.observedParentTitle.trim() || null
+          : null,
+        mapNodeKind,
+        parentRemoteKey: mapNodeKind === 'subregion'
+          ? `personal-map:${identity.provider}:${parentExternalId}`
+          : null,
+        modeKey: resolution.modeKey ?? `official-map-${identity.externalId}`,
+        sourceUrl: resolution.sourceUrl ?? null,
+        sourceIdentity: identity
+      }]
+    }
+
+    const observed = readPersonalDraftState(
+      { target: 'cycles', kind: review.kind, payload: review.payload }
+    )
+    const completed = observed
+      ? observed.completionState === 'completed'
+      : resolution.completed
+    if (typeof completed !== 'boolean') {
+      throw new Error(`个人周期事项“${title}”缺少可信挑战记录语义`)
+    }
+    const modeKey = resolution.modeKey?.trim() || proposed.modeKey?.trim() || ''
+    if (!modeKey) throw new Error(`个人周期事项“${title}”缺少稳定模式标识`)
+    return [{
+      remoteKey: proposed.remoteKey ??
+        `personal-cycle:${identity.provider}:${identity.endpoint}:${identity.externalId}`,
+      category: 'endgame',
+      title,
+      completed,
+      startsAt: proposed.startsAt ?? resolution.startsAt ?? null,
+      endsAt: proposed.endsAt ?? resolution.endsAt ?? null,
+      periodKey: proposed.periodKey ?? resolution.periodKey ?? null,
+      scheduleKind: 'remote_schedule',
+      modeKey,
+      sourceUrl: resolution.sourceUrl ?? proposed.sourceUrl ?? null,
+      sourceIdentity: identity
+    }]
   }
 
   failAiScheduleJob(jobId: string, agentId: string, message: string, reference = new Date()): AiScheduleJob {
@@ -3099,6 +2454,203 @@ export class AppDatabase {
     return job
   }
 
+  requeueAiScheduleJobAttempt(
+    jobId: string,
+    agentId: string,
+    failureKind: 'timeout' | 'infrastructure_error' | 'semantic_unresolved',
+    message: string,
+    reference = new Date()
+  ): AiScheduleJob {
+    const job = this.getAiScheduleJob(jobId)
+    if (job.status !== 'claimed' || job.agentId !== agentId) return job
+    const attemptsAtTier = this.database.prepare(`
+      SELECT COUNT(*) AS count FROM ai_schedule_job_attempts
+      WHERE job_id = ? AND routing_tier = ?
+    `).get(jobId, job.routingTier) as { count: number }
+    const currentTierAttempts = Number(attemptsAtTier.count)
+    const now = reference.toISOString()
+    const fixedRetryAllowed = failureKind === 'infrastructure_error' && currentTierAttempts < 2
+    const exhausted = !fixedRetryAllowed
+    this.database.prepare(`
+      UPDATE ai_schedule_job_attempts
+      SET completed_at = ?, outcome = ?, message = ?
+      WHERE job_id = ? AND agent_id = ? AND outcome = 'running'
+    `).run(
+      now,
+      exhausted ? 'failed' : failureKind,
+      message.trim(),
+      jobId,
+      agentId
+    )
+    if (exhausted) {
+      this.database.prepare(`
+        UPDATE ai_schedule_jobs
+        SET status = 'failed', completed_at = ?, agent_id = NULL,
+            message = ?, progress_phase = 'failed', progress_updated_at = ?,
+            last_failure_kind = ?, updated_at = ?
+        WHERE id = ? AND status = 'claimed' AND agent_id = ?
+      `).run(
+        now,
+        `当前配置未能完成：${message.trim()}`,
+        now,
+        failureKind,
+        now,
+        jobId,
+        agentId
+      )
+    } else {
+      const routeMessage = `连接或工具异常，正在使用当前配置重试 ${currentTierAttempts + 1}/2：${message.trim()}`
+      this.database.prepare(`
+        UPDATE ai_schedule_jobs
+        SET status = 'pending', agent_id = NULL, claimed_at = NULL,
+            routing_tier = ?, assigned_model = NULL,
+            assigned_reasoning_effort = NULL,
+            message = ?, progress_phase = 'retrying', progress_current = NULL,
+            progress_total = NULL, progress_updated_at = ?,
+            last_failure_kind = ?, updated_at = ?
+        WHERE id = ? AND status = 'claimed' AND agent_id = ?
+      `).run(
+        job.routingTier,
+        routeMessage,
+        now,
+        failureKind,
+        now,
+        jobId,
+        agentId
+      )
+    }
+    const updated = this.getAiScheduleJob(jobId)
+    if (updated.status === 'failed' && updated.jobKind === 'public_catalog') {
+      this.recordSyncOutcome(updated.gameId, 'error', updated.message ?? message, false, reference)
+      this.recordSyncTargetAttempt(updated.gameId, updated.target, 'error', reference)
+    }
+    return updated
+  }
+
+  recordAiScheduleJobLaunchFailure(
+    jobId: string,
+    agentId: string,
+    route: { model: string; reasoningEffort: string; startedAt: string },
+    failureKind: 'timeout' | 'infrastructure_error',
+    message: string,
+    reference = new Date()
+  ): AiScheduleJob {
+    const job = this.getAiScheduleJob(jobId)
+    if (job.status !== 'pending') return job
+    const priorAttemptsAtTier = this.database.prepare(`
+      SELECT COUNT(*) AS count FROM ai_schedule_job_attempts
+      WHERE job_id = ? AND routing_tier = ?
+    `).get(jobId, job.routingTier) as { count: number }
+    const currentTierAttempts = Number(priorAttemptsAtTier.count) + 1
+    const fixedRetryAllowed = failureKind === 'infrastructure_error' && currentTierAttempts < 2
+    const exhausted = !fixedRetryAllowed
+    const now = reference.toISOString()
+    const attemptNumber = job.attemptCount + 1
+    this.database.prepare(`
+      INSERT INTO ai_schedule_job_attempts(
+        id, job_id, attempt_number, routing_tier, model, reasoning_effort,
+        agent_id, started_at, completed_at, outcome, message
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      randomUUID(),
+      jobId,
+      attemptNumber,
+      job.routingTier,
+      route.model,
+      route.reasoningEffort,
+      agentId,
+      route.startedAt,
+      now,
+      exhausted ? 'failed' : failureKind,
+      message.trim()
+    )
+    if (exhausted) {
+      this.database.prepare(`
+        UPDATE ai_schedule_jobs
+        SET status = 'failed', completed_at = ?, attempt_count = ?,
+            message = ?, progress_phase = 'failed', progress_updated_at = ?,
+            last_failure_kind = ?, updated_at = ?
+        WHERE id = ? AND status = 'pending'
+      `).run(
+        now,
+        attemptNumber,
+        `当前配置未能启动：${message.trim()}`,
+        now,
+        failureKind,
+        now,
+        jobId
+      )
+    } else {
+      const routeMessage = `连接或工具异常，正在使用当前配置重试 ${currentTierAttempts + 1}/2：${message.trim()}`
+      this.database.prepare(`
+        UPDATE ai_schedule_jobs
+        SET attempt_count = ?, routing_tier = ?, assigned_model = NULL,
+            assigned_reasoning_effort = NULL, message = ?,
+            progress_phase = 'retrying', progress_current = NULL,
+            progress_total = NULL, progress_updated_at = ?,
+            last_failure_kind = ?, updated_at = ?
+        WHERE id = ? AND status = 'pending'
+      `).run(
+        attemptNumber,
+        job.routingTier,
+        routeMessage,
+        now,
+        failureKind,
+        now,
+        jobId
+      )
+    }
+    const updated = this.getAiScheduleJob(jobId)
+    if (updated.status === 'failed' && updated.jobKind === 'public_catalog') {
+      this.recordSyncOutcome(updated.gameId, 'error', updated.message ?? message, false, reference)
+      this.recordSyncTargetAttempt(updated.gameId, updated.target, 'error', reference)
+    }
+    return updated
+  }
+
+  getAiScheduleJobAttemptRuntimeMs(
+    jobId: string,
+    reference = new Date()
+  ): number {
+    const rows = this.database.prepare(`
+      SELECT started_at AS startedAt, completed_at AS completedAt
+      FROM ai_schedule_job_attempts
+      WHERE job_id = ?
+    `).all(jobId) as Array<{ startedAt: string; completedAt: string | null }>
+    const referenceTime = reference.getTime()
+    return rows.reduce((total, row) => {
+      const startedAt = Date.parse(row.startedAt)
+      const completedAt = row.completedAt ? Date.parse(row.completedAt) : referenceTime
+      if (!Number.isFinite(startedAt) || !Number.isFinite(completedAt)) return total
+      return total + Math.max(0, completedAt - startedAt)
+    }, 0)
+  }
+
+  expireAiScheduleJob(
+    jobId: string,
+    message: string,
+    reference = new Date()
+  ): { job: AiScheduleJob; agentId: string | null } {
+    const job = this.getAiScheduleJob(jobId)
+    if (job.status !== 'pending' && job.status !== 'claimed') {
+      return { job, agentId: job.agentId }
+    }
+    const now = reference.toISOString()
+    this.database.prepare(`
+      UPDATE ai_schedule_jobs
+      SET status = 'failed', completed_at = ?, message = ?,
+          progress_phase = 'failed', progress_updated_at = ?,
+          last_failure_kind = 'total_budget_exceeded', updated_at = ?
+      WHERE id = ? AND status IN ('pending', 'claimed')
+    `).run(now, message.trim(), now, now, jobId)
+    const updated = this.getAiScheduleJob(jobId)
+    if (updated.jobKind === 'public_catalog') {
+      this.recordSyncOutcome(updated.gameId, 'error', message.trim(), false, reference)
+      this.recordSyncTargetAttempt(updated.gameId, updated.target, 'error', reference)
+    }
+    return { job: updated, agentId: job.agentId }
+  }
+
   private getAiScheduleJob(id: string): AiScheduleJob {
     const row = this.database.prepare(`
       SELECT j.id, j.game_id AS gameId, j.scope, j.target, j.job_kind AS jobKind,
@@ -3109,19 +2661,25 @@ export class AppDatabase {
         j.progress_phase AS progressPhase,
         j.progress_current AS progressCurrent,
         j.progress_total AS progressTotal,
-        j.progress_updated_at AS progressUpdatedAt
+        j.progress_updated_at AS progressUpdatedAt,
+        j.routing_tier AS routingTier,
+        j.attempt_count AS attemptCount,
+        j.assigned_model AS assignedModel,
+        j.assigned_reasoning_effort AS assignedReasoningEffort,
+        j.last_failure_kind AS lastFailureKind
       FROM ai_schedule_jobs j
       LEFT JOIN ai_schedule_agents a ON a.id = j.agent_id
       WHERE j.id = ?
     `).get(id) as Omit<
       AiScheduleJob,
-      'activityTagTargets' | 'metadataTargets' | 'matchCandidates' | 'contract' | 'requestContext'
+      'activityTagTargets' | 'metadataTargets' | 'reviewTargets' |
+      'matchCandidates' | 'contract' | 'requestContext'
     > | undefined
     if (!row) throw new Error('AI 资料任务不存在')
     const activityTagTargets = row.jobKind === 'public_catalog' && (
       row.status === 'pending' || row.status === 'claimed'
     ) && (row.target === 'events' || row.target === 'all')
-      ? this.listActivityTagEnrichmentTargets(row.gameId, row.requestedAt)
+      ? this.listActivityTagEnrichmentTargets(row.gameId, row.requestedAt, row.outputLocale)
       : []
     const targetCategories: Record<SyncTarget, ChecklistCategory[]> = {
       tasks: ['main_quest', 'side_quest'],
@@ -3168,6 +2726,10 @@ export class AppDatabase {
           new Date(row.requestedAt)
         )
       : []
+    const reviewTargets = row.jobKind === 'personal_review' &&
+      (row.status === 'pending' || row.status === 'claimed')
+      ? this.readPersonalReviewTargets(row.id)
+      : []
     return {
       ...row,
       requestContext: {
@@ -3176,10 +2738,17 @@ export class AppDatabase {
       },
       activityTagTargets,
       metadataTargets,
+      reviewTargets,
       matchCandidates,
-      contract: row.jobKind === 'personal_metadata' &&
-        (row.target === 'events' || row.target === 'cycles')
-        ? getPersonalMetadataContract(row.target, {
+      contract: row.jobKind === 'personal_review' &&
+        (row.target === 'events' || row.target === 'cycles' || row.target === 'exploration')
+        ? getPersonalReviewContract(row.target, {
+            outputLocale: row.outputLocale,
+            userTimeZone: row.userTimeZone
+          })
+        : row.jobKind === 'personal_metadata' &&
+          (row.target === 'events' || row.target === 'cycles')
+          ? getPersonalMetadataContract(row.target, {
             outputLocale: row.outputLocale,
             userTimeZone: row.userTimeZone
           })
@@ -3188,6 +2757,17 @@ export class AppDatabase {
             userTimeZone: row.userTimeZone
           })
     }
+  }
+
+  private readPersonalReviewTargets(jobId: string): PersonalReviewTarget[] {
+    const row = this.database.prepare(`
+      SELECT review_targets_json AS reviewTargetsJson
+      FROM personal_review_batches WHERE job_id = ?
+    `).get(jobId) as { reviewTargetsJson: string } | undefined
+    if (!row) return []
+    const value = JSON.parse(row.reviewTargetsJson) as unknown
+    if (!Array.isArray(value)) throw new Error('个人数据异常暂存格式不正确')
+    return value as PersonalReviewTarget[]
   }
 
   private listPersonalMetadataEnrichmentTargets(
@@ -3201,6 +2781,7 @@ export class AppDatabase {
       SELECT i.id AS itemId, i.title, i.category,
         i.activity_tags_json AS activityTagsJson,
         i.starts_at AS startsAt, i.ends_at AS endsAt,
+        i.mode_key AS modeKey,
         b.provider, b.endpoint, b.external_id AS externalId
       FROM checklist_items i
       INNER JOIN source_bindings b ON b.game_id = i.game_id AND b.item_id = i.id
@@ -3215,6 +2796,7 @@ export class AppDatabase {
       activityTagsJson: string
       startsAt: string | null
       endsAt: string | null
+      modeKey: string | null
       provider: string
       endpoint: string
       externalId: string
@@ -3227,7 +2809,7 @@ export class AppDatabase {
           currentTags = parsed.filter((tag): tag is string => typeof tag === 'string')
         }
       } catch {
-        // Invalid legacy values require enrichment.
+        // Invalid stored values require enrichment.
       }
       currentTags = normalizeActivityTags(currentTags, outputLocale)
       const missingFields: PersonalMetadataEnrichmentTarget['missingFields'] = []
@@ -3245,6 +2827,12 @@ export class AppDatabase {
         startsAt: row.startsAt,
         endsAt: row.endsAt,
         missingFields,
+        ...(target === 'cycles' ? {
+          timeWindowPolicy:
+            gameId === 'wuthering-waves' && row.modeKey === 'endstate-matrix'
+              ? 'current_playable_phase' as const
+              : 'full_cycle' as const
+        } : {}),
         sourceIdentity: {
           provider: row.provider,
           endpoint: row.endpoint,
@@ -3256,7 +2844,8 @@ export class AppDatabase {
 
   private listActivityTagEnrichmentTargets(
     gameId: GameId,
-    reference: string
+    reference: string,
+    outputLocale: string
   ): ActivityTagEnrichmentTarget[] {
     const rows = this.database.prepare(`
       SELECT id AS itemId, title, activity_tags_json AS activityTagsJson,
@@ -3280,9 +2869,12 @@ export class AppDatabase {
           tags = parsed.filter((tag): tag is string => typeof tag === 'string')
         }
       } catch {
-        // Invalid legacy values are deliberately treated as requiring review.
+        // Invalid stored values are deliberately treated as requiring review.
       }
-      return activityTagsNeedReview(tags) ? [{ ...row, currentTags: tags }] : []
+      const normalizedTags = normalizeActivityTags(tags, outputLocale)
+      return activityTagsNeedReview(normalizedTags)
+        ? [{ ...row, currentTags: normalizedTags }]
+        : []
     })
   }
 
@@ -3293,7 +2885,7 @@ export class AppDatabase {
       UPDATE ai_schedule_jobs
       SET status = 'pending', agent_id = NULL, claimed_at = NULL,
           progress_phase = 'queued', progress_current = NULL, progress_total = NULL,
-          progress_updated_at = ?, message = 'Codex 超时，任务已重新排队', updated_at = ?
+          progress_updated_at = ?, message = '处理超时，任务已重新排队', updated_at = ?
       WHERE status = 'claimed'
         AND COALESCE(progress_updated_at, claimed_at) < ?
     `).run(now, now, threshold)
@@ -3330,7 +2922,6 @@ export class AppDatabase {
           parent_title AS parentTitle,
           map_node_kind AS mapNodeKind,
           parent_remote_key AS parentRemoteKey,
-          related_region_remote_key AS relatedRegionRemoteKey,
           starts_at AS startsAt,
           ends_at AS endsAt,
           reset_rule AS resetRule,
@@ -3403,7 +2994,6 @@ export class AppDatabase {
           parent_title AS parentTitle,
           map_node_kind AS mapNodeKind,
           parent_remote_key AS parentRemoteKey,
-          related_region_remote_key AS relatedRegionRemoteKey,
           starts_at AS startsAt,
           ends_at AS endsAt,
           reset_rule AS resetRule,
@@ -3422,7 +3012,7 @@ export class AppDatabase {
           created_at AS createdAt,
           updated_at AS updatedAt
         FROM checklist_items
-        WHERE game_id = ? AND archived = 1
+        WHERE game_id = ? AND archived = 1 AND source = 'manual'
         ORDER BY updated_at DESC
       `)
       .all(gameId) as unknown[]
@@ -3449,10 +3039,10 @@ export class AppDatabase {
       .prepare(`
         INSERT INTO checklist_items(
           id, game_id, category, title, activity_tags_json, progress_percent, parent_title,
-          map_node_kind, parent_remote_key, related_region_remote_key, starts_at, ends_at,
+          map_node_kind, parent_remote_key, starts_at, ends_at,
           reset_rule, period_key, schedule_kind, reset_weekday, timezone, mode_key,
           recurrence_rule, source, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?)
       `)
       .run(
         id,
@@ -3468,7 +3058,6 @@ export class AppDatabase {
         input.parentTitle ?? null,
         input.mapNodeKind ?? (input.category === 'exploration' ? 'region' : null),
         input.parentRemoteKey ?? null,
-        null,
         startsAt,
         endsAt,
         input.resetRule ?? null,
@@ -3562,7 +3151,6 @@ export class AppDatabase {
           parent_title = ?,
           map_node_kind = ?,
           parent_remote_key = ?,
-          related_region_remote_key = ?,
           starts_at = ?,
           ends_at = ?,
           reset_rule = ?,
@@ -3590,7 +3178,6 @@ export class AppDatabase {
         input.parentRemoteKey === undefined
           ? (categoryChanged ? null : current.parentRemoteKey)
           : input.parentRemoteKey,
-        null,
         startsAt,
         endsAt,
         input.resetRule === undefined ? current.resetRule : input.resetRule,
@@ -3615,11 +3202,13 @@ export class AppDatabase {
 
   archiveChecklistItem(id: string): void {
     if (this.isPersistentChecklistId(id)) throw new Error('固定清单事项不能删除')
+    const item = this.getChecklistItem(id)
+    if (item.source !== 'manual') throw new Error('系统清单由同步维护，不能删除')
     const result = this.database
       .prepare(`
         UPDATE checklist_items
         SET archived = 1, updated_at = ?
-        WHERE id = ? AND archived = 0
+        WHERE id = ? AND archived = 0 AND source = 'manual'
       `)
       .run(new Date().toISOString(), id)
 
@@ -3627,66 +3216,11 @@ export class AppDatabase {
   }
 
   emptyRecycleBin(gameId: GameId): number {
-    return this.runTransaction(() => {
-      const archived = this.database.prepare(`
-        SELECT id, category, remote_key AS remoteKey, source
-        FROM checklist_items
-        WHERE game_id = ? AND archived = 1
-      `).all(gameId) as Array<{
-        id: string
-        category: ChecklistCategory
-        remoteKey: string | null
-        source: ChecklistSource
-      }>
-      if (archived.length === 0) return 0
-      const insertTombstone = this.database.prepare(`
-        INSERT INTO sync_deletion_tombstones(
-          game_id, identity_key, category, deleted_at
-        ) VALUES (?, ?, ?, ?)
-        ON CONFLICT(game_id, identity_key) DO UPDATE SET
-          category = excluded.category,
-          deleted_at = excluded.deleted_at
-      `)
-      const bindings = this.database.prepare(`
-        SELECT provider, endpoint, external_id AS externalId
-        FROM source_bindings
-        WHERE game_id = ? AND item_id = ?
-      `)
-      const now = new Date().toISOString()
-      for (const item of archived) {
-        if (item.source === 'manual') continue
-        if (item.remoteKey) {
-          insertTombstone.run(
-            gameId,
-            this.catalogDeletionKey(item.remoteKey),
-            item.category,
-            now
-          )
-        }
-        const itemBindings = bindings.all(gameId, item.id) as Array<{
-          provider: string
-          endpoint: string
-          externalId: string
-        }>
-        for (const binding of itemBindings) {
-          insertTombstone.run(
-            gameId,
-            this.sourceBindingDeletionKey(
-              binding.provider,
-              binding.endpoint,
-              binding.externalId
-            ),
-            item.category,
-            now
-          )
-        }
-      }
-      this.database.prepare(`
-        DELETE FROM checklist_items
-        WHERE game_id = ? AND archived = 1
-      `).run(gameId)
-      return archived.length
-    })
+    const result = this.database.prepare(`
+      DELETE FROM checklist_items
+      WHERE game_id = ? AND archived = 1 AND source = 'manual'
+    `).run(gameId)
+    return Number(result.changes)
   }
 
   archiveChecklistItems(ids: string[]): number {
@@ -3701,7 +3235,7 @@ export class AppDatabase {
       .prepare(`
         UPDATE checklist_items
         SET archived = 0, updated_at = ?
-        WHERE id = ? AND archived = 1
+        WHERE id = ? AND archived = 1 AND source = 'manual'
       `)
       .run(new Date().toISOString(), id)
 
@@ -3711,23 +3245,23 @@ export class AppDatabase {
   }
 
   archiveCompletedSection(gameId: string, categories: ChecklistCategory[]): number {
-    if (categories.length === 0) return 0
-    const placeholders = categories.map(() => '?').join(', ')
+    if (!categories.includes('custom')) return 0
     const result = this.database
       .prepare(`
         UPDATE checklist_items
         SET archived = 1, updated_at = ?
         WHERE game_id = ?
-          AND category IN (${placeholders})
+          AND category = 'custom'
           AND completed = 1
           AND archived = 0
+          AND source = 'manual'
           AND id NOT IN (
             game_id || ':main_quest',
             game_id || ':side_quest',
             game_id || ':weekly'
           )
       `)
-      .run(new Date().toISOString(), gameId, ...categories)
+      .run(new Date().toISOString(), gameId)
 
     return Number(result.changes)
   }
@@ -3735,7 +3269,8 @@ export class AppDatabase {
   private hydratePersonalMetadataFromCache(
     gameId: GameId,
     item: NormalizedSyncItem,
-    outputLocale: string
+    outputLocale: string,
+    reference: Date
   ): NormalizedSyncItem {
     if (
       !item.sourceIdentity ||
@@ -3746,13 +3281,14 @@ export class AppDatabase {
         starts_at AS startsAt, ends_at AS endsAt, source_url AS sourceUrl
       FROM personal_metadata_cache
       WHERE game_id = ? AND provider = ? AND endpoint = ? AND external_id = ?
-        AND output_locale = ?
+        AND output_locale = ? AND taxonomy_version = ?
     `).get(
       gameId,
       item.sourceIdentity.provider,
       item.sourceIdentity.endpoint,
       item.sourceIdentity.externalId,
-      outputLocale
+      outputLocale,
+      ACTIVITY_TAG_TAXONOMY_VERSION
     ) as {
       activityTagsJson: string | null
       startsAt: string | null
@@ -3770,13 +3306,20 @@ export class AppDatabase {
       cachedTags = []
     }
     const currentTags = normalizeActivityTags(item.activityTags ?? [], outputLocale)
+    const cachedEndsAt = cached.endsAt ? Date.parse(cached.endsAt) : Number.NaN
+    // Recurring challenge identities may remain stable across periods.  A
+    // cached window that has already ended describes the previous period and
+    // must not make a fresh official response expire before it can be
+    // enriched with the current window.
+    const reuseCachedWindow = item.category !== 'endgame' ||
+      !Number.isFinite(cachedEndsAt) || cachedEndsAt > reference.getTime()
     return {
       ...item,
       activityTags: item.category === 'limited_event' && activityTagsNeedReview(currentTags)
         ? cachedTags.length > 0 ? cachedTags : currentTags
         : currentTags,
-      startsAt: item.startsAt || cached.startsAt,
-      endsAt: item.endsAt || cached.endsAt,
+      startsAt: item.startsAt || (reuseCachedWindow ? cached.startsAt : null),
+      endsAt: item.endsAt || (reuseCachedWindow ? cached.endsAt : null),
       sourceUrl: item.sourceUrl || cached.sourceUrl
     }
   }
@@ -3803,8 +3346,8 @@ export class AppDatabase {
       INSERT INTO personal_metadata_cache(
         game_id, provider, endpoint, external_id, output_locale, category,
         activity_tags_json, starts_at, ends_at, source_url, confidence,
-        verified_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        verified_at, updated_at, taxonomy_version
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(game_id, provider, endpoint, external_id, output_locale) DO UPDATE SET
         category = excluded.category,
         activity_tags_json = COALESCE(excluded.activity_tags_json, personal_metadata_cache.activity_tags_json),
@@ -3812,6 +3355,7 @@ export class AppDatabase {
         ends_at = COALESCE(excluded.ends_at, personal_metadata_cache.ends_at),
         source_url = COALESCE(excluded.source_url, personal_metadata_cache.source_url),
         confidence = COALESCE(excluded.confidence, personal_metadata_cache.confidence),
+        taxonomy_version = excluded.taxonomy_version,
         verified_at = excluded.verified_at,
         updated_at = excluded.updated_at
     `).run(
@@ -3827,7 +3371,8 @@ export class AppDatabase {
       item.sourceUrl ?? null,
       confidence,
       verifiedAt,
-      verifiedAt
+      verifiedAt,
+      ACTIVITY_TAG_TAXONOMY_VERSION
     )
   }
 
@@ -3846,7 +3391,8 @@ export class AppDatabase {
     requestContext: SyncRequestContext = {
       outputLocale: 'zh-CN',
       userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-    }
+    },
+    manageTransaction = true
   ): SyncMergeResult {
     assertAccountScope(accountScope)
     if (!adapterVersion.trim() || adapterVersion.length > 100) {
@@ -3875,7 +3421,8 @@ export class AppDatabase {
     const preparedItems = items.map((item) => this.hydratePersonalMetadataFromCache(
       gameId,
       item,
-      requestContext.outputLocale
+      requestContext.outputLocale,
+      reference
     ))
     const activeItems: NormalizedSyncItem[] = []
     const expiredItems: NormalizedSyncItem[] = []
@@ -3890,22 +3437,38 @@ export class AppDatabase {
         throw new Error(`尚未开始的活动“${item.title}”不能标记为已完成`)
       }
       const identity = item.sourceIdentity!
-      const tombstone = this.database.prepare(`
-        SELECT expired_ends_at AS expiredEndsAt
-        FROM personal_expiry_tombstones
-        WHERE game_id = ? AND provider = ? AND endpoint = ? AND external_id = ?
-      `).get(
-        gameId,
-        identity.provider,
-        identity.endpoint,
-        identity.externalId
-      ) as { expiredEndsAt: string } | undefined
+      // Catalog placeholders are local period predictions rather than
+      // official identities.  They must be allowed to reappear in a later
+      // period even if an older prediction was enriched with an end time and
+      // expired.  Expiry tombstones remain reserved for actual provider IDs.
+      const isCatalogPrediction = identity.provider === 'gtask-cycle-catalog'
+      const isKnownRecurringCycle = item.category === 'endgame' && Boolean(findCycleMode(gameId, item))
+      const tombstone = isCatalogPrediction
+        ? undefined
+        : this.database.prepare(`
+            SELECT expired_ends_at AS expiredEndsAt
+            FROM personal_expiry_tombstones
+            WHERE game_id = ? AND provider = ? AND endpoint = ? AND external_id = ?
+          `).get(
+            gameId,
+            identity.provider,
+            identity.endpoint,
+            identity.externalId
+          ) as { expiredEndsAt: string } | undefined
       const endsAtMs = item.endsAt ? Date.parse(item.endsAt) : Number.NaN
       if (Number.isFinite(endsAtMs) && endsAtMs <= reference.getTime()) {
         expiredItems.push(item)
         continue
       }
       if (tombstone) {
+        if (isKnownRecurringCycle && !Number.isFinite(endsAtMs)) {
+          // Stable official mode IDs can legitimately return again for a new
+          // period before the provider exposes the new window. Keep the old
+          // period tombstone until the current window is bound, and never
+          // carry the old period's completion bit into the placeholder.
+          activeItems.push({ ...item, completed: false })
+          continue
+        }
         if (
           Number.isFinite(endsAtMs) &&
           endsAtMs > reference.getTime() &&
@@ -3922,7 +3485,7 @@ export class AppDatabase {
     }
     this.assertStandaloneMapStructure(activeItems)
 
-    return this.runTransaction(() => {
+    const replace = (): SyncMergeResult => {
       const now = reference.toISOString()
       const categories = expectedCategories[target]
       const placeholders = categories.map(() => '?').join(', ')
@@ -3952,15 +3515,17 @@ export class AppDatabase {
       `)
       for (const item of expiredItems) {
         const identity = item.sourceIdentity!
-        upsertExpiry.run(
-          gameId,
-          identity.provider,
-          identity.endpoint,
-          identity.externalId,
-          item.category,
-          item.endsAt!,
-          now
-        )
+        if (identity.provider !== 'gtask-cycle-catalog') {
+          upsertExpiry.run(
+            gameId,
+            identity.provider,
+            identity.endpoint,
+            identity.externalId,
+            item.category,
+            item.endsAt!,
+            now
+          )
+        }
         expiredRemoved += Number(deleteExactPersonalItem.run(
           gameId,
           item.remoteKey,
@@ -3989,7 +3554,7 @@ export class AppDatabase {
         `).run(gameId, identity.provider, identity.endpoint, identity.externalId)
       }
       const previouslyExpired = this.database.prepare(`
-        SELECT i.id, i.category, i.ends_at AS endsAt,
+        SELECT i.id, i.category, i.remote_key AS remoteKey, i.ends_at AS endsAt,
           b.provider, b.endpoint, b.external_id AS externalId
         FROM checklist_items i
         LEFT JOIN source_bindings b ON b.game_id = i.game_id AND b.item_id = i.id
@@ -3999,13 +3564,17 @@ export class AppDatabase {
       `).all(gameId, ...categories, now) as Array<{
         id: string
         category: Extract<ChecklistCategory, 'limited_event' | 'endgame'>
+        remoteKey: string | null
         endsAt: string
         provider: string | null
         endpoint: string | null
         externalId: string | null
       }>
       for (const row of previouslyExpired) {
-        if (row.provider && row.endpoint && row.externalId) {
+        if (
+          row.provider && row.endpoint && row.externalId &&
+          row.provider !== 'gtask-cycle-catalog'
+        ) {
           upsertExpiry.run(
             gameId,
             row.provider,
@@ -4037,14 +3606,6 @@ export class AppDatabase {
         now
       )
 
-      // Any old Codex decision for the superseded dataset must be unable to write later.
-      this.database.prepare(`
-        UPDATE semantic_review_candidates
-        SET status = 'rejected', completed_at = ?, claimed_at = NULL, agent_id = NULL,
-            message = '个人数据源已切换，旧核验任务已取消', updated_at = ?
-        WHERE game_id = ? AND target = ? AND status IN ('pending', 'claimed')
-      `).run(now, now, gameId, target)
-
       // Replace only the active competing checklist. Rows in the recycle bin are
       // an explicit user choice and remain untouched until restored or emptied.
       // Fixed quests, weekly and custom items are outside these category sets.
@@ -4053,11 +3614,6 @@ export class AppDatabase {
         WHERE game_id = ? AND category IN (${placeholders})
           AND source <> 'personal_sync' AND archived = 0
       `).run(gameId, ...categories)
-      this.database.prepare(`
-        DELETE FROM sync_deletion_tombstones
-        WHERE game_id = ? AND category IN (${placeholders})
-      `).run(gameId, ...categories)
-
       if (target !== 'events') {
         this.database.prepare(`
           UPDATE checklist_items
@@ -4154,7 +3710,8 @@ export class AppDatabase {
       `).run(gameId, target, now, now, accountScope, snapshotId)
       if (target === 'exploration') this.assertActiveMapReferences(gameId)
       return { ...merge, expiredRemoved }
-    })
+    }
+    return manageTransaction ? this.runTransaction(replace) : replace()
   }
 
   activateChecklistSource(
@@ -4206,17 +3763,11 @@ export class AppDatabase {
     const placeholders = selected.map(() => '?').join(', ')
     const now = new Date().toISOString()
     this.database.prepare(`
-      UPDATE semantic_review_candidates
-      SET status = 'rejected', completed_at = ?, claimed_at = NULL, agent_id = NULL,
-          message = '清单已切换为公开资料，旧个人核验任务已取消', updated_at = ?
-      WHERE game_id = ? AND target = ? AND status IN ('pending', 'claimed')
-    `).run(now, now, gameId, target)
-    this.database.prepare(`
       UPDATE ai_schedule_jobs
-      SET status = 'failed', completed_at = ?, message = '清单已切换为公开资料，个人元数据补全已取消',
+      SET status = 'failed', completed_at = ?, message = '清单已切换为公开资料，个人数据 Codex 任务已取消',
           progress_phase = 'failed', progress_current = NULL, progress_total = NULL,
           progress_updated_at = ?, updated_at = ?
-      WHERE game_id = ? AND target = ? AND job_kind = 'personal_metadata'
+      WHERE game_id = ? AND target = ? AND job_kind IN ('personal_metadata', 'personal_review')
         AND status IN ('pending', 'claimed')
     `).run(now, now, now, gameId, target)
     this.database.prepare(`
@@ -4274,6 +3825,9 @@ export class AppDatabase {
 
     if (manageTransaction) this.database.exec('BEGIN IMMEDIATE')
     try {
+      if (source === 'public_schedule') {
+        this.restorePublicCycleCompletionFromHistory(gameId, items, syncedAt)
+      }
       for (const item of items) {
         if (item.category === 'main_quest' || item.category === 'side_quest') {
           if (source !== 'public_schedule') {
@@ -4304,11 +3858,6 @@ export class AppDatabase {
           Date.parse(item.startsAt!) > Date.parse(syncedAt)
         if (seenRemoteKeys.has(remoteKey)) throw new Error(`同步数据包含重复标识：${remoteKey}`)
         seenRemoteKeys.add(remoteKey)
-
-        if (this.hasSyncDeletionTombstone(gameId, this.catalogDeletionKey(remoteKey))) {
-          result.preserved += 1
-          continue
-        }
 
         const identity = this.findSyncIdentity(
           gameId,
@@ -4348,11 +3897,11 @@ export class AppDatabase {
             .prepare(`
               INSERT INTO checklist_items(
                 id, game_id, category, title, activity_tags_json, completed, progress_percent, parent_title,
-                map_node_kind, parent_remote_key, related_region_remote_key,
+                map_node_kind, parent_remote_key,
                 starts_at, ends_at, reset_rule, period_key, schedule_kind,
                 reset_weekday, timezone, mode_key, recurrence_rule, source, remote_key,
                 source_url, completed_at, last_synced_at, created_at, updated_at
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `)
             .run(
               id,
@@ -4376,7 +3925,6 @@ export class AppDatabase {
               item.parentTitle ?? null,
               item.mapNodeKind ?? (item.category === 'exploration' ? 'region' : null),
               item.parentRemoteKey ?? null,
-              null,
               item.startsAt ?? null,
               item.endsAt ?? null,
               item.resetRule ?? null,
@@ -4399,17 +3947,8 @@ export class AppDatabase {
         }
 
         const current = this.getChecklistItem(identity.id)
-        const preservePublicSchedule =
-          source === 'personal_sync' &&
-          current.source === 'public_schedule' &&
-          !options.codexReviewed
-        const resolvedCategory = preservePublicSchedule ? current.category : item.category
-        const resolvedSource =
-          source === 'public_schedule' || current.source === 'public_schedule'
-            ? 'public_schedule'
-            : 'personal_sync'
-        const resolvedActivityTags = resolvedCategory === 'limited_event'
-          ? preservePublicSchedule || item.activityTags === undefined
+        const resolvedActivityTags = item.category === 'limited_event'
+          ? item.activityTags === undefined
             ? current.activityTags
             : normalizeActivityTags(
                 item.activityTags,
@@ -4436,10 +3975,8 @@ export class AppDatabase {
           : acceptsRemoteCompletion
             ? null
             : currentCompletedAt
-        const startsAt =
-          preservePublicSchedule || item.startsAt === undefined ? current.startsAt : item.startsAt
-        const endsAt =
-          preservePublicSchedule || item.endsAt === undefined ? current.endsAt : item.endsAt
+        const startsAt = item.startsAt === undefined ? current.startsAt : item.startsAt
+        const endsAt = item.endsAt === undefined ? current.endsAt : item.endsAt
         this.assertTimeWindow(startsAt, endsAt)
 
         this.database
@@ -4453,7 +3990,6 @@ export class AppDatabase {
               parent_title = ?,
               map_node_kind = ?,
               parent_remote_key = ?,
-              related_region_remote_key = ?,
               starts_at = ?,
               ends_at = ?,
               reset_rule = ?,
@@ -4472,11 +4008,11 @@ export class AppDatabase {
             WHERE id = ? AND archived = 0
           `)
           .run(
-            resolvedCategory,
-            preservePublicSchedule ? current.title : item.title,
+            item.category,
+            item.title,
             JSON.stringify(resolvedActivityTags),
             completed ? 1 : 0,
-            resolvedCategory === 'exploration'
+            item.category === 'exploration'
               ? source === 'public_schedule' || item.progressPercent === undefined
                 ? current.progressPercent
                 : item.progressPercent
@@ -4484,24 +4020,17 @@ export class AppDatabase {
             item.parentTitle === undefined ? current.parentTitle : item.parentTitle,
             item.mapNodeKind === undefined ? current.mapNodeKind : item.mapNodeKind,
             item.parentRemoteKey === undefined ? current.parentRemoteKey : item.parentRemoteKey,
-            null,
             startsAt,
             endsAt,
-            preservePublicSchedule || item.resetRule === undefined ? current.resetRule : item.resetRule,
-            preservePublicSchedule || item.periodKey === undefined
-              ? current.periodKey
-              : item.periodKey,
-            preservePublicSchedule || item.scheduleKind === undefined
-              ? current.scheduleKind
-              : item.scheduleKind,
-            preservePublicSchedule || item.resetWeekday === undefined
-              ? current.resetWeekday
-              : item.resetWeekday,
-            preservePublicSchedule || item.timeZone === undefined ? current.timeZone : item.timeZone,
-            preservePublicSchedule || item.modeKey === undefined ? current.modeKey : item.modeKey,
+            item.resetRule === undefined ? current.resetRule : item.resetRule,
+            item.periodKey === undefined ? current.periodKey : item.periodKey,
+            item.scheduleKind === undefined ? current.scheduleKind : item.scheduleKind,
+            item.resetWeekday === undefined ? current.resetWeekday : item.resetWeekday,
+            item.timeZone === undefined ? current.timeZone : item.timeZone,
+            item.modeKey === undefined ? current.modeKey : item.modeKey,
             null,
-            resolvedSource,
-            preservePublicSchedule || item.sourceUrl === undefined ? current.sourceUrl : item.sourceUrl,
+            source,
+            item.sourceUrl === undefined ? current.sourceUrl : item.sourceUrl,
             manualCompletionLocked ? 1 : 0,
             completedAt,
             syncedAt,
@@ -4509,26 +4038,6 @@ export class AppDatabase {
             current.id
           )
         result.updated += 1
-        if (
-          item.category === 'limited_event' &&
-          source === 'personal_sync' &&
-          current.source === 'public_schedule'
-        ) {
-          this.archiveEquivalentPersonalEventDuplicates(
-            gameId,
-            current.id,
-            item,
-            syncedAt
-          )
-        }
-        if (item.category === 'exploration' && source === 'public_schedule') {
-          this.absorbEquivalentPersonalMapDuplicates(
-            gameId,
-            current.id,
-            item,
-            syncedAt
-          )
-        }
         if (completionProtected) result.preserved += 1
       }
       if (manageTransaction) this.database.exec('COMMIT')
@@ -4764,219 +4273,6 @@ export class AppDatabase {
     ) as { id: string; archived: number; source: ChecklistSource } | undefined
   }
 
-  private catalogDeletionKey(remoteKey: string): string {
-    return `catalog:${remoteKey}`
-  }
-
-  private sourceBindingDeletionKey(
-    provider: string,
-    endpoint: string,
-    externalId: string
-  ): string {
-    return `binding:${provider}:${endpoint}:${externalId}`
-  }
-
-  private hasSyncDeletionTombstone(gameId: GameId, identityKey: string): boolean {
-    return Boolean(this.database.prepare(`
-      SELECT 1
-      FROM sync_deletion_tombstones
-      WHERE game_id = ? AND identity_key = ?
-    `).get(gameId, identityKey))
-  }
-
-  private isArchivedChecklistItem(itemId: string, gameId: GameId): boolean {
-    return Boolean(this.database.prepare(`
-      SELECT 1
-      FROM checklist_items
-      WHERE id = ? AND game_id = ? AND archived = 1
-    `).get(itemId, gameId))
-  }
-
-  private archiveEquivalentPersonalEventDuplicates(
-    gameId: GameId,
-    preservedId: string,
-    item: NormalizedSyncItem,
-    syncedAt: string
-  ): void {
-    const candidates = this.database.prepare(`
-      SELECT id, title
-      FROM checklist_items
-      WHERE game_id = ?
-        AND id <> ?
-        AND category = 'limited_event'
-        AND source = 'personal_sync'
-        AND archived = 0
-        AND (
-          remote_key = ?
-          OR (? IS NOT NULL AND mode_key = ?)
-          OR (
-            starts_at IS NOT NULL AND ends_at IS NOT NULL
-            AND ? IS NOT NULL AND ? IS NOT NULL
-            AND julianday(starts_at) <= julianday(?)
-            AND julianday(ends_at) >= julianday(?)
-          )
-        )
-    `).all(
-      gameId,
-      preservedId,
-      item.remoteKey,
-      item.modeKey ?? null,
-      item.modeKey ?? null,
-      item.startsAt ?? null,
-      item.endsAt ?? null,
-      item.endsAt ?? null,
-      item.startsAt ?? null
-    ) as Array<{ id: string; title: string }>
-    const ids = candidates
-      .filter((candidate) => eventTitlesEquivalent(candidate.title, item.title))
-      .map((candidate) => candidate.id)
-    if (ids.length === 0) return
-    const statement = this.database.prepare(`
-      UPDATE checklist_items
-      SET archived = 1, updated_at = ?
-      WHERE id = ? AND source = 'personal_sync' AND archived = 0
-    `)
-    for (const id of ids) statement.run(syncedAt, id)
-  }
-
-  private absorbEquivalentPersonalMapDuplicates(
-    gameId: GameId,
-    preservedId: string,
-    item: NormalizedSyncItem,
-    syncedAt: string
-  ): void {
-    const candidates = this.database.prepare(`
-      SELECT id, progress_percent AS progressPercent, completed,
-        completed_at AS completedAt, last_synced_at AS lastSyncedAt,
-        updated_at AS updatedAt
-      FROM checklist_items
-      WHERE game_id = ?
-        AND id <> ?
-        AND category = 'exploration'
-        AND source = 'personal_sync'
-        AND archived = 0
-        AND title = ?
-        AND COALESCE(map_node_kind, 'region') = ?
-        AND (
-          (? IS NULL AND parent_remote_key IS NULL)
-          OR (
-            ? IS NOT NULL
-            AND (parent_remote_key = ? OR parent_title = ?)
-          )
-        )
-    `).all(
-      gameId,
-      preservedId,
-      item.title,
-      item.mapNodeKind ?? 'region',
-      item.parentRemoteKey ?? null,
-      item.parentRemoteKey ?? null,
-      item.parentRemoteKey ?? null,
-      item.parentTitle ?? null
-    ) as Array<{
-      id: string
-      progressPercent: number | null
-      completed: number
-      completedAt: string | null
-      lastSyncedAt: string | null
-      updatedAt: string
-    }>
-    if (candidates.length === 0) return
-
-    const moveBinding = this.database.prepare(`
-      UPDATE source_bindings
-      SET item_id = ?, updated_at = ?
-      WHERE game_id = ? AND item_id = ?
-    `)
-    const moveObservation = this.database.prepare(`
-      UPDATE sync_observations
-      SET item_id = ?
-      WHERE game_id = ? AND item_id = ?
-    `)
-    const archive = this.database.prepare(`
-      UPDATE checklist_items
-      SET archived = 1, updated_at = ?
-      WHERE id = ? AND source = 'personal_sync' AND archived = 0
-    `)
-    for (const candidate of candidates) {
-      const states = this.database.prepare(`
-        SELECT account_scope AS accountScope, provider, endpoint,
-          external_id AS externalId, completion_state AS completionState,
-          progress_percent AS progressPercent, observed_at AS observedAt,
-          updated_at AS updatedAt
-        FROM personal_item_states
-        WHERE game_id = ? AND item_id = ?
-      `).all(gameId, candidate.id) as Array<{
-        accountScope: string
-        provider: string
-        endpoint: string
-        externalId: string
-        completionState: PersonalCompletionState
-        progressPercent: number | null
-        observedAt: string
-        updatedAt: string
-      }>
-      for (const state of states) {
-        const existing = this.getPersonalItemState(state.accountScope, preservedId)
-        if (!existing || Date.parse(state.observedAt) >= Date.parse(existing.observedAt)) {
-          this.upsertPersonalItemState({
-            accountScope: state.accountScope,
-            gameId,
-            itemId: preservedId,
-            provider: state.provider,
-            endpoint: state.endpoint,
-            externalId: state.externalId,
-            completionState: state.completionState,
-            progressPercent: state.progressPercent,
-            observedAt: state.observedAt
-          }, new Date(state.updatedAt))
-        }
-      }
-      this.database.prepare(`
-        DELETE FROM personal_item_states WHERE game_id = ? AND item_id = ?
-      `).run(gameId, candidate.id)
-      moveBinding.run(preservedId, syncedAt, gameId, candidate.id)
-      moveObservation.run(preservedId, gameId, candidate.id)
-      archive.run(syncedAt, candidate.id)
-    }
-
-    const latestState = this.database.prepare(`
-      SELECT progress_percent AS progressPercent, completion_state AS completionState,
-        observed_at AS observedAt
-      FROM personal_item_states
-      WHERE game_id = ? AND item_id = ? AND progress_percent IS NOT NULL
-      ORDER BY observed_at DESC
-      LIMIT 1
-    `).get(gameId, preservedId) as {
-      progressPercent: number
-      completionState: PersonalCompletionState
-      observedAt: string
-    } | undefined
-    const fallback = candidates
-      .filter((candidate) => candidate.progressPercent !== null)
-      .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))[0]
-    const progressPercent = latestState?.progressPercent ?? fallback?.progressPercent
-    if (progressPercent === undefined || progressPercent === null) return
-    const completed = latestState
-      ? latestState.completionState === 'completed' || progressPercent === 100
-      : Boolean(fallback?.completed) || progressPercent === 100
-    this.database.prepare(`
-      UPDATE checklist_items
-      SET progress_percent = ?, completed = ?,
-        completed_at = CASE WHEN ? = 1 THEN COALESCE(completed_at, ?) ELSE NULL END,
-        last_synced_at = COALESCE(?, last_synced_at), updated_at = ?
-      WHERE id = ? AND archived = 0
-    `).run(
-      progressPercent,
-      completed ? 1 : 0,
-      completed ? 1 : 0,
-      latestState?.observedAt ?? fallback?.completedAt ?? syncedAt,
-      latestState?.observedAt ?? fallback?.lastSyncedAt ?? null,
-      syncedAt,
-      preservedId
-    )
-  }
-
   resetDueWeeklyItems(reference = new Date()): number {
     let changes = 0
     for (let resetWeekday = 1; resetWeekday <= 7; resetWeekday += 1) {
@@ -5027,6 +4323,154 @@ export class AppDatabase {
         AND julianday(ends_at) <= julianday(?)
     `).run(now, now)
     return Number(result.changes)
+  }
+
+  rolloverDueCycleItems(reference = new Date()): number {
+    const now = reference.toISOString()
+    const rows = this.database.prepare(`
+      SELECT id, game_id AS gameId, category, title,
+        activity_tags_json AS activityTagsJson, completed,
+        progress_percent AS progressPercent, parent_title AS parentTitle,
+        map_node_kind AS mapNodeKind, parent_remote_key AS parentRemoteKey,
+        starts_at AS startsAt, ends_at AS endsAt, reset_rule AS resetRule,
+        period_key AS periodKey, schedule_kind AS scheduleKind,
+        reset_weekday AS resetWeekday, timezone AS timeZone,
+        mode_key AS modeKey, recurrence_rule AS recurrenceRule,
+        source, remote_key AS remoteKey, source_url AS sourceUrl,
+        manual_completion_locked AS manualCompletionLocked,
+        last_synced_at AS lastSyncedAt, completed_at AS completedAt,
+        created_at AS createdAt, updated_at AS updatedAt
+      FROM checklist_items
+      WHERE category = 'endgame' AND archived = 0
+        AND source IN ('public_schedule', 'personal_sync')
+        AND mode_key IS NOT NULL AND remote_key IS NOT NULL
+        AND ends_at IS NOT NULL AND julianday(ends_at) <= julianday(?)
+    `).all(now) as Array<Omit<ChecklistItem, 'activityTags' | 'completed' | 'manualCompletionLocked'> & {
+      activityTagsJson: string
+      completed: number
+      manualCompletionLocked: number
+    }>
+    if (rows.length === 0) return 0
+    let changes = 0
+    this.runTransaction(() => {
+      const insertHistory = this.database.prepare(`
+        INSERT INTO cycle_period_history(
+          id, game_id, item_id, source, remote_key, mode_key, title,
+          completed, manual_completion_locked, starts_at, ends_at,
+          period_key, completed_at, archived_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+      const updateItem = this.database.prepare(`
+        UPDATE checklist_items
+        SET title = ?, completed = 0, progress_percent = NULL,
+            starts_at = ?, ends_at = ?, reset_rule = NULL,
+            period_key = ?, schedule_kind = 'remote_schedule', mode_key = ?,
+            remote_key = ?, source_url = NULL, manual_completion_locked = 0,
+            completed_at = NULL, last_synced_at = NULL, updated_at = ?
+        WHERE id = ? AND category = 'endgame' AND archived = 0
+          AND ends_at IS NOT NULL AND julianday(ends_at) <= julianday(?)
+      `)
+      const clearBindings = this.database.prepare('DELETE FROM source_bindings WHERE item_id = ?')
+      for (const row of rows) {
+        const item: ChecklistItem = {
+          ...row,
+          activityTags: JSON.parse(row.activityTagsJson) as string[],
+          completed: Boolean(row.completed),
+          manualCompletionLocked: Boolean(row.manualCompletionLocked)
+        }
+        const next = nextCyclePeriod(row.gameId, item, reference)
+        if (!next || next.periodKey === row.periodKey) continue
+        insertHistory.run(
+          randomUUID(),
+          row.gameId,
+          row.id,
+          row.source,
+          row.remoteKey,
+          row.modeKey,
+          row.title,
+          row.completed,
+          row.manualCompletionLocked,
+          row.startsAt,
+          row.endsAt,
+          row.periodKey,
+          row.completedAt,
+          now
+        )
+        clearBindings.run(row.id)
+        changes += Number(updateItem.run(
+          next.definition.title,
+          next.startsAt,
+          next.endsAt,
+          next.periodKey,
+          next.definition.modeKey,
+          next.definition.remoteKey,
+          now,
+          row.id,
+          now
+        ).changes)
+      }
+    })
+    return changes
+  }
+
+  private restorePublicCycleCompletionFromHistory(
+    gameId: GameId,
+    items: NormalizedSyncItem[],
+    reference: string
+  ): void {
+    const candidates = items.filter((item) =>
+      item.category === 'endgame' && item.modeKey && item.startsAt && item.endsAt
+    )
+    if (candidates.length === 0) return
+    const findHistory = this.database.prepare(`
+      SELECT id, completed, manual_completion_locked AS manualCompletionLocked,
+        completed_at AS completedAt
+      FROM cycle_period_history
+      WHERE game_id = ? AND source = 'public_schedule' AND mode_key = ?
+        AND restored_at IS NULL
+        AND (
+          period_key = ? OR (
+            starts_at IS NOT NULL AND ends_at IS NOT NULL
+            AND julianday(starts_at) < julianday(?)
+            AND julianday(ends_at) > julianday(?)
+          )
+        )
+      ORDER BY archived_at DESC
+      LIMIT 1
+    `)
+    const restore = this.database.prepare(`
+      UPDATE checklist_items
+      SET completed = ?, manual_completion_locked = ?, completed_at = ?, updated_at = ?
+      WHERE game_id = ? AND source = 'public_schedule' AND mode_key = ?
+        AND category = 'endgame' AND archived = 0
+    `)
+    const markRestored = this.database.prepare(
+      'UPDATE cycle_period_history SET restored_at = ? WHERE id = ?'
+    )
+    for (const item of candidates) {
+      const history = findHistory.get(
+        gameId,
+        item.modeKey!,
+        item.periodKey ?? null,
+        item.endsAt!,
+        item.startsAt!
+      ) as {
+        id: string
+        completed: number
+        manualCompletionLocked: number
+        completedAt: string | null
+      } | undefined
+      if (!history) continue
+      restore.run(
+        history.completed,
+        history.manualCompletionLocked,
+        history.completedAt,
+        reference,
+        gameId,
+        item.modeKey!
+      )
+      markRestored.run(reference, history.id)
+    }
   }
 
   private validateVersionScheduleItems(items: NormalizedSyncItem[], reference: Date): void {
@@ -5155,148 +4599,31 @@ export class AppDatabase {
     return row ? this.getChecklistItem(row.id) : null
   }
 
-  private applyPersonalStateToChecklist(
-    item: ChecklistItem,
-    accountScope: string,
-    identity: { provider: string; endpoint: string; externalId: string },
-    observed: { completionState: PersonalCompletionState; progressPercent: number | null },
-    reference: Date
-  ): { applied: number; preserved: number } {
-    const now = reference.toISOString()
-    const unknown = observed.completionState === 'unknown'
-    const requestedCompleted = observed.completionState === 'completed'
-    const completionProtected =
-      observed.completionState === 'incomplete' &&
-      item.manualCompletionLocked &&
-      item.completed
-    const completed = unknown
-      ? item.completed
-      : completionProtected
-        ? true
-        : requestedCompleted
-    const completedAt = unknown
-      ? item.completedAt
-      : completed
-        ? item.completedAt ?? now
-        : null
-    const result = this.database.prepare(`
-      UPDATE checklist_items
-      SET completed = ?,
-          progress_percent = CASE
-            WHEN category = 'exploration' AND ? IS NOT NULL THEN ?
-            ELSE progress_percent
-          END,
-          completed_at = ?,
-          last_synced_at = ?,
-          updated_at = ?
-      WHERE id = ? AND game_id = ? AND archived = 0
-    `).run(
-      completed ? 1 : 0,
-      observed.progressPercent,
-      observed.progressPercent,
-      completedAt,
-      now,
-      now,
-      item.id,
-      item.gameId
-    )
-    if (result.changes !== 1) throw new Error('个人状态对应的清单项已不存在')
-    this.upsertPersonalItemState({
-      accountScope,
-      gameId: item.gameId,
-      itemId: item.id,
-      ...identity,
-      completionState: observed.completionState,
-      progressPercent: observed.progressPercent,
-      observedAt: now
-    }, reference)
-    this.database.prepare(`
-      INSERT INTO sync_observations(
-        id, game_id, account_scope, provider, endpoint, external_id, target,
-        completion_state, progress_percent, payload_hash, outcome, item_id,
-        candidate_id, observed_at, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
-    `).run(
-      randomUUID(),
-      item.gameId,
-      accountScope,
-      identity.provider,
-      identity.endpoint,
-      identity.externalId,
-      item.category === 'exploration'
-        ? 'exploration'
-        : item.category === 'weekly' || item.category === 'endgame'
-          ? 'cycles'
-          : 'events',
-      observed.completionState,
-      observed.progressPercent,
-      createHash('sha256')
-        .update(stableJson({ identity, observed }))
-        .digest('hex'),
-      unknown || completionProtected ? 'ignored' : 'applied',
-      item.id,
-      now,
-      now
-    )
-    return unknown || completionProtected
-      ? { applied: 0, preserved: 1 }
-      : { applied: 1, preserved: 0 }
-  }
-
-  private backfillSemanticReviewBindings(reference = new Date()): void {
-    const rows = this.database.prepare(`
-      SELECT game_id AS gameId, kind, payload_json AS payloadJson,
-        decision_json AS decisionJson, account_scope AS accountScope,
-        completed_at AS completedAt
-      FROM semantic_review_candidates
-      WHERE source = 'personal_sync' AND status = 'approved'
-        AND decision_json IS NOT NULL
-      ORDER BY completed_at ASC
-    `).all() as Array<{
-      gameId: GameId
-      kind: string
-      payloadJson: string
-      decisionJson: string
-      accountScope: string | null
-      completedAt: string | null
-    }>
-    for (const row of rows) {
-      try {
-        const payload = JSON.parse(row.payloadJson) as Record<string, unknown>
-        const decision = JSON.parse(row.decisionJson) as {
-          item?: NormalizedSyncItem
-          matchItemId?: string | null
-          confidence?: number
-          completionRule?: PersonalCompletionRule | null
-        }
-        const identity = readSemanticSourceIdentity(row.kind, payload)
-        if (!identity || !decision.item) continue
-        const item = decision.matchItemId
-          ? this.findActiveChecklistItem(decision.matchItemId, row.gameId)
-          : this.findActiveChecklistItemByRemoteKey(row.gameId, decision.item.remoteKey)
-        if (!item) continue
-        this.upsertSourceBinding({
-          gameId: row.gameId,
-          ...identity,
-          itemId: item.id,
-          bindingKind: 'backfill',
-          confidence: typeof decision.confidence === 'number' ? decision.confidence : 1,
-          stateRule: decision.completionRule ?? null
-        }, row.completedAt ? new Date(row.completedAt) : reference)
-      } catch {
-        // 旧协议的决策可能不含完整身份字段；这类记录保留审计但不阻止数据库打开。
-      }
-    }
-  }
-
   private migrate(): void {
+    const existing = this.database.prepare(`
+      SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'
+    `).get()
+    if (existing) {
+      const version = this.database.prepare(
+        'SELECT MAX(version) AS version FROM schema_migrations'
+      ).get() as { version: number | null }
+      if (version.version !== CURRENT_SCHEMA_VERSION) {
+        throw new Error(
+          `数据库版本不兼容：期望 ${CURRENT_SCHEMA_VERSION}，实际 ${version.version ?? '未知'}`
+        )
+      }
+      return
+    }
+
     this.database.exec(`
-      CREATE TABLE IF NOT EXISTS schema_migrations (
+      BEGIN IMMEDIATE;
+
+      CREATE TABLE schema_migrations (
         version INTEGER PRIMARY KEY,
         applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
 
-      CREATE TABLE IF NOT EXISTS games (
+      CREATE TABLE games (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         short_name TEXT NOT NULL,
@@ -5307,7 +4634,7 @@ export class AppDatabase {
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
 
-      CREATE TABLE IF NOT EXISTS checklist_items (
+      CREATE TABLE checklist_items (
         id TEXT PRIMARY KEY,
         game_id TEXT NOT NULL REFERENCES games(id) ON DELETE RESTRICT,
         category TEXT NOT NULL CHECK (category IN (
@@ -5316,834 +4643,327 @@ export class AppDatabase {
         )),
         title TEXT NOT NULL,
         completed INTEGER NOT NULL DEFAULT 0 CHECK (completed IN (0, 1)),
-        progress_percent REAL CHECK (progress_percent IS NULL OR (progress_percent >= 0 AND progress_percent <= 100)),
+        progress_percent REAL CHECK (
+          progress_percent IS NULL OR (progress_percent >= 0 AND progress_percent <= 100)
+        ),
         starts_at TEXT,
         ends_at TEXT,
         reset_rule TEXT,
         period_key TEXT,
-        source TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'public_schedule', 'personal_sync')),
+        source TEXT NOT NULL DEFAULT 'manual'
+          CHECK (source IN ('manual', 'public_schedule', 'personal_sync')),
         remote_key TEXT,
-        manual_completion_locked INTEGER NOT NULL DEFAULT 0 CHECK (manual_completion_locked IN (0, 1)),
+        manual_completion_locked INTEGER NOT NULL DEFAULT 0
+          CHECK (manual_completion_locked IN (0, 1)),
         archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0, 1)),
         last_synced_at TEXT,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        completed_at TEXT,
+        schedule_kind TEXT CHECK (
+          schedule_kind IS NULL OR schedule_kind IN ('weekly', 'fixed_window', 'remote_schedule')
+        ),
+        reset_weekday INTEGER CHECK (
+          reset_weekday IS NULL OR (reset_weekday >= 1 AND reset_weekday <= 7)
+        ),
+        timezone TEXT,
+        mode_key TEXT,
+        parent_title TEXT,
+        source_url TEXT,
+        recurrence_rule TEXT,
+        activity_tags_json TEXT NOT NULL DEFAULT '[]',
+        map_node_kind TEXT CHECK (
+          map_node_kind IS NULL OR map_node_kind IN ('region', 'subregion')
+        ),
+        parent_remote_key TEXT,
+        source_snapshot_id TEXT
       );
-
-      CREATE UNIQUE INDEX IF NOT EXISTS checklist_remote_identity
+      CREATE UNIQUE INDEX checklist_remote_identity
         ON checklist_items(game_id, source, remote_key)
         WHERE remote_key IS NOT NULL;
 
-      CREATE TABLE IF NOT EXISTS sync_states (
+      CREATE TABLE sync_states (
         game_id TEXT PRIMARY KEY REFERENCES games(id) ON DELETE CASCADE,
-        mode TEXT NOT NULL DEFAULT 'manual' CHECK (mode IN ('manual', 'public_schedule', 'personal_sync')),
-        status TEXT NOT NULL DEFAULT 'idle' CHECK (status IN ('idle', 'success', 'error', 'stale', 'verification_required')),
+        mode TEXT NOT NULL DEFAULT 'manual'
+          CHECK (mode IN ('manual', 'public_schedule', 'personal_sync')),
+        status TEXT NOT NULL DEFAULT 'idle'
+          CHECK (status IN ('idle', 'success', 'error', 'stale', 'verification_required')),
         last_attempt_at TEXT,
         last_success_at TEXT,
         message TEXT,
-        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        run_mode TEXT NOT NULL DEFAULT 'manual' CHECK (run_mode = 'manual'),
+        auto_scope TEXT NOT NULL DEFAULT 'public_schedule' CHECK (auto_scope = 'public_schedule'),
+        last_scope TEXT CHECK (
+          last_scope IS NULL OR last_scope IN ('public_schedule', 'public_and_personal')
+        ),
+        initial_guide_dismissed INTEGER NOT NULL DEFAULT 0
+          CHECK (initial_guide_dismissed IN (0, 1))
       );
 
-      INSERT OR IGNORE INTO schema_migrations(version) VALUES (1);
-    `)
+      CREATE TABLE sync_target_states (
+        game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+        target TEXT NOT NULL CHECK (target IN ('all', 'tasks', 'events', 'cycles', 'exploration')),
+        last_success_at TEXT,
+        last_attempt_at TEXT,
+        status TEXT NOT NULL DEFAULT 'idle'
+          CHECK (status IN ('idle', 'success', 'error', 'stale', 'verification_required')),
+        catalog_coverage TEXT NOT NULL DEFAULT 'empty'
+          CHECK (catalog_coverage IN ('empty', 'partial', 'complete')),
+        catalog_source TEXT
+          CHECK (catalog_source IS NULL OR catalog_source IN ('public_schedule', 'personal_data')),
+        active_account_scope TEXT,
+        active_snapshot_id TEXT,
+        PRIMARY KEY(game_id, target)
+      );
 
-    const migration2 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 2')
-      .get()
+      CREATE TABLE ai_schedule_agents (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
 
-    if (!migration2) {
-      this.database.exec(`
-        BEGIN;
-        ALTER TABLE checklist_items ADD COLUMN completed_at TEXT;
-        INSERT INTO schema_migrations(version) VALUES (2);
-        COMMIT;
-      `)
-    }
-
-    const migration3 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 3')
-      .get()
-
-    if (!migration3) {
-      this.database.exec(`
-        BEGIN;
-        ALTER TABLE sync_states ADD COLUMN run_mode TEXT NOT NULL DEFAULT 'manual'
-          CHECK (run_mode IN ('manual', 'automatic'));
-        ALTER TABLE sync_states ADD COLUMN auto_scope TEXT NOT NULL DEFAULT 'public_schedule'
-          CHECK (auto_scope IN ('public_schedule', 'public_and_personal'));
-        ALTER TABLE sync_states ADD COLUMN last_scope TEXT
-          CHECK (last_scope IS NULL OR last_scope IN ('public_schedule', 'public_and_personal'));
-        INSERT INTO schema_migrations(version) VALUES (3);
-        COMMIT;
-      `)
-    }
-
-    const migration4 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 4')
-      .get()
-
-    if (!migration4) {
-      this.database.exec(`
-        BEGIN;
-        ALTER TABLE checklist_items ADD COLUMN schedule_kind TEXT
-          CHECK (schedule_kind IS NULL OR schedule_kind IN ('weekly', 'fixed_window', 'remote_schedule'));
-        ALTER TABLE checklist_items ADD COLUMN reset_weekday INTEGER
-          CHECK (reset_weekday IS NULL OR (reset_weekday >= 1 AND reset_weekday <= 7));
-        ALTER TABLE checklist_items ADD COLUMN timezone TEXT;
-        ALTER TABLE checklist_items ADD COLUMN mode_key TEXT;
-        UPDATE checklist_items
-          SET schedule_kind = 'weekly', reset_weekday = 1, timezone = 'Asia/Shanghai'
-          WHERE category = 'weekly';
-        UPDATE checklist_items SET schedule_kind = 'fixed_window'
-          WHERE category = 'limited_event';
-        UPDATE checklist_items SET schedule_kind = 'remote_schedule'
-          WHERE category = 'endgame';
-        INSERT INTO schema_migrations(version) VALUES (4);
-        COMMIT;
-      `)
-    }
-
-    const migration5 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 5')
-      .get()
-
-    if (!migration5) {
-      this.database.exec(`
-        BEGIN;
-        ALTER TABLE checklist_items ADD COLUMN parent_title TEXT;
-        INSERT INTO schema_migrations(version) VALUES (5);
-        COMMIT;
-      `)
-    }
-
-    const migration6 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 6')
-      .get()
-
-    if (!migration6) {
-      this.database.exec(`
-        BEGIN;
-        ALTER TABLE checklist_items ADD COLUMN source_url TEXT;
-        INSERT INTO schema_migrations(version) VALUES (6);
-        COMMIT;
-      `)
-    }
-
-    const migration7 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 7')
-      .get()
-
-    if (!migration7) {
-      this.database.exec(`
-        BEGIN;
-        CREATE TABLE ai_schedule_agents (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          last_seen_at TEXT NOT NULL,
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL
-        );
-        CREATE TABLE ai_schedule_jobs (
-          id TEXT PRIMARY KEY,
-          game_id TEXT NOT NULL REFERENCES games(id) ON DELETE RESTRICT,
-          scope TEXT NOT NULL CHECK (scope IN ('public_schedule', 'public_and_personal')),
-          status TEXT NOT NULL CHECK (status IN ('pending', 'claimed', 'completed', 'failed')),
-          requested_at TEXT NOT NULL,
-          claimed_at TEXT,
-          completed_at TEXT,
-          agent_id TEXT REFERENCES ai_schedule_agents(id) ON DELETE SET NULL,
-          evidence_json TEXT,
-          message TEXT,
-          updated_at TEXT NOT NULL
-        );
-        CREATE INDEX ai_schedule_jobs_pending ON ai_schedule_jobs(status, requested_at);
-        CREATE UNIQUE INDEX ai_schedule_jobs_active_game
-          ON ai_schedule_jobs(game_id) WHERE status IN ('pending', 'claimed');
-        INSERT INTO schema_migrations(version) VALUES (7);
-        COMMIT;
-      `)
-    }
-
-    const migration8 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 8')
-      .get()
-
-    if (!migration8) {
-      this.database.exec(`
-        BEGIN;
-        ALTER TABLE ai_schedule_jobs ADD COLUMN target TEXT NOT NULL DEFAULT 'all'
-          CHECK (target IN ('all', 'tasks', 'events', 'cycles', 'exploration'));
-        ALTER TABLE ai_schedule_jobs ADD COLUMN user_timezone TEXT NOT NULL DEFAULT 'UTC';
-        INSERT INTO schema_migrations(version) VALUES (8);
-        COMMIT;
-      `)
-    }
-
-    const migration9 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 9')
-      .get()
-
-    if (!migration9) {
-      const hasRecurrenceRule = (this.database.prepare('PRAGMA table_info(checklist_items)').all() as Array<{
-        name: string
-      }>).some((column) => column.name === 'recurrence_rule')
-      this.database.exec(hasRecurrenceRule
-        ? `INSERT INTO schema_migrations(version) VALUES (9);`
-        : `
-          BEGIN;
-          ALTER TABLE checklist_items ADD COLUMN recurrence_rule TEXT;
-          INSERT INTO schema_migrations(version) VALUES (9);
-          COMMIT;
-        `)
-    }
-
-    const migration10 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 10')
-      .get()
-
-    if (!migration10) {
-      this.database.exec(`
-        BEGIN;
-        UPDATE checklist_items SET recurrence_rule = NULL WHERE recurrence_rule IS NOT NULL;
-        INSERT INTO schema_migrations(version) VALUES (10);
-        COMMIT;
-      `)
-    }
-
-    const migration11 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 11')
-      .get()
-
-    if (!migration11) {
-      this.database.exec(`
-        BEGIN;
-        UPDATE sync_states
-          SET run_mode = 'manual', auto_scope = 'public_schedule'
-          WHERE run_mode <> 'manual' OR auto_scope <> 'public_schedule';
-        CREATE TABLE IF NOT EXISTS sync_target_states (
-          game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-          target TEXT NOT NULL CHECK (target IN ('all', 'events', 'cycles', 'exploration')),
-          last_success_at TEXT NOT NULL,
-          PRIMARY KEY(game_id, target)
-        );
-        INSERT OR REPLACE INTO sync_target_states(game_id, target, last_success_at)
-          SELECT game_id, 'all', MAX(completed_at)
-          FROM ai_schedule_jobs
-          WHERE status = 'completed' AND target = 'all' AND completed_at IS NOT NULL
-          GROUP BY game_id;
-        INSERT OR REPLACE INTO sync_target_states(game_id, target, last_success_at)
-          SELECT game_id, 'events', MAX(completed_at)
-          FROM ai_schedule_jobs
-          WHERE status = 'completed' AND target IN ('all', 'events') AND completed_at IS NOT NULL
-          GROUP BY game_id;
-        INSERT OR REPLACE INTO sync_target_states(game_id, target, last_success_at)
-          SELECT game_id, 'cycles', MAX(completed_at)
-          FROM ai_schedule_jobs
-          WHERE status = 'completed' AND target IN ('all', 'cycles') AND completed_at IS NOT NULL
-          GROUP BY game_id;
-        INSERT OR REPLACE INTO sync_target_states(game_id, target, last_success_at)
-          SELECT game_id, 'exploration', MAX(completed_at)
-          FROM ai_schedule_jobs
-          WHERE status = 'completed' AND target IN ('all', 'exploration') AND completed_at IS NOT NULL
-          GROUP BY game_id;
-        INSERT INTO schema_migrations(version) VALUES (11);
-        COMMIT;
-      `)
-    }
-
-    const migration12 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 12')
-      .get()
-
-    if (!migration12) {
-      this.database.exec(`
-        BEGIN;
-        CREATE TABLE semantic_review_candidates (
-          id TEXT PRIMARY KEY,
-          fingerprint TEXT NOT NULL UNIQUE,
-          game_id TEXT NOT NULL REFERENCES games(id) ON DELETE RESTRICT,
-          source TEXT NOT NULL CHECK (source IN ('public_schedule', 'personal_sync')),
-          target TEXT NOT NULL CHECK (target IN ('events', 'cycles', 'exploration')),
-          kind TEXT NOT NULL,
-          status TEXT NOT NULL CHECK (status IN ('pending', 'claimed', 'approved', 'rejected')),
-          payload_json TEXT NOT NULL,
-          decision_json TEXT,
-          evidence_json TEXT,
-          requested_at TEXT NOT NULL,
-          claimed_at TEXT,
-          completed_at TEXT,
-          agent_id TEXT REFERENCES ai_schedule_agents(id) ON DELETE SET NULL,
-          message TEXT,
-          updated_at TEXT NOT NULL
-        );
-        CREATE INDEX semantic_review_candidates_pending
-          ON semantic_review_candidates(status, requested_at);
-        INSERT INTO schema_migrations(version) VALUES (12);
-        COMMIT;
-      `)
-    }
-
-    const migration13 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 13')
-      .get()
-
-    if (!migration13) {
-      this.database.exec(`
-        BEGIN;
-        ALTER TABLE ai_schedule_jobs ADD COLUMN progress_phase TEXT NOT NULL DEFAULT 'queued'
-          CHECK (progress_phase IN (
-            'queued', 'fetching', 'searching', 'verifying', 'structuring',
-            'writing', 'retrying', 'verification', 'merging', 'completed', 'failed'
-          ));
-        ALTER TABLE ai_schedule_jobs ADD COLUMN progress_current INTEGER;
-        ALTER TABLE ai_schedule_jobs ADD COLUMN progress_total INTEGER;
-        ALTER TABLE ai_schedule_jobs ADD COLUMN progress_updated_at TEXT;
-        UPDATE ai_schedule_jobs
-          SET progress_phase = CASE
-            WHEN status = 'completed' THEN 'completed'
-            WHEN status = 'failed' THEN 'failed'
-            WHEN status = 'claimed' THEN 'searching'
-            ELSE 'queued'
-          END,
-          progress_updated_at = updated_at;
-        INSERT INTO schema_migrations(version) VALUES (13);
-        COMMIT;
-      `)
-    }
-
-    const migration14 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 14')
-      .get()
-
-    if (!migration14) {
-      this.database.exec(`
-        BEGIN;
-        ALTER TABLE sync_target_states RENAME TO sync_target_states_v13;
-        CREATE TABLE sync_target_states (
-          game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-          target TEXT NOT NULL CHECK (target IN ('all', 'tasks', 'events', 'cycles', 'exploration')),
-          last_success_at TEXT NOT NULL,
-          PRIMARY KEY(game_id, target)
-        );
-        INSERT INTO sync_target_states(game_id, target, last_success_at)
-          SELECT game_id, target, last_success_at FROM sync_target_states_v13;
-        DROP TABLE sync_target_states_v13;
-        INSERT INTO schema_migrations(version) VALUES (14);
-        COMMIT;
-      `)
-    }
-
-    const migration15 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 15')
-      .get()
-
-    if (!migration15) {
-      const hasActivityTags = (this.database.prepare('PRAGMA table_info(checklist_items)').all() as Array<{
-        name: string
-      }>).some((column) => column.name === 'activity_tags_json')
-      this.database.exec(hasActivityTags
-        ? `INSERT INTO schema_migrations(version) VALUES (15);`
-        : `
-          BEGIN;
-          ALTER TABLE checklist_items
-            ADD COLUMN activity_tags_json TEXT NOT NULL DEFAULT '[]';
-          INSERT INTO schema_migrations(version) VALUES (15);
-          COMMIT;
-        `)
-    }
-
-    const migration16 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 16')
-      .get()
-
-    if (!migration16) {
-      this.database.exec(`
-        BEGIN;
-        ALTER TABLE sync_target_states RENAME TO sync_target_states_v15;
-        CREATE TABLE sync_target_states (
-          game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-          target TEXT NOT NULL CHECK (target IN ('all', 'tasks', 'events', 'cycles', 'exploration')),
-          last_success_at TEXT,
-          last_attempt_at TEXT,
-          status TEXT NOT NULL DEFAULT 'idle'
-            CHECK (status IN ('idle', 'success', 'error', 'stale', 'verification_required')),
-          PRIMARY KEY(game_id, target)
-        );
-        INSERT INTO sync_target_states(
-          game_id, target, last_success_at, last_attempt_at, status
-        )
-          SELECT game_id, target, last_success_at, last_success_at, 'success'
-          FROM sync_target_states_v15;
-        DROP TABLE sync_target_states_v15;
-        UPDATE checklist_items
-          SET activity_tags_json = REPLACE(activity_tags_json, '"待识别"', '"未知"')
-          WHERE activity_tags_json LIKE '%"待识别"%';
-        INSERT INTO schema_migrations(version) VALUES (16);
-        COMMIT;
-      `)
-    }
-
-    const migration17 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 17')
-      .get()
-
-    if (!migration17) {
-      const columns = new Set((this.database.prepare('PRAGMA table_info(checklist_items)').all() as Array<{
-        name: string
-      }>).map((column) => column.name))
-      const additions = [
-        !columns.has('map_node_kind')
-          ? `ALTER TABLE checklist_items ADD COLUMN map_node_kind TEXT
-              CHECK (map_node_kind IS NULL OR map_node_kind IN ('region', 'subregion', 'independent', 'group'));`
-          : '',
-        !columns.has('parent_remote_key')
-          ? 'ALTER TABLE checklist_items ADD COLUMN parent_remote_key TEXT;'
-          : '',
-        !columns.has('related_region_remote_key')
-          ? 'ALTER TABLE checklist_items ADD COLUMN related_region_remote_key TEXT;'
-          : ''
-      ].filter(Boolean).join('\n')
-      this.database.exec(`
-        BEGIN;
-        ${additions}
-        UPDATE checklist_items
-          SET map_node_kind = CASE WHEN parent_title IS NULL THEN 'region' ELSE 'subregion' END
-          WHERE category = 'exploration' AND map_node_kind IS NULL;
-        INSERT INTO schema_migrations(version) VALUES (17);
-        COMMIT;
-      `)
-    }
-
-    const migration18 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 18')
-      .get()
-
-    if (!migration18) {
-      this.database.exec(`
-        BEGIN;
-        ALTER TABLE ai_schedule_jobs
-          ADD COLUMN output_locale TEXT NOT NULL DEFAULT 'zh-CN';
-        ALTER TABLE semantic_review_candidates
-          ADD COLUMN output_locale TEXT NOT NULL DEFAULT 'zh-CN';
-        ALTER TABLE semantic_review_candidates
-          ADD COLUMN user_timezone TEXT NOT NULL DEFAULT 'UTC';
-        INSERT INTO schema_migrations(version) VALUES (18);
-        COMMIT;
-      `)
-    }
-
-    const migration19 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 19')
-      .get()
-
-    if (!migration19) {
-      this.database.exec(`
-        BEGIN;
-        DROP INDEX IF EXISTS ai_schedule_jobs_active_game;
-        CREATE UNIQUE INDEX ai_schedule_jobs_active_game_target
-          ON ai_schedule_jobs(game_id, target)
-          WHERE status IN ('pending', 'claimed');
-        INSERT INTO schema_migrations(version) VALUES (19);
-        COMMIT;
-      `)
-    }
-
-    const migration20 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 20')
-      .get()
-
-    if (!migration20) {
-      this.database.exec(`
-        BEGIN;
-        ALTER TABLE semantic_review_candidates
-          ADD COLUMN account_scope TEXT;
-
-        CREATE TABLE IF NOT EXISTS source_bindings (
-          game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-          provider TEXT NOT NULL,
-          endpoint TEXT NOT NULL,
-          external_id TEXT NOT NULL,
-          item_id TEXT NOT NULL REFERENCES checklist_items(id) ON DELETE CASCADE,
-          binding_kind TEXT NOT NULL
-            CHECK (binding_kind IN ('mechanical', 'codex', 'backfill')),
-          confidence REAL NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL,
-          PRIMARY KEY(game_id, provider, endpoint, external_id)
-        );
-        CREATE INDEX IF NOT EXISTS source_bindings_item
-          ON source_bindings(game_id, item_id);
-
-        CREATE TABLE IF NOT EXISTS personal_item_states (
-          account_scope TEXT NOT NULL,
-          game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-          item_id TEXT NOT NULL REFERENCES checklist_items(id) ON DELETE CASCADE,
-          provider TEXT NOT NULL,
-          endpoint TEXT NOT NULL,
-          external_id TEXT NOT NULL,
-          completion_state TEXT NOT NULL
-            CHECK (completion_state IN ('completed', 'incomplete', 'unknown')),
-          progress_percent REAL
-            CHECK (progress_percent IS NULL OR (progress_percent >= 0 AND progress_percent <= 100)),
-          observed_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL,
-          PRIMARY KEY(account_scope, item_id)
-        );
-        CREATE INDEX IF NOT EXISTS personal_item_states_game_account
-          ON personal_item_states(game_id, account_scope, observed_at);
-
-        CREATE TABLE IF NOT EXISTS semantic_profiles (
-          game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-          provider TEXT NOT NULL,
-          endpoint TEXT NOT NULL,
-          profile_version TEXT NOT NULL,
-          target TEXT NOT NULL CHECK (target IN ('events', 'cycles', 'exploration')),
-          status TEXT NOT NULL CHECK (status IN ('active', 'disabled', 'needs_review')),
-          semantics_json TEXT NOT NULL,
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL,
-          PRIMARY KEY(game_id, provider, endpoint, profile_version)
-        );
-
-        CREATE TABLE IF NOT EXISTS sync_observations (
-          id TEXT PRIMARY KEY,
-          game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-          account_scope TEXT,
-          provider TEXT NOT NULL,
-          endpoint TEXT NOT NULL,
-          external_id TEXT NOT NULL,
-          target TEXT NOT NULL CHECK (target IN ('events', 'cycles', 'exploration')),
-          completion_state TEXT NOT NULL
-            CHECK (completion_state IN ('completed', 'incomplete', 'unknown')),
-          progress_percent REAL
-            CHECK (progress_percent IS NULL OR (progress_percent >= 0 AND progress_percent <= 100)),
-          payload_hash TEXT NOT NULL,
-          outcome TEXT NOT NULL CHECK (outcome IN ('applied', 'queued', 'ignored', 'conflict')),
-          item_id TEXT REFERENCES checklist_items(id) ON DELETE SET NULL,
-          candidate_id TEXT REFERENCES semantic_review_candidates(id) ON DELETE SET NULL,
-          observed_at TEXT NOT NULL,
-          created_at TEXT NOT NULL
-        );
-        CREATE INDEX IF NOT EXISTS sync_observations_lookup
-          ON sync_observations(game_id, provider, endpoint, external_id, observed_at);
-
-        INSERT INTO schema_migrations(version) VALUES (20);
-        COMMIT;
-      `)
-    }
-
-    const migration21 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 21')
-      .get()
-
-    if (!migration21) {
-      const syncTargetColumns = new Set(
-        (this.database.prepare('PRAGMA table_info(sync_target_states)').all() as Array<{ name: string }>)
-          .map((column) => column.name)
-      )
-      const catalogCoverageMigration = syncTargetColumns.has('catalog_coverage')
-        ? ''
-        : `
-          ALTER TABLE sync_target_states
-            ADD COLUMN catalog_coverage TEXT NOT NULL DEFAULT 'empty'
-              CHECK (catalog_coverage IN ('empty', 'partial', 'complete'));
-        `
-      const catalogSourceMigration = syncTargetColumns.has('catalog_source')
-        ? ''
-        : `
-          ALTER TABLE sync_target_states
-            ADD COLUMN catalog_source TEXT
-              CHECK (catalog_source IS NULL OR catalog_source IN ('public_schedule', 'personal_data'));
-        `
-      this.database.exec(`
-        BEGIN;
-        ${catalogCoverageMigration}
-        ${catalogSourceMigration}
-
-        UPDATE sync_target_states
-        SET catalog_coverage = 'partial',
-            catalog_source = 'personal_data'
-        WHERE target IN ('events', 'cycles', 'exploration')
-          AND EXISTS (
-            SELECT 1
-            FROM checklist_items item
-            WHERE item.game_id = sync_target_states.game_id
-              AND item.archived = 0
-              AND (
-                (sync_target_states.target = 'events'
-                  AND item.category = 'limited_event')
-                OR (sync_target_states.target = 'cycles'
-                  AND item.category IN ('weekly', 'endgame'))
-                OR (sync_target_states.target = 'exploration'
-                  AND item.category = 'exploration')
-              )
-          );
-
-        UPDATE sync_target_states
-        SET catalog_coverage = 'complete',
-            catalog_source = 'public_schedule'
-        WHERE EXISTS (
-          SELECT 1
-          FROM ai_schedule_jobs job
-          WHERE job.game_id = sync_target_states.game_id
-            AND job.status = 'completed'
-            AND (job.target = sync_target_states.target OR job.target = 'all')
-        );
-
-        UPDATE sync_target_states
-        SET catalog_coverage = 'complete',
-            catalog_source = 'public_schedule'
-        WHERE target = 'all'
-          AND last_success_at IS NOT NULL;
-
-        INSERT INTO schema_migrations(version) VALUES (21);
-        COMMIT;
-      `)
-    }
-
-    const migration22 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 22')
-      .get()
-
-    if (!migration22) {
-      const syncStateColumns = new Set(
-        (this.database.prepare('PRAGMA table_info(sync_states)').all() as Array<{ name: string }>)
-          .map((column) => column.name)
-      )
-      this.database.exec(syncStateColumns.has('initial_guide_dismissed')
-        ? `INSERT INTO schema_migrations(version) VALUES (22);`
-        : `
-          BEGIN;
-          ALTER TABLE sync_states
-            ADD COLUMN initial_guide_dismissed INTEGER NOT NULL DEFAULT 0
-              CHECK (initial_guide_dismissed IN (0, 1));
-          INSERT INTO schema_migrations(version) VALUES (22);
-          COMMIT;
-        `)
-    }
-
-    const migration23 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 23')
-      .get()
-
-    if (!migration23) {
-      const bindingColumns = new Set(
-        (this.database.prepare('PRAGMA table_info(source_bindings)').all() as Array<{ name: string }>)
-          .map((column) => column.name)
-      )
-      this.database.exec(bindingColumns.has('state_rule_json')
-        ? `INSERT INTO schema_migrations(version) VALUES (23);`
-        : `
-          BEGIN;
-          ALTER TABLE source_bindings ADD COLUMN state_rule_json TEXT;
-          INSERT INTO schema_migrations(version) VALUES (23);
-          COMMIT;
-        `)
-    }
-
-    const migration24 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 24')
-      .get()
-
-    if (!migration24) {
-      this.database.exec(`
-        BEGIN;
-        UPDATE checklist_items
-        SET parent_remote_key = COALESCE(parent_remote_key, related_region_remote_key)
-        WHERE category = 'exploration'
-          AND parent_remote_key IS NULL
-          AND related_region_remote_key IS NOT NULL;
-        UPDATE checklist_items
-        SET parent_remote_key = (
-          SELECT parent.parent_remote_key
-          FROM checklist_items parent
-          WHERE parent.game_id = checklist_items.game_id
-            AND parent.remote_key = checklist_items.parent_remote_key
-            AND parent.archived = 0
-        )
-        WHERE category = 'exploration'
-          AND parent_remote_key IN (
-            SELECT remote_key
-            FROM checklist_items
-            WHERE category = 'exploration'
-              AND parent_remote_key IS NOT NULL
-              AND archived = 0
-          );
-        UPDATE checklist_items
-        SET parent_remote_key = NULL
-        WHERE category = 'exploration'
-          AND parent_remote_key IS NOT NULL
-          AND NOT EXISTS (
-            SELECT 1
-            FROM checklist_items parent
-            WHERE parent.game_id = checklist_items.game_id
-              AND parent.remote_key = checklist_items.parent_remote_key
-              AND parent.archived = 0
-          );
-        UPDATE checklist_items
-        SET map_node_kind = CASE
-              WHEN parent_remote_key IS NULL THEN 'region'
-              ELSE 'subregion'
-            END,
-            related_region_remote_key = NULL
-        WHERE category = 'exploration';
-        INSERT INTO schema_migrations(version) VALUES (24);
-        COMMIT;
-      `)
-    }
-
-    const migration25 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 25')
-      .get()
-
-    if (!migration25) {
-      this.database.exec(`
-        BEGIN;
-        CREATE TABLE IF NOT EXISTS codex_worker_settings (
-          singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-          model TEXT NOT NULL DEFAULT 'inherit'
-            CHECK (model IN ('inherit', 'gpt-5.6-sol', 'gpt-5.6-terra')),
-          reasoning_effort TEXT NOT NULL DEFAULT 'inherit'
-            CHECK (reasoning_effort IN (
-              'inherit', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'
-            )),
-          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-        );
-        INSERT OR IGNORE INTO codex_worker_settings(singleton) VALUES (1);
-        INSERT INTO schema_migrations(version) VALUES (25);
-        COMMIT;
-      `)
-    }
-
-    const migration26 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 26')
-      .get()
-
-    if (!migration26) {
-      this.database.exec(`
-        BEGIN;
-        CREATE TABLE IF NOT EXISTS sync_deletion_tombstones (
-          game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-          identity_key TEXT NOT NULL,
-          category TEXT NOT NULL CHECK (category IN (
-            'main_quest', 'side_quest', 'limited_event',
-            'weekly', 'endgame', 'exploration', 'custom'
-          )),
-          deleted_at TEXT NOT NULL,
-          PRIMARY KEY(game_id, identity_key)
-        );
-        INSERT INTO schema_migrations(version) VALUES (26);
-        COMMIT;
-      `)
-    }
-
-    const migration27 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 27')
-      .get()
-
-    if (!migration27) {
-      const checklistColumns = new Set(
-        (this.database.prepare('PRAGMA table_info(checklist_items)').all() as Array<{ name: string }>)
-          .map((column) => column.name)
-      )
-      const targetColumns = new Set(
-        (this.database.prepare('PRAGMA table_info(sync_target_states)').all() as Array<{ name: string }>)
-          .map((column) => column.name)
-      )
-      this.database.exec(`
-        BEGIN;
-        ${checklistColumns.has('source_snapshot_id')
-          ? ''
-          : 'ALTER TABLE checklist_items ADD COLUMN source_snapshot_id TEXT;'}
-        ${targetColumns.has('active_account_scope')
-          ? ''
-          : 'ALTER TABLE sync_target_states ADD COLUMN active_account_scope TEXT;'}
-        ${targetColumns.has('active_snapshot_id')
-          ? ''
-          : 'ALTER TABLE sync_target_states ADD COLUMN active_snapshot_id TEXT;'}
-        CREATE TABLE IF NOT EXISTS personal_sync_snapshots (
-          id TEXT PRIMARY KEY,
-          game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-          target TEXT NOT NULL CHECK (target IN ('events', 'cycles', 'exploration')),
-          account_scope TEXT NOT NULL,
-          adapter_version TEXT NOT NULL,
-          item_count INTEGER NOT NULL CHECK (item_count >= 0),
-          activated_at TEXT NOT NULL,
-          created_at TEXT NOT NULL
-        );
-        CREATE INDEX IF NOT EXISTS personal_sync_snapshots_target
-          ON personal_sync_snapshots(game_id, target, activated_at DESC);
-        UPDATE semantic_review_candidates
-        SET status = 'rejected', completed_at = CURRENT_TIMESTAMP,
-            claimed_at = NULL, agent_id = NULL,
-            message = '个人同步已升级为完整快照，旧融合核验任务已停用',
-            updated_at = CURRENT_TIMESTAMP
+      CREATE TABLE ai_schedule_jobs (
+        id TEXT PRIMARY KEY,
+        game_id TEXT NOT NULL REFERENCES games(id) ON DELETE RESTRICT,
+        scope TEXT NOT NULL CHECK (scope IN ('public_schedule', 'public_and_personal')),
+        status TEXT NOT NULL CHECK (status IN ('pending', 'claimed', 'completed', 'failed')),
+        requested_at TEXT NOT NULL,
+        claimed_at TEXT,
+        completed_at TEXT,
+        agent_id TEXT REFERENCES ai_schedule_agents(id) ON DELETE SET NULL,
+        evidence_json TEXT,
+        message TEXT,
+        updated_at TEXT NOT NULL,
+        target TEXT NOT NULL DEFAULT 'all'
+          CHECK (target IN ('all', 'tasks', 'events', 'cycles', 'exploration')),
+        user_timezone TEXT NOT NULL DEFAULT 'UTC',
+        progress_phase TEXT NOT NULL DEFAULT 'queued' CHECK (progress_phase IN (
+          'queued', 'fetching', 'searching', 'verifying', 'structuring',
+          'writing', 'retrying', 'verification', 'merging', 'completed', 'failed', 'cancelled'
+        )),
+        progress_current INTEGER,
+        progress_total INTEGER,
+        progress_updated_at TEXT,
+        output_locale TEXT NOT NULL DEFAULT 'zh-CN',
+        job_kind TEXT NOT NULL DEFAULT 'public_catalog'
+          CHECK (job_kind IN ('public_catalog', 'personal_metadata', 'personal_review')),
+        routing_tier INTEGER NOT NULL DEFAULT 0,
+        attempt_count INTEGER NOT NULL DEFAULT 0,
+        assigned_model TEXT,
+        assigned_reasoning_effort TEXT,
+        last_failure_kind TEXT
+      );
+      CREATE INDEX ai_schedule_jobs_pending ON ai_schedule_jobs(status, requested_at);
+      CREATE UNIQUE INDEX ai_schedule_jobs_active_game_target_kind
+        ON ai_schedule_jobs(game_id, target, job_kind)
         WHERE status IN ('pending', 'claimed');
-        INSERT INTO schema_migrations(version) VALUES (27);
-        COMMIT;
-      `)
-    }
 
-    const migration28 = this.database
-      .prepare('SELECT version FROM schema_migrations WHERE version = 28')
-      .get()
+      CREATE TABLE ai_schedule_job_attempts (
+        id TEXT PRIMARY KEY,
+        job_id TEXT NOT NULL REFERENCES ai_schedule_jobs(id) ON DELETE CASCADE,
+        attempt_number INTEGER NOT NULL,
+        routing_tier INTEGER NOT NULL,
+        model TEXT NOT NULL,
+        reasoning_effort TEXT NOT NULL,
+        agent_id TEXT NOT NULL,
+        started_at TEXT NOT NULL,
+        completed_at TEXT,
+        outcome TEXT CHECK (outcome IN (
+          'running', 'completed', 'escalated', 'timeout', 'infrastructure_error',
+          'cancelled', 'failed'
+        )),
+        message TEXT
+      );
+      CREATE INDEX ai_schedule_job_attempts_job
+        ON ai_schedule_job_attempts(job_id, attempt_number DESC);
+      CREATE TRIGGER ai_schedule_job_attempt_finished
+        AFTER UPDATE OF status ON ai_schedule_jobs
+        WHEN NEW.status IN ('completed', 'failed')
+        BEGIN
+          UPDATE ai_schedule_job_attempts
+          SET completed_at = COALESCE(completed_at, NEW.completed_at, NEW.updated_at),
+              outcome = CASE WHEN NEW.status = 'completed' THEN 'completed' ELSE 'failed' END,
+              message = COALESCE(message, NEW.message)
+          WHERE job_id = NEW.id AND outcome = 'running';
+        END;
 
-    if (!migration28) {
-      const jobColumns = new Set(
-        (this.database.prepare('PRAGMA table_info(ai_schedule_jobs)').all() as Array<{ name: string }>)
-          .map((column) => column.name)
-      )
-      this.database.exec(`
-        BEGIN;
-        ${jobColumns.has('job_kind')
-          ? ''
-          : `ALTER TABLE ai_schedule_jobs ADD COLUMN job_kind TEXT NOT NULL DEFAULT 'public_catalog'
-              CHECK (job_kind IN ('public_catalog', 'personal_metadata'));`}
-        DROP INDEX IF EXISTS ai_schedule_jobs_active_game_target;
-        CREATE UNIQUE INDEX ai_schedule_jobs_active_game_target_kind
-          ON ai_schedule_jobs(game_id, target, job_kind)
-          WHERE status IN ('pending', 'claimed');
-        CREATE TABLE IF NOT EXISTS personal_metadata_cache (
-          game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-          provider TEXT NOT NULL,
-          endpoint TEXT NOT NULL,
-          external_id TEXT NOT NULL,
-          output_locale TEXT NOT NULL,
-          category TEXT NOT NULL CHECK (category IN ('limited_event', 'endgame')),
-          activity_tags_json TEXT,
-          starts_at TEXT,
-          ends_at TEXT,
-          source_url TEXT,
-          confidence REAL CHECK (confidence IS NULL OR (confidence >= 0 AND confidence <= 1)),
-          verified_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL,
-          PRIMARY KEY(game_id, provider, endpoint, external_id, output_locale)
-        );
-        CREATE TABLE IF NOT EXISTS personal_expiry_tombstones (
-          game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-          provider TEXT NOT NULL,
-          endpoint TEXT NOT NULL,
-          external_id TEXT NOT NULL,
-          category TEXT NOT NULL CHECK (category IN ('limited_event', 'endgame')),
-          expired_ends_at TEXT NOT NULL,
-          observed_at TEXT NOT NULL,
-          PRIMARY KEY(game_id, provider, endpoint, external_id)
-        );
-        CREATE INDEX IF NOT EXISTS personal_expiry_tombstones_game_category
-          ON personal_expiry_tombstones(game_id, category, observed_at DESC);
-        INSERT INTO schema_migrations(version) VALUES (28);
-        COMMIT;
-      `)
-    }
+      CREATE TABLE source_bindings (
+        game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+        provider TEXT NOT NULL,
+        endpoint TEXT NOT NULL,
+        external_id TEXT NOT NULL,
+        item_id TEXT NOT NULL REFERENCES checklist_items(id) ON DELETE CASCADE,
+        binding_kind TEXT NOT NULL CHECK (binding_kind IN ('mechanical', 'codex')),
+        confidence REAL NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        state_rule_json TEXT,
+        PRIMARY KEY(game_id, provider, endpoint, external_id)
+      );
+      CREATE INDEX source_bindings_item ON source_bindings(game_id, item_id);
 
-    const versionRow = this.database
-      .prepare('SELECT MAX(version) AS version FROM schema_migrations')
-      .get() as { version: number | null }
-    if (Number(versionRow.version) !== CURRENT_SCHEMA_VERSION) {
-      throw new Error(
-        `数据库版本异常：期望 ${CURRENT_SCHEMA_VERSION}，实际 ${String(versionRow.version)}`
-      )
-    }
+      CREATE TABLE personal_sync_snapshots (
+        id TEXT PRIMARY KEY,
+        game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+        target TEXT NOT NULL CHECK (target IN ('events', 'cycles', 'exploration')),
+        account_scope TEXT NOT NULL,
+        adapter_version TEXT NOT NULL,
+        item_count INTEGER NOT NULL CHECK (item_count >= 0),
+        activated_at TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX personal_sync_snapshots_target
+        ON personal_sync_snapshots(game_id, target, activated_at DESC);
+
+      CREATE TABLE personal_review_batches (
+        job_id TEXT PRIMARY KEY REFERENCES ai_schedule_jobs(id) ON DELETE CASCADE,
+        game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+        target TEXT NOT NULL CHECK (target IN ('events', 'cycles', 'exploration')),
+        account_scope TEXT NOT NULL,
+        adapter_version TEXT NOT NULL,
+        base_items_json TEXT NOT NULL,
+        review_targets_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX personal_review_batches_target
+        ON personal_review_batches(game_id, target, created_at DESC);
+
+      CREATE TABLE personal_review_rules (
+        game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+        provider TEXT NOT NULL,
+        endpoint TEXT NOT NULL,
+        external_id TEXT NOT NULL,
+        target TEXT NOT NULL CHECK (target IN ('events', 'cycles', 'exploration')),
+        rule_version TEXT NOT NULL,
+        resolution_json TEXT NOT NULL,
+        evidence_json TEXT NOT NULL,
+        confidence REAL NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
+        verified_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY(game_id, provider, endpoint, external_id, target)
+      );
+
+      CREATE TABLE personal_metadata_cache (
+        game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+        provider TEXT NOT NULL,
+        endpoint TEXT NOT NULL,
+        external_id TEXT NOT NULL,
+        output_locale TEXT NOT NULL,
+        category TEXT NOT NULL CHECK (category IN ('limited_event', 'endgame')),
+        activity_tags_json TEXT,
+        starts_at TEXT,
+        ends_at TEXT,
+        source_url TEXT,
+        confidence REAL CHECK (confidence IS NULL OR (confidence >= 0 AND confidence <= 1)),
+        verified_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        taxonomy_version INTEGER NOT NULL DEFAULT 1,
+        PRIMARY KEY(game_id, provider, endpoint, external_id, output_locale)
+      );
+
+      CREATE TABLE personal_expiry_tombstones (
+        game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+        provider TEXT NOT NULL,
+        endpoint TEXT NOT NULL,
+        external_id TEXT NOT NULL,
+        category TEXT NOT NULL CHECK (category IN ('limited_event', 'endgame')),
+        expired_ends_at TEXT NOT NULL,
+        observed_at TEXT NOT NULL,
+        PRIMARY KEY(game_id, provider, endpoint, external_id)
+      );
+      CREATE INDEX personal_expiry_tombstones_game_category
+        ON personal_expiry_tombstones(game_id, category, observed_at DESC);
+
+      CREATE TABLE cycle_period_history (
+        id TEXT PRIMARY KEY,
+        game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+        item_id TEXT NOT NULL,
+        source TEXT NOT NULL CHECK (source IN ('public_schedule', 'personal_sync')),
+        remote_key TEXT NOT NULL,
+        mode_key TEXT NOT NULL,
+        title TEXT NOT NULL,
+        completed INTEGER NOT NULL CHECK (completed IN (0, 1)),
+        manual_completion_locked INTEGER NOT NULL CHECK (manual_completion_locked IN (0, 1)),
+        starts_at TEXT,
+        ends_at TEXT,
+        period_key TEXT,
+        completed_at TEXT,
+        archived_at TEXT NOT NULL,
+        restored_at TEXT
+      );
+      CREATE INDEX cycle_period_history_lookup
+        ON cycle_period_history(game_id, source, mode_key, archived_at DESC);
+
+      CREATE TABLE activity_tag_registry (
+        id TEXT PRIMARY KEY,
+        dimension TEXT NOT NULL CHECK (dimension IN ('gameplay', 'format', 'content', 'reward')),
+        labels_json TEXT NOT NULL,
+        description TEXT NOT NULL,
+        aliases_json TEXT NOT NULL DEFAULT '[]',
+        source_url TEXT NOT NULL,
+        evidence_json TEXT NOT NULL DEFAULT '[]',
+        created_by_agent TEXT,
+        taxonomy_version INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE codex_worker_settings (
+        singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+        strategy TEXT NOT NULL DEFAULT 'fixed' CHECK (strategy = 'fixed'),
+        model TEXT NOT NULL DEFAULT 'gpt-5.6-sol'
+          CHECK (model IN ('inherit', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna')),
+        reasoning_effort TEXT NOT NULL DEFAULT 'medium'
+          CHECK (reasoning_effort IN ('inherit', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra')),
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      INSERT INTO codex_worker_settings(singleton, strategy, model, reasoning_effort)
+        VALUES (1, 'fixed', 'gpt-5.6-sol', 'medium');
+
+      INSERT INTO schema_migrations(version) VALUES (${CURRENT_SCHEMA_VERSION});
+      COMMIT;
+    `)
+  }
+
+  private loadRuntimeActivityTags(): void {
+    const rows = this.database.prepare(`
+      SELECT id, dimension, labels_json AS labelsJson, description,
+        aliases_json AS aliasesJson
+      FROM activity_tag_registry
+      WHERE taxonomy_version = ?
+      ORDER BY id
+    `).all(ACTIVITY_TAG_TAXONOMY_VERSION) as Array<{
+      id: string
+      dimension: ActivityTagDimension
+      labelsJson: string
+      description: string
+      aliasesJson: string
+    }>
+    const definitions = rows.flatMap((row): ActivityTagDefinition[] => {
+      try {
+        const labels = JSON.parse(row.labelsJson)
+        const aliases = JSON.parse(row.aliasesJson)
+        if (!labels || typeof labels !== 'object' || Array.isArray(labels) || !Array.isArray(aliases)) {
+          return []
+        }
+        return [{
+          id: row.id,
+          dimension: row.dimension,
+          labels: Object.fromEntries(Object.entries(labels)
+            .filter((entry): entry is [string, string] => typeof entry[1] === 'string')),
+          description: row.description,
+          aliases: aliases.filter((alias): alias is string => typeof alias === 'string'),
+          builtin: false
+        }]
+      } catch {
+        return []
+      }
+    })
+    configureRuntimeActivityTags(definitions)
   }
 
   private seedGames(): void {
@@ -6177,104 +4997,6 @@ export class AppDatabase {
         game.enabled ? 1 : 0
       )
       insertSyncState.run(game.id)
-    }
-  }
-
-  private seedPersonalSemanticProfiles(): void {
-    const now = new Date().toISOString()
-    const insert = this.database.prepare(`
-      INSERT OR IGNORE INTO semantic_profiles(
-        game_id, provider, endpoint, profile_version, target, status,
-        semantics_json, created_at, updated_at
-      ) VALUES (?, ?, ?, 'personal-v1', ?, ?, ?, ?, ?)
-    `)
-    const profiles: Array<{
-      gameId: GameId
-      provider: string
-      endpoint: string
-      target: PersonalSyncTarget
-      status: SemanticProfile['status']
-      semantics: Record<string, unknown>
-    }> = [
-      ...(['genshin', 'star-rail', 'zenless'] as const).map((gameId) => ({
-        gameId,
-        provider: 'miyoushe',
-        endpoint: 'personal-challenge-record',
-        target: 'cycles' as const,
-        status: 'active' as const,
-        semantics: {
-          identityField: 'observedRemoteKey',
-          modeField: 'observedModeKey',
-          completionField: 'observedHasChallengeRecord',
-          completionMeaning: '存在任意挑战记录即视为已完成'
-        }
-      })),
-      {
-        gameId: 'wuthering-waves',
-        provider: 'kuro-community',
-        endpoint: 'personal-challenge-record',
-        target: 'cycles',
-        status: 'active',
-        semantics: {
-          identityField: 'observedRemoteKey',
-          modeField: 'observedModeKey',
-          completionField: 'observedHasChallengeRecord',
-          completionMeaning: '存在任意挑战记录即视为已完成'
-        }
-      },
-      ...([
-        ['genshin', 'miyoushe'],
-        ['zenless', 'miyoushe'],
-        ['wuthering-waves', 'kuro-community']
-      ] as const).map(([gameId, provider]) => ({
-        gameId,
-        provider,
-        endpoint: 'personal-map-progress',
-        target: 'exploration' as const,
-        status: 'active' as const,
-        semantics: {
-          identityField: 'officialId',
-          progressField: 'observedProgress',
-          progressRange: '0-100',
-          catalogAuthority: 'bundled-canonical-map-catalog'
-        }
-      })),
-      {
-        gameId: 'genshin',
-        provider: 'miyoushe',
-        endpoint: 'miyoushe-genshin-event-calendar',
-        target: 'events',
-        status: 'needs_review',
-        semantics: { completionMeaning: '接口完成字段尚不能证明玩家完成整个活动' }
-      },
-      {
-        gameId: 'star-rail',
-        provider: 'miyoushe',
-        endpoint: 'miyoushe-star-rail-event-calendar',
-        target: 'events',
-        status: 'needs_review',
-        semantics: { completionMeaning: '接口完成字段需按具体活动语义判断' }
-      },
-      {
-        gameId: 'zenless',
-        provider: 'miyoushe',
-        endpoint: 'miyoushe-zenless-event-calendar',
-        target: 'events',
-        status: 'needs_review',
-        semantics: { completionMeaning: '接口状态与奖励字段需按具体活动语义判断' }
-      }
-    ]
-    for (const profile of profiles) {
-      insert.run(
-        profile.gameId,
-        profile.provider,
-        profile.endpoint,
-        profile.target,
-        profile.status,
-        stableJson(profile.semantics),
-        now,
-        now
-      )
     }
   }
 
@@ -6376,151 +5098,11 @@ export class AppDatabase {
     }
 
     this.database.prepare(`
-      UPDATE checklist_items
-      SET archived = 1, updated_at = ?
+      DELETE FROM checklist_items
       WHERE category = 'weekly'
         AND archived = 0
         AND id <> game_id || ':weekly'
-    `).run(now)
-  }
-
-  private consolidateEquivalentSyncedEndgameItems(): void {
-    type EndgameIdentityRow = {
-      id: string
-      gameId: GameId
-      title: string
-      completed: number
-      manualCompletionLocked: number
-      completedAt: string | null
-      startsAt: string | null
-      endsAt: string | null
-      periodKey: string | null
-      modeKey: string | null
-      source: ChecklistSource
-      remoteKey: string | null
-      lastSyncedAt: string | null
-      updatedAt: string
-    }
-
-    const rows = this.database.prepare(`
-      SELECT id,
-        game_id AS gameId,
-        title,
-        completed,
-        manual_completion_locked AS manualCompletionLocked,
-        completed_at AS completedAt,
-        starts_at AS startsAt,
-        ends_at AS endsAt,
-        period_key AS periodKey,
-        mode_key AS modeKey,
-        source,
-        remote_key AS remoteKey,
-        last_synced_at AS lastSyncedAt,
-        updated_at AS updatedAt
-      FROM checklist_items
-      WHERE category = 'endgame'
-        AND source <> 'manual'
-        AND archived = 0
-    `).all() as EndgameIdentityRow[]
-    if (rows.length < 2) return
-
-    const parents = rows.map((_, index) => index)
-    const find = (index: number): number => {
-      while (parents[index] !== index) {
-        parents[index] = parents[parents[index]]
-        index = parents[index]
-      }
-      return index
-    }
-    const union = (left: number, right: number): void => {
-      const leftRoot = find(left)
-      const rightRoot = find(right)
-      if (leftRoot !== rightRoot) parents[rightRoot] = leftRoot
-    }
-    const windowsOverlap = (left: EndgameIdentityRow, right: EndgameIdentityRow): boolean => {
-      if (!left.startsAt || !left.endsAt || !right.startsAt || !right.endsAt) return false
-      return Date.parse(left.startsAt) < Date.parse(right.endsAt) &&
-        Date.parse(left.endsAt) > Date.parse(right.startsAt)
-    }
-    const activeAtStartup = (row: EndgameIdentityRow): boolean => {
-      if (!row.startsAt || !row.endsAt) return false
-      const now = Date.now()
-      return Date.parse(row.startsAt) <= now && Date.parse(row.endsAt) >= now
-    }
-    const equivalent = (left: EndgameIdentityRow, right: EndgameIdentityRow): boolean => {
-      if (left.gameId !== right.gameId) return false
-      const sameMode = Boolean(left.modeKey && right.modeKey && left.modeKey === right.modeKey)
-      const sameTitle = normalizeSyncedEventTitle(left.title) === normalizeSyncedEventTitle(right.title)
-      if (!sameMode && !sameTitle) return false
-      if (
-        sameTitle &&
-        left.source !== right.source &&
-        (activeAtStartup(left) || activeAtStartup(right))
-      ) return true
-      if (windowsOverlap(left, right)) return true
-      if (left.periodKey && right.periodKey) return left.periodKey === right.periodKey
-      return Boolean(left.remoteKey && left.remoteKey === right.remoteKey)
-    }
-
-    for (let left = 0; left < rows.length; left += 1) {
-      for (let right = left + 1; right < rows.length; right += 1) {
-        if (equivalent(rows[left], rows[right])) union(left, right)
-      }
-    }
-
-    const groups = new Map<number, EndgameIdentityRow[]>()
-    rows.forEach((row, index) => {
-      const root = find(index)
-      const group = groups.get(root) ?? []
-      group.push(row)
-      groups.set(root, group)
-    })
-    const now = new Date().toISOString()
-    const updateCanonical = this.database.prepare(`
-      UPDATE checklist_items
-      SET completed = ?,
-          manual_completion_locked = ?,
-          completed_at = ?,
-          updated_at = ?
-      WHERE id = ? AND archived = 0
-    `)
-    const archiveDuplicate = this.database.prepare(`
-      UPDATE checklist_items
-      SET archived = 1, updated_at = ?
-      WHERE id = ? AND archived = 0 AND source <> 'manual'
-    `)
-
-    for (const group of groups.values()) {
-      if (group.length < 2) continue
-      group.sort((left, right) => {
-        const sourceDifference =
-          Number(right.source === 'public_schedule') - Number(left.source === 'public_schedule')
-        if (sourceDifference !== 0) return sourceDifference
-        const lockDifference = right.manualCompletionLocked - left.manualCompletionLocked
-        if (lockDifference !== 0) return lockDifference
-        const completionDifference = right.completed - left.completed
-        if (completionDifference !== 0) return completionDifference
-        return Date.parse(right.lastSyncedAt ?? right.updatedAt) -
-          Date.parse(left.lastSyncedAt ?? left.updatedAt)
-      })
-      const [canonical, ...duplicates] = group
-      const completed = group.some((row) => Boolean(row.completed))
-      const manualCompletionLocked = group.some((row) => Boolean(row.manualCompletionLocked))
-      const completedAt = completed
-        ? group
-            .map((row) => row.completedAt)
-            .filter((value): value is string => Boolean(value))
-            .sort()[0] ?? now
-        : null
-      updateCanonical.run(
-        completed ? 1 : 0,
-        manualCompletionLocked ? 1 : 0,
-        completedAt,
-        now,
-        canonical.id
-      )
-      for (const duplicate of duplicates) archiveDuplicate.run(now, duplicate.id)
-    }
+    `).run()
   }
 
   private normalizeLegacyActivityTags(): void {
@@ -6540,7 +5122,7 @@ export class AppDatabase {
       try {
         parsed = JSON.parse(row.activityTagsJson)
       } catch {
-        // Invalid legacy values use the honest fallback below.
+        // Invalid stored values use the honest fallback below.
       }
       const tags = Array.isArray(parsed)
         ? [...new Set(parsed
@@ -6553,45 +5135,6 @@ export class AppDatabase {
       const serialized = JSON.stringify(normalizedTags.length > 0 ? normalizedTags : ['未知'])
       if (serialized !== row.activityTagsJson) update.run(serialized, now, row.id)
     }
-  }
-
-  private dismissExpiredSemanticReviewCandidates(reference = new Date()): number {
-    const rows = this.database.prepare(`
-      SELECT id, target, kind, payload_json AS payloadJson
-      FROM semantic_review_candidates
-      WHERE status IN ('pending', 'claimed')
-        AND target IN ('events', 'cycles')
-    `).all() as Array<{
-      id: string
-      target: PersonalSyncTarget
-      kind: string
-      payloadJson: string
-    }>
-    const expiredIds = rows.flatMap((row) => {
-      try {
-        const draft: SemanticReviewDraft = {
-          target: row.target,
-          kind: row.kind,
-          payload: JSON.parse(row.payloadJson) as Record<string, unknown>
-        }
-        return isSemanticReviewDraftRelevant(draft, reference) ? [] : [row.id]
-      } catch {
-        return []
-      }
-    })
-    if (expiredIds.length === 0) return 0
-    const now = reference.toISOString()
-    const update = this.database.prepare(`
-      UPDATE semantic_review_candidates
-      SET status = 'rejected', completed_at = ?, agent_id = NULL, claimed_at = NULL,
-          message = '历史事项已结束，无需同步到当前清单', updated_at = ?
-      WHERE id = ? AND status IN ('pending', 'claimed')
-    `)
-    let dismissed = 0
-    this.runTransaction(() => {
-      for (const id of expiredIds) dismissed += Number(update.run(now, now, id).changes)
-    })
-    return dismissed
   }
 
   private normalizeSyncedProgressSafety(reference = new Date()): void {
@@ -6633,7 +5176,6 @@ export class AppDatabase {
           parent_title AS parentTitle,
           map_node_kind AS mapNodeKind,
           parent_remote_key AS parentRemoteKey,
-          related_region_remote_key AS relatedRegionRemoteKey,
           starts_at AS startsAt,
           ends_at AS endsAt,
           reset_rule AS resetRule,
@@ -6679,7 +5221,7 @@ export class AppDatabase {
 
     return {
       ...rest,
-      activityTags,
+      activityTags: localizeActivityTags(activityTags, 'zh-CN'),
       completed: Boolean(item.completed),
       manualCompletionLocked: Boolean(item.manualCompletionLocked)
     }

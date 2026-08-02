@@ -1,4 +1,4 @@
 interface:
   display_name: "同步 Gtask 资料"
-  short_description: "联网核验公开清单，或补全个人清单缺失的标签与时间"
+  short_description: "核验公开清单、个人异常与缺失元数据"
   default_prompt: "Use $sync-gacha-schedules to process the pending Gtask synchronization job."

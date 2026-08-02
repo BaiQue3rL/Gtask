@@ -1,108 +1,94 @@
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { delimiter, join } from 'node:path'
-import type { CodexWorkerPreferences } from '../../shared/contracts'
+import type {
+  AiScheduleJob,
+  CodexReasoningEffort,
+  CodexWorkerModel,
+  CodexWorkerPreferences
+} from '../../shared/contracts'
 
 export const CODEX_SCHEDULE_WORKER_AGENT_ID = 'gacha-app-background-worker'
-export const MIN_CODEX_SCHEDULE_WORKERS = 2
 export const MAX_CODEX_SCHEDULE_WORKERS = 6
-export const CODEX_CONCURRENCY_COOLDOWN_MS = 2 * 60 * 1000
-export const CODEX_STABLE_COMPLETIONS_TO_SCALE_UP = 2
 
-export function desiredCodexWorkerCount(
-  activePublicJobs: number,
-  maxWorkers = MAX_CODEX_SCHEDULE_WORKERS
-): number {
-  const capacity = Math.max(0, Math.floor(maxWorkers))
-  const publicJobs = Math.max(0, Math.floor(activePublicJobs))
-  if (capacity === 0 || publicJobs === 0) return 0
-  return Math.min(publicJobs, capacity)
+export interface CodexWorkerRoute {
+  jobId: string
+  model: Exclude<CodexWorkerModel, 'inherit'> | 'inherit'
+  reasoningEffort: CodexReasoningEffort
+  label: string
+  timeoutMs: number
+  totalBudgetMs: number
+  requiresWeb: boolean
 }
 
-export interface CodexDynamicConcurrencyOptions {
-  minWorkers?: number
+export function resolveCodexWorkerRoute(
+  job: AiScheduleJob,
+  preferences: CodexWorkerPreferences
+): CodexWorkerRoute {
+  return {
+    jobId: job.id,
+    model: preferences.model,
+    reasoningEffort: preferences.reasoningEffort,
+    label: '自定义配置',
+    timeoutMs: 20 * 60_000,
+    totalBudgetMs: 25 * 60_000,
+    requiresWeb: job.jobKind !== 'personal_review' || job.target === 'events'
+  }
+}
+
+export interface CodexWorkerSelectionOptions {
+  jobs: AiScheduleJob[]
+  runningRoutes: CodexWorkerRoute[]
+  preferences: CodexWorkerPreferences
   maxWorkers?: number
-  stableCompletionsToScaleUp?: number
-  cooldownMs?: number
+  maxPerGame?: number
+  maxWebWorkers?: number
+  maxSolWorkers?: number
 }
 
-export class CodexDynamicConcurrencyController {
-  private limit: number
-  private stableCompletions = 0
-  private cooldownUntil = 0
-  private readonly minWorkers: number
-  private readonly maxWorkers: number
-  private readonly stableCompletionsToScaleUp: number
-  private readonly cooldownMs: number
-
-  constructor(options: CodexDynamicConcurrencyOptions = {}) {
-    this.minWorkers = Math.max(
-      1,
-      Math.floor(options.minWorkers ?? MIN_CODEX_SCHEDULE_WORKERS)
-    )
-    this.maxWorkers = Math.max(
-      this.minWorkers,
-      Math.floor(options.maxWorkers ?? MAX_CODEX_SCHEDULE_WORKERS)
-    )
-    this.stableCompletionsToScaleUp = Math.max(
-      1,
-      Math.floor(
-        options.stableCompletionsToScaleUp ?? CODEX_STABLE_COMPLETIONS_TO_SCALE_UP
-      )
-    )
-    this.cooldownMs = Math.max(1_000, Math.floor(
-      options.cooldownMs ?? CODEX_CONCURRENCY_COOLDOWN_MS
-    ))
-    this.limit = this.minWorkers
+export function selectCodexWorkerRoutes({
+  jobs,
+  runningRoutes,
+  preferences,
+  maxWorkers = MAX_CODEX_SCHEDULE_WORKERS,
+  maxPerGame = 2,
+  maxWebWorkers = MAX_CODEX_SCHEDULE_WORKERS,
+  maxSolWorkers = MAX_CODEX_SCHEDULE_WORKERS
+}: CodexWorkerSelectionOptions): CodexWorkerRoute[] {
+  const runningJobIds = new Set(runningRoutes.map((route) => route.jobId))
+  const executingJobIds = new Set([
+    ...runningJobIds,
+    ...jobs.filter((job) => job.status === 'claimed').map((job) => job.id)
+  ])
+  const runningRouteByJobId = new Map(runningRoutes.map((route) => [route.jobId, route]))
+  const gameCounts = new Map<string, number>()
+  let webCount = 0
+  let solCount = 0
+  for (const job of jobs.filter((candidate) => executingJobIds.has(candidate.id))) {
+    gameCounts.set(job.gameId, (gameCounts.get(job.gameId) ?? 0) + 1)
+    const route = runningRouteByJobId.get(job.id) ?? resolveCodexWorkerRoute(job, preferences)
+    if (route.requiresWeb) webCount += 1
+    if (route.model === 'gpt-5.6-sol') solCount += 1
   }
 
-  get currentLimit(): number {
-    return this.limit
+  const priorities = { personal_review: 0, personal_metadata: 1, public_catalog: 2 } as const
+  const selected: CodexWorkerRoute[] = []
+  for (const job of jobs
+    .filter((candidate) => candidate.status === 'pending' && !runningJobIds.has(candidate.id))
+    .sort((left, right) =>
+      priorities[left.jobKind] - priorities[right.jobKind] ||
+      left.requestedAt.localeCompare(right.requestedAt))) {
+    if (runningRoutes.length + selected.length >= maxWorkers) break
+    if ((gameCounts.get(job.gameId) ?? 0) >= maxPerGame) continue
+    const route = resolveCodexWorkerRoute(job, preferences)
+    if (route.requiresWeb && webCount >= maxWebWorkers) continue
+    if (route.model === 'gpt-5.6-sol' && solCount >= maxSolWorkers) continue
+    selected.push(route)
+    gameCounts.set(job.gameId, (gameCounts.get(job.gameId) ?? 0) + 1)
+    if (route.requiresWeb) webCount += 1
+    if (route.model === 'gpt-5.6-sol') solCount += 1
   }
-
-  get maximumLimit(): number {
-    return this.maxWorkers
-  }
-
-  recordHealthyCompletion(hasBacklog: boolean, reference = Date.now()): number {
-    if (!hasBacklog || reference < this.cooldownUntil || this.limit >= this.maxWorkers) {
-      if (!hasBacklog) this.stableCompletions = 0
-      return this.limit
-    }
-    this.stableCompletions += 1
-    if (this.stableCompletions >= this.stableCompletionsToScaleUp) {
-      this.limit = Math.min(this.maxWorkers, this.limit + 1)
-      this.stableCompletions = 0
-    }
-    return this.limit
-  }
-
-  recordBackpressure(reference = Date.now()): number {
-    this.limit = Math.max(this.minWorkers, Math.ceil(this.limit / 2))
-    this.stableCompletions = 0
-    this.cooldownUntil = reference + this.cooldownMs
-    return this.limit
-  }
-
-  desiredWorkers(
-    activePublicJobs: number,
-    availableMemoryRatio = 1
-  ): number {
-    const normalizedMemory = Number.isFinite(availableMemoryRatio)
-      ? Math.max(0, Math.min(1, availableMemoryRatio))
-      : 1
-    const memoryLimit = normalizedMemory < 0.12
-      ? 1
-      : normalizedMemory < 0.2
-        ? 2
-        : normalizedMemory < 0.3
-          ? 3
-          : this.maxWorkers
-    return desiredCodexWorkerCount(
-      activePublicJobs,
-      Math.min(this.limit, memoryLimit)
-    )
-  }
+  return selected
 }
 export type CodexWorkerTransportMode = 'websocket_preferred' | 'https_compatibility'
 
@@ -120,6 +106,7 @@ export interface CodexCliDiscoveryOptions {
 
 export interface CodexScheduleWorkerEvent {
   agentId: string
+  jobId?: string | null
   phase:
     | 'starting'
     | 'initializing'
@@ -127,11 +114,17 @@ export interface CodexScheduleWorkerEvent {
     | 'retrying'
     | 'fallback'
     | 'authorization'
+    | 'configuration'
+    | 'timeout'
     | 'stopped'
   message: string
   current?: number
   total?: number
   exitCode?: number | null
+  timedOut?: boolean
+  model?: CodexWorkerRoute['model']
+  reasoningEffort?: CodexWorkerRoute['reasoningEffort']
+  startedAt?: string
 }
 
 export type CodexScheduleWorkerDiagnosticEvent = Omit<CodexScheduleWorkerEvent, 'agentId'>
@@ -144,7 +137,6 @@ export interface CodexScheduleWorkerOptions {
   findExecutable?: () => string | null
   spawnProcess?: typeof spawn
   onEvent?: (event: CodexScheduleWorkerEvent) => void
-  resolvePreferences?: () => CodexWorkerPreferences
 }
 
 export function codexWorkerTransportArguments(
@@ -168,7 +160,11 @@ export function codexWorkerTransportArguments(
 }
 
 export function codexWorkerInferenceArguments(
-  preferences: CodexWorkerPreferences = { model: 'inherit', reasoningEffort: 'inherit' }
+  preferences: CodexWorkerPreferences = {
+    strategy: 'fixed',
+    model: 'gpt-5.6-sol',
+    reasoningEffort: 'medium'
+  }
 ): string[] {
   const args: string[] = []
   if (preferences.model !== 'inherit') args.push('--model', preferences.model)
@@ -194,18 +190,23 @@ export interface CodexScheduleWorkerPoolLaunchResult {
 export interface CodexScheduleWorkerPoolOptions
   extends Omit<CodexScheduleWorkerOptions, 'agentId'> {
   maxWorkers?: number
+  canStartWorkers?: () => boolean
+  unavailableMessage?: string
 }
 
-function backgroundPrompt(agentId: string): string {
+function backgroundPrompt(agentId: string, route: CodexWorkerRoute): string {
   return `必须使用 $sync-gacha-schedules 技能处理 Gtask 的后台同步队列。
 你是由桌面应用自动启动的本地后台 Agent，不要修改项目源码，也不要要求用户回复。
 用户已经在桌面应用中主动点击同步，明确授权本轮读取公开资料，并由你决定对本次契约范围内的同步数据执行新增、更新或软删除；该授权不包含凭据读取、跨版块写入或删除受保护的手动数据。
 请使用固定 Agent ID“${agentId}”、名称“Gtask 后台 Codex”登记联网能力。
+只允许领取指定任务“${route.jobId}”；调用领取工具时必须传入 jobId="${route.jobId}"、model="${route.model}"、reasoningEffort="${route.reasoningEffort}"。若任务不存在或已被领取则立即退出，不得改领其他任务。
+本次使用“${route.label}”。模型和推理强度由用户设置，本任务不得自行切换模型或推理等级。
 领取任务后先读取 job.contract；它是当前版块所需数据、字段语义和完成条件的唯一权威来源。先按契约建立完整目录，再逐项检索必需字段，不要从提示词猜字段要求。
 必须按 job.contract.requestContext 的 outputLocale 和 userTimeZone 组织结果，并在提交时原样回传 contentLocale。
-只领取一项任务并完整处理，先按 job.jobKind 选择公开清单或个人元数据流程，严格按技能要求更新每个阶段的用户可见进度；已领取任务必须提交或明确失败。
+只领取一项任务并完整处理，先按 job.jobKind 选择公开清单、个人异常核验或个人元数据流程，严格按技能要求更新每个阶段的用户可见进度；已领取任务必须提交或明确失败。
 若 target=all，先提交已核验版块以安全保存；只要工具返回 remainingTargets 或任务仍为 claimed，就继续使用 Codex 原生联网检索自主补齐，不得把部分结果宣布为完成。
-公开资料任务根据结果自由调整关键词和来源，只有确实穷尽有用检索后才能明确失败。个人完成状态与清单成员由 Gtask 官方接口适配器按完整快照处理；personal_metadata 任务只补契约列出的标签和时间，不得尝试与公开清单融合。
+公开资料任务根据结果自由调整关键词和来源，只有确实穷尽有用检索后才能明确失败。个人数据正常字段由适配器机械处理；personal_review 只解决契约列出的异常项，其中活动已经先行建表并由本任务后台修正，结构不完整的地图等异常仍保持暂存；personal_metadata 只补既有个人项的标签和时间。两者都不得读取或融合公开清单。
+处理活动标签时准确性优先于数量：根据活动实际玩法自主选择最贴切的稳定标签，不要求覆盖固定维度，也不要为了凑数添加近义或无关标签。逐标签审计说明可选，但整体结论必须有可靠来源。
 本 Worker 的失败只允许结束自己领取的任务，不得领取、失败或结束其他 Worker 的任务。
 完成该任务后退出；不要领取第二项任务。`
 }
@@ -292,6 +293,16 @@ export function parseCodexWorkerLine(line: string): CodexScheduleWorkerDiagnosti
     if (
       event.type === 'item.completed' &&
       event.item?.type === 'mcp_tool_call' &&
+      /protocol|incompatible|协议版本|插件版本/i.test(event.item.error?.message ?? '')
+    ) {
+      return {
+        phase: 'configuration',
+        message: 'Gtask 同步插件版本不兼容，请在设置中更新插件后重试'
+      }
+    }
+    if (
+      event.type === 'item.completed' &&
+      event.item?.type === 'mcp_tool_call' &&
       /cancelled|approval|permission/i.test(event.item.error?.message ?? '')
     ) {
       return {
@@ -308,6 +319,8 @@ export function parseCodexWorkerLine(line: string): CodexScheduleWorkerDiagnosti
 export class CodexScheduleWorker {
   private child: ChildProcess | null = null
   private stopped = false
+  private activeRoute: CodexWorkerRoute | null = null
+  private timeoutTimer: ReturnType<typeof setTimeout> | null = null
   private readonly intentionallyStoppedChildren = new WeakSet<ChildProcess>()
 
   constructor(private readonly options: CodexScheduleWorkerOptions) {}
@@ -320,7 +333,15 @@ export class CodexScheduleWorker {
     return Boolean(this.child && this.child.exitCode === null && !this.stopped)
   }
 
-  start(): CodexScheduleWorkerLaunchResult {
+  get jobId(): string | null {
+    return this.activeRoute?.jobId ?? null
+  }
+
+  get route(): CodexWorkerRoute | null {
+    return this.activeRoute
+  }
+
+  start(route: CodexWorkerRoute): CodexScheduleWorkerLaunchResult {
     if (this.isRunning()) {
       return {
         status: 'already_running',
@@ -340,11 +361,9 @@ export class CodexScheduleWorker {
     }
 
     this.stopped = false
+    this.activeRoute = route
+    const startedAt = new Date().toISOString()
     const spawnProcess = this.options.spawnProcess ?? spawn
-    const preferences = this.options.resolvePreferences?.() ?? {
-      model: 'inherit' as const,
-      reasoningEffort: 'inherit' as const
-    }
     const child = spawnProcess(executablePath, [
       'exec',
       '--ephemeral',
@@ -352,7 +371,11 @@ export class CodexScheduleWorker {
       '--color',
       'never',
       ...codexWorkerTransportArguments(this.options.transportMode),
-      ...codexWorkerInferenceArguments(preferences),
+      ...codexWorkerInferenceArguments({
+        strategy: 'fixed',
+        model: route.model,
+        reasoningEffort: route.reasoningEffort
+      }),
       '--sandbox',
       'read-only',
       '-c',
@@ -362,7 +385,7 @@ export class CodexScheduleWorker {
       '--skip-git-repo-check',
       '-C',
       this.options.workingDirectory,
-      backgroundPrompt(this.agentId)
+      backgroundPrompt(this.agentId, route)
     ], {
       cwd: this.options.workingDirectory,
       env: { ...process.env, ...this.options.env, CODEX_GACHA_BACKGROUND: '1' },
@@ -372,13 +395,34 @@ export class CodexScheduleWorker {
     this.child = child
     this.options.onEvent?.({
       agentId: this.agentId,
+      jobId: route.jobId,
       phase: 'starting',
-      message: '正在启动本机 Codex 自动处理进程'
+      message: `Codex ${route.label}正在启动 · ${route.model}/${route.reasoningEffort}`,
+      model: route.model,
+      reasoningEffort: route.reasoningEffort,
+      startedAt
     })
+
+    this.timeoutTimer = setTimeout(() => {
+      if (this.child !== child || child.exitCode !== null) return
+      this.options.onEvent?.({
+        agentId: this.agentId,
+        jobId: route.jobId,
+        phase: 'timeout',
+        message: `${route.label}达到单次时间预算，已安全结束当前任务`,
+        exitCode: null,
+        timedOut: true,
+        model: route.model,
+        reasoningEffort: route.reasoningEffort,
+        startedAt
+      })
+      this.stop()
+    }, route.timeoutMs)
 
     let stdoutBuffer = ''
     let stderrBuffer = ''
     let lastFailureMessage: string | null = null
+    let terminalEventHandled = false
     const consume = (chunk: Buffer | string, source: 'stdout' | 'stderr'): void => {
       const combined = (source === 'stdout' ? stdoutBuffer : stderrBuffer) + chunk.toString()
       const lines = combined.split(/\r?\n/)
@@ -389,44 +433,73 @@ export class CodexScheduleWorker {
         const event = parseCodexWorkerLine(line.trim())
         if (event) {
           if (event.phase === 'authorization') lastFailureMessage = event.message
-          this.options.onEvent?.({ ...event, agentId: this.agentId })
+          this.options.onEvent?.({
+            ...event,
+            agentId: this.agentId,
+            jobId: route.jobId,
+            model: route.model,
+            reasoningEffort: route.reasoningEffort,
+            startedAt
+          })
         }
       }
     }
     child.stdout?.on('data', (chunk) => consume(chunk, 'stdout'))
     child.stderr?.on('data', (chunk) => consume(chunk, 'stderr'))
     child.once('error', (error) => {
-      if (this.child === child) this.child = null
+      if (terminalEventHandled) return
+      terminalEventHandled = true
+      if (this.timeoutTimer) clearTimeout(this.timeoutTimer)
+      this.timeoutTimer = null
+      const wasCurrentChild = this.child === child
+      if (wasCurrentChild) this.child = null
+      if (wasCurrentChild && this.activeRoute?.jobId === route.jobId) this.activeRoute = null
       if (this.intentionallyStoppedChildren.has(child)) return
       this.options.onEvent?.({
         agentId: this.agentId,
+        jobId: route.jobId,
         phase: 'stopped',
         message: `Codex 自动进程启动失败：${error.message}`,
-        exitCode: null
+        exitCode: null,
+        model: route.model,
+        reasoningEffort: route.reasoningEffort,
+        startedAt
       })
     })
     child.once('exit', (exitCode) => {
-      if (this.child === child) this.child = null
+      if (terminalEventHandled) return
+      terminalEventHandled = true
+      if (this.timeoutTimer) clearTimeout(this.timeoutTimer)
+      this.timeoutTimer = null
+      const wasCurrentChild = this.child === child
+      if (wasCurrentChild) this.child = null
+      if (wasCurrentChild && this.activeRoute?.jobId === route.jobId) this.activeRoute = null
       if (this.intentionallyStoppedChildren.has(child)) return
       this.options.onEvent?.({
         agentId: this.agentId,
+        jobId: route.jobId,
         phase: 'stopped',
         message: exitCode === 0
-          ? lastFailureMessage ?? 'Codex 自动处理进程已结束'
-          : `Codex 自动处理进程异常退出（代码 ${exitCode ?? '未知'}）`,
-        exitCode
+          ? lastFailureMessage ?? '同步服务已停止'
+          : '同步服务意外停止，请稍后重试',
+        exitCode,
+        model: route.model,
+        reasoningEffort: route.reasoningEffort,
+        startedAt
       })
     })
 
     return {
       status: 'started',
-      message: '正在启动本机 Codex 自动处理进程',
+      message: '正在启动同步服务',
       executablePath
     }
   }
 
   stop(): void {
     this.stopped = true
+    if (this.timeoutTimer) clearTimeout(this.timeoutTimer)
+    this.timeoutTimer = null
     if (this.child && this.child.exitCode === null) {
       this.intentionallyStoppedChildren.add(this.child)
       const pid = this.child.pid
@@ -442,6 +515,7 @@ export class CodexScheduleWorker {
       }
     }
     this.child = null
+    this.activeRoute = null
   }
 }
 
@@ -469,15 +543,33 @@ export class CodexScheduleWorkerPool {
     return this.workers.filter((worker) => worker.isRunning()).length
   }
 
-  ensureCapacity(desiredWorkers: number): CodexScheduleWorkerPoolLaunchResult {
-    const desired = Math.max(0, Math.min(Math.floor(desiredWorkers), this.workers.length))
+  get runningRoutes(): CodexWorkerRoute[] {
+    return this.workers.flatMap((worker) => worker.isRunning() && worker.route
+      ? [worker.route]
+      : [])
+  }
+
+  startJobs(routes: CodexWorkerRoute[]): CodexScheduleWorkerPoolLaunchResult {
+    if (this.options.canStartWorkers && !this.options.canStartWorkers()) {
+      return {
+        status: 'unavailable',
+        message: this.options.unavailableMessage ?? 'Codex 同步插件尚未就绪',
+        started: 0,
+        running: this.runningCount
+      }
+    }
     let started = 0
     let unavailableMessage: string | null = null
-    for (const worker of this.workers) {
-      if (this.runningCount >= desired) break
-      if (worker.isRunning()) continue
-      const launch = worker.start()
-      if (launch.status === 'started') started += 1
+    const assigned = new Set(this.runningRoutes.map((route) => route.jobId))
+    for (const route of routes) {
+      if (assigned.has(route.jobId)) continue
+      const worker = this.workers.find((candidate) => !candidate.isRunning())
+      if (!worker) break
+      const launch = worker.start(route)
+      if (launch.status === 'started') {
+        started += 1
+        assigned.add(route.jobId)
+      }
       if (launch.status === 'unavailable') {
         unavailableMessage = launch.message
         break
@@ -495,16 +587,14 @@ export class CodexScheduleWorkerPool {
     if (started > 0) {
       return {
         status: 'started',
-        message: `正在启动 Codex 并行处理进程（${running}/${desired}，动态上限 ${this.workers.length}）`,
+        message: '同步服务正在启动',
         started,
         running
       }
     }
     return {
       status: 'already_running',
-      message: running > 1
-        ? `${running} 个 Codex 并行处理进程已运行（动态目标 ${desired}/${this.workers.length}），正在领取任务`
-        : 'Codex 自动处理进程已运行，正在领取任务',
+      message: running > 0 ? '同步任务正在处理' : '同步任务正在排队',
       started,
       running
     }

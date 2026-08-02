@@ -2,6 +2,7 @@ import {
   CHECKLIST_CATEGORIES,
   CHECKLIST_SECTIONS,
   CODEX_REASONING_EFFORTS,
+  CODEX_WORKER_STRATEGIES,
   CODEX_WORKER_MODELS,
   CREDENTIAL_PROVIDERS,
   MAP_NODE_KINDS,
@@ -58,13 +59,10 @@ function parseActivityTags(value: unknown): string[] | undefined {
   const tags = value.map((entry) => {
     if (typeof entry !== 'string') throw new Error('活动玩法标签格式不正确')
     const tag = entry.trim()
-    if (!tag || tag.length > 20) throw new Error('活动玩法标签须为 1 到 20 个字符')
+    if (!tag || tag.length > 80) throw new Error('活动玩法标签须为 1 到 80 个字符')
     return tag
   })
   const uniqueTags = normalizeActivityTags(tags)
-  if (uniqueTags.includes('待识别')) {
-    throw new Error('活动玩法标签不能使用“待识别”，无法确认时请使用“未知”')
-  }
   return uniqueTags
 }
 
@@ -273,6 +271,12 @@ export function parseExternalUrl(value: unknown): string {
 export function parseCodexWorkerPreferences(value: unknown): CodexWorkerPreferences {
   if (!isRecord(value)) throw new Error('Codex 后台设置格式不正确')
   if (
+    typeof value.strategy !== 'string' ||
+    !CODEX_WORKER_STRATEGIES.includes(value.strategy as CodexWorkerPreferences['strategy'])
+  ) {
+    throw new Error('不支持的 Codex 后台调度策略')
+  }
+  if (
     typeof value.model !== 'string' ||
     !CODEX_WORKER_MODELS.includes(value.model as CodexWorkerPreferences['model'])
   ) {
@@ -287,6 +291,7 @@ export function parseCodexWorkerPreferences(value: unknown): CodexWorkerPreferen
     throw new Error('不支持的 Codex 推理强度')
   }
   return {
+    strategy: value.strategy as CodexWorkerPreferences['strategy'],
     model: value.model as CodexWorkerPreferences['model'],
     reasoningEffort: value.reasoningEffort as CodexWorkerPreferences['reasoningEffort']
   }

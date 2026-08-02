@@ -1,5 +1,5 @@
 export const SUPPORTED_GAME_IDS = ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const
-export const GTASK_MCP_PROTOCOL_VERSION = '2026-08-01.1'
+export const GTASK_MCP_PROTOCOL_VERSION = '2026-08-02.3'
 
 export type GameId = (typeof SUPPORTED_GAME_IDS)[number]
 
@@ -36,7 +36,14 @@ export type ScheduleKind = (typeof SCHEDULE_KINDS)[number]
 export const CREDENTIAL_PROVIDERS = ['miyoushe', 'kuro-community'] as const
 export type CredentialProvider = (typeof CREDENTIAL_PROVIDERS)[number]
 
-export const CODEX_WORKER_MODELS = ['inherit', 'gpt-5.6-sol', 'gpt-5.6-terra'] as const
+export const CODEX_WORKER_STRATEGIES = ['fixed'] as const
+export type CodexWorkerStrategy = (typeof CODEX_WORKER_STRATEGIES)[number]
+export const CODEX_WORKER_MODELS = [
+  'inherit',
+  'gpt-5.6-sol',
+  'gpt-5.6-terra',
+  'gpt-5.6-luna'
+] as const
 export type CodexWorkerModel = (typeof CODEX_WORKER_MODELS)[number]
 export const CODEX_REASONING_EFFORTS = [
   'inherit',
@@ -50,8 +57,38 @@ export const CODEX_REASONING_EFFORTS = [
 export type CodexReasoningEffort = (typeof CODEX_REASONING_EFFORTS)[number]
 
 export interface CodexWorkerPreferences {
+  strategy: CodexWorkerStrategy
   model: CodexWorkerModel
   reasoningEffort: CodexReasoningEffort
+}
+
+export const RENDERING_MODES = ['compatibility', 'accelerated'] as const
+export type RenderingMode = (typeof RENDERING_MODES)[number]
+
+export interface RenderingModeState {
+  configured: RenderingMode
+  active: RenderingMode
+  restartRequired: boolean
+}
+
+export interface SoftwareUpdateSettings {
+  autoCheckEnabled: boolean
+  lastSuccessfulCheckAt: string | null
+}
+
+export type SoftwareUpdateCheckOutcome =
+  | 'update_available'
+  | 'up_to_date'
+  | 'unavailable'
+  | 'error'
+
+export interface SoftwareUpdateCheckResult {
+  outcome: SoftwareUpdateCheckOutcome
+  currentVersion: string
+  latestVersion: string | null
+  releaseUrl: string | null
+  checkedAt: string | null
+  message: string
 }
 
 export interface CredentialStatus {
@@ -100,7 +137,7 @@ export interface BackupSummary {
 }
 
 export type AiScheduleJobStatus = 'pending' | 'claimed' | 'completed' | 'failed'
-export type AiScheduleJobKind = 'public_catalog' | 'personal_metadata'
+export type AiScheduleJobKind = 'public_catalog' | 'personal_metadata' | 'personal_review'
 export const SYNC_PROGRESS_PHASES = [
   'queued',
   'fetching',
@@ -130,6 +167,9 @@ export interface SyncProgressUpdate {
   source: 'public_schedule' | 'personal_data'
   phase: SyncProgressPhase
   status: SyncProgressStatus
+  /** Structured retry origin used for UI decisions; never infer it from message text. */
+  retryKind?: 'codex_connection' | 'source_request' | null
+  /** Internal diagnostic only. Product UI must derive copy from structured fields. */
   message: string
   current: number | null
   total: number | null
@@ -170,6 +210,7 @@ export interface ActivityTagEnrichmentTarget {
 }
 
 export type PersonalMetadataField = 'activityTags' | 'startsAt' | 'endsAt'
+export type PersonalCycleTimeWindowPolicy = 'full_cycle' | 'current_playable_phase'
 
 export interface PersonalMetadataEnrichmentTarget {
   itemId: string
@@ -179,6 +220,7 @@ export interface PersonalMetadataEnrichmentTarget {
   startsAt: string | null
   endsAt: string | null
   missingFields: PersonalMetadataField[]
+  timeWindowPolicy?: PersonalCycleTimeWindowPolicy
   sourceIdentity: {
     provider: string
     endpoint: string
@@ -230,8 +272,16 @@ export interface SyncRequestContext {
   userTimeZone: string
 }
 
+export interface ActivityTagContractEntry {
+  id: string
+  dimension: 'gameplay' | 'format' | 'content' | 'reward'
+  qualityRole: 'primary' | 'supporting' | 'fallback'
+  label: string
+  description: string
+}
+
 export interface PublicSyncContract {
-  schemaVersion: 6
+  schemaVersion: 11
   jobKind: 'public_catalog'
   authority: 'interface_contract'
   decisionAuthority: 'codex'
@@ -243,11 +293,12 @@ export interface PublicSyncContract {
   commonRequiredItemFields: string[]
   submissionRequiredFields: string[]
   fieldSemantics: Record<string, string>
+  activityTagCatalog: ActivityTagContractEntry[]
   sections: SyncSectionContract[]
 }
 
 export interface PersonalMetadataContract {
-  schemaVersion: 1
+  schemaVersion: 6
   jobKind: 'personal_metadata'
   authority: 'interface_contract'
   decisionAuthority: 'codex'
@@ -257,20 +308,37 @@ export interface PersonalMetadataContract {
   requestContext: SyncRequestContext
   workflow: ['inspect_targets', 'research_missing_fields', 'verify', 'submit_metadata']
   fieldSemantics: Record<string, string>
+  activityTagCatalog: ActivityTagContractEntry[]
   completionCriteria: string[]
 }
 
-export interface SemanticReviewContract {
-  schemaVersion: 9
+export type PersonalReviewIssue =
+  | 'item_identity'
+  | 'classification'
+  | 'completion_semantics'
+  | 'time_window'
+  | 'hierarchy'
+
+export interface PersonalReviewTarget {
+  candidateId: string
+  kind: string
+  issues: PersonalReviewIssue[]
+  payload: Record<string, unknown>
+}
+
+export interface PersonalReviewContract {
+  schemaVersion: 4
+  jobKind: 'personal_review'
   authority: 'interface_contract'
   decisionAuthority: 'codex'
   executorPolicy: 'mechanical_validation_only'
-  allowedMutations: ['create', 'update', 'archive']
+  allowedMutations: ['refine_active_personal_snapshot']
   target: PersonalSyncTarget
   requestContext: SyncRequestContext
-  requiredDecisionFields: string[]
-  conditionalFields: SyncContractConditionalField[]
+  workflow: ['inspect_official_facts', 'research_exceptions', 'resolve_every_target', 'refine_active_snapshot']
   fieldSemantics: Record<string, string>
+  activityTagCatalog: ActivityTagContractEntry[]
+  completionCriteria: string[]
 }
 
 export interface AiScheduleJob {
@@ -293,47 +361,16 @@ export interface AiScheduleJob {
   progressCurrent: number | null
   progressTotal: number | null
   progressUpdatedAt: string
+  routingTier: number
+  attemptCount: number
+  assignedModel: CodexWorkerModel | null
+  assignedReasoningEffort: CodexReasoningEffort | null
+  lastFailureKind: string | null
   activityTagTargets: ActivityTagEnrichmentTarget[]
   metadataTargets: PersonalMetadataEnrichmentTarget[]
+  reviewTargets: PersonalReviewTarget[]
   matchCandidates: AiScheduleMatchCandidate[]
-  contract: PublicSyncContract | PersonalMetadataContract
-}
-
-export type SemanticReviewStatus = 'pending' | 'claimed' | 'approved' | 'rejected'
-
-export interface SemanticReviewCandidate {
-  id: string
-  gameId: GameId
-  source: 'public_schedule' | 'personal_sync'
-  target: PersonalSyncTarget
-  kind: string
-  status: SemanticReviewStatus
-  payload: Record<string, unknown>
-  requestedAt: string
-  claimedAt: string | null
-  completedAt: string | null
-  agentId: string | null
-  agentName: string | null
-  message: string | null
-  accountScope: string | null
-  requestContext: SyncRequestContext
-}
-
-export interface SemanticReviewDecisionSummary {
-  id: string
-  gameId: GameId
-  target: PersonalSyncTarget
-  status: Extract<SemanticReviewStatus, 'approved' | 'rejected'>
-  completedAt: string
-  message: string | null
-}
-
-export interface SemanticReviewSummary {
-  gameId: GameId
-  pendingCount: number
-  claimedCount: number
-  waitingForCatalogCount: number
-  latestDecision: SemanticReviewDecisionSummary | null
+  contract: PublicSyncContract | PersonalMetadataContract | PersonalReviewContract
 }
 
 export interface GameSummary {
@@ -361,8 +398,6 @@ export interface ChecklistItem {
   parentTitle: string | null
   mapNodeKind: MapNodeKind | null
   parentRemoteKey: string | null
-  /** @deprecated Legacy database compatibility; new map data uses parentRemoteKey only. */
-  relatedRegionRemoteKey: string | null
   startsAt: string | null
   endsAt: string | null
   resetRule: string | null
@@ -456,6 +491,8 @@ export interface SyncSourceResult {
   updated: number
   preserved: number
   pendingReview?: number
+  reviewMode?: 'background' | 'blocking'
+  requiresCodexPlugin?: boolean
 }
 
 export interface SyncResult {
@@ -479,6 +516,14 @@ export interface SyncCancellationResult {
 
 export interface GachaApi {
   getAppInfo: () => Promise<AppInfo>
+  getRenderingModeState: () => Promise<RenderingModeState>
+  updateRenderingMode: (mode: RenderingMode) => Promise<RenderingModeState>
+  getSoftwareUpdateSettings: () => Promise<SoftwareUpdateSettings>
+  updateSoftwareUpdateSettings: (
+    settings: Pick<SoftwareUpdateSettings, 'autoCheckEnabled'>
+  ) => Promise<SoftwareUpdateSettings>
+  checkSoftwareUpdate: () => Promise<SoftwareUpdateCheckResult>
+  restartApp: () => Promise<boolean>
   openDataDirectory: () => Promise<void>
   openExternalUrl: (url: string) => Promise<void>
   listBackups: () => Promise<BackupSummary[]>
@@ -487,10 +532,6 @@ export interface GachaApi {
   getAiScheduleAgentStatus: () => Promise<AiScheduleAgentStatus>
   getActiveAiScheduleJob: (gameId: GameId, target?: SyncTarget) => Promise<AiScheduleJob | null>
   listActiveAiScheduleJobs: (gameId?: GameId) => Promise<AiScheduleJob[]>
-  getSemanticReviewSummary: (
-    gameId: GameId,
-    target?: PersonalSyncTarget
-  ) => Promise<SemanticReviewSummary>
   openCodexPlugin: () => Promise<void>
   updateCodexPlugin: () => Promise<CodexPluginInstallResult>
   repairCodexConnection: (

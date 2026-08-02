@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { detectCodexPlugin } from '../src/main/ai/codex-plugin'
+import {
+  CODEX_PLUGIN_REQUIRED_MESSAGE,
+  detectCodexPlugin,
+  isCodexPluginUsable
+} from '../src/main/ai/codex-plugin'
 
 describe('Codex 插件检测', () => {
   it('需要启用配置和安装缓存同时存在', () => {
@@ -59,5 +63,11 @@ describe('Codex 插件检测', () => {
       readText: () => '[plugins."gacha-task-manager@personal"]\nenabled = true',
       listDirectory: () => []
     }).installed).toBe(false)
+  })
+
+  it('只有实际安装并启用的插件才能启动 Gtask Codex 任务', () => {
+    expect(isCodexPluginUsable({ installed: true })).toBe(true)
+    expect(isCodexPluginUsable({ installed: false })).toBe(false)
+    expect(CODEX_PLUGIN_REQUIRED_MESSAGE).toContain('未安装或未启用')
   })
 })

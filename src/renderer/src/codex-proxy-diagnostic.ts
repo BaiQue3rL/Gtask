@@ -14,8 +14,7 @@ export const CODEX_PROXY_REPAIR_PROMPT = [
 export function isCodexConnectionRetry(progress: SyncProgressUpdate | null): boolean {
   return Boolean(
     progress &&
-    progress.source === 'public_schedule' &&
     progress.phase === 'retrying' &&
-    /Codex.+连接模型.+重试\s*\d+\/\d+/.test(progress.message)
+    progress.retryKind === 'codex_connection'
   )
 }

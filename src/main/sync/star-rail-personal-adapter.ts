@@ -10,7 +10,7 @@ import {
   type PersonalRequestOutcome
 } from './personal-sync-settler'
 import type { SyncAdapter, SyncAdapterOutput, SyncProgressReporter } from './types'
-import { personalEventsFromCandidates, withPersonalIdentity } from './personal-snapshot'
+import { assemblePersonalEventsFromCandidates, withPersonalIdentity } from './personal-snapshot'
 
 export interface StarRailBattleChronicleClient {
   getMemoryOfChaos: () => Promise<unknown>
@@ -45,12 +45,14 @@ export class StarRailPersonalAdapter implements SyncAdapter {
         outcomes
       )
       assertAnyPersonalRequestSucceeded(outcomes)
+      const eventSnapshot = assemblePersonalEventsFromCandidates(
+        'star-rail',
+        'miyoushe',
+        extractStarRailEventReviewCandidates(eventCalendar)
+      )
       return {
-        items: personalEventsFromCandidates(
-          'star-rail',
-          'miyoushe',
-          extractStarRailEventReviewCandidates(eventCalendar)
-        ),
+        items: eventSnapshot.items,
+        reviewCandidates: eventSnapshot.reviewCandidates,
         snapshotCompleteness: 'complete',
         adapterVersion: 'star-rail-personal-v1',
         message: '星铁活动进度已读取'
@@ -108,11 +110,17 @@ export class StarRailPersonalAdapter implements SyncAdapter {
     const eventCandidates = eventCalendar === undefined
       ? []
       : extractStarRailEventReviewCandidates(eventCalendar)
+    const eventSnapshot = assemblePersonalEventsFromCandidates(
+      'star-rail',
+      'miyoushe',
+      eventCandidates
+    )
     return {
       items: [
-        ...personalEventsFromCandidates('star-rail', 'miyoushe', eventCandidates),
+        ...eventSnapshot.items,
         ...withPersonalIdentity(cycleItems, 'miyoushe', 'personal-challenge-record')
       ],
+      reviewCandidates: eventSnapshot.reviewCandidates,
       snapshotCompleteness: outcomes.every((outcome) => outcome.succeeded) ? 'complete' : 'partial',
       adapterVersion: 'star-rail-personal-v1',
       message: '星铁四种周期战绩已同步' + suffix

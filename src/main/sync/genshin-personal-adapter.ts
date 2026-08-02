@@ -12,8 +12,8 @@ import {
 } from './personal-sync-settler'
 import type { SyncAdapter, SyncAdapterOutput, SyncProgressReporter } from './types'
 import {
-  personalEventsFromCandidates,
-  personalMapsFromCandidates,
+  assemblePersonalEventsFromCandidates,
+  assemblePersonalMapsFromCandidates,
   withPersonalIdentity
 } from './personal-snapshot'
 
@@ -84,11 +84,24 @@ export class GenshinPersonalAdapter implements SyncAdapter {
             stygianOnslaught
           })
       : []
+    const eventSnapshot = assemblePersonalEventsFromCandidates(
+      'genshin',
+      'miyoushe',
+      eventCandidates
+    )
+    const explorationSnapshot = assemblePersonalMapsFromCandidates(
+      'miyoushe',
+      explorationCandidates
+    )
     return {
       items: [
-        ...personalEventsFromCandidates('genshin', 'miyoushe', eventCandidates),
-        ...personalMapsFromCandidates('miyoushe', explorationCandidates),
+        ...eventSnapshot.items,
+        ...explorationSnapshot.items,
         ...withPersonalIdentity(cycleItems, 'miyoushe', 'personal-challenge-record')
+      ],
+      reviewCandidates: [
+        ...eventSnapshot.reviewCandidates,
+        ...explorationSnapshot.reviewCandidates
       ],
       snapshotCompleteness: outcomes.every((outcome) => outcome.succeeded) ? 'complete' : 'partial',
       adapterVersion: 'genshin-personal-v1',

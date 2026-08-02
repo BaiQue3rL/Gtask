@@ -10,6 +10,11 @@ const CYCLE_TITLE_PATTERNS: Record<GameId, RegExp[]> = {
   'wuthering-waves': [/逆境深塔/u, /冥歌海墟/u, /终焉矩阵/u, /千道门扉/u]
 }
 
+export interface PersonalSnapshotAssembly {
+  items: NormalizedSyncItem[]
+  reviewCandidates: SemanticReviewDraft[]
+}
+
 export function withPersonalIdentity(
   items: NormalizedSyncItem[],
   provider: PersonalProvider,
@@ -33,10 +38,26 @@ export function personalEventsFromCandidates(
   candidates: SemanticReviewDraft[],
   reference = new Date()
 ): NormalizedSyncItem[] {
+  return assemblePersonalEventsFromCandidates(
+    gameId,
+    provider,
+    candidates,
+    reference
+  ).items
+}
+
+export function assemblePersonalEventsFromCandidates(
+  gameId: GameId,
+  provider: PersonalProvider,
+  candidates: SemanticReviewDraft[],
+  reference = new Date()
+): PersonalSnapshotAssembly {
   const now = reference.getTime()
   const seen = new Set<string>()
-  return candidates.flatMap((candidate) => {
-    if (candidate.target !== 'events') return []
+  const items: NormalizedSyncItem[] = []
+  const reviewCandidates: SemanticReviewDraft[] = []
+  for (const candidate of candidates) {
+    if (candidate.target !== 'events') continue
     const id = candidate.payload.officialEventId
     const title = candidate.payload.title
     const endpoint = candidate.payload.sourceContext
@@ -45,15 +66,15 @@ export function personalEventsFromCandidates(
       typeof endpoint !== 'string' || !endpoint.trim()) {
       throw new Error('官方活动快照缺少稳定标识、名称或接口来源')
     }
-    if (CYCLE_TITLE_PATTERNS[gameId].some((pattern) => pattern.test(title))) return []
+    if (CYCLE_TITLE_PATTERNS[gameId].some((pattern) => pattern.test(title))) continue
     const startsAt = readIso(candidate.payload.normalizedStartAt)
     const endsAt = readIso(candidate.payload.normalizedEndAt)
-    if (endsAt && Date.parse(endsAt) <= now) return []
+    if (endsAt && Date.parse(endsAt) <= now) continue
     const externalId = String(id).trim()
     const remoteKey = `personal-event:${provider}:${endpoint}:${externalId}`
-    if (seen.has(remoteKey)) return []
+    if (seen.has(remoteKey)) continue
     seen.add(remoteKey)
-    return [{
+    const item: NormalizedSyncItem = {
       remoteKey,
       category: 'limited_event' as const,
       title: title.trim(),
@@ -63,21 +84,50 @@ export function personalEventsFromCandidates(
       modeKey: `official-event-${externalId}`,
       sourceIdentity: { provider, endpoint, externalId }
       // 官方活动日历的状态字段语义并不等同于“玩家完成”，因此不猜 completed。
-    }]
-  })
+    }
+    items.push(item)
+    reviewCandidates.push({
+      ...candidate,
+      payload: {
+        ...candidate.payload,
+        provider,
+        reviewIssues: [
+          'classification',
+          'completion_semantics',
+          ...(!startsAt || !endsAt ? ['time_window'] : [])
+        ],
+        proposedItem: item
+      }
+    })
+  }
+  return { items, reviewCandidates }
 }
 
 export function personalMapsFromCandidates(
   provider: PersonalProvider,
   candidates: SemanticReviewDraft[]
 ): NormalizedSyncItem[] {
+  const assembly = assemblePersonalMapsFromCandidates(provider, candidates)
+  if (assembly.reviewCandidates.length > 0) {
+    const title = assembly.reviewCandidates[0]?.payload.officialTitle
+    throw new Error(`官方二级地区“${typeof title === 'string' ? title : '未知地区'}”缺少同批次一级父地区`)
+  }
+  return assembly.items
+}
+
+export function assemblePersonalMapsFromCandidates(
+  provider: PersonalProvider,
+  candidates: SemanticReviewDraft[]
+): PersonalSnapshotAssembly {
   const drafts = candidates.filter((candidate) => candidate.target === 'exploration')
   const remoteKeyByOfficialId = new Map<string, string>()
   for (const draft of drafts) {
     const id = readIdentifier(draft.payload.officialId)
     if (id) remoteKeyByOfficialId.set(id, `personal-map:${provider}:${id}`)
   }
-  return drafts.flatMap((draft) => {
+  const items: NormalizedSyncItem[] = []
+  const reviewCandidates: SemanticReviewDraft[] = []
+  for (const draft of drafts) {
     const id = readIdentifier(draft.payload.officialId)
     const title = typeof draft.payload.officialTitle === 'string'
       ? draft.payload.officialTitle.trim()
@@ -85,15 +135,40 @@ export function personalMapsFromCandidates(
     const progress = draft.payload.observedProgress
     const nodeKind = draft.payload.observedNodeKind
     if (!id || !title || typeof progress !== 'number' || !Number.isFinite(progress) ||
-      progress < 0 || progress > 100 || (nodeKind !== 'region' && nodeKind !== 'subregion')) {
-      throw new Error('官方地图快照缺少稳定标识、名称、进度或层级')
+      progress < 0 || progress > 100) {
+      throw new Error('官方地图快照缺少稳定标识、名称或进度')
     }
     const parentId = readIdentifier(draft.payload.observedParentId)
     const parentRemoteKey = parentId ? remoteKeyByOfficialId.get(parentId) ?? null : null
-    if (nodeKind === 'subregion' && !parentRemoteKey) {
-      throw new Error(`官方二级地区“${title}”缺少同批次一级父地区`)
+    if (
+      (nodeKind !== 'region' && nodeKind !== 'subregion') ||
+      (nodeKind === 'region' && parentId !== null) ||
+      (nodeKind === 'subregion' && !parentRemoteKey)
+    ) {
+      reviewCandidates.push({
+        ...draft,
+        payload: {
+          ...draft.payload,
+          provider,
+          sourceContext: 'personal-map-progress',
+          reviewIssues: ['hierarchy'],
+          proposedItem: {
+            remoteKey: remoteKeyByOfficialId.get(id)!,
+            category: 'exploration',
+            title,
+            completed: progress === 100,
+            progressPercent: progress,
+            sourceIdentity: {
+              provider,
+              endpoint: 'personal-map-progress',
+              externalId: id
+            }
+          }
+        }
+      })
+      continue
     }
-    return [{
+    items.push({
       remoteKey: remoteKeyByOfficialId.get(id)!,
       category: 'exploration' as const,
       title,
@@ -110,8 +185,9 @@ export function personalMapsFromCandidates(
         endpoint: 'personal-map-progress',
         externalId: id
       }
-    }]
-  })
+    })
+  }
+  return { items, reviewCandidates }
 }
 
 function readIdentifier(value: unknown): string | null {

@@ -39,6 +39,11 @@
     "appId": "com.gachataskmanager.app",
     "productName": "Gtask",
     "electronDist": "node_modules/electron/dist",
+    "electronLanguages": [
+      "en-US",
+      "zh-CN",
+      "zh-TW"
+    ],
     "npmRebuild": false,
     "directories": {
       "output": "release"
@@ -47,7 +52,9 @@
       "out/**/*",
       "package.json",
       "LICENSE",
-      "THIRD_PARTY_NOTICES.txt"
+      "THIRD_PARTY_NOTICES.txt",
+      "!node_modules/pngjs/coverage/**",
+      "!node_modules/qrcode/bin/**"
     ],
     "extraResources": [
       {
@@ -70,12 +77,13 @@
     },
     "nsis": {
       "artifactName": "${productName}-${version}-setup.${ext}",
+      "include": "build/installer.nsh",
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": false,
       "createStartMenuShortcut": true,
       "shortcutName": "Gtask",
-      "runAfterFinish": false,
+      "runAfterFinish": true,
       "deleteAppDataOnUninstall": false
     }
   },

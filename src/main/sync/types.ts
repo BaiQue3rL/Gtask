@@ -58,20 +58,53 @@ export interface ActivityTagUpdate {
   itemId: string
   title: string
   activityTags: string[]
+  activityTagEvidence?: ActivityTagEvidenceInput[]
   sourceUrl: string
   confidence: number
   unresolvedReason?: string | null
+}
+
+export interface ActivityTagEvidenceInput {
+  tagId: string
+  sourceUrl: string
+  note: string
 }
 
 export interface PersonalMetadataUpdate {
   itemId: string
   title: string
   activityTags?: string[]
+  activityTagEvidence?: ActivityTagEvidenceInput[]
   startsAt?: string | null
   endsAt?: string | null
   unresolvedFields?: PersonalMetadataField[]
   unresolvedReason?: string | null
   sourceUrl: string
+  confidence: number
+}
+
+export interface PersonalCompletionRuleInput {
+  fieldPath: string
+  completedValues: Array<string | number | boolean>
+  incompleteValues: Array<string | number | boolean>
+}
+
+export interface PersonalReviewResolution {
+  candidateId: string
+  decision: 'include' | 'exclude'
+  eventScope?: 'limited' | 'permanent' | 'unknown'
+  reason: string
+  title?: string
+  activityTags?: string[]
+  completed?: boolean
+  completionRule?: PersonalCompletionRuleInput | null
+  startsAt?: string | null
+  endsAt?: string | null
+  modeKey?: string | null
+  periodKey?: string | null
+  mapNodeKind?: MapNodeKind | null
+  parentExternalId?: string | null
+  sourceUrl?: string | null
   confidence: number
 }
 

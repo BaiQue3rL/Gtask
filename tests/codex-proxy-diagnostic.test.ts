@@ -13,6 +13,7 @@ function progress(overrides: Partial<SyncProgressUpdate> = {}): SyncProgressUpda
     source: 'public_schedule',
     phase: 'retrying',
     status: 'running',
+    retryKind: 'codex_connection',
     message: 'Codex 正在连接模型，重试 2/5',
     current: 2,
     total: 5,
@@ -22,15 +23,17 @@ function progress(overrides: Partial<SyncProgressUpdate> = {}): SyncProgressUpda
 }
 
 describe('Codex 代理诊断提示', () => {
-  it('只在公开资料的 Codex 模型连接重试时出现', () => {
+  it('只按结构化重试来源判断 Codex 连接问题', () => {
     expect(isCodexConnectionRetry(progress())).toBe(true)
     expect(isCodexConnectionRetry(progress({
       source: 'personal_data',
-      message: '库街区数据令牌暂时失败，正在重试 2/3'
-    }))).toBe(false)
+      message: '任何内部说明'
+    }))).toBe(true)
     expect(isCodexConnectionRetry(progress({
-      message: 'Codex 正在交叉验证资料，重试 2/5'
+      retryKind: 'source_request',
+      message: 'Codex 正在连接模型，重试 2/5'
     }))).toBe(false)
+    expect(isCodexConnectionRetry(progress({ phase: 'verifying' }))).toBe(false)
   })
 
   it('说明已验证的网络风险、同步耗时和用户选择权', () => {

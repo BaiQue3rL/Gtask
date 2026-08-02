@@ -22,7 +22,6 @@ function mapItem(
     parentTitle: null,
     mapNodeKind: 'region',
     parentRemoteKey: null,
-    relatedRegionRemoteKey: null,
     startsAt: null,
     endsAt: null,
     resetRule: null,

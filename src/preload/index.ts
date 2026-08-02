@@ -3,6 +3,13 @@ import type { GachaApi } from '../shared/contracts'
 
 const gachaApi: GachaApi = {
   getAppInfo: () => ipcRenderer.invoke('app:get-info'),
+  getRenderingModeState: () => ipcRenderer.invoke('rendering:get-mode'),
+  updateRenderingMode: (mode) => ipcRenderer.invoke('rendering:update-mode', mode),
+  getSoftwareUpdateSettings: () => ipcRenderer.invoke('software-update:get-settings'),
+  updateSoftwareUpdateSettings: (settings) =>
+    ipcRenderer.invoke('software-update:update-settings', settings),
+  checkSoftwareUpdate: () => ipcRenderer.invoke('software-update:check'),
+  restartApp: () => ipcRenderer.invoke('app:restart'),
   openDataDirectory: () => ipcRenderer.invoke('app:open-data-directory'),
   openExternalUrl: (url) => ipcRenderer.invoke('app:open-external-url', url),
   listBackups: () => ipcRenderer.invoke('backups:list'),
@@ -13,8 +20,6 @@ const gachaApi: GachaApi = {
     ipcRenderer.invoke('ai-schedule:get-active-job', gameId, target),
   listActiveAiScheduleJobs: (gameId) =>
     ipcRenderer.invoke('ai-schedule:list-active-jobs', gameId),
-  getSemanticReviewSummary: (gameId, target) =>
-    ipcRenderer.invoke('semantic-review:get-summary', gameId, target),
   openCodexPlugin: () => ipcRenderer.invoke('codex-plugin:open'),
   updateCodexPlugin: () => ipcRenderer.invoke('codex-plugin:update'),
   repairCodexConnection: (mode) => ipcRenderer.invoke('codex-proxy:repair', mode),

@@ -53,12 +53,10 @@ describe('本地 MCP server', () => {
       'register_gacha_schedule_agent',
       'claim_gacha_schedule_job',
       'update_gacha_schedule_job_progress',
-      'claim_gacha_semantic_review',
-      'claim_gacha_semantic_review_batch',
-      'approve_gacha_semantic_review',
-      'reject_gacha_semantic_review',
+      'register_gacha_activity_tag',
       'apply_gacha_public_schedule',
       'apply_gacha_personal_metadata',
+      'apply_gacha_personal_review',
       'fail_gacha_schedule_job'
     ])
     const updateTool = tools.tools.find((tool) => tool.name === 'update_gacha_item')
@@ -170,7 +168,7 @@ describe('本地 MCP server', () => {
         status: 'claimed',
         progressPhase: 'searching',
         contract: {
-          schemaVersion: 6,
+          schemaVersion: 11,
           authority: 'interface_contract',
           target: 'events',
           requestContext: {
@@ -191,7 +189,6 @@ describe('本地 MCP server', () => {
                 categories: ['limited_event'],
                 requiredFields: expect.arrayContaining([
                   'title',
-                  'activityTags',
                   'startsAt',
                   'endsAt'
                 ])
@@ -294,7 +291,7 @@ describe('本地 MCP server', () => {
             startsAt: '2026-07-21T02:00:00.000Z',
             endsAt: '2026-08-01T19:59:00.000Z',
             scheduleKind: 'fixed_window',
-            activityTags: ['战斗', '跑酷'],
+            activityTags: ['combat', 'parkour', 'challenge'],
             sourceUrl: 'https://example.com/official-event',
             confidence: 0.98
           }
@@ -321,7 +318,7 @@ describe('本地 MCP server', () => {
           title: 'AI 交叉验证活动',
           source: 'public_schedule',
           sourceUrl: 'https://example.com/official-event',
-          activityTags: ['战斗', '跑酷'],
+          activityTags: ['战斗', '跑酷', '挑战'],
           completed: false
         })
       ])
@@ -348,6 +345,110 @@ describe('本地 MCP server', () => {
       })
     ]))
     expect(database!.getAiScheduleAgentStatus().connected).toBe(false)
+  })
+
+  it('新活动玩法必须先注册稳定标签 ID，注册后可复用并按界面语言展示', async () => {
+    const connected = await connect()
+    await connected.callTool({
+      name: 'register_gacha_schedule_agent',
+      arguments: {
+        agentId: 'custom-tag-agent',
+        name: '新玩法标签 Agent',
+        webSearch: true,
+        protocolVersion: GTASK_MCP_PROTOCOL_VERSION
+      }
+    })
+    const queued = database!.createAiScheduleJob(
+      'zenless',
+      'public_schedule',
+      new Date('2026-08-02T08:00:00.000Z'),
+      false,
+      'events'
+    )
+    await connected.callTool({
+      name: 'claim_gacha_schedule_job',
+      arguments: { agentId: 'custom-tag-agent' }
+    })
+
+    const unregistered = await connected.callTool({
+      name: 'apply_gacha_public_schedule',
+      arguments: {
+        agentId: 'custom-tag-agent',
+        jobId: queued.id,
+        contentLocale: 'zh-CN',
+        retrievedAt: '2026-08-02T08:01:00.000Z',
+        items: [{
+          remoteKey: 'zenless:event:new-mechanic',
+          category: 'limited_event',
+          title: '新机制活动',
+          titleSourceUrl: 'https://example.com/new-mechanic',
+          activityTags: ['custom.gravity-painting', 'challenge', 'story'],
+          startsAt: '2026-08-02T08:00:00.000Z',
+          endsAt: '2026-08-20T08:00:00.000Z',
+          sourceUrl: 'https://example.com/new-mechanic',
+          confidence: 0.9
+        }],
+        evidence: [{
+          url: 'https://example.com/new-mechanic',
+          platform: '官方平台',
+          publisher: '官方账号',
+          official: true,
+          language: 'zh-CN'
+        }]
+      }
+    })
+    expect(unregistered.isError).toBe(true)
+
+    const registered = await connected.callTool({
+      name: 'register_gacha_activity_tag',
+      arguments: {
+        agentId: 'custom-tag-agent',
+        jobId: queued.id,
+        id: 'custom.gravity-painting',
+        dimension: 'gameplay',
+        labels: { 'zh-CN': '重力绘画', 'en-US': 'Gravity painting' },
+        description: '通过改变重力方向绘制并连接目标图案。',
+        aliases: ['重力涂绘'],
+        sourceUrl: 'https://example.com/new-mechanic',
+        evidence: [{ url: 'https://example.com/new-mechanic', note: '官方玩法说明' }]
+      }
+    })
+    expect(registered.isError).not.toBe(true)
+    expect(registered.structuredContent).toMatchObject({
+      tag: { id: 'custom.gravity-painting', dimension: 'gameplay' }
+    })
+
+    const applied = await connected.callTool({
+      name: 'apply_gacha_public_schedule',
+      arguments: {
+        agentId: 'custom-tag-agent',
+        jobId: queued.id,
+        contentLocale: 'zh-CN',
+        retrievedAt: '2026-08-02T08:02:00.000Z',
+        items: [{
+          remoteKey: 'zenless:event:new-mechanic',
+          category: 'limited_event',
+          title: '新机制活动',
+          titleSourceUrl: 'https://example.com/new-mechanic',
+          activityTags: ['custom.gravity-painting', 'challenge', 'story'],
+          startsAt: '2026-08-02T08:00:00.000Z',
+          endsAt: '2026-08-20T08:00:00.000Z',
+          sourceUrl: 'https://example.com/new-mechanic',
+          confidence: 0.9
+        }],
+        evidence: [{
+          url: 'https://example.com/new-mechanic',
+          platform: '官方平台',
+          publisher: '官方账号',
+          official: true,
+          language: 'zh-CN'
+        }]
+      }
+    })
+    expect(applied.isError).not.toBe(true)
+    expect(database!.listChecklistItems('zenless')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ title: '新机制活动', activityTags: ['重力绘画', '挑战', '剧情'] })
+    ]))
   })
 
   it('公开资料回写拒绝不带时区的时间', async () => {
@@ -443,7 +544,7 @@ describe('本地 MCP server', () => {
           category: 'limited_event',
           title: '本轮新活动',
           titleSourceUrl: 'https://example.com/cn/new-event',
-          activityTags: ['战斗'],
+          activityTags: ['combat', 'challenge', 'story'],
           startsAt: '2026-07-26T10:00:00+08:00',
           endsAt: '2026-08-10T03:59:00+08:00',
           sourceUrl: 'https://example.com/cn/new-event',
@@ -458,22 +559,41 @@ describe('本地 MCP server', () => {
         }]
       }
     })
-    expect(omitted.isError).toBe(true)
+    expect(omitted.isError).not.toBe(true)
     expect(database!.listChecklistItems('star-rail').some((item) => item.title === '本轮新活动'))
-      .toBe(false)
+      .toBe(true)
+    expect(database!.listChecklistItems('star-rail').find((item) => item.title === '巡星之礼'))
+      .toMatchObject({ activityTags: [] })
+
+    const tagJob = database!.createAiScheduleJob(
+      'star-rail',
+      'public_schedule',
+      new Date('2026-07-26T00:11:00.000Z'),
+      false,
+      'events'
+    )
+    const tagClaimed = await connected.callTool({
+      name: 'claim_gacha_schedule_job',
+      arguments: { agentId: 'tag-mcp-agent' }
+    })
+    const tagTarget = (
+      tagClaimed.structuredContent as {
+        job: { activityTagTargets: Array<{ itemId: string; title: string }> }
+      }
+    ).job.activityTagTargets.find((candidate) => candidate.title === '巡星之礼')!
 
     const applied = await connected.callTool({
       name: 'apply_gacha_public_schedule',
       arguments: {
         agentId: 'tag-mcp-agent',
-        jobId: queued.id,
+        jobId: tagJob.id,
         contentLocale: 'zh-CN',
         retrievedAt: '2026-07-26T00:12:00.000Z',
         items: [],
         activityTagUpdates: [{
-          itemId: target.itemId,
-          title: target.title,
-          activityTags: ['签到'],
+          itemId: tagTarget.itemId,
+          title: tagTarget.title,
+          activityTags: ['sign-in', 'quest', 'festival'],
           sourceUrl: 'https://example.com/cn/check-in',
           confidence: 0.99
         }],
@@ -488,7 +608,7 @@ describe('本地 MCP server', () => {
     })
     expect(applied.isError).not.toBe(true)
     expect(database!.listChecklistItems('star-rail').find((item) => item.title === '巡星之礼'))
-      .toMatchObject({ activityTags: ['签到'], source: 'public_schedule' })
+      .toMatchObject({ activityTags: ['签到', '任务', '节庆'], source: 'public_schedule' })
   })
 
   it('公开资料 MCP 接受地图区域目录并以 0% 初始化', async () => {
@@ -667,288 +787,175 @@ describe('本地 MCP server', () => {
     )
   })
 
-  it('Codex 可按同一游戏和版块批量领取个人语义候选', async () => {
+  it('个人活动标签使用当前固定配置提交且不会触发自动切模', async () => {
     const connected = await connect()
-    database!.recordCatalogCoverage('genshin', 'exploration', 'public_schedule', 'complete')
+    const reference = new Date('2026-08-02T12:00:00.000Z')
     await connected.callTool({
       name: 'register_gacha_schedule_agent',
       arguments: {
-        agentId: 'semantic-batch-agent',
-        name: '批量语义审核 Agent',
+        agentId: 'metadata-escalation-agent',
+        name: '标签核验 Agent',
         webSearch: true,
         protocolVersion: GTASK_MCP_PROTOCOL_VERSION
       }
     })
-    const accountScope = `miyoushe:${'9'.repeat(64)}`
-    database!.queueSemanticReviewCandidates(
-      'genshin',
-      'personal_sync',
-      [1, 2, 3].map((index) => ({
-        target: 'exploration' as const,
-        kind: 'personal-map-progress',
-        payload: {
-          provider: 'miyoushe',
-          officialId: `area-${index}`,
-          officialTitle: `区域 ${index}`,
-          observedProgress: index * 20
+    database!.replacePersonalSnapshot(
+      'star-rail',
+      'events',
+      `miyoushe:${'b'.repeat(64)}`,
+      [{
+        remoteKey: 'personal-event:miyoushe:event-api:check-in',
+        category: 'limited_event',
+        title: '测试签到活动',
+        startsAt: '2026-08-01T00:00:00.000Z',
+        endsAt: '2026-08-20T00:00:00.000Z',
+        sourceIdentity: {
+          provider: 'miyoushe', endpoint: 'event-api', externalId: 'check-in'
         }
-      })),
-      new Date('2026-07-28T04:00:00.000Z'),
-      { outputLocale: 'zh-CN', userTimeZone: 'Asia/Shanghai' },
-      accountScope
+      }],
+      'test-v1',
+      reference
     )
-
+    const queued = database!.createPersonalMetadataJob(
+      'star-rail',
+      'events',
+      { outputLocale: 'zh-CN', userTimeZone: 'Asia/Shanghai' },
+      reference,
+      true
+    )!
     const claimed = await connected.callTool({
-      name: 'claim_gacha_semantic_review_batch',
-      arguments: { agentId: 'semantic-batch-agent', limit: 20 }
+      name: 'claim_gacha_schedule_job',
+      arguments: {
+        agentId: 'metadata-escalation-agent',
+        jobId: queued.id,
+        model: 'gpt-5.6-terra',
+        reasoningEffort: 'medium'
+      }
     })
-    expect(claimed.isError).not.toBe(true)
-    expect(claimed.structuredContent).toMatchObject({
-      command: 'claim_semantic_review_batch',
-      gameId: 'genshin',
-      target: 'exploration',
-      count: 3,
-      contract: {
-        target: 'exploration',
-        requestContext: {
-          outputLocale: 'zh-CN',
-          userTimeZone: 'Asia/Shanghai'
-        }
-      },
-      reviews: [
-        expect.objectContaining({
-          candidate: expect.objectContaining({
-            gameId: 'genshin',
-            target: 'exploration',
-            accountScope
-          })
-        }),
-        expect.any(Object),
-        expect.any(Object)
-      ]
+    const job = (claimed.structuredContent as {
+      job: { id: string; metadataTargets: Array<{ itemId: string; title: string }> }
+    }).job
+    const applied = await connected.callTool({
+      name: 'apply_gacha_personal_metadata',
+      arguments: {
+        agentId: 'metadata-escalation-agent',
+        jobId: job.id,
+        contentLocale: 'zh-CN',
+        retrievedAt: '2026-08-02T12:02:00.000Z',
+        updates: [{
+          itemId: job.metadataTargets[0]!.itemId,
+          title: job.metadataTargets[0]!.title,
+          activityTags: ['sign-in'],
+          sourceUrl: 'https://example.com/check-in',
+          confidence: 0.87
+        }],
+        evidence: []
+      }
     })
+    expect(applied.isError).not.toBe(true)
+    expect(applied.structuredContent).toMatchObject({
+      command: 'apply_personal_metadata',
+      job: { id: queued.id, status: 'completed', routingTier: 0 }
+    })
+    expect(database!.listChecklistItems('star-rail').find(
+      (item) => item.title === '测试签到活动'
+    )?.activityTags).toEqual(['签到'])
   })
 
-  it.skip('旧融合流程：Codex 可把个人候选匹配到公开清单', async () => {
+  it('通过专用 MCP 契约一次性解决个人异常批次并激活快照', async () => {
     const connected = await connect()
-    database!.recordCatalogCoverage('star-rail', 'events', 'public_schedule', 'complete')
     await connected.callTool({
       name: 'register_gacha_schedule_agent',
       arguments: {
-        agentId: 'semantic-agent',
-        name: '语义核验 Agent',
+        agentId: 'personal-review-mcp-agent',
+        name: '个人异常 MCP Agent',
         webSearch: true,
         protocolVersion: GTASK_MCP_PROTOCOL_VERSION
       }
     })
-    database!.mergeSyncedItems('star-rail', 'public_schedule', [{
-      remoteKey: 'event:public:anti-fraud',
-      category: 'limited_event',
-      title: '反贪「砖」家',
-      activityTags: ['经营'],
-      startsAt: '2026-07-20T02:00:00.000Z',
-      endsAt: '2026-08-10T01:59:00.000Z'
-    }])
-    const existing = database!.listChecklistItems('star-rail').find(
-      (item) => item.remoteKey === 'event:public:anti-fraud'
-    )!
-    database!.queueSemanticReviewCandidates('star-rail', 'personal_sync', [{
-      target: 'events',
-      kind: 'personal-item-semantics',
-      payload: {
-        officialEventId: '6011',
-        title: '反贪「砖」家',
-        observedStatus: { allFinished: true, actStatus: 'OtherActStatusFinish' }
+    const proposed = {
+      remoteKey: 'personal-event:miyoushe:event-api:mcp-event',
+      category: 'limited_event' as const,
+      title: 'MCP 核验活动',
+      startsAt: '2026-08-01T00:00:00.000Z',
+      endsAt: '2026-08-20T00:00:00.000Z',
+      sourceIdentity: {
+        provider: 'miyoushe', endpoint: 'event-api', externalId: 'mcp-event'
       }
-    }])
-
+    }
+    database!.preparePersonalReviewJob(
+      'genshin',
+      'events',
+      `miyoushe:${'a'.repeat(64)}`,
+      [proposed],
+      [{
+        target: 'events',
+        kind: 'personal-item-semantics',
+        payload: {
+          provider: 'miyoushe', sourceContext: 'event-api', officialEventId: 'mcp-event',
+          title: proposed.title, observedStatus: { isFinished: false },
+          reviewIssues: ['classification', 'completion_semantics'], proposedItem: proposed
+        }
+      }],
+      'test-v1',
+      { outputLocale: 'zh-CN', userTimeZone: 'Asia/Shanghai' },
+      new Date('2026-08-01T12:00:00.000Z')
+    )
     const claimed = await connected.callTool({
-      name: 'claim_gacha_semantic_review',
-      arguments: { agentId: 'semantic-agent' }
+      name: 'claim_gacha_schedule_job',
+      arguments: { agentId: 'personal-review-mcp-agent' }
     })
-    expect(claimed.isError).not.toBe(true)
     expect(claimed.structuredContent).toMatchObject({
-      command: 'claim_semantic_review',
-      candidate: {
-        gameId: 'star-rail',
-        source: 'personal_sync',
-        target: 'events',
-        status: 'claimed',
-        payload: { title: '反贪「砖」家' }
-      },
-      matchCandidates: [expect.objectContaining({
-        itemId: existing.id,
-        title: '反贪「砖」家',
-        remoteKey: 'event:public:anti-fraud'
-      })],
-      contract: {
-        schemaVersion: 9,
-        authority: 'interface_contract',
-        target: 'events',
-        requestContext: {
-          outputLocale: 'zh-CN',
-          userTimeZone: expect.any(String)
+      job: {
+        jobKind: 'personal_review',
+        contract: {
+          jobKind: 'personal_review',
+          fieldSemantics: { sourceIsolation: expect.any(String) }
         },
-        requiredDecisionFields: expect.arrayContaining(['remoteKey', 'category', 'title'])
+        reviewTargets: [expect.objectContaining({ issues: expect.arrayContaining(['classification']) })]
       }
     })
-    const candidateId = (claimed.structuredContent as {
-      candidate: { id: string }
-    }).candidate.id
-
-    const approved = await connected.callTool({
-      name: 'approve_gacha_semantic_review',
+    const job = (claimed.structuredContent as {
+      job: { id: string; reviewTargets: Array<{ candidateId: string }> }
+    }).job
+    const applied = await connected.callTool({
+      name: 'apply_gacha_personal_review',
       arguments: {
-        agentId: 'semantic-agent',
-        candidateId,
+        agentId: 'personal-review-mcp-agent',
+        jobId: job.id,
         contentLocale: 'zh-CN',
-        matchItemId: existing.id,
-        confidence: 0.95,
-        item: {
-          remoteKey: 'event:miyoushe:6011',
-          category: 'limited_event',
-          title: '反贪「砖」家',
-          activityTags: ['经营'],
-          startsAt: '2026-07-20T02:00:00.000Z',
-          endsAt: '2026-08-10T01:59:00.000Z',
-          sourceUrl: 'https://example.com/star-rail-event'
-        },
+        retrievedAt: '2026-08-01T12:05:00.000Z',
+        resolutions: [{
+          candidateId: job.reviewTargets[0]!.candidateId,
+          decision: 'include',
+          eventScope: 'limited',
+          reason: '确认是独立限时活动',
+          completed: false,
+          completionRule: {
+            fieldPath: 'observedStatus.isFinished',
+            completedValues: [true],
+            incompleteValues: [false]
+          },
+          confidence: 0.95
+        }],
         evidence: [{
-          url: 'https://example.com/star-rail-schema',
-          note: '字段仅代表活动生命周期，不代表玩家已完成'
+          url: 'https://example.com/mcp-event',
+          platform: '官方社区',
+          publisher: '发行商',
+          official: true,
+          language: 'zh-CN',
+          note: '活动说明'
         }]
       }
     })
-    expect(approved.isError).not.toBe(true)
-    expect(approved.structuredContent).toMatchObject({
-      command: 'approve_semantic_review',
-      candidate: { status: 'approved' },
-      merge: { added: 0, updated: 1 }
-    })
-    expect(database!.listChecklistItems('star-rail')).toEqual(expect.arrayContaining([
+    expect(applied.isError).not.toBe(true)
+    expect(database!.listChecklistItems('genshin')).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        title: '反贪「砖」家',
-        completed: false,
-        source: 'public_schedule',
-        remoteKey: 'event:public:anti-fraud'
+        title: proposed.title,
+        source: 'personal_sync',
+        activityTags: []
       })
     ]))
   })
 
-  it.skip('旧融合流程：地图语义核验匹配公开目录', async () => {
-    const connected = await connect()
-    database!.recordCatalogCoverage('genshin', 'exploration', 'public_schedule', 'complete')
-    await connected.callTool({
-      name: 'register_gacha_schedule_agent',
-      arguments: {
-        agentId: 'map-semantic-agent',
-        name: '地图语义核验 Agent',
-        webSearch: true,
-        protocolVersion: GTASK_MCP_PROTOCOL_VERSION
-      }
-    })
-    database!.mergeSyncedItems('genshin', 'public_schedule', [
-      {
-        remoteKey: 'map:fontaine',
-        category: 'exploration',
-        title: '枫丹',
-        mapNodeKind: 'region'
-      },
-      {
-        remoteKey: 'map:fontaine:sea-of-bygone-eras',
-        category: 'exploration',
-        title: '旧日之海',
-        mapNodeKind: 'subregion',
-        parentTitle: '枫丹',
-        parentRemoteKey: 'map:fontaine'
-      },
-      {
-        remoteKey: 'map:natlan',
-        category: 'exploration',
-        title: '纳塔',
-        mapNodeKind: 'region'
-      }
-    ])
-    const subregionMap = database!.listChecklistItems('genshin').find(
-      (item) => item.remoteKey === 'map:fontaine:sea-of-bygone-eras'
-    )!
-    database!.queueSemanticReviewCandidates('genshin', 'personal_sync', [{
-      target: 'exploration',
-      kind: 'personal-map-progress',
-      payload: {
-        provider: 'miyoushe',
-        officialId: '6:subregion:sea-of-bygone-eras',
-        officialTitle: '旧日之海',
-        observedProgress: 82.5,
-        observedNodeKind: 'subregion',
-        observedParentId: '6',
-        observedParentTitle: '枫丹'
-      }
-    }])
-
-    const claimed = await connected.callTool({
-      name: 'claim_gacha_semantic_review',
-      arguments: { agentId: 'map-semantic-agent' }
-    })
-    expect(claimed.isError).not.toBe(true)
-    expect(claimed.structuredContent).toMatchObject({
-      contract: {
-        target: 'exploration',
-        requiredDecisionFields: expect.arrayContaining(['progressPercent'])
-      },
-      candidate: { target: 'exploration' },
-      matchCandidateScope: 'relevant_map_subset',
-      matchCandidateCount: 2,
-      targetMatchCandidateCount: 3,
-      matchCandidates: expect.arrayContaining([
-        expect.objectContaining({
-          itemId: subregionMap.id,
-          title: '旧日之海',
-          progressPercent: 0,
-          parentRemoteKey: 'map:fontaine'
-        }),
-        expect.objectContaining({ title: '枫丹', progressPercent: 0 })
-      ])
-    })
-    const text = (claimed.content as Array<{ type: 'text'; text: string }>)[0].text
-    expect(text.indexOf('"contract"')).toBeLessThan(text.indexOf('"matchCandidates"'))
-    const candidateId = (claimed.structuredContent as {
-      candidate: { id: string }
-    }).candidate.id
-
-    const approved = await connected.callTool({
-      name: 'approve_gacha_semantic_review',
-      arguments: {
-        agentId: 'map-semantic-agent',
-        candidateId,
-        contentLocale: 'zh-CN',
-        matchItemId: subregionMap.id,
-        confidence: 0.99,
-        item: {
-          remoteKey: 'map:miyoushe:6:area:fontaine-court',
-          category: 'exploration',
-          title: '旧日之海',
-          progressPercent: 82.5,
-          mapNodeKind: 'subregion',
-          parentTitle: '枫丹',
-          parentRemoteKey: 'map:fontaine'
-        },
-        evidence: [{
-          url: 'https://example.com/genshin-map-progress',
-          note: '个人地图接口返回该独立地图探索度为 82.5%'
-        }]
-      }
-    })
-
-    expect(approved.isError).not.toBe(true)
-    expect(database!.listChecklistItems('genshin').find(
-      (item) => item.id === subregionMap.id
-    ))
-      .toMatchObject({
-        source: 'public_schedule',
-        progressPercent: 82.5,
-        completed: false,
-        parentRemoteKey: 'map:fontaine'
-      })
-  })
 })

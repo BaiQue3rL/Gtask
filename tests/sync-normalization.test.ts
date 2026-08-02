@@ -54,7 +54,7 @@ describe('normalizeSyncItem', () => {
         title: '玩法活动',
         activityTags: [' 战斗 ', '解谜', '战斗']
       }).activityTags
-    ).toEqual(['战斗', '解谜'])
+    ).toEqual(['combat', 'puzzle'])
 
     expect(() =>
       normalizeSyncItem({

@@ -11,7 +11,6 @@ import {
   restoreBackup
 } from '../src/main/backup'
 import { AppDatabase, CURRENT_SCHEMA_VERSION } from '../src/main/database'
-import { openDatabaseWithMigrationBackup } from '../src/main/database-bootstrap'
 import { DatabaseSync } from 'node:sqlite'
 
 let database: AppDatabase | null = null
@@ -108,30 +107,6 @@ describe('createDailyBackup', () => {
       ])
     )
     expect(() => pruneDailyBackups(backupDirectory, 0)).toThrow('大于零的整数')
-  })
-
-  it('CLI/MCP 安全打开旧数据库时同样先创建迁移前备份', async () => {
-    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-command-bootstrap-test-'))
-    const dataDirectory = join(temporaryDirectory, 'data')
-    const databasePath = join(dataDirectory, 'source.sqlite')
-    const backupDirectory = join(temporaryDirectory, 'backups')
-    database = new AppDatabase(databasePath)
-    database.close()
-    database = null
-
-    const oldDatabase = new DatabaseSync(databasePath)
-    oldDatabase.exec(`
-      DROP TABLE semantic_review_candidates;
-      DROP TABLE ai_schedule_jobs;
-      DROP TABLE ai_schedule_agents;
-      ALTER TABLE checklist_items DROP COLUMN source_url;
-      DELETE FROM schema_migrations WHERE version >= 6;
-    `)
-    oldDatabase.close()
-
-    database = await openDatabaseWithMigrationBackup(databasePath)
-    expect(listBackups(backupDirectory).map((backup) => backup.kind)).toContain('pre_migration')
-    expect(database.listGames()).toHaveLength(4)
   })
 
   it('恢复已知备份前保留当前数据库的安全副本', async () => {

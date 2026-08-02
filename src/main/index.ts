@@ -1,7 +1,7 @@
 import { cpSync, existsSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { freemem, totalmem } from 'node:os'
 import { app, BrowserWindow, dialog, ipcMain, net, safeStorage, session, shell } from 'electron'
+import { terminateApplicationProcess } from './application-exit'
 import { AppDatabase, CURRENT_SCHEMA_VERSION } from './database'
 import {
   createDailyBackup,
@@ -12,7 +12,11 @@ import {
   restoreBackup
 } from './backup'
 import { CredentialVault, removeRetiredDeepSeekCredential } from './credential-vault'
-import { detectCodexPlugin } from './ai/codex-plugin'
+import {
+  CODEX_PLUGIN_REQUIRED_MESSAGE,
+  detectCodexPlugin,
+  isCodexPluginUsable
+} from './ai/codex-plugin'
 import {
   installCodexPluginFromPersonalMarketplace,
   prepareStableMcpElectronRuntime,
@@ -20,9 +24,11 @@ import {
   refreshCodexMcpLauncher
 } from './ai/codex-plugin-installer'
 import {
-  CodexDynamicConcurrencyController,
+  MAX_CODEX_SCHEDULE_WORKERS,
   CodexScheduleWorkerPool,
   findCodexCli,
+  resolveCodexWorkerRoute,
+  selectCodexWorkerRoutes,
   type CodexWorkerTransportMode,
   type CodexScheduleWorkerEvent
 } from './ai/codex-schedule-worker'
@@ -47,7 +53,14 @@ import { createKuroCommunityPersonalAdapter } from './sync/kuro-community-client
 import { encodeKuroCommunityCredential } from './sync/kuro-community-credential'
 import { SyncOrchestrator } from './sync/orchestrator'
 import { restoreRelaunchOptions } from './relaunch'
-import { migrateLegacyAppData, resolveAppDataPaths } from './data-paths'
+import { readRenderingMode, writeRenderingMode } from './rendering-mode'
+import {
+  JsonFeedUpdateProvider,
+  SoftwareUpdateService,
+  readSoftwareUpdateSettings,
+  writeSoftwareUpdateSettings
+} from './software-update'
+import { resolveAppDataPaths } from './data-paths'
 import { getFixedWeeklyBootstrap } from './sync/public-sync-bootstrap'
 import {
   getBundledMapCatalog,
@@ -68,12 +81,18 @@ import {
   type CodexConnectionRepairMode,
   type CodexConnectionRepairResult,
   type GameId,
+  type PersonalSyncTarget,
+  type RenderingMode,
+  type RenderingModeState,
+  type SoftwareUpdateCheckResult,
+  type SoftwareUpdateSettings,
   type SyncProgressUpdate,
   type SyncRequestContext,
   type SyncResult,
   type SyncScope,
   type SyncTarget
 } from '../shared/contracts'
+import { projectAiJobProgressPhase } from '../shared/sync-progress'
 import {
   parseChecklistSection,
   parseCodexWorkerPreferences,
@@ -87,6 +106,30 @@ import {
   parseSyncTarget,
   parseUpdateChecklistItem
 } from './validation'
+
+const renderingModeConfigPath = join(app.getPath('userData'), 'rendering-mode.json')
+const activeRenderingMode = readRenderingMode(renderingModeConfigPath)
+let configuredRenderingMode = activeRenderingMode
+const softwareUpdateConfigPath = join(app.getPath('userData'), 'software-update.json')
+let softwareUpdateSettings = readSoftwareUpdateSettings(softwareUpdateConfigPath)
+
+// Electron requires this call before app readiness. Compatibility mode is the
+// safe default because some Windows GPU/game overlay combinations corrupt
+// Chromium compositor frames even though application state remains correct.
+if (activeRenderingMode === 'compatibility') app.disableHardwareAcceleration()
+
+function renderingModeState(): RenderingModeState {
+  return {
+    configured: configuredRenderingMode,
+    active: activeRenderingMode,
+    restartRequired: configuredRenderingMode !== activeRenderingMode
+  }
+}
+
+function parseRequestedRenderingMode(value: unknown): RenderingMode {
+  if (value === 'compatibility' || value === 'accelerated') return value
+  throw new Error('界面渲染模式格式不正确')
+}
 
 const SECTION_CATEGORIES = {
   tasks: ['main_quest', 'side_quest'],
@@ -102,6 +145,7 @@ let syncOrchestrator: SyncOrchestrator | null = null
 let periodTimer: ReturnType<typeof setInterval> | null = null
 let externalChangeTimer: ReturnType<typeof setInterval> | null = null
 let aiJobProgressTimer: ReturnType<typeof setInterval> | null = null
+let softwareUpdateTimer: ReturnType<typeof setTimeout> | null = null
 const aiJobProgressSignatures = new Map<string, string>()
 let codexScheduleWorkerPool: CodexScheduleWorkerPool | null = null
 let credentialVault: CredentialVault | null = null
@@ -113,13 +157,12 @@ let appDatabasePath: string | null = null
 let appDataRoot: string | null = null
 let codexWorkerEnvironment: NodeJS.ProcessEnv = {}
 let codexWorkerTransportMode: CodexWorkerTransportMode = 'websocket_preferred'
-const codexConcurrency = new CodexDynamicConcurrencyController()
+let softwareUpdateService: SoftwareUpdateService | null = null
 let isShuttingDown = false
 
 function reportBackgroundError(context: string, error: unknown): void {
   const message = error instanceof Error ? error.message : String(error)
   if (/database is locked|SQLITE_BUSY/i.test(message)) {
-    codexConcurrency.recordBackpressure()
     console.warn(`${context}暂时遇到数据库占用，稍后自动重试`)
     return
   }
@@ -135,6 +178,8 @@ function shutdownApplicationRuntime(): void {
   externalChangeTimer = null
   if (aiJobProgressTimer) clearInterval(aiJobProgressTimer)
   aiJobProgressTimer = null
+  if (softwareUpdateTimer) clearTimeout(softwareUpdateTimer)
+  softwareUpdateTimer = null
   aiJobProgressSignatures.clear()
 
   syncOrchestrator?.shutdown()
@@ -142,7 +187,6 @@ function shutdownApplicationRuntime(): void {
   kuroCommunityLogin?.dispose()
   try {
     appDatabase?.cancelAllActiveAiScheduleJobs()
-    appDatabase?.cancelAllSemanticReviewCandidates()
   } catch (error) {
     reportBackgroundError('退出时取消同步任务', error)
   }
@@ -163,6 +207,52 @@ function shutdownApplicationRuntime(): void {
   appBackupDirectory = null
   appDatabasePath = null
   appDataRoot = null
+}
+
+function parseAutomaticUpdateSetting(value: unknown): boolean {
+  if (!value || typeof value !== 'object') throw new Error('更新设置格式不正确')
+  const enabled = (value as Record<string, unknown>).autoCheckEnabled
+  if (typeof enabled !== 'boolean') throw new Error('更新设置格式不正确')
+  return enabled
+}
+
+async function checkForSoftwareUpdate(automatic: boolean): Promise<SoftwareUpdateCheckResult> {
+  if (!softwareUpdateService) throw new Error('更新服务尚未初始化')
+  const result = await softwareUpdateService.check()
+  if (result.checkedAt) {
+    softwareUpdateSettings = writeSoftwareUpdateSettings(softwareUpdateConfigPath, {
+      ...softwareUpdateSettings,
+      lastSuccessfulCheckAt: result.checkedAt
+    })
+  }
+  if (!automatic || result.outcome !== 'update_available' || !mainWindow || mainWindow.isDestroyed()) {
+    return result
+  }
+
+  const hasReleaseUrl = Boolean(result.releaseUrl)
+  const response = await dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    title: '发现 Gtask 新版本',
+    message: result.message,
+    detail: '可以稍后在设置中再次检查更新。',
+    buttons: hasReleaseUrl ? ['稍后', '查看更新'] : ['知道了'],
+    defaultId: hasReleaseUrl ? 1 : 0,
+    cancelId: 0,
+    noLink: true
+  })
+  if (hasReleaseUrl && response.response === 1) await shell.openExternal(result.releaseUrl!)
+  return result
+}
+
+function scheduleStartupUpdateCheck(): void {
+  if (!softwareUpdateSettings.autoCheckEnabled || softwareUpdateTimer) return
+  softwareUpdateTimer = setTimeout(() => {
+    softwareUpdateTimer = null
+    void checkForSoftwareUpdate(true).catch((error) => {
+      // Automatic checks never interrupt startup or surface transient network errors.
+      reportBackgroundError('后台检查更新', error)
+    })
+  }, 2_000)
 }
 
 function codexMcpLauncherOptions() {
@@ -193,11 +283,16 @@ function createCodexWorkerPool(): CodexScheduleWorkerPool {
     workingDirectory: app.getPath('userData'),
     env: codexWorkerEnvironment,
     transportMode: codexWorkerTransportMode,
-    resolvePreferences: () => appDatabase?.getCodexWorkerPreferences() ?? {
-      model: 'inherit',
-      reasoningEffort: 'inherit'
-    },
+    maxWorkers: MAX_CODEX_SCHEDULE_WORKERS,
+    canStartWorkers: () => isCodexPluginUsable(currentCodexPluginStatus()),
+    unavailableMessage: CODEX_PLUGIN_REQUIRED_MESSAGE,
     onEvent: handleCodexScheduleWorkerEvent
+  })
+}
+
+function currentCodexPluginStatus() {
+  return detectCodexPlugin({
+    appMarketplacePath: join(app.getPath('userData'), 'codex-integration', 'marketplace.json')
   })
 }
 
@@ -227,8 +322,27 @@ async function queueAiScheduleSync(
   if (!appDatabase) throw new Error('数据库尚未初始化')
   if (scope === 'public_and_personal') {
     if (!syncOrchestrator) throw new Error('个人数据同步服务尚未初始化')
-    if (target === 'tasks') throw new Error('任务版块不支持同步个人进度')
+    if (target === 'tasks') throw new Error('任务版块不支持同步个人数据')
     return syncOrchestrator.syncPersonalOnly(gameId, target, requestContext)
+  }
+  const overlappingPersonalTargets = target === 'all'
+    ? getPersonalSyncTargets(gameId)
+    : target === 'events' || target === 'cycles' || target === 'exploration'
+      ? [target]
+      : []
+  const personalJobActive = appDatabase.listActiveAiScheduleJobs(gameId).some((job) =>
+    (job.jobKind === 'personal_review' || job.jobKind === 'personal_metadata') &&
+    overlappingPersonalTargets.includes(job.target as PersonalSyncTarget)
+  )
+  const personalReadActive = overlappingPersonalTargets.some((personalTarget) =>
+    syncOrchestrator?.isPersonalSyncActive(gameId, personalTarget)
+  )
+  if (personalJobActive || personalReadActive) {
+    throw new Error('对应版块正在同步个人数据，请等待完成或先取消；公开数据不会插队覆盖个人快照')
+  }
+  const plugin = currentCodexPluginStatus()
+  if (!isCodexPluginUsable(plugin)) {
+    throw new Error(CODEX_PLUGIN_REQUIRED_MESSAGE)
   }
   const startedAt = new Date().toISOString()
   let mapAuditReason: MapCatalogAuditReason | null = null
@@ -284,12 +398,11 @@ async function queueAiScheduleSync(
       }
     : null)
   try {
-    const plugin = detectCodexPlugin()
     const job = appDatabase.createAiScheduleJob(
       gameId,
       queuedJobScope,
       new Date(),
-      plugin.installed,
+      true,
       target,
       requestContext
     )
@@ -303,18 +416,18 @@ async function queueAiScheduleSync(
     }
     const launch = startCodexWorkersForActiveJobs() ?? {
       status: 'unavailable' as const,
-      message: 'Codex 自动处理服务尚未初始化',
+      message: '同步服务尚未就绪',
       started: 0,
       running: 0
     }
     if (launch.status === 'unavailable') {
-      appDatabase.failPendingAiScheduleJobs(launch.message)
+      appDatabase.failPendingAiScheduleJob(job.id, launch.message)
       throw new Error(launch.message)
     }
-    appDatabase.updatePendingAiScheduleJobsMessage(launch.message)
+    appDatabase.updateAiScheduleJobLaunchMessage(job.id, launch.message)
     const activeJob = appDatabase.getActiveAiScheduleJob(gameId, target, 'public_catalog') ?? job
     sendAiJobProgress(activeJob)
-    const publicMessage = `${launch.message}（任务 ${job.id.slice(0, 8)}）`
+    const publicMessage = '同步任务已开始'
     const localMessages = [
       fixedWeeklyMerge
         ? `固定周常已维护（新增 ${fixedWeeklyMerge.added}，更新 ${fixedWeeklyMerge.updated}）`
@@ -379,8 +492,8 @@ function queuePersonalMetadataEnrichment(
   requestContext: SyncRequestContext
 ): void {
   if (!appDatabase || (target !== 'events' && target !== 'cycles')) return
-  const plugin = detectCodexPlugin()
-  if (!plugin.installed) return
+  const plugin = currentCodexPluginStatus()
+  if (!isCodexPluginUsable(plugin)) return
   const job = appDatabase.createPersonalMetadataJob(
     gameId,
     target,
@@ -406,77 +519,188 @@ function queuePersonalMetadataEnrichment(
 
 function handleCodexScheduleWorkerEvent(event: CodexScheduleWorkerEvent): void {
   if (!appDatabase) return
-  if (event.phase === 'stopped') {
-    const message =
-      event.exitCode === 0 && event.message === 'Codex 自动处理进程已结束'
-        ? 'Codex 处理进程已结束，未完成任务已重新排队'
-        : event.message
-    const requeuedJobs = appDatabase.requeueClaimedAiScheduleJobsByAgent(
-      event.agentId,
-      new Date(),
-      message
-    )
-    const requeuedReviews = appDatabase.requeueClaimedSemanticReviewsByAgent(
-      event.agentId,
-      message
-    )
-    const healthyExit =
-      event.exitCode === 0 &&
-      event.message === 'Codex 自动处理进程已结束' &&
-      requeuedJobs === 0
-    const hasBacklog = appDatabase.listActiveAiScheduleJobs().length > 0
-    if (healthyExit) codexConcurrency.recordHealthyCompletion(hasBacklog)
-    else codexConcurrency.recordBackpressure()
-    if (requeuedJobs > 0 || requeuedReviews > 0) {
+  if (
+    (event.phase === 'authorization' || event.phase === 'configuration') &&
+    event.jobId
+  ) {
+    const active = appDatabase.listActiveAiScheduleJobs()
+      .find((job) => job.id === event.jobId)
+    const failed = active?.status === 'claimed' && active.agentId === event.agentId
+      ? appDatabase.failAiScheduleJob(event.jobId, event.agentId, event.message)
+      : active?.status === 'pending'
+        ? appDatabase.failPendingAiScheduleJob(event.jobId, event.message)
+        : null
+    codexScheduleWorkerPool?.stopAgent(event.agentId)
+    if (failed) {
+      sendAiJobProgress(failed)
       mainWindow?.webContents.send('checklist:changed')
     }
     setTimeout(startCodexWorkersForActiveJobs, 0)
     return
   }
-  if (event.phase === 'retrying' || event.phase === 'fallback') {
-    codexConcurrency.recordBackpressure()
+  if (event.phase === 'timeout' && event.jobId) {
+    const before = appDatabase.listActiveAiScheduleJobs()
+      .find((job) => job.id === event.jobId)
+    const updated = before?.status === 'pending'
+      ? appDatabase.recordAiScheduleJobLaunchFailure(
+          event.jobId,
+          event.agentId,
+          {
+            model: event.model ?? 'inherit',
+            reasoningEffort: event.reasoningEffort ?? 'inherit',
+            startedAt: event.startedAt ?? new Date().toISOString()
+          },
+          'timeout',
+          event.message
+        )
+      : appDatabase.requeueAiScheduleJobAttempt(
+          event.jobId,
+          event.agentId,
+          'timeout',
+          event.message
+        )
+    sendAiJobProgress(updated)
+    mainWindow?.webContents.send('checklist:changed')
+    setTimeout(startCodexWorkersForActiveJobs, 0)
+    return
   }
-  const runningWorkers = codexScheduleWorkerPool?.runningCount ?? 0
-  const message = runningWorkers > 1
-    ? `${event.message} · 并行 ${runningWorkers} · 动态目标 ${codexConcurrency.currentLimit}/${codexConcurrency.maximumLimit}`
-    : event.message
-  const changed = appDatabase.updatePendingAiScheduleJobsMessage(
-    message,
-    event.current ?? null,
-    event.total ?? null
-  )
+  if (event.phase === 'stopped') {
+    let requeuedJobs = 0
+    if (event.jobId) {
+      const before = appDatabase.listActiveAiScheduleJobs()
+        .find((job) => job.id === event.jobId)
+      if (before?.status === 'claimed' && before.agentId === event.agentId) {
+        const updated = appDatabase.requeueAiScheduleJobAttempt(
+          event.jobId,
+          event.agentId,
+          'infrastructure_error',
+          event.exitCode === 0
+            ? 'Codex 进程已结束但没有提交完整结果'
+            : event.message
+        )
+        requeuedJobs = updated.status === 'pending' ? 1 : 0
+        sendAiJobProgress(updated)
+      } else if (before?.status === 'pending') {
+        const updated = appDatabase.recordAiScheduleJobLaunchFailure(
+          event.jobId,
+          event.agentId,
+          {
+            model: event.model ?? 'inherit',
+            reasoningEffort: event.reasoningEffort ?? 'inherit',
+            startedAt: event.startedAt ?? new Date().toISOString()
+          },
+          'infrastructure_error',
+          event.message
+        )
+        requeuedJobs = updated.status === 'pending' ? 1 : 0
+        sendAiJobProgress(updated)
+      }
+    }
+    if (event.jobId || requeuedJobs > 0) {
+      mainWindow?.webContents.send('checklist:changed')
+    }
+    setTimeout(startCodexWorkersForActiveJobs, 0)
+    return
+  }
+  const message = event.message
+  const changed = event.jobId
+    ? appDatabase.updateAiScheduleJobLaunchMessage(
+        event.jobId,
+        message,
+        event.current ?? null,
+        event.total ?? null,
+        event.phase === 'retrying' || event.phase === 'fallback'
+          ? 'retrying'
+          : event.phase === 'connecting'
+            ? 'searching'
+            : 'queued'
+      )
+    : 0
   if (changed > 0) pollAiJobProgress()
 }
 
 function startCodexWorkersForActiveJobs():
-  | ReturnType<CodexScheduleWorkerPool['ensureCapacity']>
+  | ReturnType<CodexScheduleWorkerPool['startJobs']>
   | null {
   if (!appDatabase || !codexScheduleWorkerPool) return null
-  const activeJobs = appDatabase.listActiveAiScheduleJobs().length
-  const memoryRatio = totalmem() > 0 ? freemem() / totalmem() : 1
-  const activeWork = codexConcurrency.desiredWorkers(
-    activeJobs,
-    memoryRatio
-  )
-  if (activeWork === 0) return null
-  const launch = codexScheduleWorkerPool.ensureCapacity(activeWork)
-  if (launch.status === 'unavailable') {
-    appDatabase.failPendingAiScheduleJobs(launch.message)
-    mainWindow?.webContents.send('checklist:changed')
-  } else {
-    appDatabase.updatePendingAiScheduleJobsMessage(launch.message)
+  const plugin = currentCodexPluginStatus()
+  if (!isCodexPluginUsable(plugin)) {
+    const activeJobs = appDatabase.listActiveAiScheduleJobs()
+    if (activeJobs.length > 0) {
+      appDatabase.updatePendingAiScheduleJobsMessage(
+        '等待安装或启用 Gtask Codex 同步插件',
+        null,
+        null
+      )
+    }
+    return {
+      status: 'unavailable',
+      message: CODEX_PLUGIN_REQUIRED_MESSAGE,
+      started: 0,
+      running: codexScheduleWorkerPool.runningCount
+    }
   }
+  const preferences = appDatabase.getCodexWorkerPreferences()
+  let activeJobs = appDatabase.listActiveAiScheduleJobs()
+  const now = Date.now()
+  const budgetRemainingByJobId = new Map<string, number>()
+  for (const job of activeJobs) {
+    const route = resolveCodexWorkerRoute(job, preferences)
+    const attemptedRuntimeMs = appDatabase.getAiScheduleJobAttemptRuntimeMs(job.id, new Date(now))
+    const remainingMs = route.totalBudgetMs - attemptedRuntimeMs
+    if (remainingMs > 0) {
+      budgetRemainingByJobId.set(job.id, remainingMs)
+      continue
+    }
+    const expired = appDatabase.expireAiScheduleJob(
+      job.id,
+      `后台处理已达到总时间预算（${Math.round(route.totalBudgetMs / 60_000)} 分钟），已停止并保留现有数据`
+    )
+    if (expired.agentId) codexScheduleWorkerPool.stopAgent(expired.agentId)
+    sendAiJobProgress(expired.job)
+  }
+  activeJobs = appDatabase.listActiveAiScheduleJobs()
+  const runningRoutes = codexScheduleWorkerPool.runningRoutes
+  const routes = selectCodexWorkerRoutes({ jobs: activeJobs, runningRoutes, preferences })
+    .map((route) => ({
+      ...route,
+      timeoutMs: Math.min(
+        route.timeoutMs,
+        budgetRemainingByJobId.get(route.jobId) ?? route.totalBudgetMs
+      )
+    }))
+  if (routes.length === 0) {
+    return {
+      status: 'already_running',
+      message: codexScheduleWorkerPool.runningCount > 0
+        ? '同步任务已排队，完成后会自动继续'
+        : '同步任务已排队',
+      started: 0,
+      running: codexScheduleWorkerPool.runningCount
+    }
+  }
+  const launch = codexScheduleWorkerPool.startJobs(routes)
   return launch
 }
 
 function toAiJobProgress(job: AiScheduleJob): SyncProgressUpdate {
+  const phase = projectAiJobProgressPhase(job)
   return {
     gameId: job.gameId,
     target: job.target,
-    source: job.jobKind === 'personal_metadata' ? 'personal_data' : 'public_schedule',
-    phase: job.progressPhase,
-    status: job.status === 'pending' ? 'waiting' : 'running',
-    message: job.message ?? (job.status === 'pending' ? '正在启动本机 Codex' : 'Codex 正在处理'),
+    source: job.jobKind === 'public_catalog' ? 'public_schedule' : 'personal_data',
+    phase,
+    status: job.status === 'pending'
+      ? 'waiting'
+      : job.status === 'claimed'
+        ? 'running'
+        : job.status === 'completed'
+          ? 'completed'
+          : 'error',
+    retryKind: phase === 'retrying' ? 'codex_connection' : null,
+    // Detailed Agent diagnostics stay in the job record. The renderer receives
+    // only structured progress fields and derives its own product copy.
+    message: '',
     current: job.progressCurrent,
     total: job.progressTotal,
     updatedAt: job.progressUpdatedAt
@@ -484,7 +708,23 @@ function toAiJobProgress(job: AiScheduleJob): SyncProgressUpdate {
 }
 
 function sendAiJobProgress(job: AiScheduleJob): void {
+  if (job.status === 'pending' || job.status === 'claimed') {
+    aiJobProgressSignatures.set(job.id, [
+      job.status,
+      job.progressPhase,
+      job.progressCurrent,
+      job.progressTotal,
+      job.progressUpdatedAt,
+      job.message
+    ].join(':'))
+  } else {
+    aiJobProgressSignatures.delete(job.id)
+  }
   mainWindow?.webContents.send('sync:progress', toAiJobProgress(job))
+}
+
+function isCancelledAiJob(job: AiScheduleJob): boolean {
+  return job.status === 'failed' && Boolean(job.message?.includes('取消'))
 }
 
 function pollAiJobProgress(): void {
@@ -493,12 +733,20 @@ function pollAiJobProgress(): void {
     const maintenance = appDatabase.maintainAiScheduleJobs()
     if (maintenance.requeued > 0 || maintenance.expired > 0) {
       mainWindow?.webContents.send('checklist:changed')
+      if (maintenance.requeued > 0) setTimeout(startCodexWorkersForActiveJobs, 0)
     }
     const jobs = appDatabase.listActiveAiScheduleJobs()
     const activeJobIds = new Set(jobs.map((job) => job.id))
     for (const knownJobId of aiJobProgressSignatures.keys()) {
       if (activeJobIds.has(knownJobId)) continue
+      const terminalJob = appDatabase.getAiScheduleJobById(knownJobId)
       aiJobProgressSignatures.delete(knownJobId)
+      if (
+        (terminalJob.status === 'completed' || terminalJob.status === 'failed') &&
+        !isCancelledAiJob(terminalJob)
+      ) {
+        sendAiJobProgress(terminalJob)
+      }
       mainWindow?.webContents.send('checklist:changed')
     }
     for (const job of jobs) {
@@ -538,9 +786,15 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => mainWindow?.show())
+  mainWindow.on('close', () => {
+    shutdownApplicationRuntime()
+  })
   mainWindow.on('closed', () => {
     mainWindow = null
-    if (!isShuttingDown) app.quit()
+    // Runtime resources were closed synchronously in the close handler. On Windows,
+    // Electron's graceful exit can still leave a headless UI thread and lock the app
+    // directory, so the final process boundary must be deterministic.
+    terminateApplicationProcess(0)
   })
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -561,6 +815,7 @@ function createWindow(): void {
         console.warn('已阻止主窗口导航到不安全链接', error)
       }
     })
+    scheduleStartupUpdateCheck()
   })
 
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
@@ -575,6 +830,30 @@ function registerIpcHandlers(): void {
     version: app.getVersion(),
     dataPath: appDataRoot ?? app.getPath('documents')
   }))
+  ipcMain.handle('rendering:get-mode', () => renderingModeState())
+  ipcMain.handle('rendering:update-mode', (_event, value: unknown) => {
+    configuredRenderingMode = writeRenderingMode(
+      renderingModeConfigPath,
+      parseRequestedRenderingMode(value)
+    )
+    return renderingModeState()
+  })
+  ipcMain.handle('software-update:get-settings', () => softwareUpdateSettings)
+  ipcMain.handle('software-update:update-settings', (_event, value: unknown) => {
+    softwareUpdateSettings = writeSoftwareUpdateSettings(softwareUpdateConfigPath, {
+      ...softwareUpdateSettings,
+      autoCheckEnabled: parseAutomaticUpdateSetting(value)
+    })
+    return softwareUpdateSettings
+  })
+  ipcMain.handle('software-update:check', () => checkForSoftwareUpdate(false))
+  ipcMain.handle('app:restart', () => {
+    setTimeout(() => {
+      app.relaunch()
+      app.quit()
+    }, 100)
+    return true
+  })
   ipcMain.handle('app:open-data-directory', async () => {
     const message = await shell.openPath(appDataRoot ?? app.getPath('documents'))
     if (message) throw new Error(message)
@@ -647,10 +926,13 @@ function registerIpcHandlers(): void {
   })
   ipcMain.handle('ai-schedule:get-agent-status', () => {
     if (!appDatabase) throw new Error('数据库尚未初始化')
-    const appMarketplacePath = join(app.getPath('userData'), 'codex-integration', 'marketplace.json')
+    const plugin = currentCodexPluginStatus()
+    if (isCodexPluginUsable(plugin) && appDatabase.listActiveAiScheduleJobs().length > 0) {
+      setTimeout(startCodexWorkersForActiveJobs, 0)
+    }
     return {
       ...appDatabase.getAiScheduleAgentStatus(),
-      codexPluginInstalled: detectCodexPlugin({ appMarketplacePath }).installed
+      codexPluginInstalled: plugin.installed
     }
   })
   ipcMain.handle('codex-worker:get-preferences', () => {
@@ -677,18 +959,6 @@ function registerIpcHandlers(): void {
     return appDatabase.listActiveAiScheduleJobs(
       gameId === undefined ? undefined : parseGameId(gameId)
     )
-  })
-  ipcMain.handle('semantic-review:get-summary', (
-    _event,
-    gameId: unknown,
-    target?: unknown
-  ) => {
-    if (!appDatabase) throw new Error('数据库尚未初始化')
-    const parsedTarget = target === undefined ? undefined : parseSyncTarget(target)
-    if (parsedTarget === 'all' || parsedTarget === 'tasks') {
-      throw new Error('语义核验进度只支持活动、周期事项和地图探索版块')
-    }
-    return appDatabase.getSemanticReviewSummary(parseGameId(gameId), parsedTarget)
   })
   ipcMain.handle('codex-plugin:open', async () => {
     const launcherOptions = codexMcpLauncherOptions()
@@ -844,21 +1114,75 @@ function registerIpcHandlers(): void {
     const parsedTarget = parseSyncTarget(target)
     const parsedRequestContext = parseSyncRequestContext(requestContext)
     if (parsedTarget === 'all' || parsedTarget === 'tasks') {
-      throw new Error('同步进度只能从活动、周期事项或地图探索版块发起')
+      throw new Error('同步个人数据只能从活动、周期事项或地图探索版块发起')
     }
     if (!supportsPersonalSyncTarget(parsedGameId, parsedTarget)) {
       throw new Error('当前游戏的个人数据接口不提供该版块进度')
+    }
+    const publicJob = appDatabase.listActiveAiScheduleJobs(parsedGameId).find((job) =>
+      job.jobKind === 'public_catalog' &&
+      (job.target === parsedTarget || job.target === 'all')
+    )
+    if (publicJob) {
+      throw new Error('对应版块正在同步公开数据，请等待完成或先取消；个人数据不会与公开任务并发切换来源')
     }
     const result = await syncOrchestrator.syncPersonalOnly(
       parsedGameId,
       parsedTarget,
       parsedRequestContext
     )
-    if (result.status === 'success') {
+    if (
+      result.status === 'success' &&
+      !result.sources.some((source) => (source.pendingReview ?? 0) > 0)
+    ) {
       queuePersonalMetadataEnrichment(parsedGameId, parsedTarget, parsedRequestContext)
     }
     if (result.sources.some((source) => (source.pendingReview ?? 0) > 0)) {
-      startCodexWorkersForActiveJobs()
+      const plugin = currentCodexPluginStatus()
+      if (!isCodexPluginUsable(plugin)) {
+        const reviewJob = appDatabase.getActiveAiScheduleJob(
+          parsedGameId,
+          parsedTarget,
+          'personal_review'
+        )
+        if (reviewJob?.status === 'pending') {
+          appDatabase.updateAiScheduleJobLaunchMessage(
+            reviewJob.id,
+            '个人数据已暂存，等待安装 Codex 同步插件',
+            0,
+            reviewJob.progressTotal,
+            'queued'
+          )
+          sendAiJobProgress(appDatabase.getActiveAiScheduleJob(
+            parsedGameId,
+            parsedTarget,
+            'personal_review'
+          ) ?? reviewJob)
+        }
+        result.sources = result.sources.map((source) => (source.pendingReview ?? 0) > 0
+          ? {
+              ...source,
+              requiresCodexPlugin: true,
+              message: `${source.message}；${CODEX_PLUGIN_REQUIRED_MESSAGE}`
+            }
+          : source)
+        result.message = result.sources.map((source) => source.message).join('；')
+        mainWindow?.webContents.send('checklist:changed')
+      } else {
+        const launch = startCodexWorkersForActiveJobs()
+        if (launch?.status === 'unavailable') {
+          const reviewJob = appDatabase.getActiveAiScheduleJob(
+            parsedGameId,
+            parsedTarget,
+            'personal_review'
+          )
+          if (reviewJob?.status === 'pending') {
+            const failed = appDatabase.failPendingAiScheduleJob(reviewJob.id, launch.message)
+            sendAiJobProgress(failed)
+            mainWindow?.webContents.send('checklist:changed')
+          }
+        }
+      }
     }
     return result
   })
@@ -887,19 +1211,12 @@ function registerIpcHandlers(): void {
       cancelled = Boolean(result)
     } else {
       if (parsedTarget === 'all' || parsedTarget === 'tasks') {
-        throw new Error('个人进度取消只支持活动、周期事项和地图探索版块')
+        throw new Error('个人数据取消只支持活动、周期事项和地图探索版块')
       }
       const adapterCancelled = syncOrchestrator.cancelPersonalSync(
         parsedGameId,
         parsedTarget
       )
-      const reviews = appDatabase.cancelSemanticReviewCandidates(
-        parsedGameId,
-        parsedTarget
-      )
-      for (const agentId of reviews.agentIds) {
-        codexScheduleWorkerPool?.stopAgent(agentId)
-      }
       const metadataJob = appDatabase.cancelActiveAiScheduleJob(
         parsedGameId,
         parsedTarget,
@@ -907,7 +1224,14 @@ function registerIpcHandlers(): void {
         'personal_metadata'
       )
       if (metadataJob?.agentId) codexScheduleWorkerPool?.stopAgent(metadataJob.agentId)
-      cancelled = adapterCancelled || reviews.cancelled > 0 || Boolean(metadataJob)
+      const reviewJob = appDatabase.cancelActiveAiScheduleJob(
+        parsedGameId,
+        parsedTarget,
+        new Date(),
+        'personal_review'
+      )
+      if (reviewJob?.agentId) codexScheduleWorkerPool?.stopAgent(reviewJob.agentId)
+      cancelled = adapterCancelled || Boolean(metadataJob) || Boolean(reviewJob)
     }
 
     const message = cancelled ? '已取消' : '当前没有可取消的同步'
@@ -1033,7 +1357,6 @@ if (!app.requestSingleInstanceLock()) {
     appBackupDirectory = backupDirectory
     appDatabasePath = databasePath
     try {
-      await migrateLegacyAppData(app.getPath('userData'), dataPaths)
       await createPreMigrationBackup(databasePath, backupDirectory, CURRENT_SCHEMA_VERSION)
     } catch (error) {
       dialog.showErrorBox(
@@ -1072,6 +1395,13 @@ if (!app.requestSingleInstanceLock()) {
       unprotect: (encrypted) => safeStorage.decryptString(encrypted)
     })
     const fetcher = createElectronNetFetcher(net.fetch)
+    softwareUpdateService = new SoftwareUpdateService(app.getVersion(), [
+      new JsonFeedUpdateProvider(
+        'primary',
+        process.env.GTASK_UPDATE_FEED_URL?.trim() ?? '',
+        net.fetch
+      )
+    ])
     miyousheQrLogin = new MiyousheQrLoginService(fetcher)
     kuroCommunityCredential = new KuroCommunityCredentialService(fetcher)
     kuroCommunityLogin = new KuroCommunityLoginService(
@@ -1085,21 +1415,9 @@ if (!app.requestSingleInstanceLock()) {
       console.error('创建或整理每日数据库备份失败', error)
     }
     try {
-      const appMarketplacePath = join(app.getPath('userData'), 'codex-integration', 'marketplace.json')
-      if (detectCodexPlugin({ appMarketplacePath }).installed) {
+      if (currentCodexPluginStatus().installed) {
         const launcherOptions = codexMcpLauncherOptions()
         refreshCodexMcpLauncher(launcherOptions)
-        const legacyIntegrationDirectory = join(
-          app.getPath('appData'),
-          'gacha-task-manager',
-          'codex-integration'
-        )
-        if (existsSync(join(legacyIntegrationDirectory, 'launch-gacha-mcp.cmd'))) {
-          refreshCodexMcpLauncher({
-            ...launcherOptions,
-            integrationDirectory: legacyIntegrationDirectory
-          })
-        }
       }
     } catch (error) {
       console.error('刷新 Codex MCP 启动路径失败', error)
@@ -1113,6 +1431,7 @@ if (!app.requestSingleInstanceLock()) {
         const changes =
           (appDatabase?.resetDueWeeklyItems() ?? 0) +
           (appDatabase?.resetDueQuestItems() ?? 0) +
+          (appDatabase?.rolloverDueCycleItems() ?? 0) +
           (appDatabase?.markStaleSyncStates() ?? 0)
         if (changes > 0) mainWindow?.webContents.send('checklist:changed')
       } catch (error) {
@@ -1145,7 +1464,8 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+  shutdownApplicationRuntime()
+  terminateApplicationProcess(0)
 })
 
 app.on('before-quit', () => {

@@ -12,8 +12,8 @@ import {
 } from './personal-sync-settler'
 import type { SyncAdapter, SyncAdapterOutput, SyncProgressReporter } from './types'
 import {
-  personalEventsFromCandidates,
-  personalMapsFromCandidates,
+  assemblePersonalEventsFromCandidates,
+  assemblePersonalMapsFromCandidates,
   withPersonalIdentity
 } from './personal-snapshot'
 
@@ -79,11 +79,24 @@ export class ZenlessPersonalAdapter implements SyncAdapter {
     const explorationCandidates = exploration === undefined
       ? []
       : extractZenlessExplorationReviewCandidates(exploration)
+    const eventSnapshot = assemblePersonalEventsFromCandidates(
+      'zenless',
+      'miyoushe',
+      eventCandidates
+    )
+    const explorationSnapshot = assemblePersonalMapsFromCandidates(
+      'miyoushe',
+      explorationCandidates
+    )
     return {
       items: [
-        ...personalEventsFromCandidates('zenless', 'miyoushe', eventCandidates),
+        ...eventSnapshot.items,
         ...withPersonalIdentity(cycleItems, 'miyoushe', 'personal-challenge-record'),
-        ...personalMapsFromCandidates('miyoushe', explorationCandidates)
+        ...explorationSnapshot.items
+      ],
+      reviewCandidates: [
+        ...eventSnapshot.reviewCandidates,
+        ...explorationSnapshot.reviewCandidates
       ],
       snapshotCompleteness: outcomes.every((outcome) => outcome.succeeded) ? 'complete' : 'partial',
       adapterVersion: 'zenless-personal-v1',

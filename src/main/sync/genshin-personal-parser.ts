@@ -316,7 +316,7 @@ export function parseStygianOnslaught(value: unknown): NormalizedSyncItem | null
   return {
     remoteKey: 'endgame:stygian-onslaught',
     category: 'endgame',
-    title: requiredOptionalString(schedule.name) ?? '幽境危战',
+    title: '幽境危战',
     completed: single.has_data === true || difficulty > 0,
     startsAt: toIsoDate(schedule.start_time ?? schedule.start_date_time, '幽境危战开始时间'),
     endsAt: toIsoDate(schedule.end_time ?? schedule.end_date_time, '幽境危战结束时间'),

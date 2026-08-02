@@ -25,7 +25,7 @@ export async function capturePersonalRequest<T>(
 
 export function assertAnyPersonalRequestSucceeded(outcomes: PersonalRequestOutcome[]): void {
   if (outcomes.length === 0 || outcomes.some((outcome) => outcome.succeeded)) return
-  throw outcomes.find((outcome) => outcome.error)?.error ?? new Error('个人进度接口全部同步失败')
+  throw outcomes.find((outcome) => outcome.error)?.error ?? new Error('个人数据接口全部同步失败')
 }
 
 export function personalPartialSuffix(outcomes: PersonalRequestOutcome[]): string {

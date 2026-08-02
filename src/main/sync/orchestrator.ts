@@ -15,12 +15,16 @@ import {
   SyncCancelledError,
   SyncVerificationRequiredError,
   throwIfSyncCancelled,
+  officialPersonalFactAuthority,
+  type NormalizedSyncItem,
+  type SemanticReviewDraft,
   type SyncAdapter,
   type SyncAdapterProgress,
   type SyncAdapterRegistry
 } from './types'
 import { normalizeSyncItems } from './normalization'
 import { getPersonalSyncTargets } from './personal-sync-capabilities'
+import { completeCycleCatalog } from './cycle-catalog'
 
 const PERSONAL_PLATFORM_NAMES: Record<GameId, string> = {
   genshin: '米游社',
@@ -86,7 +90,9 @@ export class SyncOrchestrator {
     }
 
     const successCount = sources.filter((source) => source.status === 'success').length
-    const hasPendingReview = sources.some((source) => (source.pendingReview ?? 0) > 0)
+    const hasPendingReview = sources.some((source) =>
+      (source.pendingReview ?? 0) > 0 && source.reviewMode !== 'background'
+    )
     const status: SyncResult['status'] =
       successCount === sources.length && !hasPendingReview
         ? 'success'
@@ -104,7 +110,10 @@ export class SyncOrchestrator {
           ? 'stale'
           : 'error'
     this.database.recordSyncOutcome(gameId, databaseStatus, message, successCount > 0)
-    if (sources[0]?.status === 'success' && !sources[0].pendingReview) {
+    if (
+      sources[0]?.status === 'success' &&
+      (!(sources[0].pendingReview ?? 0) || sources[0].reviewMode === 'background')
+    ) {
       this.database.recordSyncTargetSuccess(gameId, target, new Date(), true)
     }
 
@@ -144,7 +153,8 @@ export class SyncOrchestrator {
         message: '应用已退出，任务已取消'
       }
     }
-    const hasPendingReview = (personal.pendingReview ?? 0) > 0
+    const hasPendingReview = (personal.pendingReview ?? 0) > 0 &&
+      personal.reviewMode !== 'background'
     const status: SyncResult['status'] = personal.status === 'cancelled'
       ? 'cancelled'
       : personal.status === 'success'
@@ -215,6 +225,11 @@ export class SyncOrchestrator {
     })
     this.personalInFlight.set(key, { controller, operation })
     return operation
+  }
+
+  isPersonalSyncActive(gameId: GameId, target?: PersonalSyncTarget): boolean {
+    const prefix = target ? `${gameId}:${target}:` : `${gameId}:`
+    return [...this.personalInFlight.keys()].some((key) => key.startsWith(prefix))
   }
 
   cancelPersonalSync(gameId: GameId, target: SyncTarget): boolean {
@@ -292,9 +307,21 @@ export class SyncOrchestrator {
         exploration: ['exploration']
       } as const
       const categories = target === 'all' ? undefined : targetCategories[target]
-      const normalizedItems = normalizeSyncItems(result.items).filter(
+      let normalizedItems = normalizeSyncItems(result.items).filter(
         (item) => !categories || (categories as readonly string[]).includes(item.category)
       )
+      if (target === 'all' || target === 'cycles') {
+        normalizedItems = completeCycleCatalog(
+          gameId,
+          normalizedItems,
+          this.database.listChecklistItems(gameId),
+          source === 'personal_data' ? 'personal_sync' : 'public_schedule',
+          new Date()
+        )
+      }
+      const personalReviewDrafts = source === 'personal_data'
+        ? detectPersonalReviewDrafts(normalizedItems, result.reviewCandidates ?? [])
+        : []
       throwIfSyncCancelled(signal)
       reportProgress({
         phase: 'merging',
@@ -305,20 +332,19 @@ export class SyncOrchestrator {
         total: 1
       })
       const merge = { added: 0, updated: 0, preserved: 0, expiredRemoved: 0 }
+      let pendingReview = 0
+      let reviewMode: SyncSourceResult['reviewMode']
       if (source === 'personal_data') {
         if (result.snapshotCompleteness === 'partial') {
           throw new Error('个人接口只返回了部分数据，已保留上次个人清单，请稍后重试')
         }
         if (!result.accountScope) throw new Error('个人数据缺少安全账号作用域，请重新登录')
-        if ((result.reviewCandidates?.length ?? 0) > 0) {
-          throw new Error('个人数据适配器未能形成完整快照，已保留上次个人清单')
-        }
         const personalTargets: PersonalSyncTarget[] = target === 'all'
           ? getPersonalSyncTargets(gameId)
           : target === 'events' || target === 'cycles' || target === 'exploration'
             ? [target]
             : []
-        if (personalTargets.length === 0) throw new Error('当前版块不支持同步个人进度')
+        if (personalTargets.length === 0) throw new Error('当前版块不支持同步个人数据')
         const byTarget: Record<PersonalSyncTarget, typeof normalizedItems> = {
           events: normalizedItems.filter((item) => item.category === 'limited_event'),
           cycles: normalizedItems.filter((item) => item.category === 'endgame'),
@@ -326,12 +352,31 @@ export class SyncOrchestrator {
         }
         for (const personalTarget of personalTargets) {
           throwIfSyncCancelled(signal)
-          const replaced = this.database.replacePersonalSnapshot(
+          const prepared = this.database.preparePersonalReviewJob(
             gameId,
             personalTarget,
             result.accountScope,
             byTarget[personalTarget],
-            result.adapterVersion ?? 'legacy-personal-adapter-v1',
+            personalReviewDrafts,
+            result.adapterVersion ?? 'personal-adapter-v1',
+            requestContext,
+            new Date()
+          )
+          if (prepared.job) {
+            pendingReview += prepared.job.reviewTargets.length
+            if (personalTarget === 'events' && reviewMode !== 'blocking') {
+              reviewMode = 'background'
+            } else if (personalTarget !== 'events') {
+              reviewMode = 'blocking'
+              continue
+            }
+          }
+          const replaced = this.database.replacePersonalSnapshot(
+            gameId,
+            personalTarget,
+            result.accountScope,
+            prepared.items,
+            result.adapterVersion ?? 'personal-adapter-v1',
             new Date(),
             requestContext
           )
@@ -356,18 +401,33 @@ export class SyncOrchestrator {
       const expiredMessage = (merge.expiredRemoved ?? 0) > 0
         ? `，淘汰到期 ${merge.expiredRemoved}`
         : ''
-      reportProgress({
-        phase: 'completed',
-        status: 'completed',
-        message: '同步完成',
-        current: 1,
-        total: 1
-      })
+      reportProgress(pendingReview > 0
+        ? {
+            phase: reviewMode === 'background' ? 'completed' : 'queued',
+            status: reviewMode === 'background' ? 'completed' : 'waiting',
+            message: reviewMode === 'background'
+              ? '个人清单已建立，正在完善清单信息'
+              : '个人数据已暂存，正在确认清单结构',
+            current: reviewMode === 'background' ? 1 : 0,
+            total: reviewMode === 'background' ? 1 : pendingReview
+          }
+        : {
+            phase: 'completed',
+            status: 'completed',
+            message: '同步完成',
+            current: 1,
+            total: 1
+          })
       return {
         source,
         status: 'success',
-        message: `${result.message}（${changeMessage}${preservedMessage}${expiredMessage}）`,
-        pendingReview: 0,
+        message: pendingReview > 0
+          ? reviewMode === 'background'
+            ? `${result.message}；清单已建立，正在完善清单信息`
+            : `${result.message}；数据已安全暂存，确认完成后会更新清单`
+          : `${result.message}（${changeMessage}${preservedMessage}${expiredMessage}）`,
+        pendingReview,
+        reviewMode,
         ...merge
       }
     } catch (error) {
@@ -420,10 +480,104 @@ export class SyncOrchestrator {
       source,
       phase: progress.phase,
       status: progress.status ?? 'running',
-      message: progress.message,
+      retryKind: progress.phase === 'retrying' ? 'source_request' : null,
+      // Adapter diagnostics are deliberately not transported to the product
+      // UI. User-facing copy is derived from source/target/phase/count.
+      message: '',
       current: progress.current ?? null,
       total: progress.total ?? null,
       updatedAt: new Date().toISOString()
     })
   }
+}
+
+function detectPersonalReviewDrafts(
+  items: NormalizedSyncItem[],
+  supplied: SemanticReviewDraft[]
+): SemanticReviewDraft[] {
+  const drafts = [...supplied]
+  const suppliedIdentities = new Set(supplied.flatMap((draft) => {
+    const proposed = draft.payload.proposedItem
+    if (!proposed || typeof proposed !== 'object' || Array.isArray(proposed)) return []
+    const identity = (proposed as Partial<NormalizedSyncItem>).sourceIdentity
+    return identity
+      ? [`${identity.provider}\u0000${identity.endpoint}\u0000${identity.externalId}`]
+      : []
+  }))
+  const mapKeys = new Set(items
+    .filter((item) => item.category === 'exploration')
+    .map((item) => item.remoteKey))
+  const cycleGroups = new Map<string, NormalizedSyncItem[]>()
+  for (const item of items) {
+    if (item.category !== 'endgame') continue
+    const key = `${item.modeKey ?? ''}\u0000${item.periodKey ?? ''}`
+    const group = cycleGroups.get(key) ?? []
+    group.push(item)
+    cycleGroups.set(key, group)
+  }
+  for (const item of items) {
+    const identity = item.sourceIdentity
+    if (!identity) continue
+    const identityKey = `${identity.provider}\u0000${identity.endpoint}\u0000${identity.externalId}`
+    if (suppliedIdentities.has(identityKey)) continue
+    let issues: Array<'item_identity' | 'classification' | 'hierarchy'> = []
+    if (item.category === 'limited_event') issues = ['classification']
+    if (item.category === 'endgame') {
+      const groupKey = `${item.modeKey ?? ''}\u0000${item.periodKey ?? ''}`
+      if (!item.modeKey || !item.periodKey || (cycleGroups.get(groupKey)?.length ?? 0) > 1) {
+        issues = ['item_identity']
+      }
+    }
+    if (item.category === 'exploration' && (
+      (item.mapNodeKind !== 'region' && item.mapNodeKind !== 'subregion') ||
+      (item.mapNodeKind === 'region' && Boolean(item.parentRemoteKey)) ||
+      (item.mapNodeKind === 'subregion' && (
+        !item.parentRemoteKey || !mapKeys.has(item.parentRemoteKey)
+      ))
+    )) issues = ['hierarchy']
+    if (issues.length === 0) continue
+    const factAuthority = item.category === 'exploration'
+      ? officialPersonalFactAuthority('identity', 'localized_title', 'progress')
+      : item.category === 'endgame'
+        ? officialPersonalFactAuthority(
+            'identity', 'localized_title', 'time_window', 'challenge_record'
+          )
+        : officialPersonalFactAuthority('identity', 'localized_title', 'time_window')
+    drafts.push({
+      target: item.category === 'limited_event'
+        ? 'events'
+        : item.category === 'endgame'
+          ? 'cycles'
+          : 'exploration',
+      kind: item.category === 'limited_event'
+        ? 'personal-item-semantics'
+        : item.category === 'endgame'
+          ? 'personal-cycle-exception'
+          : 'personal-map-progress',
+      payload: {
+        factAuthority,
+        provider: identity.provider,
+        sourceContext: identity.endpoint,
+        officialId: identity.externalId,
+        officialEventId: item.category === 'limited_event' ? identity.externalId : undefined,
+        observedRemoteKey: identity.externalId,
+        title: item.title,
+        officialTitle: item.title,
+        observedProgress: item.progressPercent,
+        observedNodeKind: item.mapNodeKind,
+        observedParentId: item.parentRemoteKey?.startsWith(`personal-map:${identity.provider}:`)
+          ? item.parentRemoteKey.slice(`personal-map:${identity.provider}:`.length)
+          : null,
+        observedParentTitle: item.parentTitle ?? null,
+        observedModeKey: item.modeKey ?? null,
+        observedPeriodKey: item.periodKey ?? null,
+        observedStartsAt: item.startsAt ?? null,
+        observedEndsAt: item.endsAt ?? null,
+        observedHasChallengeRecord: item.category === 'endgame' ? item.completed : undefined,
+        reviewIssues: issues,
+        proposedItem: item
+      }
+    })
+  }
+  return drafts
 }

@@ -17,7 +17,10 @@ import type {
   KuroCommunityRole,
   MiyousheQrLoginState,
   PersonalSyncTarget,
-  SemanticReviewSummary,
+  RenderingMode,
+  RenderingModeState,
+  SoftwareUpdateCheckResult,
+  SoftwareUpdateSettings,
   SyncResult,
   SyncProgressUpdate,
   SyncScope,
@@ -25,10 +28,26 @@ import type {
   SyncTargetState,
   SyncSettings
 } from '../../shared/contracts'
+import { projectAiJobProgressPhase } from '../../shared/sync-progress'
 import { readHiddenGameIds, writeHiddenGameIds } from './game-visibility'
 import { kuroRoleKey } from './kuro-role-key'
 import { compareChecklistItems } from './checklist-sort'
-import { resolveAdaptiveColumnLayout } from './adaptive-column-layout'
+import {
+  DEFAULT_PANEL_ORDER,
+  movePanelSection,
+  normalizePanelOrder,
+  panelDragWheelDelta,
+  readPanelOrders,
+  writePanelOrder,
+  type PanelDropPosition
+} from './panel-order'
+import {
+  globalSyncSourceLabel,
+  orderPersonalSyncTargets,
+  selectGuardedGlobalPublicTargets,
+  summarizeGlobalSyncState,
+  waitForPersonalSyncCooldown
+} from './global-sync'
 import {
   buildMapTreeRows,
   collectMapBranchKeys,
@@ -42,9 +61,23 @@ import {
 } from './codex-proxy-diagnostic'
 import { toCodexWorkerPreferencesIpcPayload } from './codex-worker-preferences'
 import {
-  credentialProviderForSyncResult,
-  credentialProviderFromSyncMessage
-} from './sync-credential-notice'
+  applyPersonalProgressUpdate,
+  isTerminalPersonalProgress,
+  mergeLiveSyncProgresses,
+  personalProgressKey,
+  reconcilePersonalProgressForGame
+} from './personal-sync-progress'
+import { credentialProviderForSyncResult } from './sync-credential-notice'
+import {
+  userFacingProgressMessage,
+  userFacingSyncNotice
+} from './sync-display-copy'
+import {
+  claimInitialSyncSetup,
+  resolveInitialSyncSetupStep,
+  type InitialSyncSource,
+  type PendingInitialSyncSetup
+} from './initial-onboarding'
 import genshinIcon from './assets/games/genshin.jpg'
 import starRailIcon from './assets/games/star-rail.jpg'
 import zenlessIcon from './assets/games/zenless.jpg'
@@ -58,31 +91,21 @@ interface ChecklistPanel {
   defaultCategory: ChecklistCategory
   allowCreate?: boolean
   allowClear?: boolean
+  createLabel?: string
   syncTarget?: Exclude<SyncTarget, 'all'>
 }
 
 const panels: ChecklistPanel[] = [
   { title: '任务', section: 'tasks', categories: ['main_quest', 'side_quest'], defaultCategory: 'side_quest', allowCreate: false, allowClear: false, syncTarget: 'tasks' },
-  { title: '活动', section: 'events', categories: ['limited_event'], defaultCategory: 'limited_event', syncTarget: 'events' },
-  { title: '周期事项', section: 'cycles', categories: ['weekly', 'endgame'], defaultCategory: 'endgame', syncTarget: 'cycles' },
-  { title: '地图探索', section: 'exploration', categories: ['exploration'], defaultCategory: 'exploration', syncTarget: 'exploration' }
+  { title: '活动', section: 'events', categories: ['limited_event'], defaultCategory: 'limited_event', syncTarget: 'events', allowClear: false },
+  { title: '周期事项', section: 'cycles', categories: ['weekly', 'endgame'], defaultCategory: 'endgame', syncTarget: 'cycles', allowClear: false },
+  { title: '地图探索', section: 'exploration', categories: ['exploration'], defaultCategory: 'exploration', syncTarget: 'exploration', allowClear: false },
+  { title: '自定义清单', section: 'custom', categories: ['custom'], defaultCategory: 'custom', createLabel: '自定义事项', allowClear: true }
 ]
 const personalReviewTargets: PersonalSyncTarget[] = ['events', 'cycles', 'exploration']
+const panelBySection = new Map(panels.map((panel) => [panel.section, panel]))
 
 const workspaceElement = ref<HTMLElement | null>(null)
-const checklistColumnElements: Array<HTMLElement | null> = []
-const adaptiveColumnHeight = ref<number | null>(null)
-const constrainedColumnIndex = ref<number | null>(null)
-let adaptiveResizeObserver: ResizeObserver | null = null
-let adaptiveLayoutFrame: number | null = null
-const panelColumns: ChecklistPanel[][] = [
-  [panels[0], panels[2]],
-  [panels[1]],
-  [panels[3]]
-]
-const checklistColumnRefSetters = panelColumns.map((_, index) => (element: unknown) => {
-  setChecklistColumnElement(element instanceof Element ? element : null, index)
-})
 
 const categoryLabels: Record<ChecklistCategory, string> = {
   main_quest: '主线任务',
@@ -160,6 +183,7 @@ const gameIcons: Record<GameId, string> = {
   'wuthering-waves': wutheringWavesIcon
 }
 const hiddenGameIds = ref<GameId[]>(readHiddenGameIds(window.localStorage))
+const panelOrders = ref(readPanelOrders(window.localStorage))
 const items = ref<ChecklistItem[]>([])
 const archivedItems = ref<ChecklistItem[]>([])
 const appInfo = ref<AppInfo | null>(null)
@@ -168,10 +192,19 @@ const restoringGameView = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
 const selectedGameId = ref<GameId>('genshin')
+const draggingPanelSection = ref<ChecklistSection | null>(null)
+const panelDropTarget = ref<{ section: ChecklistSection; position: PanelDropPosition } | null>(null)
+let panelDragPointerId: number | null = null
+let panelDragHandle: HTMLElement | null = null
+const panelDragPoint = ref<{ x: number; y: number } | null>(null)
 const showIncompleteOnly = ref(false)
 const activityTagFilter = ref('')
 const activityTagMenuOpen = ref(false)
 const sectionSyncMenuOpen = ref<ChecklistSection | null>(null)
+const globalSyncMenuOpen = ref(false)
+const globalPersonalSyncBusy = ref(false)
+const globalPublicSyncBusy = ref(false)
+const pendingPublicSourceSwitch = ref<PersonalSyncTarget | null>(null)
 const collapsedMapKeys = ref(new Set<string>())
 const collapsedMapKeysByGame = new Map<GameId, Set<string>>()
 const knownMapBranchKeysByGame = new Map<GameId, Set<string>>()
@@ -211,7 +244,6 @@ const activeAiJob = ref<AiScheduleJob | null>(null)
 const activeAiJobs = ref<AiScheduleJob[]>([])
 const personalSyncProgressByKey = ref<Record<string, SyncProgressUpdate>>({})
 const cancellingSyncKeys = ref(new Set<string>())
-const semanticReviewSummaryByKey = ref<Record<string, SemanticReviewSummary>>({})
 const editingItem = ref<ChecklistItem | null>(null)
 const dismissedCodexProxyJobId = ref('')
 const codexProxyPromptCopied = ref(false)
@@ -219,17 +251,28 @@ const codexRepairStage = ref<'none' | 'proxy_applied' | 'https_applied'>('none')
 const codexRepairBusy = ref(false)
 const codexPluginBusy = ref(false)
 const codexPluginMessage = ref('')
+const codexSetupPromptOpen = ref(false)
 const codexWorkerPreferences = ref<CodexWorkerPreferences>({
-  model: 'inherit',
-  reasoningEffort: 'inherit'
+  strategy: 'fixed',
+  model: 'gpt-5.6-sol',
+  reasoningEffort: 'medium'
 })
 const codexWorkerPreferencesBusy = ref(false)
 const codexWorkerPreferencesMessage = ref('')
+const renderingModeState = ref<RenderingModeState | null>(null)
+const renderingModeSelection = ref<RenderingMode>('compatibility')
+const renderingModeBusy = ref(false)
+const renderingModeMessage = ref('')
+const softwareUpdateSettings = ref<SoftwareUpdateSettings>({
+  autoCheckEnabled: true,
+  lastSuccessfulCheckAt: null
+})
+const softwareUpdateBusy = ref(false)
+const softwareUpdateMessage = ref('')
+const onboardingBusy = ref(false)
+const pendingInitialSyncSetup = ref<PendingInitialSyncSetup | null>(null)
+const initialSyncContinuationBusy = ref(false)
 let miyousheLoginTimer: number | null = null
-let semanticReviewTimer: number | null = null
-const personalReviewTotals = new Map<string, number>()
-const semanticReviewLastRemaining = new Map<string, number>()
-const semanticReviewLastUpdatedAt = new Map<string, string>()
 
 const form = reactive({
   category: 'custom' as ChecklistCategory,
@@ -245,20 +288,47 @@ const form = reactive({
 })
 
 const selectedGame = computed(() => games.value.find((game) => game.id === selectedGameId.value))
+const orderedPanels = computed(() => {
+  const order = normalizePanelOrder(panelOrders.value[selectedGameId.value] ?? DEFAULT_PANEL_ORDER)
+  return order
+    .map((section) => panelBySection.get(section))
+    .filter((panel): panel is ChecklistPanel => Boolean(panel))
+})
+const draggingPanel = computed(() => (
+  draggingPanelSection.value ? panelBySection.get(draggingPanelSection.value) ?? null : null
+))
+const panelDragPreviewStyle = computed(() => {
+  const point = panelDragPoint.value
+  if (!point) return undefined
+  const width = 260
+  const height = 62
+  const gap = 16
+  const x = point.x + gap + width <= window.innerWidth - 10
+    ? point.x + gap
+    : Math.max(10, point.x - width - gap)
+  const y = point.y + gap + height <= window.innerHeight - 10
+    ? point.y + gap
+    : Math.max(10, point.y - height - gap)
+  return { transform: `translate3d(${x}px, ${y}px, 0)` }
+})
+const panelOrderIsDefault = computed(() =>
+  currentPanelOrder().every((section, index) => section === DEFAULT_PANEL_ORDER[index])
+)
 const editorExamples = computed(() => gameEditorExamples[selectedGameId.value])
 const visibleGames = computed(() => games.value.filter((game) => !hiddenGameIds.value.includes(game.id)))
 const gameCredentialStatuses = computed(() => credentialStatuses.value)
 const aiScheduleAvailable = computed(() =>
-  Boolean(aiScheduleAgent.value?.connected || aiScheduleAgent.value?.codexPluginInstalled)
+  aiScheduleAgent.value?.codexPluginInstalled === true
 )
 const publicSyncProgresses = computed<SyncProgressUpdate[]>(() =>
   activeAiJobs.value.map((job) => ({
     gameId: job.gameId,
     target: job.target,
-    source: job.jobKind === 'personal_metadata' ? 'personal_data' : 'public_schedule',
-    phase: job.progressPhase,
+    source: job.jobKind === 'public_catalog' ? 'public_schedule' : 'personal_data',
+    phase: projectAiJobProgressPhase(job),
     status: job.status === 'pending' ? 'waiting' : 'running',
-    message: job.message ?? (job.status === 'pending' ? '等待 Codex 接单' : 'Codex 正在处理'),
+    retryKind: job.progressPhase === 'retrying' ? 'codex_connection' : null,
+    message: '',
     current: job.progressCurrent,
     total: job.progressTotal,
     updatedAt: job.progressUpdatedAt
@@ -267,11 +337,14 @@ const publicSyncProgresses = computed<SyncProgressUpdate[]>(() =>
 const publicSyncProgress = computed<SyncProgressUpdate | null>(() =>
   publicSyncProgresses.value.find((progress) => progress.source === 'public_schedule') ?? null
 )
+const codexSyncProgress = computed<SyncProgressUpdate | null>(() =>
+  publicSyncProgresses.value.find((progress) => progress.gameId === selectedGameId.value) ?? null
+)
 const liveSyncProgress = computed(() =>
-  [
-    ...publicSyncProgresses.value,
-    ...Object.values(personalSyncProgressByKey.value)
-  ].filter(
+  mergeLiveSyncProgresses(
+    publicSyncProgresses.value,
+    Object.values(personalSyncProgressByKey.value)
+  ).filter(
     (progress): progress is SyncProgressUpdate =>
       Boolean(
         progress &&
@@ -281,7 +354,7 @@ const liveSyncProgress = computed(() =>
   )
 )
 const showCodexProxyWarning = computed(() =>
-  isCodexConnectionRetry(publicSyncProgress.value) &&
+  isCodexConnectionRetry(codexSyncProgress.value) &&
   Boolean(activeAiJob.value?.id) &&
   dismissedCodexProxyJobId.value !== activeAiJob.value?.id
 )
@@ -298,6 +371,15 @@ const hasActivePublicSync = computed(() =>
 const syncing = computed(() =>
   [...activeSyncRequests.value].some((key) => key.startsWith(`${selectedGameId.value}:`))
 )
+
+function syncResultNotice(result: SyncResult): ReturnType<typeof userFacingSyncNotice> {
+  return userFacingSyncNotice({
+    status: result.status,
+    credentialProvider: credentialProviderForSyncResult(result),
+    needsRetry: result.sources.some((source) => source.status === 'error')
+  })
+}
+
 const editorCategories = computed(() => {
   const questCategories: ChecklistCategory[] = ['main_quest', 'side_quest']
   if (editingItem.value && questCategories.includes(editingItem.value.category)) {
@@ -314,12 +396,18 @@ const personalPlatform = computed(() =>
   selectedGameId.value === 'wuthering-waves' ? '库街区' : '米游社'
 )
 const syncNoticeCredentialProvider = computed<CredentialProvider | null>(() => {
-  if (syncNotice.value?.credentialProvider) return syncNotice.value.credentialProvider
-  const message = syncNotice.value?.message ?? ''
-  return credentialProviderFromSyncMessage(message)
+  return syncNotice.value?.credentialProvider ?? null
 })
 const incompleteCount = computed(() => items.value.filter((item) => !item.completed).length)
-const globalSyncState = computed(() => syncTargetStates.value.find((state) => state.target === 'all'))
+const globalSyncState = computed(() => summarizeGlobalSyncState(syncTargetStates.value))
+const globalSourceLabel = computed(() => globalSyncSourceLabel(syncTargetStates.value))
+const pendingPublicSourceSwitchLabel = computed(() =>
+  pendingPublicSourceSwitch.value === 'events'
+    ? '活动'
+    : pendingPublicSourceSwitch.value === 'cycles'
+      ? '周期事项'
+      : '地图探索'
+)
 const hasEstablishedCatalog = computed(() => items.value.some((item) =>
   !['main_quest', 'side_quest', 'custom'].includes(item.category)
 ))
@@ -327,6 +415,19 @@ const needsInitialSync = computed(() =>
   !syncSettings.value?.initialGuideDismissed &&
   !hasEstablishedCatalog.value &&
   !globalSyncState.value?.lastSuccessAt
+)
+const codexSetupDescription = computed(() => {
+  const setup = pendingInitialSyncSetup.value
+  if (setup?.source === 'personal_data') {
+    return '安装并启用插件后将继续登录；也可以暂不安装，先同步目前可读取的个人数据。'
+  }
+  if (setup?.source === 'public_schedule') {
+    return '同步公开数据需要 Codex 插件。安装并启用后，本次初始化会自动继续。'
+  }
+  return '当前数据已安全保留。安装并启用插件后，Gtask 会自动继续等待处理的任务；无需重新同步。'
+})
+const codexSetupDeferLabel = computed(() =>
+  pendingInitialSyncSetup.value?.source === 'personal_data' ? '暂不安装，继续登录' : '稍后安装'
 )
 const completedCount = computed(() => {
   const weekStart = startOfCurrentWeek()
@@ -346,14 +447,10 @@ const expiringCount = computed(() => {
     return end >= now && end <= threshold
   }).length
 })
-function displaySyncMessage(message: string): string {
-  return message
-    .replaceAll('公开排期', '公开资料')
-    .replaceAll('AI 排期', 'AI 资料')
-}
-
 onMounted(async () => {
   window.addEventListener('keydown', handleGlobalKeydown)
+  window.addEventListener('wheel', handlePanelDragWheel, { capture: true, passive: false })
+  window.addEventListener('blur', endPanelDrag)
   try {
     ;[games.value, appInfo.value, aiScheduleAgent.value] = await Promise.all([
       window.gacha.listGames(),
@@ -369,21 +466,18 @@ onMounted(async () => {
       loadSyncSettings(),
       loadSyncTargetStates(),
       loadPersonalSyncTargets(),
-      loadActiveAiJobs(),
-      refreshSemanticReviewProgress()
+      loadActiveAiJobs()
     ])
   } catch (error) {
     showError(error)
   } finally {
     loading.value = false
   }
-  await nextTick()
-  startAdaptiveColumnObserver()
 })
 
 const removeSyncListener = window.gacha.onSyncCompleted((result) => {
   if (result.gameId !== selectedGameId.value) return
-  syncNotice.value = { status: result.status, message: displaySyncMessage(result.message) }
+  syncNotice.value = syncResultNotice(result)
   void Promise.all([
     loadItems(),
     loadSyncSettings(),
@@ -397,37 +491,45 @@ const removeChecklistListener = window.gacha.onChecklistChanged(() => {
     loadSyncSettings(),
     loadSyncTargetStates(),
     loadAiScheduleAgentStatus(),
-    loadActiveAiJobs(),
-    refreshSemanticReviewProgress()
+    loadActiveAiJobs()
   ])
     .then(() => {
       const settings = syncSettings.value
       if (!settings?.message || settings.status === 'idle') return
-      syncNotice.value = {
+      syncNotice.value = userFacingSyncNotice({
         status: settings.status === 'success'
           ? 'success'
           : settings.status === 'error'
             ? 'error'
             : 'partial',
-        message: displaySyncMessage(settings.message)
-      }
+        needsRetry: settings.status === 'error'
+      })
     })
 })
 const removeSyncProgressListener = window.gacha.onSyncProgress((progress) => {
   if (progress.source === 'personal_data') {
     if (progress.target === 'all' || progress.target === 'tasks') return
-    if (progress.status === 'cancelled') {
-      const next = { ...personalSyncProgressByKey.value }
-      delete next[personalProgressKey(progress.gameId, progress.target)]
-      personalSyncProgressByKey.value = next
+    personalSyncProgressByKey.value = applyPersonalProgressUpdate(
+      personalSyncProgressByKey.value,
+      progress
+    )
+    if (isTerminalPersonalProgress(progress)) {
       if (progress.gameId === selectedGameId.value) {
-        syncNotice.value = { status: 'cancelled', message: '已取消' }
+        syncNotice.value = progress.status === 'completed'
+          ? null
+          : progress.status === 'cancelled'
+            ? { status: 'cancelled', message: '已取消' }
+            : userFacingSyncNotice({
+                status: 'error'
+              })
+        void Promise.all([
+          loadItems(),
+          loadSyncSettings(),
+          loadSyncTargetStates(),
+          loadActiveAiJobs()
+        ])
       }
       return
-    }
-    personalSyncProgressByKey.value = {
-      ...personalSyncProgressByKey.value,
-      [personalProgressKey(progress.gameId, progress.target)]: progress
     }
     return
   }
@@ -443,34 +545,20 @@ const clockTimer = window.setInterval(() => {
 }, 1_000)
 const agentTimer = window.setInterval(() => {
   void loadAiScheduleAgentStatus()
-}, 60_000)
+}, 5_000)
 const progressTimer = window.setInterval(() => {
   if (activeAiJobs.value.length > 0) void loadActiveAiJobs()
 }, 2_000)
-semanticReviewTimer = window.setInterval(() => {
-  if (Object.entries(semanticReviewSummaryByKey.value).some(
-    ([key, summary]) =>
-      key.startsWith(`${selectedGameId.value}:`) &&
-      summary.pendingCount + summary.claimedCount > 0
-  )) {
-    void refreshSemanticReviewProgress()
-  }
-}, 2_000)
-
 onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
+  window.removeEventListener('wheel', handlePanelDragWheel, true)
+  window.removeEventListener('blur', endPanelDrag)
   removeSyncListener()
   removeChecklistListener()
   removeSyncProgressListener()
   window.clearInterval(clockTimer)
   window.clearInterval(agentTimer)
   window.clearInterval(progressTimer)
-  if (semanticReviewTimer !== null) window.clearInterval(semanticReviewTimer)
-  semanticReviewTimer = null
-  adaptiveResizeObserver?.disconnect()
-  adaptiveResizeObserver = null
-  if (adaptiveLayoutFrame !== null) window.cancelAnimationFrame(adaptiveLayoutFrame)
-  adaptiveLayoutFrame = null
   stopMiyousheLoginPolling()
 })
 
@@ -484,6 +572,11 @@ function handleGlobalKeydown(event: KeyboardEvent): void {
     void closeKuroCommunityLogin()
     return
   }
+  if (pendingPublicSourceSwitch.value) {
+    pendingPublicSourceSwitch.value = null
+    return
+  }
+  globalSyncMenuOpen.value = false
   sectionSyncMenuOpen.value = null
   activityTagMenuOpen.value = false
   editorOpen.value = false
@@ -496,13 +589,19 @@ watch(selectedGameId, async (gameId, previousGameId) => {
     checklistScrollByGame.set(previousGameId, captureChecklistScroll())
   }
   restoringGameView.value = true
+  items.value = []
   syncNotice.value = null
   activeAiJob.value = null
   activeAiJobs.value = []
+  globalSyncMenuOpen.value = false
   sectionSyncMenuOpen.value = null
+  pendingPublicSourceSwitch.value = null
   activityTagMenuOpen.value = false
+  draggingPanelSection.value = null
+  panelDropTarget.value = null
   recycleBinOpen.value = false
   activityTagFilter.value = ''
+  let savedScroll: ChecklistScrollSnapshot | undefined
   try {
     await Promise.all([
       loadItems({ showLoading: true, preserveScroll: false }),
@@ -510,102 +609,149 @@ watch(selectedGameId, async (gameId, previousGameId) => {
       loadSyncSettings(),
       loadSyncTargetStates(),
       loadPersonalSyncTargets(),
-      loadActiveAiJobs(),
-      refreshSemanticReviewProgress()
+      loadActiveAiJobs()
     ])
-    const savedScroll = checklistScrollByGame.get(gameId)
-    if (selectedGameId.value === gameId && savedScroll) {
-      await restoreChecklistScroll(savedScroll)
-    } else {
-      await nextTick()
-    }
+    savedScroll = checklistScrollByGame.get(gameId)
   } finally {
-    if (selectedGameId.value === gameId) restoringGameView.value = false
+    if (selectedGameId.value === gameId) {
+      restoringGameView.value = false
+      if (savedScroll) await restoreChecklistScroll(savedScroll)
+      else await nextTick()
+    }
   }
-})
+}, { flush: 'sync' })
+
+function currentPanelOrder(): ChecklistSection[] {
+  return normalizePanelOrder(panelOrders.value[selectedGameId.value] ?? DEFAULT_PANEL_ORDER)
+}
+
+function persistPanelOrder(order: readonly ChecklistSection[]): void {
+  panelOrders.value = writePanelOrder(
+    window.localStorage,
+    panelOrders.value,
+    selectedGameId.value,
+    order
+  )
+}
+
+function resetPanelOrder(): void {
+  persistPanelOrder(DEFAULT_PANEL_ORDER)
+}
+
+function beginPanelDrag(event: PointerEvent, section: ChecklistSection): void {
+  if (event.button !== 0) return
+  const handle = event.currentTarget
+  if (!(handle instanceof HTMLElement)) return
+  event.preventDefault()
+  draggingPanelSection.value = section
+  panelDropTarget.value = null
+  panelDragPointerId = event.pointerId
+  panelDragHandle = handle
+  panelDragPoint.value = { x: event.clientX, y: event.clientY }
+  handle.setPointerCapture(event.pointerId)
+}
+
+function handlePanelDragWheel(event: WheelEvent): void {
+  const workspace = workspaceElement.value
+  if (!draggingPanelSection.value || !workspace) return
+  const delta = panelDragWheelDelta(event.deltaY, event.deltaMode, workspace.clientHeight)
+  if (delta === 0) return
+  event.preventDefault()
+  workspace.scrollTop += delta
+  if (panelDragPoint.value) {
+    updatePanelDropTargetAtPoint(panelDragPoint.value.x, panelDragPoint.value.y)
+    window.requestAnimationFrame(() => {
+      if (panelDragPoint.value) {
+        updatePanelDropTargetAtPoint(panelDragPoint.value.x, panelDragPoint.value.y)
+      }
+    })
+  }
+}
+
+function updatePanelDropTargetAtPoint(clientX: number, clientY: number): void {
+  const source = draggingPanelSection.value
+  if (!source) return
+  const hit = document.elementFromPoint(clientX, clientY)
+  const element = hit instanceof Element
+    ? hit.closest<HTMLElement>('[data-panel-section]')
+    : null
+  const section = element?.dataset.panelSection as ChecklistSection | undefined
+  if (!element || !section || !panelBySection.has(section) || source === section) {
+    panelDropTarget.value = null
+    return
+  }
+  const bounds = element.getBoundingClientRect()
+  panelDropTarget.value = {
+    section,
+    position: clientY < bounds.top + bounds.height / 2 ? 'before' : 'after'
+  }
+}
+
+function movePanelDrag(event: PointerEvent): void {
+  if (event.pointerId !== panelDragPointerId || !draggingPanelSection.value) return
+  panelDragPoint.value = { x: event.clientX, y: event.clientY }
+  updatePanelDropTargetAtPoint(event.clientX, event.clientY)
+}
+
+function finishPanelDrag(event: PointerEvent): void {
+  if (event.pointerId !== panelDragPointerId) return
+  movePanelDrag(event)
+  dropPanel()
+}
+
+function cancelPanelDrag(event: PointerEvent): void {
+  if (event.pointerId === panelDragPointerId) endPanelDrag()
+}
+
+function dropPanel(): void {
+  const source = draggingPanelSection.value
+  const target = panelDropTarget.value
+  if (source && target) {
+    persistPanelOrder(movePanelSection(currentPanelOrder(), source, target.section, target.position))
+  }
+  endPanelDrag()
+}
+
+function endPanelDrag(): void {
+  if (panelDragHandle && panelDragPointerId !== null) {
+    try {
+      if (panelDragHandle.hasPointerCapture(panelDragPointerId)) {
+        panelDragHandle.releasePointerCapture(panelDragPointerId)
+      }
+    } catch {
+      // Pointer capture may already be released by the browser after pointerup.
+    }
+  }
+  panelDragPointerId = null
+  panelDragHandle = null
+  panelDragPoint.value = null
+  draggingPanelSection.value = null
+  panelDropTarget.value = null
+}
+
+function movePanelByKeyboard(section: ChecklistSection, direction: -1 | 1): void {
+  const order = currentPanelOrder()
+  const sourceIndex = order.indexOf(section)
+  const targetIndex = sourceIndex + direction
+  if (sourceIndex < 0 || targetIndex < 0 || targetIndex >= order.length) return
+  persistPanelOrder(movePanelSection(
+    order,
+    section,
+    order[targetIndex],
+    direction < 0 ? 'before' : 'after'
+  ))
+}
 
 interface ChecklistScrollSnapshot {
   workspaceTop: number
   workspaceLeft: number
-  listPositions: Array<{ top: number; left: number }>
 }
 
 function captureChecklistScroll(): ChecklistScrollSnapshot {
   return {
     workspaceTop: workspaceElement.value?.scrollTop ?? 0,
-    workspaceLeft: workspaceElement.value?.scrollLeft ?? 0,
-    listPositions: [...(workspaceElement.value?.querySelectorAll<HTMLElement>('.item-list') ?? [])]
-      .map((element) => ({ top: element.scrollTop, left: element.scrollLeft }))
+    workspaceLeft: workspaceElement.value?.scrollLeft ?? 0
   }
-}
-
-function measureNaturalColumnHeight(element: HTMLElement): number {
-  const wasConstrained = element.classList.contains('checklist-column-constrained')
-  const previousHeight = element.style.getPropertyValue('--adaptive-column-height')
-  const previousPriority = element.style.getPropertyPriority('--adaptive-column-height')
-  if (wasConstrained) {
-    element.classList.remove('checklist-column-constrained')
-    element.style.removeProperty('--adaptive-column-height')
-  }
-  const hiddenListHeight = [...element.querySelectorAll<HTMLElement>('.item-list')]
-    .reduce((total, list) => total + Math.max(0, list.scrollHeight - list.clientHeight), 0)
-  const naturalHeight = element.scrollHeight + hiddenListHeight
-  if (wasConstrained) {
-    element.classList.add('checklist-column-constrained')
-    if (previousHeight) {
-      element.style.setProperty('--adaptive-column-height', previousHeight, previousPriority)
-    }
-  }
-  return naturalHeight
-}
-
-function updateAdaptiveColumnLayout(): void {
-  const columns = checklistColumnElements.slice(0, 2)
-  if (columns.length < 2 || columns.some((element) => !element)) {
-    adaptiveColumnHeight.value = null
-    constrainedColumnIndex.value = null
-    return
-  }
-  const heights = columns.map((element) => measureNaturalColumnHeight(element!))
-  const layout = resolveAdaptiveColumnLayout(heights)
-  if (!layout) {
-    adaptiveColumnHeight.value = null
-    constrainedColumnIndex.value = null
-    return
-  }
-  if (
-    adaptiveColumnHeight.value === layout.height &&
-    constrainedColumnIndex.value === layout.constrainedIndex
-  ) return
-  adaptiveColumnHeight.value = layout.height
-  constrainedColumnIndex.value = layout.constrainedIndex
-}
-
-function scheduleAdaptiveColumnLayout(): void {
-  if (adaptiveLayoutFrame !== null) window.cancelAnimationFrame(adaptiveLayoutFrame)
-  adaptiveLayoutFrame = window.requestAnimationFrame(() => {
-    adaptiveLayoutFrame = null
-    updateAdaptiveColumnLayout()
-  })
-}
-
-function startAdaptiveColumnObserver(): void {
-  adaptiveResizeObserver?.disconnect()
-  adaptiveResizeObserver = new ResizeObserver(() => scheduleAdaptiveColumnLayout())
-  for (const element of checklistColumnElements.slice(0, 2)) {
-    if (element) adaptiveResizeObserver.observe(element)
-  }
-  scheduleAdaptiveColumnLayout()
-}
-
-function setChecklistColumnElement(element: Element | null, index: number): void {
-  const previous = checklistColumnElements[index]
-  const htmlElement = element instanceof HTMLElement ? element : null
-  if (previous === htmlElement) return
-  if (previous) adaptiveResizeObserver?.unobserve(previous)
-  checklistColumnElements[index] = htmlElement
-  if (htmlElement && index < 2) adaptiveResizeObserver?.observe(htmlElement)
-  scheduleAdaptiveColumnLayout()
 }
 
 async function restoreChecklistScroll(snapshot: ChecklistScrollSnapshot): Promise<void> {
@@ -614,12 +760,6 @@ async function restoreChecklistScroll(snapshot: ChecklistScrollSnapshot): Promis
       top: snapshot.workspaceTop,
       left: snapshot.workspaceLeft,
       behavior: 'auto'
-    })
-    const lists = workspaceElement.value?.querySelectorAll<HTMLElement>('.item-list') ?? []
-    lists.forEach((element, index) => {
-      const position = snapshot.listPositions[index]
-      if (!position) return
-      element.scrollTo({ top: position.top, left: position.left, behavior: 'auto' })
     })
   }
   await nextTick()
@@ -653,7 +793,6 @@ async function loadItems(
       collapsedMapKeysByGame.set(gameId, collapsed)
       collapsedMapKeys.value = new Set(collapsed)
       if (scrollSnapshot) await restoreChecklistScroll(scrollSnapshot)
-      scheduleAdaptiveColumnLayout()
     }
   } catch (error) {
     if (selectedGameId.value === gameId) showError(error)
@@ -672,14 +811,159 @@ async function loadSyncSettings(): Promise<void> {
   }
 }
 
-async function dismissInitialSyncGuide(): Promise<void> {
-  const gameId = selectedGameId.value
+async function dismissInitialSyncGuide(gameId = selectedGameId.value): Promise<boolean> {
+  const previousSettings = selectedGameId.value === gameId ? syncSettings.value : null
+  if (previousSettings && selectedGameId.value === gameId) {
+    syncSettings.value = { ...previousSettings, initialGuideDismissed: true }
+  }
   try {
     const settings = await window.gacha.dismissInitialSyncGuide(gameId)
     if (selectedGameId.value === gameId) syncSettings.value = settings
+    return true
+  } catch (error) {
+    if (selectedGameId.value === gameId && previousSettings) syncSettings.value = previousSettings
+    if (selectedGameId.value === gameId) showError(error)
+    return false
+  }
+}
+
+function credentialProviderForGame(gameId: GameId): CredentialProvider {
+  return gameId === 'wuthering-waves' ? 'kuro-community' : 'miyoushe'
+}
+
+async function ensurePersonalSyncCredential(gameId: GameId): Promise<boolean> {
+  credentialStatuses.value = await window.gacha.listCredentialStatuses()
+  const provider = credentialProviderForGame(gameId)
+  const credential = credentialStatuses.value.find((status) => status.provider === provider)
+  if (credential?.stored) return true
+  if (selectedGameId.value === gameId) await openCredentialSettings(provider)
+  return false
+}
+
+async function runPersonalSyncBatch(gameId = selectedGameId.value): Promise<boolean> {
+  if (globalPersonalSyncBusy.value) return false
+  globalSyncMenuOpen.value = false
+  globalPersonalSyncBusy.value = true
+  try {
+    if (!await ensurePersonalSyncCredential(gameId)) return false
+    const supportedTargets = orderPersonalSyncTargets(
+      await window.gacha.getPersonalSyncTargets(gameId)
+    )
+    if (supportedTargets.length === 0) {
+      if (selectedGameId.value === gameId) errorMessage.value = '当前游戏暂不支持同步个人数据'
+      return false
+    }
+    for (let index = 0; index < supportedTargets.length; index += 1) {
+      if (index > 0) await waitForPersonalSyncCooldown()
+      if (!await runPersonalSync(supportedTargets[index], gameId)) return false
+    }
+    return true
   } catch (error) {
     if (selectedGameId.value === gameId) showError(error)
+    return false
+  } finally {
+    globalPersonalSyncBusy.value = false
   }
+}
+
+async function runGlobalPublicSync(gameId = selectedGameId.value): Promise<boolean> {
+  if (globalPublicSyncBusy.value) return false
+  globalSyncMenuOpen.value = false
+  if (!aiScheduleAvailable.value) {
+    codexSetupPromptOpen.value = true
+    return false
+  }
+  globalPublicSyncBusy.value = true
+  try {
+    const states = await window.gacha.getSyncTargetStates(gameId)
+    if (selectedGameId.value === gameId) syncTargetStates.value = states
+    const targets = selectGuardedGlobalPublicTargets(states)
+    const results = await Promise.all(
+      targets.map((target) => runSync('public_schedule', target, gameId))
+    )
+    const skippedPersonalCount = ['events', 'cycles', 'exploration'].filter((target) =>
+      states.find((state) => state.target === target)?.catalogSource === 'personal_data'
+    ).length
+    if (selectedGameId.value === gameId && skippedPersonalCount > 0 && !results.every(Boolean)) {
+      syncNotice.value = userFacingSyncNotice({
+        status: 'partial',
+        needsRetry: true
+      })
+    }
+    return results.length > 0 && results.every(Boolean)
+  } catch (error) {
+    if (selectedGameId.value === gameId) showError(error)
+    return false
+  } finally {
+    globalPublicSyncBusy.value = false
+  }
+}
+
+async function continueInitialSyncSetup(): Promise<void> {
+  const setup = pendingInitialSyncSetup.value
+  if (!setup || initialSyncContinuationBusy.value) return
+  initialSyncContinuationBusy.value = true
+  try {
+    const provider = credentialProviderForGame(setup.gameId)
+    if (setup.source === 'personal_data') {
+      credentialStatuses.value = await window.gacha.listCredentialStatuses()
+    }
+    const credentialStored = setup.source === 'personal_data' && credentialStatuses.value.some(
+      (status) => status.provider === provider && status.stored
+    )
+    const step = resolveInitialSyncSetupStep(
+      setup,
+      Boolean(aiScheduleAgent.value?.codexPluginInstalled),
+      credentialStored
+    )
+    if (step === 'codex_plugin') {
+      codexSetupPromptOpen.value = true
+      return
+    }
+    if (step === 'credential') {
+      await openCredentialSettings(provider)
+      return
+    }
+
+    pendingInitialSyncSetup.value = null
+    if (setup.source === 'personal_data') {
+      void runPersonalSyncBatch(setup.gameId)
+    } else {
+      void runGlobalPublicSync(setup.gameId)
+    }
+  } catch (error) {
+    if (selectedGameId.value === setup.gameId) showError(error)
+  } finally {
+    initialSyncContinuationBusy.value = false
+  }
+}
+
+async function beginInitialSync(source: InitialSyncSource): Promise<void> {
+  if (onboardingBusy.value) return
+  const gameId = selectedGameId.value
+  const claim = claimInitialSyncSetup(pendingInitialSyncSetup.value, gameId, source)
+  if (!claim.accepted) return
+  pendingInitialSyncSetup.value = claim.setup
+  onboardingBusy.value = true
+  try {
+    if (!await dismissInitialSyncGuide(gameId)) {
+      pendingInitialSyncSetup.value = null
+      return
+    }
+  } catch (error) {
+    showError(error)
+  } finally {
+    onboardingBusy.value = false
+  }
+  await continueInitialSyncSetup()
+}
+
+async function startInitialPublicSync(): Promise<void> {
+  await beginInitialSync('public_schedule')
+}
+
+async function startInitialPersonalSync(): Promise<void> {
+  await beginInitialSync('personal_data')
 }
 
 async function loadSyncTargetStates(): Promise<void> {
@@ -725,7 +1009,7 @@ function syncStateLabel(state: SyncTargetState | undefined): string {
   const source = state.catalogSource === 'personal_data'
     ? '个人数据'
     : state.catalogSource === 'public_schedule'
-      ? '公开资料'
+      ? '公开数据'
       : null
   if (state.status === 'success') return source ? `已同步 · ${source}` : '已同步'
   if (state.status === 'stale') return '部分同步'
@@ -741,9 +1025,25 @@ function syncStateClass(state: SyncTargetState | undefined): string {
 async function loadAiScheduleAgentStatus(): Promise<void> {
   try {
     aiScheduleAgent.value = await window.gacha.getAiScheduleAgentStatus()
+    if (aiScheduleAgent.value.codexPluginInstalled) {
+      codexSetupPromptOpen.value = false
+      if (pendingInitialSyncSetup.value) void continueInitialSyncSetup()
+    }
   } catch (error) {
     showError(error)
   }
+}
+
+function dismissCodexSetupPrompt(): void {
+  codexSetupPromptOpen.value = false
+  const setup = pendingInitialSyncSetup.value
+  if (!setup) return
+  if (setup.source === 'public_schedule') {
+    pendingInitialSyncSetup.value = null
+    return
+  }
+  pendingInitialSyncSetup.value = { ...setup, allowWithoutCodexPlugin: true }
+  void continueInitialSyncSetup()
 }
 
 async function loadActiveAiJobs(): Promise<void> {
@@ -753,103 +1053,16 @@ async function loadActiveAiJobs(): Promise<void> {
     if (selectedGameId.value === gameId) {
       activeAiJobs.value = jobs
       activeAiJob.value = jobs[0] ?? null
-    }
-  } catch (error) {
-    if (selectedGameId.value === gameId) showError(error)
-  }
-}
-
-async function refreshSemanticReviewProgress(
-  requestedTarget?: PersonalSyncTarget
-): Promise<void> {
-  const gameId = selectedGameId.value
-  try {
-    const targets = requestedTarget ? [requestedTarget] : personalReviewTargets
-    const summaries = await Promise.all(
-      targets.map(async (target) => ({
-        target,
-        summary: await window.gacha.getSemanticReviewSummary(gameId, target)
-      }))
-    )
-    if (selectedGameId.value !== gameId) return
-    let completedAny = false
-    const completedDecisions: SemanticReviewSummary['latestDecision'][] = []
-    const nextSummaries = { ...semanticReviewSummaryByKey.value }
-    const nextProgress = { ...personalSyncProgressByKey.value }
-    for (const { target, summary } of summaries) {
-      const key = personalProgressKey(gameId, target)
-      const previousSummary = semanticReviewSummaryByKey.value[key]
-      const previousRemaining = previousSummary
-        ? previousSummary.pendingCount + previousSummary.claimedCount
-        : 0
-      nextSummaries[key] = summary
-      const remaining = summary.pendingCount + summary.claimedCount
-      if (remaining > 0) {
-        const waitingForCatalog = summary.waitingForCatalogCount > 0
-        const catalogJobActive = activeAiJobs.value.some(
-          (job) =>
-            job.gameId === gameId &&
-            job.jobKind === 'public_catalog' &&
-            (job.target === target || job.target === 'all')
-        )
-        if (waitingForCatalog && !catalogJobActive) {
-          delete nextProgress[key]
-          syncNotice.value = {
-            status: 'partial',
-            message: '个人数据已暂存，但规范清单尚未完成；请重新同步进度以继续补建清单'
-          }
-          continue
-        }
-        const total = Math.max(personalReviewTotals.get(key) ?? 0, remaining)
-        personalReviewTotals.set(key, total)
-        if (
-          remaining !== semanticReviewLastRemaining.get(key) ||
-          !semanticReviewLastUpdatedAt.get(key)
-        ) {
-          semanticReviewLastRemaining.set(key, remaining)
-          semanticReviewLastUpdatedAt.set(key, new Date().toISOString())
-        }
-        nextProgress[key] = {
-          gameId,
-          target,
-          source: 'personal_data',
-          phase: summary.claimedCount > 0 ? 'verifying' : 'queued',
-          status: summary.claimedCount > 0 ? 'running' : 'waiting',
-          message: summary.claimedCount > 0
-            ? `Codex 正在核验个人${target === 'events' ? '活动' : target === 'cycles' ? '周期事项' : '地图'}数据，剩余 ${remaining} 条`
-            : waitingForCatalog
-              ? '个人数据已暂存，正在先建立完整的公开规范清单'
-              : '排队中，等待可用的 Codex 处理',
-          current: summary.claimedCount > 0 ? Math.max(0, total - remaining) : null,
-          total: summary.claimedCount > 0 ? total : null,
-          updatedAt: semanticReviewLastUpdatedAt.get(key)!
-        }
-        continue
+      const activeTargets = new Set<PersonalSyncTarget>()
+      for (const target of personalReviewTargets) {
+        if (isSyncRequestActive('personal_data', target, gameId)) activeTargets.add(target)
       }
-      if (previousRemaining > 0 || (personalReviewTotals.get(key) ?? 0) > 0) {
-        delete nextProgress[key]
-        personalReviewTotals.delete(key)
-        semanticReviewLastRemaining.delete(key)
-        semanticReviewLastUpdatedAt.delete(key)
-        completedAny = true
-        completedDecisions.push(summary.latestDecision)
-      }
-    }
-    semanticReviewSummaryByKey.value = nextSummaries
-    personalSyncProgressByKey.value = nextProgress
-    if (completedAny) {
-      const cancelled = completedDecisions.some(
-        (decision) => decision?.status === 'rejected' && decision.message === '用户已取消'
+      personalSyncProgressByKey.value = reconcilePersonalProgressForGame(
+        personalSyncProgressByKey.value,
+        gameId,
+        jobs,
+        activeTargets
       )
-      const rejected = completedDecisions.some(
-        (decision) => decision?.status === 'rejected'
-      )
-      syncNotice.value = cancelled
-        ? { status: 'cancelled', message: '已取消' }
-        : rejected
-          ? { status: 'partial', message: 'Codex 核验结束，部分数据未写入，可重新同步' }
-          : { status: 'success', message: '个人进度已由 Codex 核验并合并' }
-      await Promise.all([loadItems(), loadSyncSettings(), loadSyncTargetStates()])
     }
   } catch (error) {
     if (selectedGameId.value === gameId) showError(error)
@@ -860,12 +1073,12 @@ const syncProgressPhaseLabels: Record<SyncProgressUpdate['phase'], string> = {
   queued: '排队中',
   fetching: '读取数据',
   searching: '联网检索',
-  verifying: '交叉核验',
-  structuring: '整理数据',
+  verifying: '核对信息',
+  structuring: '整理清单',
   writing: '写入清单',
   retrying: '正在重试',
   verification: '等待验证',
-  merging: '安全合并',
+  merging: '更新清单',
   completed: '同步完成',
   failed: '同步失败',
   cancelled: '已取消'
@@ -881,10 +1094,10 @@ const syncProgressTargetLabels: Record<SyncTarget, string> = {
 
 function syncProgressTitle(progress: SyncProgressUpdate): string {
   if (progress.source !== 'public_schedule') {
-    return `${personalPlatform.value}${syncProgressTargetLabels[progress.target]}进度同步`
+    return `${personalPlatform.value}${syncProgressTargetLabels[progress.target]}个人数据同步`
   }
-  if (progress.target === 'tasks') return 'Codex 版更校时'
-  return `Codex ${syncProgressTargetLabels[progress.target]}清单同步`
+  if (progress.target === 'tasks') return '版更校时'
+  return `${syncProgressTargetLabels[progress.target]}公开数据同步`
 }
 
 function syncProgressCount(progress: SyncProgressUpdate): string | null {
@@ -911,27 +1124,7 @@ function syncProgressAge(progress: SyncProgressUpdate): string {
 }
 
 function syncProgressMessage(progress: SyncProgressUpdate): string {
-  if (
-    progress.source !== 'public_schedule' ||
-    progress.status !== 'waiting' ||
-    activeAiJob.value?.status !== 'pending'
-  ) {
-    return progress.message
-  }
-  if (
-    progress.message &&
-    progress.message !== '等待 Codex 接单' &&
-    !progress.message.includes('已提交给 AI')
-  ) {
-    return progress.message
-  }
-  const waitingMs = clockNow.value - new Date(progress.updatedAt).getTime()
-  if (progress.message.includes('重新排队')) {
-    return '上次处理长时间没有进度，已重新排队等待 Codex 接单'
-  }
-  if (waitingMs < 10_000) return '同步任务已提交，正在启动本机 Codex'
-  if (waitingMs < 60_000) return '本机 Codex 正在启动并连接同步插件'
-  return '排队中；Codex 可用后会自动继续，无需重新同步'
+  return userFacingProgressMessage(progress)
 }
 
 function progressForTarget(target: SyncTarget): SyncProgressUpdate | null {
@@ -951,18 +1144,40 @@ async function loadArchivedItems(): Promise<void> {
 async function openSettings(): Promise<void> {
   settingsOpen.value = true
   try {
-    const [statuses, listedBackups, preferences] = await Promise.all([
+    const [statuses, listedBackups, preferences, loadedRenderingMode, loadedUpdateSettings] = await Promise.all([
       window.gacha.listCredentialStatuses(),
       window.gacha.listBackups(),
-      window.gacha.getCodexWorkerPreferences()
+      window.gacha.getCodexWorkerPreferences(),
+      window.gacha.getRenderingModeState(),
+      window.gacha.getSoftwareUpdateSettings()
     ])
     credentialStatuses.value = statuses
     backups.value = listedBackups
     codexWorkerPreferences.value = preferences
     codexWorkerPreferencesMessage.value = ''
+    renderingModeState.value = loadedRenderingMode
+    renderingModeSelection.value = loadedRenderingMode.configured
+    renderingModeMessage.value = ''
+    softwareUpdateSettings.value = loadedUpdateSettings
+    softwareUpdateMessage.value = ''
   } catch (error) {
     showError(error)
   }
+}
+
+function closeSettings(): void {
+  settingsOpen.value = false
+  const setup = pendingInitialSyncSetup.value
+  if (!setup || setup.source !== 'personal_data') return
+  const provider = credentialProviderForGame(setup.gameId)
+  const credentialStored = credentialStatuses.value.some(
+    (status) => status.provider === provider && status.stored
+  )
+  if (!credentialStored) {
+    pendingInitialSyncSetup.value = null
+    return
+  }
+  void continueInitialSyncSetup()
 }
 
 async function openCredentialSettings(provider: CredentialProvider): Promise<void> {
@@ -1077,6 +1292,7 @@ async function pollMiyousheLogin(): Promise<void> {
 
 async function closeMiyousheLogin(): Promise<void> {
   const sessionId = miyousheLoginState.value?.sessionId
+  const shouldResumeInitialSync = miyousheLoginState.value?.status === 'confirmed'
   const finished = ['confirmed', 'expired'].includes(miyousheLoginState.value?.status ?? '')
   stopMiyousheLoginPolling()
   miyousheLoginOpen.value = false
@@ -1087,6 +1303,10 @@ async function closeMiyousheLogin(): Promise<void> {
     } catch {
       // Closing the UI remains safe even if the in-memory session already expired.
     }
+  }
+  if (shouldResumeInitialSync) {
+    settingsOpen.value = false
+    await continueInitialSyncSetup()
   }
 }
 
@@ -1186,6 +1406,8 @@ async function saveKuroCommunityLogin(): Promise<void> {
     credentialStatuses.value = await window.gacha.listCredentialStatuses()
     kuroCredentialBusy.value = false
     await closeKuroCommunityLogin()
+    settingsOpen.value = false
+    await continueInitialSyncSetup()
   } catch (error) {
     kuroCredentialMessage.value = error instanceof Error
       ? error.message
@@ -1214,6 +1436,7 @@ async function openExternalSource(url: string): Promise<void> {
 async function openCodexPlugin(): Promise<void> {
   try {
     await window.gacha.openCodexPlugin()
+    codexPluginMessage.value = 'Codex 安装页已打开；安装并启用后，Gtask 会自动检测。'
   } catch (error) {
     showError(error)
   }
@@ -1224,7 +1447,7 @@ async function updateCodexPlugin(): Promise<void> {
   codexPluginMessage.value = '正在更新插件…'
   try {
     const result = await window.gacha.updateCodexPlugin()
-    codexPluginMessage.value = `${result.message}；新同步任务将使用最新版。`
+    codexPluginMessage.value = result.message
     await loadAiScheduleAgentStatus()
   } catch (error) {
     codexPluginMessage.value = ''
@@ -1242,13 +1465,77 @@ async function saveCodexWorkerPreferences(): Promise<void> {
     codexWorkerPreferences.value = await window.gacha.updateCodexWorkerPreferences(
       toCodexWorkerPreferencesIpcPayload(codexWorkerPreferences.value)
     )
-    codexWorkerPreferencesMessage.value = '已保存，新启动的后台同步任务将使用此设置。'
+    codexWorkerPreferencesMessage.value = '设置已保存'
   } catch (error) {
     codexWorkerPreferencesMessage.value = ''
     showError(error)
   } finally {
     codexWorkerPreferencesBusy.value = false
   }
+}
+
+async function saveRenderingMode(): Promise<void> {
+  if (renderingModeBusy.value) return
+  renderingModeBusy.value = true
+  renderingModeMessage.value = '正在保存…'
+  try {
+    const state = await window.gacha.updateRenderingMode(renderingModeSelection.value)
+    renderingModeState.value = state
+    if (!state.restartRequired) {
+      renderingModeMessage.value = '当前已使用此模式。'
+      return
+    }
+    renderingModeMessage.value = '已保存，正在重启 Gtask…'
+    await window.gacha.restartApp()
+  } catch (error) {
+    renderingModeMessage.value = ''
+    showError(error)
+  } finally {
+    renderingModeBusy.value = false
+  }
+}
+
+async function saveSoftwareUpdatePreference(): Promise<void> {
+  if (softwareUpdateBusy.value) return
+  softwareUpdateBusy.value = true
+  softwareUpdateMessage.value = '正在保存…'
+  try {
+    softwareUpdateSettings.value = await window.gacha.updateSoftwareUpdateSettings({
+      autoCheckEnabled: softwareUpdateSettings.value.autoCheckEnabled
+    })
+    softwareUpdateMessage.value = '设置已保存'
+  } catch (error) {
+    softwareUpdateSettings.value.autoCheckEnabled = !softwareUpdateSettings.value.autoCheckEnabled
+    softwareUpdateMessage.value = ''
+    showError(error)
+  } finally {
+    softwareUpdateBusy.value = false
+  }
+}
+
+async function checkSoftwareUpdate(): Promise<void> {
+  if (softwareUpdateBusy.value) return
+  softwareUpdateBusy.value = true
+  softwareUpdateMessage.value = '正在检查更新…'
+  try {
+    const result: SoftwareUpdateCheckResult = await window.gacha.checkSoftwareUpdate()
+    softwareUpdateMessage.value = result.message
+    softwareUpdateSettings.value = await window.gacha.getSoftwareUpdateSettings()
+    if (result.outcome === 'update_available' && result.releaseUrl) {
+      const confirmed = window.confirm(`${result.message}，是否查看更新？`)
+      if (confirmed) await window.gacha.openExternalUrl(result.releaseUrl)
+    }
+  } catch (error) {
+    softwareUpdateMessage.value = '暂时无法检查更新，请稍后重试'
+    showError(error)
+  } finally {
+    softwareUpdateBusy.value = false
+  }
+}
+
+function formatUpdateCheckTime(value: string | null): string {
+  if (!value) return '尚未完成在线检查'
+  return `上次检查 ${new Date(value).toLocaleString('zh-CN', { hour12: false })}`
 }
 
 async function copyCodexProxyRepairPrompt(): Promise<void> {
@@ -1265,8 +1552,8 @@ async function copyCodexProxyRepairPrompt(): Promise<void> {
 
 async function repairCodexConnection(mode: 'proxy' | 'https'): Promise<void> {
   const confirmed = window.confirm(mode === 'proxy'
-    ? '检测到 Codex 连接反复重试。软件会读取系统代理解析到的本地端口，仅显式应用于本软件启动的 Codex 进程；不会修改 Windows 或 Codex 配置。重连会消耗少量额外 Token，是否继续？'
-    : '显式应用当前代理后仍未解决连接重试。软件将关闭本次 Codex 进程的 Responses WebSocket，改用已验证的 HTTPS 兼容连接；不会修改 Codex 配置。重连会消耗少量额外 Token，是否继续？')
+    ? '检测到 Codex 连接不稳定。是否使用当前系统代理重新连接？不会修改 Windows 或 Codex 配置，重连会消耗少量 Token。'
+    : '连接仍不稳定。是否改用 HTTPS 兼容连接？不会修改 Codex 配置，重连会消耗少量 Token。')
   if (!confirmed) return
   codexRepairBusy.value = true
   try {
@@ -1294,10 +1581,6 @@ function syncRequestKey(
   target: SyncTarget
 ): string {
   return `${gameId}:${source}:${target}`
-}
-
-function personalProgressKey(gameId: GameId, target: PersonalSyncTarget): string {
-  return `${gameId}:${target}`
 }
 
 function setSyncRequestActive(
@@ -1328,16 +1611,31 @@ function hasActivePublicSyncForTarget(target: SyncTarget): boolean {
   )
 }
 
-function hasActivePersonalSyncForTarget(target: PersonalSyncTarget): boolean {
+function hasActivePersonalSyncForTarget(
+  target: PersonalSyncTarget,
+  gameId = selectedGameId.value
+): boolean {
   const progress = personalSyncProgressByKey.value[
-    personalProgressKey(selectedGameId.value, target)
+    personalProgressKey(gameId, target)
   ]
-  return activeAiJobs.value.some((job) =>
-    job.jobKind === 'personal_metadata' && job.target === target
-  ) || isSyncRequestActive('personal_data', target) || Boolean(
+  return activeAiJobs.value.some((job) => job.gameId === gameId &&
+    (job.jobKind === 'personal_metadata' || job.jobKind === 'personal_review') &&
+      job.target === target
+  ) || isSyncRequestActive('personal_data', target, gameId) || Boolean(
     progress && ['waiting', 'running', 'verification_required'].includes(progress.status)
   )
 }
+
+const hasActivePersonalSync = computed(() =>
+  personalSyncTargets.value.some((target) => hasActivePersonalSyncForTarget(target))
+)
+const globalSyncBusy = computed(() =>
+  globalPersonalSyncBusy.value ||
+  globalPublicSyncBusy.value ||
+  syncing.value ||
+  hasActivePublicSync.value ||
+  hasActivePersonalSync.value
+)
 
 function isCancellingSync(progress: SyncProgressUpdate): boolean {
   return cancellingSyncKeys.value.has(
@@ -1363,7 +1661,7 @@ async function cancelSync(progress: SyncProgressUpdate): Promise<void> {
       (job) => !(
         job.gameId === progress.gameId &&
         job.target === progress.target &&
-        job.jobKind === 'personal_metadata'
+        (job.jobKind === 'personal_metadata' || job.jobKind === 'personal_review')
       )
     )
     activeAiJob.value = activeAiJobs.value[0] ?? null
@@ -1381,13 +1679,12 @@ async function cancelSync(progress: SyncProgressUpdate): Promise<void> {
     )
     syncNotice.value = {
       status: result.cancelled ? 'cancelled' : 'partial',
-      message: result.message
+      message: result.cancelled ? '同步已取消' : '当前没有进行中的同步'
     }
     await Promise.all([
       loadActiveAiJobs(),
       loadSyncSettings(),
-      loadSyncTargetStates(),
-      refreshSemanticReviewProgress()
+      loadSyncTargetStates()
     ])
   } catch (error) {
     showError(error)
@@ -1398,9 +1695,17 @@ async function cancelSync(progress: SyncProgressUpdate): Promise<void> {
   }
 }
 
-async function runSync(scope: SyncScope, target: SyncTarget = 'all'): Promise<void> {
-  const gameId = selectedGameId.value
-  if (isSyncRequestActive('public_schedule', target, gameId)) return
+async function runSync(
+  scope: SyncScope,
+  target: SyncTarget = 'all',
+  gameId = selectedGameId.value
+): Promise<boolean> {
+  if (isSyncRequestActive('public_schedule', target, gameId)) return false
+  if (!aiScheduleAvailable.value) {
+    codexSetupPromptOpen.value = true
+    return false
+  }
+  globalSyncMenuOpen.value = false
   sectionSyncMenuOpen.value = null
   setSyncRequestActive(gameId, 'public_schedule', target, true)
   syncNotice.value = null
@@ -1410,21 +1715,25 @@ async function runSync(scope: SyncScope, target: SyncTarget = 'all'): Promise<vo
       userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
     })
     if (selectedGameId.value === gameId) {
-      syncNotice.value = { status: result.status, message: displaySyncMessage(result.message) }
+      syncNotice.value = syncResultNotice(result)
       await Promise.all([loadItems(), loadSyncSettings(), loadSyncTargetStates(), loadActiveAiJobs()])
     }
+    return result.status !== 'error' && result.status !== 'cancelled'
   } catch (error) {
     if (selectedGameId.value === gameId) showError(error)
+    return false
   } finally {
     setSyncRequestActive(gameId, 'public_schedule', target, false)
   }
 }
 
-async function runPersonalSync(target: SyncTarget): Promise<void> {
-  if (target === 'all' || target === 'tasks') return
-  const gameId = selectedGameId.value
-  if (hasActivePersonalSyncForTarget(target)) return
-  let keepReviewProgress = false
+async function runPersonalSync(
+  target: SyncTarget,
+  gameId = selectedGameId.value
+): Promise<boolean> {
+  if (target === 'all' || target === 'tasks') return false
+  if (hasActivePersonalSyncForTarget(target, gameId)) return false
+  globalSyncMenuOpen.value = false
   sectionSyncMenuOpen.value = null
   setSyncRequestActive(gameId, 'personal_data', target, true)
   syncNotice.value = null
@@ -1439,34 +1748,56 @@ async function runPersonalSync(target: SyncTarget): Promise<void> {
     })
     if (selectedGameId.value === gameId) {
       const credentialProvider = credentialProviderForSyncResult(result)
-      syncNotice.value = {
+      syncNotice.value = userFacingSyncNotice({
         status: result.status,
-        message: displaySyncMessage(result.message),
-        credentialProvider
-      }
+        credentialProvider,
+        needsRetry: result.sources.some((source) => source.status === 'error')
+      })
       const pendingReview = result.sources.reduce(
         (count, source) => count + (source.pendingReview ?? 0),
         0
       )
       if (pendingReview > 0) {
-        keepReviewProgress = true
-        personalReviewTotals.set(progressKey, pendingReview)
         await loadActiveAiJobs()
-        await refreshSemanticReviewProgress(target)
+      }
+      if (result.sources.some((source) => source.requiresCodexPlugin)) {
+        codexSetupPromptOpen.value = true
       }
       await Promise.all([loadItems(), loadSyncSettings(), loadSyncTargetStates()])
       if (credentialProvider) await openCredentialSettings(credentialProvider)
     }
+    return result.status !== 'error' && result.status !== 'cancelled' &&
+      !credentialProviderForSyncResult(result)
   } catch (error) {
     if (selectedGameId.value === gameId) showError(error)
+    return false
   } finally {
     setSyncRequestActive(gameId, 'personal_data', target, false)
-    if (selectedGameId.value === gameId && !keepReviewProgress) {
+    const hasBackgroundJob = activeAiJobs.value.some(
+      (job) => job.gameId === gameId && job.target === target &&
+        (job.jobKind === 'personal_metadata' || job.jobKind === 'personal_review')
+    )
+    if (selectedGameId.value === gameId && !hasBackgroundJob) {
       const remainingProgress = { ...personalSyncProgressByKey.value }
       delete remainingProgress[progressKey]
       personalSyncProgressByKey.value = remainingProgress
     }
   }
+}
+
+function requestSectionPublicSync(target: PersonalSyncTarget): void {
+  sectionSyncMenuOpen.value = null
+  if (syncTargetState(target)?.catalogSource === 'personal_data') {
+    pendingPublicSourceSwitch.value = target
+    return
+  }
+  void runSync('public_schedule', target)
+}
+
+async function confirmPublicSourceSwitch(): Promise<void> {
+  const target = pendingPublicSourceSwitch.value
+  pendingPublicSourceSwitch.value = null
+  if (target) await runSync('public_schedule', target)
 }
 
 function itemsFor(categories: ChecklistCategory[]): ChecklistItem[] {
@@ -1501,9 +1832,10 @@ function panelItems(panel: ChecklistPanel): ChecklistTreeRow[] {
 
 function panelItemColumns(panel: ChecklistPanel): ChecklistTreeRow[][] {
   const rows = panelItems(panel)
-  return panel.section === 'exploration'
-    ? distributeMapTreeRows(rows, 2)
-    : [rows]
+  if (panel.section === 'exploration') return distributeMapTreeRows(rows, 2)
+  if (rows.length <= 1) return rows.length === 0 ? [] : [rows]
+  const midpoint = Math.ceil(rows.length / 2)
+  return [rows.slice(0, midpoint), rows.slice(midpoint)]
 }
 
 function toggleMapBranch(item: ChecklistItem): void {
@@ -1664,7 +1996,7 @@ async function archiveCompletedSection(
   sectionTitle: string
 ): Promise<void> {
   const completedItems = items.value.filter(
-    (item) => categories.includes(item.category) && item.completed && !isPersistentItem(item)
+    (item) => categories.includes(item.category) && item.completed && item.source === 'manual' && !isPersistentItem(item)
   )
   if (completedItems.length === 0) return
   if (!window.confirm(`确定删除“${sectionTitle}”中的 ${completedItems.length} 个已完成事项吗？`)) return
@@ -1773,7 +2105,7 @@ function showError(error: unknown): void {
 </script>
 
 <template>
-  <main class="app-shell" @click="sectionSyncMenuOpen = null; activityTagMenuOpen = false">
+  <main class="app-shell" @click="globalSyncMenuOpen = false; sectionSyncMenuOpen = null; activityTagMenuOpen = false">
     <aside class="sidebar">
       <div class="brand">
         <img class="brand-mark" :src="appIcon" alt="" aria-hidden="true">
@@ -1799,7 +2131,13 @@ function showError(error: unknown): void {
         </button>
       </nav>
       <div class="sidebar-footer">
-        <button type="button" @click="recycleBinOpen = true">♲ 回收站 <span>{{ archivedItems.length }}</span></button>
+        <button type="button" @click="recycleBinOpen = true">
+          <span class="sidebar-action-label">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></svg>
+            回收站
+          </span>
+          <span>{{ archivedItems.length }}</span>
+        </button>
         <button type="button" @click="openSettings">⚙ 设置</button>
       </div>
     </aside>
@@ -1810,29 +2148,54 @@ function showError(error: unknown): void {
           <p class="eyebrow">本地任务总览</p>
           <h1>{{ selectedGame?.name ?? 'Gtask' }}</h1>
         </div>
-        <div class="topbar-actions">
+        <div v-if="!loading && !restoringGameView" class="topbar-actions">
           <button
-            class="toolbar-button"
+            class="toolbar-button incomplete-filter-button"
             :class="{ active: showIncompleteOnly }"
             type="button"
             :aria-pressed="showIncompleteOnly"
             @click="showIncompleteOnly = !showIncompleteOnly"
           >
-            ◇ 只看未完成
+            <span>只看未完成</span>
+            <svg class="incomplete-filter-icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M2.5 3.25h11L8.75 7.5v5.25h-1.5V7.5L2.5 3.25Z" />
+            </svg>
           </button>
-          <button
-            class="toolbar-button"
-            type="button"
-            :disabled="syncing || hasActivePublicSync || !aiScheduleAvailable"
-            :title="aiScheduleAgent?.connected
-              ? `已连接 ${aiScheduleAgent.name}`
-              : aiScheduleAgent?.codexPluginInstalled
-                ? '已安装 Codex 插件；点击后将自动启动 Codex 处理资料任务'
-                : '刷新清单需要连接 Codex/MCP'"
-            @click="runSync('public_schedule')"
-          >
-            {{ hasActivePublicSync ? 'AI 处理中…' : syncing ? '同步中…' : aiScheduleAvailable ? '↻ 刷新清单' : '↻ 未连接 AI' }}
-          </button>
+          <div class="dropdown global-sync-dropdown" @click.stop>
+            <button
+              class="toolbar-button global-sync-button"
+              type="button"
+              aria-haspopup="menu"
+              :aria-expanded="globalSyncMenuOpen"
+              :disabled="globalSyncBusy"
+              @click="globalSyncMenuOpen = !globalSyncMenuOpen"
+            >
+              <span>全局同步</span>
+              <svg class="dropdown-chevron global-sync-chevron" viewBox="0 0 16 16" aria-hidden="true">
+                <path d="m4 6 4 4 4-4" />
+              </svg>
+            </button>
+            <div v-if="globalSyncMenuOpen" class="dropdown-menu global-sync-menu" role="menu">
+              <button
+                role="menuitem"
+                type="button"
+                :disabled="personalSyncTargets.length === 0 || hasActivePersonalSync"
+                @click="runPersonalSyncBatch()"
+              >
+                <strong>同步个人数据</strong>
+                <small>按版块依次读取官方进度</small>
+              </button>
+              <button
+                role="menuitem"
+                type="button"
+                :disabled="!aiScheduleAvailable || hasActivePersonalSync"
+                @click="runGlobalPublicSync()"
+              >
+                <strong>同步公开数据</strong>
+                <small>保留正在使用的个人数据版块</small>
+              </button>
+            </div>
+          </div>
           <span
             class="sync-indicator"
             :class="syncStateClass(globalSyncState)"
@@ -1840,31 +2203,14 @@ function showError(error: unknown): void {
               ? `同步时间：${new Date(syncStateTimestamp(globalSyncState)!).toLocaleString()}`
               : '尚未完成全局同步'"
           >
-            <strong>全局清单 · {{ syncStateLabel(globalSyncState) }}</strong>
+            <strong>全局清单 · {{ syncStateLabel(globalSyncState) }}<template v-if="globalSourceLabel === '混合来源'"> · 混合来源</template></strong>
             <time v-if="syncStateTimestamp(globalSyncState)">{{ formatSyncTimestamp(syncStateTimestamp(globalSyncState)!) }}</time>
           </span>
         </div>
       </header>
 
-      <p v-if="errorMessage" class="error-banner" role="alert">{{ errorMessage }}</p>
-      <div v-if="needsInitialSync" class="onboarding-banner">
-        <div>
-          <strong>建立你的第一份清单</strong>
-          <small>可以同步公开资料，也可以直接在活动、周期或地图版块同步个人进度。</small>
-        </div>
-        <button class="onboarding-primary" type="button" :disabled="syncing || hasActivePublicSync" @click="aiScheduleAvailable ? runSync('public_schedule', 'all') : settingsOpen = true">
-          {{ aiScheduleAvailable ? '同步公开资料' : '连接 Codex' }}
-        </button>
-        <button
-          class="onboarding-dismiss"
-          type="button"
-          aria-label="关闭初始同步提示"
-          @click="dismissInitialSyncGuide"
-        >
-          ×
-        </button>
-      </div>
-      <div v-if="liveSyncProgress.length" class="sync-progress-stack" aria-live="polite">
+      <p v-if="!loading && !restoringGameView && errorMessage" class="error-banner" role="alert">{{ errorMessage }}</p>
+      <div v-if="!loading && !restoringGameView && liveSyncProgress.length" class="sync-progress-stack" aria-live="polite">
         <article
           v-for="progress in liveSyncProgress"
           :key="`${progress.source}:${progress.target}`"
@@ -1927,7 +2273,7 @@ function showError(error: unknown): void {
           </div>
         </aside>
       </div>
-      <div v-if="syncNotice" class="sync-banner" :class="syncNotice.status" aria-live="polite">
+      <div v-if="!loading && !restoringGameView && syncNotice" class="sync-banner" :class="syncNotice.status" aria-live="polite">
         <span>{{ syncNotice.message }}</span>
         <button
           v-if="syncNoticeCredentialProvider"
@@ -1935,7 +2281,7 @@ function showError(error: unknown): void {
           @click="openCredentialSettings(syncNoticeCredentialProvider)"
         >前往登录</button>
       </div>
-      <section class="summary-grid">
+      <section v-if="!loading && !restoringGameView" class="summary-grid">
         <article class="summary-card">
           <span class="summary-icon coral" aria-hidden="true">
             <svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5" /></svg>
@@ -1958,43 +2304,56 @@ function showError(error: unknown): void {
         </article>
       </section>
 
-      <section v-if="loading" class="panel centered" role="status" aria-live="polite">正在读取本地清单…</section>
+      <section
+        v-if="loading || restoringGameView"
+        class="panel centered"
+        role="status"
+        aria-live="polite"
+      >{{ restoringGameView ? '正在切换游戏…' : '正在读取本地清单…' }}</section>
       <div
         v-else
         class="checklist-content-frame"
-        :class="{ 'restoring-scroll': restoringGameView }"
       >
-        <section class="content-grid">
-          <div
-            v-for="(column, columnIndex) in panelColumns"
-            :key="columnIndex"
-            :ref="checklistColumnRefSetters[columnIndex]"
-            class="checklist-column"
-            :class="{
-              'checklist-column-wide': columnIndex === panelColumns.length - 1,
-              'checklist-column-constrained': columnIndex === constrainedColumnIndex
-            }"
-            :style="columnIndex === constrainedColumnIndex && adaptiveColumnHeight !== null
-              ? { '--adaptive-column-height': `${adaptiveColumnHeight}px` }
-              : undefined"
+        <section class="content-grid" :key="selectedGameId">
+          <article
+            v-for="panel in orderedPanels"
+            :key="panel.section"
+            class="panel checklist-card"
+            :data-panel-section="panel.section"
+            :class="[
+              `panel-${panel.section}`,
+              {
+                'panel-dragging': draggingPanelSection === panel.section,
+                'panel-drop-before': panelDropTarget?.section === panel.section && panelDropTarget.position === 'before',
+                'panel-drop-after': panelDropTarget?.section === panel.section && panelDropTarget.position === 'after'
+              }
+            ]"
           >
-            <article
-              v-for="panel in column"
-              :key="panel.title"
-              class="panel checklist-card"
-              :class="`panel-${panel.section}`"
-            >
               <div class="section-header">
+                <button
+                  class="panel-drag-handle"
+                  type="button"
+                  :aria-label="`拖动调整${panel.title}的顺序；按 Alt+上、下方向键也可移动`"
+                  :aria-pressed="draggingPanelSection === panel.section"
+                  title="拖动调整版块顺序"
+                  @pointerdown="beginPanelDrag($event, panel.section)"
+                  @pointermove="movePanelDrag"
+                  @pointerup="finishPanelDrag"
+                  @pointercancel="cancelPanelDrag"
+                  @keydown.alt.up.prevent="movePanelByKeyboard(panel.section, -1)"
+                  @keydown.alt.down.prevent="movePanelByKeyboard(panel.section, 1)"
+                ><span></span><span></span><span></span><span></span><span></span><span></span></button>
                 <div class="section-title">
-                <h2>
-                  <span class="panel-icon" :class="`panel-icon-${panel.section}`" aria-hidden="true">
-                    <svg v-if="panel.section === 'tasks'" viewBox="0 0 24 24"><path d="M7 4h10a2 2 0 0 1 2 2v14H5V6a2 2 0 0 1 2-2Z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>
-                    <svg v-else-if="panel.section === 'events'" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><path d="M5.6 5.6 18.4 18.4M18.4 5.6 5.6 18.4"/><circle cx="12" cy="12" r="4"/></svg>
-                    <svg v-else-if="panel.section === 'cycles'" viewBox="0 0 24 24"><path d="M20 8a8 8 0 1 0 .3 7"/><path d="M20 3v5h-5"/><path d="M12 7v5l3 2"/></svg>
-                    <svg v-else viewBox="0 0 24 24"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Z"/><path d="M9 3v15M15 6v15"/></svg>
-                  </span>
-                  {{ panel.title }}
-                </h2>
+                  <h2>
+                    <span class="panel-icon" :class="`panel-icon-${panel.section}`" aria-hidden="true">
+                      <svg v-if="panel.section === 'tasks'" viewBox="0 0 24 24"><path d="M7 4h10a2 2 0 0 1 2 2v14H5V6a2 2 0 0 1 2-2Z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>
+                      <svg v-else-if="panel.section === 'events'" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><path d="M5.6 5.6 18.4 18.4M18.4 5.6 5.6 18.4"/><circle cx="12" cy="12" r="4"/></svg>
+                      <svg v-else-if="panel.section === 'cycles'" viewBox="0 0 24 24"><path d="M20 8a8 8 0 1 0 .3 7"/><path d="M20 3v5h-5"/><path d="M12 7v5l3 2"/></svg>
+                      <svg v-else-if="panel.section === 'exploration'" viewBox="0 0 24 24"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Z"/><path d="M9 3v15M15 6v15"/></svg>
+                      <svg v-else viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="m8 9 2 2 4-4M8 15h8"/></svg>
+                    </span>
+                    <span class="section-title-text">{{ panel.title }}</span>
+                  </h2>
                   <span
                     v-if="panel.syncTarget"
                     class="section-sync-indicator"
@@ -2024,28 +2383,33 @@ function showError(error: unknown): void {
                       aria-haspopup="menu"
                       :aria-expanded="sectionSyncMenuOpen === panel.section"
                       @click="sectionSyncMenuOpen = sectionSyncMenuOpen === panel.section ? null : panel.section"
-                    >↻ 同步 ▾</button>
+                    >
+                      <span>↻ 同步</span>
+                      <svg class="dropdown-chevron" viewBox="0 0 16 16" aria-hidden="true">
+                        <path d="m4 6 4 4 4-4" />
+                      </svg>
+                    </button>
                     <div v-if="sectionSyncMenuOpen === panel.section" class="dropdown-menu section-sync-menu" role="menu">
                       <button
                         role="menuitem"
                         type="button"
-                        :disabled="!aiScheduleAvailable || isSyncRequestActive('public_schedule', panel.syncTarget) || hasActivePublicSyncForTarget(panel.syncTarget)"
-                        @click="runSync('public_schedule', panel.syncTarget)"
-                      >同步清单</button>
+                        :disabled="!aiScheduleAvailable || isSyncRequestActive('public_schedule', panel.syncTarget) || hasActivePublicSyncForTarget(panel.syncTarget) || hasActivePersonalSyncForTarget(panel.syncTarget as PersonalSyncTarget)"
+                        @click="requestSectionPublicSync(panel.syncTarget as PersonalSyncTarget)"
+                      >同步公开数据</button>
                       <button
                         v-if="personalSyncTargets.includes(panel.syncTarget)"
                         role="menuitem"
                         type="button"
-                        :disabled="hasActivePersonalSyncForTarget(panel.syncTarget as PersonalSyncTarget)"
+                        :disabled="hasActivePersonalSyncForTarget(panel.syncTarget as PersonalSyncTarget) || hasActivePublicSyncForTarget(panel.syncTarget)"
                         @click="runPersonalSync(panel.syncTarget)"
-                      >同步进度</button>
+                      >同步个人数据</button>
                     </div>
                   </div>
                   <button
-                    v-if="panel.allowClear !== false"
+                    v-if="panel.allowClear === true"
                     class="clear-completed-button"
                     type="button"
-                    :disabled="!items.some((item) => panel.categories.includes(item.category) && item.completed && !isPersistentItem(item))"
+                    :disabled="!items.some((item) => panel.categories.includes(item.category) && item.completed && item.source === 'manual' && !isPersistentItem(item))"
                     @click="archiveCompletedSection(panel.section, panel.categories, panel.title)"
                   >删除已完成</button>
                 </div>
@@ -2085,7 +2449,10 @@ function showError(error: unknown): void {
                       :aria-expanded="activityTagMenuOpen"
                       @click="activityTagMenuOpen = !activityTagMenuOpen"
                     >
-                      <span>{{ activityTagFilter || '全部玩法' }}</span><i>⌄</i>
+                      <span>{{ activityTagFilter || '全部玩法' }}</span>
+                      <svg class="dropdown-chevron" viewBox="0 0 16 16" aria-hidden="true">
+                        <path d="m4 6 4 4 4-4" />
+                      </svg>
                     </button>
                     <div v-if="activityTagMenuOpen" class="dropdown-menu activity-filter-menu" role="menu">
                       <button
@@ -2108,7 +2475,7 @@ function showError(error: unknown): void {
                   </div>
                 </div>
               </div>
-              <div class="item-list" :class="{ 'map-item-columns': panel.section === 'exploration' }">
+              <div class="item-list panel-item-columns">
                 <div
                   v-for="(itemColumn, itemColumnIndex) in panelItemColumns(panel)"
                   :key="itemColumnIndex"
@@ -2159,13 +2526,16 @@ function showError(error: unknown): void {
                       <span v-if="row.item.category === 'exploration' && row.displayProgressPercent !== null">
                         {{ row.displayProgressPercent }}%
                       </span>
-                      <span v-if="row.item.resetRule" class="reset-detail">{{ row.item.resetRule }}</span>
+                      <span
+                        v-if="row.item.resetRule && (row.item.category === 'weekly' || row.item.source === 'manual')"
+                        class="reset-detail"
+                      >{{ row.item.resetRule }}</span>
                       <span
                         v-if="row.item.source !== 'manual' && row.item.lastSyncedAt"
                         class="source-detail"
-                        :title="`${row.item.source === 'public_schedule' ? '公开资料' : '个人数据'} · 同步于 ${formatLocalTime(row.item.lastSyncedAt)}${row.item.sourceUrl ? ` · ${row.item.sourceUrl}` : ''}`"
+                        :title="`${row.item.source === 'public_schedule' ? '公开数据' : '个人数据'} · 同步于 ${formatLocalTime(row.item.lastSyncedAt)}${row.item.sourceUrl ? ` · ${row.item.sourceUrl}` : ''}`"
                       >
-                        {{ row.item.source === 'public_schedule' ? '公开资料' : '个人数据' }}
+                        {{ row.item.source === 'public_schedule' ? '公开数据' : '个人数据' }}
                       </span>
                     </span>
                     <span v-if="row.item.startsAt && isUpcoming(row.item.startsAt)" class="item-timing deadline upcoming">{{ countdown(row.item.startsAt, '距离开始') }}</span>
@@ -2180,42 +2550,10 @@ function showError(error: unknown): void {
                 </div>
                 <p v-if="panelItems(panel).length === 0" class="empty-text">暂无事项</p>
               </div>
-              <button v-if="panel.allowCreate !== false" class="add-button" type="button" @click="openCreate(panel.defaultCategory)">＋ 新增{{ panel.title }}</button>
-            </article>
-          </div>
-        </section>
-
-        <section class="panel custom-list">
-          <div class="section-header">
-            <h2>自定义清单</h2>
-            <button
-              class="clear-completed-button"
-              type="button"
-              :disabled="!items.some((item) => item.category === 'custom' && item.completed)"
-              @click="archiveCompletedSection('custom', ['custom'], '自定义清单')"
-            >删除已完成</button>
-          </div>
-          <div class="custom-grid">
-            <div
-              v-for="item in itemsFor(['custom'])"
-              :key="item.id"
-              class="checklist-row"
-              :class="{ completed: item.completed }"
-            >
-              <button
-                class="check-button"
-                type="button"
-                :aria-label="item.completed ? '标为未完成' : '标为完成'"
-                @click="toggleCompleted(item)"
-              >{{ item.completed ? '✓' : '' }}</button>
-              <button class="item-main" type="button" @click="openEdit(item)">
-                <span class="item-title">{{ item.title }}</span>
+              <button v-if="panel.allowCreate !== false" class="add-button" type="button" @click="openCreate(panel.defaultCategory)">
+                <span class="add-button-label"><span class="add-button-icon" aria-hidden="true">＋</span>新增{{ panel.createLabel ?? panel.title }}</span>
               </button>
-              <button class="more-button" type="button" aria-label="编辑" @click="openEdit(item)">⋮</button>
-            </div>
-          </div>
-          <p v-if="itemsFor(['custom']).length === 0" class="empty-text">暂无自定义事项</p>
-          <button class="add-button" type="button" @click="openCreate('custom')">＋ 新增自定义事项</button>
+          </article>
         </section>
       </div>
 
@@ -2268,10 +2606,11 @@ function showError(error: unknown): void {
         </div>
 
         <div class="modal-actions">
-          <button v-if="editingItem && !isPersistentItem(editingItem)" class="danger-button" type="button" @click="archiveItem(editingItem)">删除</button>
-          <span></span>
-          <button class="secondary-button" type="button" @click="editorOpen = false">取消</button>
-          <button class="primary-button" type="submit" :disabled="saving || !form.title.trim()">{{ saving ? '保存中…' : '保存' }}</button>
+          <button v-if="editingItem?.source === 'manual' && !isPersistentItem(editingItem)" class="danger-button" type="button" @click="archiveItem(editingItem)">删除</button>
+          <div class="modal-actions-right">
+            <button class="secondary-button" type="button" @click="editorOpen = false">取消</button>
+            <button class="primary-button" type="submit" :disabled="saving || !form.title.trim()">{{ saving ? '保存中…' : '保存' }}</button>
+          </div>
         </div>
       </form>
     </div>
@@ -2290,12 +2629,12 @@ function showError(error: unknown): void {
             <button class="close-button" type="button" aria-label="关闭回收站" @click="recycleBinOpen = false">×</button>
           </div>
         </div>
-        <p class="recycle-hint">已删除事项保留在本机；远端同步不会自动恢复它们。</p>
+        <p class="recycle-hint">手动删除的事项会保留在本机，便于随时恢复。</p>
         <div class="recycle-list">
           <div v-for="item in archivedItems" :key="item.id" class="recycle-row">
             <div>
               <strong>{{ item.title }}</strong>
-              <span>{{ categoryLabels[item.category] }} · {{ item.source === 'manual' ? '手动' : '同步' }}</span>
+              <span>{{ categoryLabels[item.category] }} · 手动事项</span>
             </div>
             <button class="secondary-button" type="button" @click="restoreItem(item)">恢复</button>
           </div>
@@ -2304,11 +2643,103 @@ function showError(error: unknown): void {
       </section>
     </div>
 
-    <div v-if="settingsOpen" class="modal-backdrop" @click.self="settingsOpen = false">
+    <div
+      v-if="pendingPublicSourceSwitch"
+      class="modal-backdrop source-switch-backdrop"
+      @click.self="pendingPublicSourceSwitch = null"
+    >
+      <section class="source-switch-modal" role="dialog" aria-modal="true" aria-labelledby="source-switch-title">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">切换数据来源</p>
+            <h2 id="source-switch-title">改用公开数据？</h2>
+          </div>
+          <button class="close-button" type="button" aria-label="取消" @click="pendingPublicSourceSwitch = null">×</button>
+        </div>
+        <p>{{ pendingPublicSourceSwitchLabel }}版块当前使用个人数据。继续后，该版块会切换为公开清单，完成状态需要手动维护。</p>
+        <div class="source-switch-actions">
+          <button class="toolbar-button" type="button" @click="pendingPublicSourceSwitch = null">取消</button>
+          <button class="primary-button" type="button" @click="confirmPublicSourceSwitch">切换并同步</button>
+        </div>
+      </section>
+    </div>
+
+    <div
+      v-if="!loading && !restoringGameView && needsInitialSync"
+      class="modal-backdrop onboarding-backdrop"
+    >
+      <section class="onboarding-modal" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+        <div class="modal-header onboarding-header">
+          <div>
+            <p class="eyebrow">{{ selectedGame?.name }}</p>
+            <h2 id="onboarding-title">建立你的第一份清单</h2>
+            <p>选择一种数据来源，之后仍可在每个版块随时切换。</p>
+          </div>
+          <button class="close-button" type="button" aria-label="稍后再说" @click="dismissInitialSyncGuide()">×</button>
+        </div>
+        <div v-if="!aiScheduleAgent?.codexPluginInstalled" class="onboarding-plugin-guide">
+          <div>
+            <strong>连接 Codex 同步插件</strong>
+            <span>同步公开数据需要插件；同步个人数据时也会用它补充和校正清单信息。</span>
+          </div>
+          <button class="secondary-button" type="button" @click="openCodexPlugin">安装插件</button>
+        </div>
+        <div class="onboarding-choice-grid">
+          <button
+            class="onboarding-choice recommended"
+            type="button"
+            :disabled="onboardingBusy"
+            @click="startInitialPersonalSync"
+          >
+            <span class="onboarding-choice-label">推荐</span>
+            <strong>同步个人数据</strong>
+            <small>需要登录 {{ personalPlatform }}。活动、周期事项和地图探索会按版块依次同步。</small>
+            <b>{{ onboardingBusy ? '正在处理…' : '使用个人数据开始' }}</b>
+          </button>
+          <button
+            class="onboarding-choice"
+            type="button"
+            :disabled="onboardingBusy"
+            @click="startInitialPublicSync"
+          >
+            <strong>同步公开数据</strong>
+            <small>无需登录。根据公开资料建立清单，进度由你手动维护。</small>
+            <b>{{ aiScheduleAvailable ? '使用公开数据开始' : '先连接 Codex' }}</b>
+          </button>
+        </div>
+        <p class="onboarding-note">可随时在各版块切换数据来源，自定义事项不受影响。</p>
+        <button class="onboarding-later" type="button" :disabled="onboardingBusy" @click="dismissInitialSyncGuide()">稍后再说</button>
+      </section>
+    </div>
+
+    <div
+      v-if="codexSetupPromptOpen"
+      class="modal-backdrop codex-install-backdrop"
+      @click.self="dismissCodexSetupPrompt"
+    >
+      <section class="source-switch-modal codex-install-modal" role="dialog" aria-modal="true" aria-labelledby="codex-install-title">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Codex 同步</p>
+            <h2 id="codex-install-title">需要安装同步插件</h2>
+          </div>
+          <button class="close-button" type="button" aria-label="稍后安装" @click="dismissCodexSetupPrompt">×</button>
+        </div>
+        <p>{{ codexSetupDescription }}</p>
+        <p v-if="codexPluginMessage" class="codex-install-status">{{ codexPluginMessage }}</p>
+        <div class="source-switch-actions">
+          <button class="toolbar-button" type="button" @click="dismissCodexSetupPrompt">{{ codexSetupDeferLabel }}</button>
+          <button class="toolbar-button" type="button" @click="loadAiScheduleAgentStatus">重新检测</button>
+          <button class="primary-button" type="button" @click="openCodexPlugin">打开安装页</button>
+        </div>
+      </section>
+    </div>
+
+    <div v-if="settingsOpen" class="modal-backdrop" @click.self="closeSettings">
       <section class="editor-modal recycle-modal" role="dialog" aria-modal="true" aria-label="设置">
         <div class="modal-header">
           <div><p class="eyebrow">本机设置</p><h2>设置</h2></div>
-          <button class="close-button" type="button" aria-label="关闭设置" @click="settingsOpen = false">×</button>
+          <button class="close-button" type="button" aria-label="关闭设置" @click="closeSettings">×</button>
         </div>
         <h3 class="settings-heading">我的游戏</h3>
         <p class="recycle-hint">隐藏只影响侧栏，数据仍会保留。</p>
@@ -2324,16 +2755,50 @@ function showError(error: unknown): void {
             >
           </label>
         </div>
-        <h3 class="settings-heading">公开资料 AI</h3>
+        <h3 class="settings-heading">版块布局</h3>
+        <div class="panel-order-setting">
+          <div>
+            <strong>{{ selectedGame?.name }}</strong>
+            <span>在总览中拖动标题旁的手柄调整版块顺序。</span>
+          </div>
+          <button
+            class="secondary-button settings-action-button"
+            type="button"
+            :disabled="panelOrderIsDefault"
+            @click="resetPanelOrder"
+          >恢复默认顺序</button>
+        </div>
+        <h3 class="settings-heading">界面渲染</h3>
+        <div class="ai-provider-box rendering-provider-box">
+          <label class="codex-strategy-field">
+            <span>渲染模式</span>
+            <select v-model="renderingModeSelection">
+              <option value="compatibility">兼容模式（推荐）· 与游戏同时运行更稳定</option>
+              <option value="accelerated">GPU 加速 · 性能优先</option>
+            </select>
+          </label>
+          <div class="codex-runtime-footer">
+            <span>{{ renderingModeMessage || (renderingModeState?.active === 'compatibility'
+              ? '当前使用软件渲染，可规避部分游戏、驱动或叠加层造成的界面残影。'
+              : '当前使用 GPU 加速；若与游戏同时运行时出现残影，请切回兼容模式。') }}</span>
+            <button
+              class="primary-button settings-action-button"
+              type="button"
+              :disabled="renderingModeBusy"
+              @click="saveRenderingMode"
+            >{{ renderingModeBusy ? '保存中…' : renderingModeSelection === renderingModeState?.active ? '确认设置' : '保存并重启' }}</button>
+          </div>
+        </div>
+        <h3 class="settings-heading">Codex 同步</h3>
         <div class="ai-provider-box codex-provider-box">
           <div class="ai-provider-heading">
             <div>
-              <strong>Codex 资料同步插件</strong>
-              <span>{{ aiScheduleAgent?.connected
-                ? `Agent 已连接 · ${aiScheduleAgent.name}`
-                : aiScheduleAgent?.codexPluginInstalled
-                  ? '已安装 · 同步时将自动启动 Codex'
-                  : '未安装或未启用' }}</span>
+              <strong>Codex 插件</strong>
+              <span>{{ !aiScheduleAgent?.codexPluginInstalled
+                ? '未安装或未启用'
+                : aiScheduleAgent?.connected
+                  ? `已连接 · ${aiScheduleAgent.name}`
+                  : '已安装' }}</span>
             </div>
           </div>
           <div class="codex-runtime-settings">
@@ -2344,6 +2809,7 @@ function showError(error: unknown): void {
                   <option value="inherit">跟随 Codex 默认</option>
                   <option value="gpt-5.6-sol">GPT-5.6-Sol · 准确优先</option>
                   <option value="gpt-5.6-terra">GPT-5.6-Terra · 速度均衡</option>
+                  <option value="gpt-5.6-luna">GPT-5.6-Luna · 高速结构化</option>
                 </select>
               </label>
               <label>
@@ -2360,7 +2826,7 @@ function showError(error: unknown): void {
               </label>
             </div>
             <div class="codex-runtime-footer">
-              <span>{{ codexWorkerPreferencesMessage || '仅影响 Gtask 后台任务，不修改 Codex 全局配置。' }}</span>
+              <span>{{ codexWorkerPreferencesMessage || '所有后台任务使用这里选择的模型与推理强度。' }}</span>
               <button
                 class="primary-button settings-action-button"
                 type="button"
@@ -2370,12 +2836,8 @@ function showError(error: unknown): void {
             </div>
           </div>
           <div v-if="!aiScheduleAgent?.codexPluginInstalled" class="codex-setup-guide">
-            <ol>
-              <li>打开安装页，在 Codex 中确认安装。</li>
-              <li>返回后重新检测，即可开始同步。</li>
-            </ol>
             <div class="codex-setup-actions">
-              <button class="secondary-button wide-action-button" type="button" @click="openCodexPlugin">打开 Codex 安装页</button>
+              <button class="secondary-button wide-action-button" type="button" @click="openCodexPlugin">安装 Codex 插件</button>
               <button class="secondary-button" type="button" @click="loadAiScheduleAgentStatus">重新检测</button>
             </div>
           </div>
@@ -2395,7 +2857,34 @@ function showError(error: unknown): void {
           </div>
           <p v-if="codexPluginMessage" class="codex-plugin-message">{{ codexPluginMessage }}</p>
         </div>
-        <p class="recycle-hint">插件不会静默安装；启用后同步会自动调用 Codex。</p>
+        <h3 class="settings-heading">软件更新</h3>
+        <div class="ai-provider-box software-update-box">
+          <label class="software-update-toggle">
+            <span>
+              <strong>启动后自动检查更新</strong>
+              <small>不影响软件启动；网络超时或暂时不可用时不会打扰你。</small>
+            </span>
+            <input
+              v-model="softwareUpdateSettings.autoCheckEnabled"
+              type="checkbox"
+              :disabled="softwareUpdateBusy"
+              aria-label="启动后自动检查更新"
+              @change="saveSoftwareUpdatePreference"
+            >
+          </label>
+          <div class="software-update-footer">
+            <span>
+              <strong>当前版本 v{{ appInfo?.version ?? '—' }}</strong>
+              <small>{{ softwareUpdateMessage || formatUpdateCheckTime(softwareUpdateSettings.lastSuccessfulCheckAt) }}</small>
+            </span>
+            <button
+              class="secondary-button settings-action-button"
+              type="button"
+              :disabled="softwareUpdateBusy"
+              @click="checkSoftwareUpdate"
+            >{{ softwareUpdateBusy ? '检查中…' : '手动检查更新' }}</button>
+          </div>
+        </div>
         <h3 class="settings-heading data-heading">登录凭据</h3>
         <p class="recycle-hint">登录可选；凭据由 Windows 加密保存在本机。</p>
         <div class="recycle-list">
@@ -2442,7 +2931,7 @@ function showError(error: unknown): void {
             <button class="secondary-button" type="button" @click="openDataDirectory">打开目录</button>
           </div>
         </div>
-        <p class="recycle-hint">本地数据位于系统“文档”目录的 GachaTaskManager；backups 子目录保留最近 30 份每日备份，手动与安全备份不自动清理。</p>
+        <p class="recycle-hint">数据保存在系统“文档\GachaTaskManager”目录，自动保留最近 30 份每日备份。</p>
         <div class="backup-list">
           <div v-for="backup in backups" :key="backup.fileName" class="backup-row">
             <div><strong>{{ backup.fileName }}</strong><span>{{ formatLocalTime(backup.updatedAt) }}</span></div>
@@ -2457,13 +2946,13 @@ function showError(error: unknown): void {
           </div>
           <p v-if="backups.length === 0" class="empty-text">尚无备份</p>
         </div>
-        <p class="settings-note">米游社使用二维码登录；鸣潮在应用内完成库街区手机号、滑块和短信验证。Token 与 DID 均由应用自动取得并只在本机加密保存。</p>
+        <p class="settings-note">米游社支持扫码登录，库街区支持手机号登录；凭据仅在本机加密保存。</p>
       </section>
     </div>
     <div v-if="miyousheLoginOpen" class="modal-backdrop login-backdrop" @click.self="closeMiyousheLogin">
       <section class="editor-modal login-modal" role="dialog" aria-modal="true" aria-label="米游社扫码登录">
         <div class="modal-header">
-          <div><h2>米游社扫码登录</h2><p>凭据只会经 Windows DPAPI 加密保存在本机</p></div>
+          <div><h2>米游社扫码登录</h2><p>登录凭据仅保存在本机</p></div>
           <button class="close-button" type="button" aria-label="关闭米游社登录" @click="closeMiyousheLogin">×</button>
         </div>
         <div v-if="miyousheLoginState" class="qr-login-content">
@@ -2479,7 +2968,7 @@ function showError(error: unknown): void {
           </div>
           <strong>{{ miyousheLoginState.message }}</strong>
           <p v-if="miyousheLoginState.status === 'waiting_confirmation'">请回到米游社 App 完成授权，窗口会自动更新。</p>
-          <p v-else-if="miyousheLoginState.status === 'confirmed'">现在可以使用“同步进度”读取米游社个人数据。</p>
+          <p v-else-if="miyousheLoginState.status === 'confirmed'">现在可以使用“同步个人数据”读取米游社数据。</p>
           <p v-else-if="miyousheLoginState.status === 'expired'">出于安全考虑，二维码不会自动长期续期。</p>
           <p v-else>二维码有效期约 5 分钟，应用不会读取浏览器 Cookie。</p>
         </div>
@@ -2561,7 +3050,7 @@ function showError(error: unknown): void {
             </select>
           </label>
           <p v-if="kuroCredentialMessage" class="credential-import-message">{{ kuroCredentialMessage }}</p>
-          <p class="recycle-hint">DID 由应用自动生成，Token 不会显示或进入剪贴板；角色数据权限验证成功后才会通过 Windows DPAPI 加密保存。</p>
+          <p class="recycle-hint">验证成功后，登录凭据会加密保存在本机。</p>
         </div>
         <div class="login-actions">
           <button
@@ -2579,6 +3068,27 @@ function showError(error: unknown): void {
           >取消</button>
         </div>
       </section>
+    </div>
+    <div
+      v-if="draggingPanel && panelDragPreviewStyle"
+      class="panel-drag-preview"
+      :style="panelDragPreviewStyle"
+      aria-hidden="true"
+    >
+      <span class="panel-drag-preview-grip">
+        <span></span><span></span><span></span><span></span><span></span><span></span>
+      </span>
+      <span class="panel-icon" :class="`panel-icon-${draggingPanel.section}`">
+        <svg v-if="draggingPanel.section === 'tasks'" viewBox="0 0 24 24"><path d="M7 4h10a2 2 0 0 1 2 2v14H5V6a2 2 0 0 1 2-2Z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>
+        <svg v-else-if="draggingPanel.section === 'events'" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><path d="M5.6 5.6 18.4 18.4M18.4 5.6 5.6 18.4"/><circle cx="12" cy="12" r="4"/></svg>
+        <svg v-else-if="draggingPanel.section === 'cycles'" viewBox="0 0 24 24"><path d="M20 8a8 8 0 1 0 .3 7"/><path d="M20 3v5h-5"/><path d="M12 7v5l3 2"/></svg>
+        <svg v-else-if="draggingPanel.section === 'exploration'" viewBox="0 0 24 24"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Z"/><path d="M9 3v15M15 6v15"/></svg>
+        <svg v-else viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="m8 9 2 2 4-4M8 15h8"/></svg>
+      </span>
+      <span class="panel-drag-preview-copy">
+        <strong>{{ draggingPanel.title }}</strong>
+        <small>拖动调整位置</small>
+      </span>
     </div>
   </main>
 </template>

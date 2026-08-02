@@ -161,7 +161,7 @@ function parseAnomalyArbitration(value: unknown): NormalizedSyncItem | null {
   return {
     remoteKey: 'endgame:anomaly-arbitration',
     category: 'endgame',
-    title: requiredOptionalString(group.name_mi18n) ?? '异相仲裁',
+    title: '异相仲裁',
     completed: hasData,
     startsAt: toIsoDate(group.begin_time, '异相仲裁开始时间'),
     endsAt: toIsoDate(group.end_time, '异相仲裁结束时间'),

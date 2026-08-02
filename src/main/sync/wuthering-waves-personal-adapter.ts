@@ -10,7 +10,7 @@ import {
   parseWutheringWavesPersonalData
 } from './wuthering-waves-personal-parser'
 import type { SyncAdapter, SyncAdapterOutput, SyncProgressReporter } from './types'
-import { personalMapsFromCandidates, withPersonalIdentity } from './personal-snapshot'
+import { assemblePersonalMapsFromCandidates, withPersonalIdentity } from './personal-snapshot'
 
 export interface WutheringWavesCommunityClient {
   getExploration: () => Promise<unknown>
@@ -68,11 +68,16 @@ export class WutheringWavesPersonalAdapter implements SyncAdapter {
     const explorationCandidates = exploration === undefined
       ? []
       : extractWutheringWavesExplorationReviewCandidates(exploration)
+    const explorationSnapshot = assemblePersonalMapsFromCandidates(
+      'kuro-community',
+      explorationCandidates
+    )
     return {
       items: [
-        ...personalMapsFromCandidates('kuro-community', explorationCandidates),
+        ...explorationSnapshot.items,
         ...withPersonalIdentity(cycleItems, 'kuro-community', 'personal-challenge-record')
       ],
+      reviewCandidates: explorationSnapshot.reviewCandidates,
       snapshotCompleteness: outcomes.every((outcome) => outcome.succeeded) ? 'complete' : 'partial',
       adapterVersion: 'wuthering-waves-personal-v1',
       message: (target === 'exploration'

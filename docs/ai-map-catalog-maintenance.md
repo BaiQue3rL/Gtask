@@ -15,7 +15,7 @@ Primary source:
 - `src/main/sync/map-catalog.ts`
   - `MAP_CATALOGS`: canonical names and parent/child hierarchy.
   - `MAP_CATALOG_VERIFIED_AT`: last evidence-backed verification time for each game.
-  - `stableKey()`: stable machine identities and legacy rename aliases.
+  - `stableKey()`: stable machine identities.
 
 Relevant behavior and contracts:
 
@@ -85,11 +85,11 @@ Rules:
 4. Compare the verified inventory with the current baseline and make the smallest additive or corrective edit. Do not rebuild unchanged games.
 5. Update only the affected game's `MAP_CATALOG_VERIFIED_AT` after the whole affected catalog has been checked, using an ISO-8601 timestamp with `Z` or an explicit UTC offset.
 
-## Stable identity when correcting a shipped name
+## Stable identity after the first public release
 
 `stableKey()` hashes the game, node kind, parent identity, and title. A simple rename would otherwise create a new machine identity and could detach existing provider bindings or progress.
 
-When correcting a title that may already have shipped, add a legacy alias in `stableKey()` that maps the **new identity to the old shipped identity** before changing the displayed title. For a subregion:
+Gtask 1.0 的首发基准尚未对外发布，因此当前目录不保留封闭测试版本的拼写别名。首个公开版本发布后，如果修正一个已经发布的标题，需要在 `stableKey()` 中增加别名，把**新 identity 映射到旧发布 identity**后再改显示名称。对于二级地区：
 
 ```ts
 ['game-id\0subregion\0Parent\0Corrected Name', 'Parent\0Old Shipped Name']

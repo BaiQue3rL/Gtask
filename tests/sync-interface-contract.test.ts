@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   getPublicSyncContract,
   getPersonalMetadataContract,
-  getSemanticReviewContract
+  getPersonalReviewContract
 } from '../src/main/sync/interface-contract'
 
 describe('同步接口契约', () => {
@@ -28,24 +28,6 @@ describe('同步接口契约', () => {
     ])
   })
 
-  it('所有游戏和版块共用语言与时区请求上下文', () => {
-    const requestContext = {
-      outputLocale: 'en-US',
-      userTimeZone: 'America/Los_Angeles'
-    }
-    for (const target of ['all', 'tasks', 'events', 'cycles', 'exploration'] as const) {
-      const contract = getPublicSyncContract(target, requestContext)
-      expect(contract.requestContext).toEqual(requestContext)
-      expect(contract.fieldSemantics.title).toContain('en-US')
-      expect(contract.submissionRequiredFields).toContain('contentLocale')
-    }
-    expect(getSemanticReviewContract('events', requestContext)).toMatchObject({
-      requestContext,
-      decisionAuthority: 'codex',
-      executorPolicy: 'mechanical_validation_only'
-    })
-  })
-
   it('活动契约只接受具有完整时间窗的限时活动', () => {
     const [events] = getPublicSyncContract('events').sections
     const limited = events.itemShapes.find((shape) =>
@@ -53,17 +35,33 @@ describe('同步接口契约', () => {
     )!
 
     expect(events.itemShapes).toHaveLength(1)
-    expect(limited.requiredFields).toEqual(expect.arrayContaining([
-      'activityTags',
-      'startsAt',
-      'endsAt'
-    ]))
+    expect(limited.requiredFields).toEqual(expect.arrayContaining(['startsAt', 'endsAt']))
+    expect(limited.requiredFields).not.toContain('activityTags')
     const criteria = events.completionCriteria.join('；')
     expect(criteria).toContain('限时签到')
     expect(criteria).toContain('活动商店')
     expect(criteria).toContain('角色或武器卡池')
     expect(criteria).toContain('交叉核验')
     expect(criteria).toContain('不得猜测')
+    expect(getPublicSyncContract('events').fieldSemantics.activityTags)
+      .toContain('不得写入“活动”“限时活动”“常驻活动”等版块分类')
+    expect(getPublicSyncContract('events').fieldSemantics.activityTags)
+      .toContain('词汇表，不是待分配清单')
+    expect(getPublicSyncContract('events').fieldSemantics.activityTags)
+      .toContain('留空优于猜测')
+    expect(getPublicSyncContract('events').activityTagCatalog)
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: 'combat', qualityRole: 'primary' }),
+        expect.objectContaining({ id: 'challenge', qualityRole: 'supporting' })
+      ]))
+  })
+
+  it('个人活动审核明确在快照激活后运行且不阻塞首次建表', () => {
+    const contract = getPersonalReviewContract('events')
+    expect(contract.allowedMutations).toEqual(['refine_active_personal_snapshot'])
+    expect(contract.workflow).toContain('refine_active_snapshot')
+    expect(contract.fieldSemantics.reviewTargets).toContain('已经先行写入')
+    expect(contract.completionCriteria.join('；')).toContain('不得阻塞')
   })
 
   it('周期与地图契约只向 Codex 请求应用不能机械补齐的数据', () => {
@@ -114,28 +112,6 @@ describe('同步接口契约', () => {
     expect(criteria).toContain('不得猜测')
   })
 
-  it('个人进度契约按版块声明最终决策字段', () => {
-    expect(getSemanticReviewContract('events').schemaVersion).toBe(9)
-    expect(getSemanticReviewContract('events').fieldSemantics.factAuthority)
-      .toContain('无需再次联网证明')
-    expect(getSemanticReviewContract('events').requiredDecisionFields)
-      .toEqual(expect.arrayContaining(['remoteKey', 'category', 'title']))
-    expect(getSemanticReviewContract('events').requiredDecisionFields)
-      .not.toContain('completed')
-    expect(getSemanticReviewContract('cycles').requiredDecisionFields)
-      .toEqual(expect.arrayContaining(['category', 'completed']))
-    expect(getSemanticReviewContract('exploration').requiredDecisionFields)
-      .toEqual(expect.arrayContaining(['mapNodeKind', 'progressPercent']))
-    expect(getSemanticReviewContract('exploration').fieldSemantics.mapNodeKind)
-      .toContain('个人接口的节点类型只作为观测')
-    expect(getSemanticReviewContract('events').fieldSemantics.itemIdentity)
-      .toContain('活动商店')
-    expect(getSemanticReviewContract('cycles').fieldSemantics.itemIdentity)
-      .toContain('periodKey')
-    expect(getSemanticReviewContract('exploration').fieldSemantics.itemIdentity)
-      .toContain('层岩巨渊·地下矿区')
-  })
-
   it('个人元数据契约只允许补标签和缺失时间', () => {
     const events = getPersonalMetadataContract('events')
     expect(events).toMatchObject({
@@ -144,19 +120,36 @@ describe('同步接口契约', () => {
       executorPolicy: 'mechanical_validation_only'
     })
     expect(events.fieldSemantics.activityTags).toContain('zh-CN')
+    expect(events.fieldSemantics.activityTags).toContain('不得提交活动版块分类')
+    expect(events.fieldSemantics.activityTags).toContain('词汇表，不是待分配清单')
+    expect(events.fieldSemantics.unresolvedFields).toContain('活动标签')
+    expect(events.fieldSemantics.activityTagEvidence).toContain('可选')
     expect(events.completionCriteria.join('；')).toContain('不得修改 completed')
-    expect(getPersonalMetadataContract('cycles').completionCriteria.join('；'))
+    const cycles = getPersonalMetadataContract('cycles')
+    expect(cycles.completionCriteria.join('；'))
       .toContain('周期事项只补齐缺失起止时间')
+    expect(cycles.fieldSemantics.endsAt).toContain('timeWindowPolicy')
+    expect(cycles.completionCriteria.join('；')).toContain('metadataTargets.timeWindowPolicy')
   })
 
-  it('个人同步把同名且倒计时重叠的周期项视为强重复信号', () => {
-    const contract = getSemanticReviewContract('cycles')
-
-    expect(contract.fieldSemantics.matchCandidates).toContain('倒计时')
-    expect(contract.fieldSemantics.duplicateDetection).toContain('标题核心名称相同')
-    expect(contract.fieldSemantics.duplicateDetection).toContain('时间窗重叠')
-    expect(contract.fieldSemantics.matchItemId).toContain('public_schedule')
-    expect(contract.fieldSemantics.archiveItems).toContain('personal_sync')
-    expect(contract.fieldSemantics.archiveItems).toContain('归档')
+  it('个人异常契约明确隔离公开清单并只处理最小异常集合', () => {
+    for (const target of ['events', 'cycles', 'exploration'] as const) {
+      const contract = getPersonalReviewContract(target)
+      expect(contract).toMatchObject({
+        jobKind: 'personal_review',
+        target,
+        allowedMutations: ['refine_active_personal_snapshot'],
+        executorPolicy: 'mechanical_validation_only'
+      })
+      expect(contract.fieldSemantics.sourceIsolation).toContain('不得读取')
+      expect(contract.completionCriteria.join('；')).toContain('逐项处理全部')
+    }
+    expect(getPersonalReviewContract('events').fieldSemantics.completionRule)
+      .toContain('observedStatus')
+    expect(getPersonalReviewContract('events').fieldSemantics.activityTags)
+      .toContain('不得提交活动版块分类')
+    expect(getPersonalReviewContract('exploration').fieldSemantics.parentExternalId)
+      .toContain('官方个人响应')
   })
+
 })
