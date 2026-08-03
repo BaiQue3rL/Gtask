@@ -15,6 +15,7 @@ import type {
   CreateChecklistItemInput,
   GameId,
   GameSummary,
+  GameVersionSummary,
   PersonalSyncTarget,
   PersonalMetadataEnrichmentTarget,
   PersonalReviewTarget,
@@ -478,6 +479,38 @@ export class AppDatabase {
       .all() as Array<Omit<GameSummary, 'enabled'> & { enabled: number }>
 
     return rows.map((row) => ({ ...row, enabled: Boolean(row.enabled) }))
+  }
+
+  listGameVersionSummaries(reference = new Date()): GameVersionSummary[] {
+    const referenceTime = reference.getTime()
+    const rows = this.database.prepare(`
+      SELECT
+        game_id AS gameId,
+        starts_at AS startsAt,
+        ends_at AS endsAt
+      FROM checklist_items
+      WHERE archived = 0
+        AND category IN ('main_quest', 'side_quest')
+        AND starts_at IS NOT NULL
+        AND ends_at IS NOT NULL
+    `).all() as Array<{ gameId: GameId; startsAt: string; endsAt: string }>
+
+    return this.listGames().map((game) => {
+      const currentWindow = rows
+        .filter((row) => {
+          if (row.gameId !== game.id) return false
+          const startsAt = Date.parse(row.startsAt)
+          const endsAt = Date.parse(row.endsAt)
+          return Number.isFinite(startsAt) && Number.isFinite(endsAt) &&
+            startsAt <= referenceTime && referenceTime < endsAt
+        })
+        .sort((left, right) => Date.parse(right.startsAt) - Date.parse(left.startsAt))[0]
+
+      return {
+        gameId: game.id,
+        endsAt: currentWindow?.endsAt ?? null
+      }
+    })
   }
 
   getDataVersion(): number {

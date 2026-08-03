@@ -14,6 +14,7 @@ import type {
   CredentialStatus,
   GameId,
   GameSummary,
+  GameVersionSummary,
   KuroCommunityRole,
   MiyousheQrLoginState,
   PersonalSyncTarget,
@@ -30,6 +31,10 @@ import type {
 } from '../../shared/contracts'
 import { projectAiJobProgressPhase } from '../../shared/sync-progress'
 import { readHiddenGameIds, writeHiddenGameIds } from './game-visibility'
+import {
+  formatGameVersionRemaining,
+  orderGamesByVersion
+} from './game-navigation'
 import { kuroRoleKey } from './kuro-role-key'
 import { compareChecklistItems } from './checklist-sort'
 import {
@@ -176,6 +181,7 @@ const gameEditorExamples: Record<GameId, {
 }
 
 const games = ref<GameSummary[]>([])
+const gameVersionSummaries = ref<GameVersionSummary[]>([])
 const gameIcons: Record<GameId, string> = {
   genshin: genshinIcon,
   'star-rail': starRailIcon,
@@ -315,7 +321,14 @@ const panelOrderIsDefault = computed(() =>
   currentPanelOrder().every((section, index) => section === DEFAULT_PANEL_ORDER[index])
 )
 const editorExamples = computed(() => gameEditorExamples[selectedGameId.value])
-const visibleGames = computed(() => games.value.filter((game) => !hiddenGameIds.value.includes(game.id)))
+const orderedGames = computed(() => orderGamesByVersion(
+  games.value,
+  gameVersionSummaries.value,
+  clockNow.value
+))
+const visibleGames = computed(() => orderedGames.value.filter(
+  (game) => !hiddenGameIds.value.includes(game.id)
+))
 const gameCredentialStatuses = computed(() => credentialStatuses.value)
 const aiScheduleAvailable = computed(() =>
   aiScheduleAgent.value?.codexPluginInstalled === true
@@ -452,8 +465,14 @@ onMounted(async () => {
   window.addEventListener('wheel', handlePanelDragWheel, { capture: true, passive: false })
   window.addEventListener('blur', endPanelDrag)
   try {
-    ;[games.value, appInfo.value, aiScheduleAgent.value] = await Promise.all([
+    ;[
+      games.value,
+      gameVersionSummaries.value,
+      appInfo.value,
+      aiScheduleAgent.value
+    ] = await Promise.all([
       window.gacha.listGames(),
+      window.gacha.listGameVersionSummaries(),
       window.gacha.getAppInfo(),
       window.gacha.getAiScheduleAgentStatus()
     ])
@@ -480,6 +499,7 @@ const removeSyncListener = window.gacha.onSyncCompleted((result) => {
   syncNotice.value = syncResultNotice(result)
   void Promise.all([
     loadItems(),
+    loadGameVersionSummaries(),
     loadSyncSettings(),
     loadSyncTargetStates()
   ])
@@ -487,6 +507,7 @@ const removeSyncListener = window.gacha.onSyncCompleted((result) => {
 const removeChecklistListener = window.gacha.onChecklistChanged(() => {
   void Promise.all([
     loadItems(),
+    loadGameVersionSummaries(),
     loadArchivedItems(),
     loadSyncSettings(),
     loadSyncTargetStates(),
@@ -798,6 +819,14 @@ async function loadItems(
     if (selectedGameId.value === gameId) showError(error)
   } finally {
     if (showLoading && selectedGameId.value === gameId) loading.value = false
+  }
+}
+
+async function loadGameVersionSummaries(): Promise<void> {
+  try {
+    gameVersionSummaries.value = await window.gacha.listGameVersionSummaries()
+  } catch (error) {
+    showError(error)
   }
 }
 
@@ -2080,6 +2109,12 @@ function countdown(value: string, prefix = '剩余'): string {
   return `${prefix} ${minutes} 分钟`
 }
 
+function versionRemainingForGame(gameId: GameId): string | null {
+  const endsAt = gameVersionSummaries.value.find((summary) => summary.gameId === gameId)?.endsAt
+    ?? null
+  return formatGameVersionRemaining(endsAt, clockNow.value)
+}
+
 function isExpired(value: string): boolean {
   return new Date(value).getTime() <= clockNow.value
 }
@@ -2139,12 +2174,16 @@ function showError(error: unknown): void {
           :key="game.id"
           class="game-button"
           :class="{ selected: selectedGameId === game.id }"
+          :style="{ '--game-accent': game.accent }"
           type="button"
           :aria-current="selectedGameId === game.id ? 'page' : undefined"
           @click="selectedGameId = game.id"
         >
           <img class="game-icon" :src="gameIcons[game.id]" alt="" aria-hidden="true">
-          {{ game.name }}
+          <span class="game-name">{{ game.name }}</span>
+          <small v-if="versionRemainingForGame(game.id)" class="game-version-remaining">
+            {{ versionRemainingForGame(game.id) }}
+          </small>
         </button>
       </nav>
       <div class="sidebar-footer">
@@ -2157,7 +2196,7 @@ function showError(error: unknown): void {
         </button>
         <button type="button" @click="openSettings">
           <span class="sidebar-action-label">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><circle cx="12" cy="12" r="1.55"/><path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M5.99 5.99l1.56 1.56M16.45 16.45l1.56 1.56M18.01 5.99l-1.56 1.56M7.55 16.45l-1.56 1.56"/></svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4A2 2 0 0 0 4 9.9l.2.1a2 2 0 0 1 1 1.7v.6a2 2 0 0 1-1 1.7l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7v.2a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.7v-.6a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></svg>
             设置
           </span>
         </button>

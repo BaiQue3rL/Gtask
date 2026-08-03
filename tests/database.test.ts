@@ -106,6 +106,32 @@ describe('AppDatabase', () => {
     expect(() => database!.archiveChecklistItem('genshin:main_quest')).toThrow('固定清单事项不能删除')
   })
 
+  it('只向侧栏提供当前进行中版本的结束时间', () => {
+    database = new AppDatabase(':memory:')
+    for (const id of ['genshin:main_quest', 'genshin:side_quest']) {
+      database.updateChecklistItem({
+        id,
+        startsAt: '2026-08-01T00:00:00.000Z',
+        endsAt: '2026-08-20T00:00:00.000Z'
+      })
+    }
+    for (const id of ['star-rail:main_quest', 'star-rail:side_quest']) {
+      database.updateChecklistItem({
+        id,
+        startsAt: '2026-07-01T00:00:00.000Z',
+        endsAt: '2026-08-01T00:00:00.000Z'
+      })
+    }
+
+    expect(database.listGameVersionSummaries(new Date('2026-08-03T00:00:00.000Z')))
+      .toEqual([
+        { gameId: 'genshin', endsAt: '2026-08-20T00:00:00.000Z' },
+        { gameId: 'star-rail', endsAt: null },
+        { gameId: 'zenless', endsAt: null },
+        { gameId: 'wuthering-waves', endsAt: null }
+      ])
+  })
+
   it('新增、编辑、手动完成和软删除事项', () => {
     database = new AppDatabase(':memory:')
     const created = database.createChecklistItem({

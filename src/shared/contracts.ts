@@ -382,6 +382,11 @@ export interface GameSummary {
   enabled: boolean
 }
 
+export interface GameVersionSummary {
+  gameId: GameId
+  endsAt: string | null
+}
+
 export interface AppInfo {
   version: string
   dataPath: string
@@ -542,6 +547,7 @@ export interface GachaApi {
     preferences: CodexWorkerPreferences
   ) => Promise<CodexWorkerPreferences>
   listGames: () => Promise<GameSummary[]>
+  listGameVersionSummaries: () => Promise<GameVersionSummary[]>
   listChecklistItems: (gameId: GameId) => Promise<ChecklistItem[]>
   listArchivedChecklistItems: (gameId: GameId) => Promise<ChecklistItem[]>
   createChecklistItem: (input: CreateChecklistItemInput) => Promise<ChecklistItem>

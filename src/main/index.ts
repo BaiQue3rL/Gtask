@@ -1057,6 +1057,9 @@ function registerIpcHandlers(): void {
   )
 
   ipcMain.handle('games:list', () => appDatabase?.listGames() ?? [])
+  ipcMain.handle('games:list-version-summaries', () =>
+    appDatabase?.listGameVersionSummaries() ?? []
+  )
   ipcMain.handle('checklist:list', (_event, gameId: unknown) =>
     appDatabase?.listChecklistItems(parseGameId(gameId)) ?? []
   )

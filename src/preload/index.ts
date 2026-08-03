@@ -27,6 +27,7 @@ const gachaApi: GachaApi = {
   updateCodexWorkerPreferences: (preferences) =>
     ipcRenderer.invoke('codex-worker:update-preferences', preferences),
   listGames: () => ipcRenderer.invoke('games:list'),
+  listGameVersionSummaries: () => ipcRenderer.invoke('games:list-version-summaries'),
   listChecklistItems: (gameId) => ipcRenderer.invoke('checklist:list', gameId),
   listArchivedChecklistItems: (gameId) => ipcRenderer.invoke('checklist:list-archived', gameId),
   createChecklistItem: (input) => ipcRenderer.invoke('checklist:create', input),
