@@ -73,7 +73,8 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .sidebar-footer { display: grid; gap: 8px; margin-top: auto; padding: 14px 5px 0; border-top: 1px solid #263c5b; color: #b8c6db; }
 .sidebar-footer button { display: flex; min-height: 36px; align-items: center; justify-content: space-between; padding: 8px 7px; border: 0; border-radius: 6px; color: #b8c6db; background: transparent; text-align: left; cursor: pointer; }
 .sidebar-footer button:hover { color: white; background: rgba(40, 89, 153, 0.25); }
-.sidebar-footer button > span:last-child { color: #6f8eb5; }
+.sidebar-action-count { color: #6f8eb5; }
+.sidebar-footer button:hover .sidebar-action-count { color: #a9c8ee; }
 .sidebar-action-label { display: grid; grid-template-columns: 18px auto; align-items: center; gap: 8px; color: inherit; line-height: 20px; }
 .sidebar-action-label svg { display: block; width: 16px; height: 16px; justify-self: center; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 

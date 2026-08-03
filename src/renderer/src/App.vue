@@ -2135,11 +2135,11 @@ function showError(error: unknown): void {
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></svg>
             回收站
           </span>
-          <span>{{ archivedItems.length }}</span>
+          <span class="sidebar-action-count">{{ archivedItems.length }}</span>
         </button>
         <button type="button" @click="openSettings">
           <span class="sidebar-action-label">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/><path d="M19 13.2v-2.4l-2-.6a7.7 7.7 0 0 0-.7-1.6l1-1.9-1.7-1.7-1.9 1a7.7 7.7 0 0 0-1.6-.7l-.6-2H9.1l-.6 2a7.7 7.7 0 0 0-1.6.7L5 5 3.3 6.7l1 1.9a7.7 7.7 0 0 0-.7 1.6l-2 .6v2.4l2 .6a7.7 7.7 0 0 0 .7 1.6l-1 1.9L5 19l1.9-1a7.7 7.7 0 0 0 1.6.7l.6 2h2.4l.6-2a7.7 7.7 0 0 0 1.6-.7l1.9 1 1.7-1.7-1-1.9a7.7 7.7 0 0 0 .7-1.6l2-.6Z"/></svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><circle cx="12" cy="12" r="1.55"/><path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M5.99 5.99l1.56 1.56M16.45 16.45l1.56 1.56M18.01 5.99l-1.56 1.56M7.55 16.45l-1.56 1.56"/></svg>
             设置
           </span>
         </button>
