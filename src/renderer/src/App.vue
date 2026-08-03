@@ -51,9 +51,9 @@ import {
 import {
   buildMapTreeRows,
   collectMapBranchKeys,
-  distributeMapTreeRows,
   type ChecklistTreeRow
 } from './map-tree'
+import { filterChecklistPanels } from './panel-visibility'
 import {
   CODEX_PROXY_REPAIR_PROMPT,
   CODEX_PROXY_WARNING,
@@ -1637,6 +1637,27 @@ const globalSyncBusy = computed(() =>
   hasActivePersonalSync.value
 )
 
+function panelHasActiveSync(panel: ChecklistPanel): boolean {
+  const target = panel.syncTarget
+  if (!target) return false
+  if (
+    isSyncRequestActive('public_schedule', target) ||
+    hasActivePublicSyncForTarget(target)
+  ) return true
+  return target !== 'tasks' && hasActivePersonalSyncForTarget(target)
+}
+
+const visiblePanels = computed(() => filterChecklistPanels(
+  orderedPanels.value,
+  items.value,
+  showIncompleteOnly.value,
+  new Set(
+    orderedPanels.value
+      .filter(panelHasActiveSync)
+      .map((panel) => panel.section)
+  )
+))
+
 function isCancellingSync(progress: SyncProgressUpdate): boolean {
   return cancellingSyncKeys.value.has(
     syncRequestKey(progress.gameId, progress.source, progress.target)
@@ -1832,10 +1853,7 @@ function panelItems(panel: ChecklistPanel): ChecklistTreeRow[] {
 
 function panelItemColumns(panel: ChecklistPanel): ChecklistTreeRow[][] {
   const rows = panelItems(panel)
-  if (panel.section === 'exploration') return distributeMapTreeRows(rows, 2)
-  if (rows.length <= 1) return rows.length === 0 ? [] : [rows]
-  const midpoint = Math.ceil(rows.length / 2)
-  return [rows.slice(0, midpoint), rows.slice(midpoint)]
+  return rows.length === 0 ? [] : [rows]
 }
 
 function toggleMapBranch(item: ChecklistItem): void {
@@ -2318,9 +2336,17 @@ function showError(error: unknown): void {
         v-else
         class="checklist-content-frame"
       >
-        <section class="content-grid" :key="selectedGameId">
+        <TransitionGroup
+          name="panel-flow"
+          tag="section"
+          class="content-grid"
+          :class="{
+            'motion-suppressed': draggingPanelSection !== null || globalSyncBusy || liveSyncProgress.length > 0
+          }"
+          :key="selectedGameId"
+        >
           <article
-            v-for="panel in orderedPanels"
+            v-for="panel in visiblePanels"
             :key="panel.section"
             class="panel checklist-card"
             :data-panel-section="panel.section"
@@ -2480,10 +2506,13 @@ function showError(error: unknown): void {
                 </div>
               </div>
               <div class="item-list panel-item-columns">
-                <div
+                <TransitionGroup
                   v-for="(itemColumn, itemColumnIndex) in panelItemColumns(panel)"
                   :key="itemColumnIndex"
+                  name="checklist-flow"
+                  tag="div"
                   class="item-list-column"
+                  :class="{ 'motion-suppressed': globalSyncBusy || liveSyncProgress.length > 0 }"
                 >
                   <div
                     v-for="row in itemColumn"
@@ -2551,14 +2580,17 @@ function showError(error: unknown): void {
                   </button>
                     <button class="more-button" type="button" aria-label="编辑" @click="openEdit(row.item)">⋮</button>
                   </div>
-                </div>
+                </TransitionGroup>
                 <p v-if="panelItems(panel).length === 0" class="empty-text">暂无事项</p>
               </div>
               <button v-if="panel.allowCreate !== false" class="add-button" type="button" @click="openCreate(panel.defaultCategory)">
                 <span class="add-button-label"><span class="add-button-icon" aria-hidden="true">＋</span>新增{{ panel.createLabel ?? panel.title }}</span>
               </button>
           </article>
-        </section>
+          <p v-if="visiblePanels.length === 0" key="filtered-empty" class="filtered-empty-state">
+            当前没有未完成事项
+          </p>
+        </TransitionGroup>
       </div>
 
       <footer v-if="appInfo" class="dev-footer">v{{ appInfo.version }} · 数据仅保存在本机</footer>

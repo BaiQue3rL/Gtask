@@ -1,7 +1,11 @@
 import { cpSync, existsSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { app, BrowserWindow, dialog, ipcMain, net, powerMonitor, safeStorage, session, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, net, powerMonitor, safeStorage, screen, session, shell } from 'electron'
 import { terminateApplicationProcess } from './application-exit'
+import {
+  calculatePortraitWindowSize,
+  PORTRAIT_WINDOW_ASPECT_RATIO
+} from './window-layout'
 import { AppDatabase, CURRENT_SCHEMA_VERSION } from './database'
 import {
   createDailyBackup,
@@ -792,11 +796,14 @@ function pollAiJobProgress(): void {
 }
 
 function createWindow(): void {
+  const portraitSize = calculatePortraitWindowSize(screen.getPrimaryDisplay().workAreaSize)
   mainWindow = new BrowserWindow({
-    width: 1440,
-    height: 920,
-    minWidth: 1100,
-    minHeight: 720,
+    width: portraitSize.width,
+    height: portraitSize.height,
+    minWidth: portraitSize.minWidth,
+    minHeight: portraitSize.minHeight,
+    maximizable: false,
+    fullscreenable: false,
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#061126',
@@ -807,6 +814,9 @@ function createWindow(): void {
       nodeIntegration: false
     }
   })
+
+  mainWindow.setAspectRatio(PORTRAIT_WINDOW_ASPECT_RATIO)
+  mainWindow.center()
 
   mainWindow.on('ready-to-show', () => mainWindow?.show())
   mainWindow.on('focus', maintainChecklistTimeState)
