@@ -1953,13 +1953,12 @@ async function toggleCompleted(item: ChecklistItem): Promise<void> {
   const scrollTop = workspaceElement.value?.scrollTop ?? 0
   const scrollLeft = workspaceElement.value?.scrollLeft ?? 0
   try {
-    const updated = await window.gacha.updateChecklistItem({
-      id: item.id,
-      completed: !item.completed
-    })
-    const index = items.value.findIndex((candidate) => candidate.id === updated.id)
+    const updatedItems = await window.gacha.setChecklistCompletion(item.id, !item.completed)
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
-    if (index >= 0) items.value[index] = updated
+    for (const updated of updatedItems) {
+      const index = items.value.findIndex((candidate) => candidate.id === updated.id)
+      if (index >= 0) items.value[index] = updated
+    }
     await nextTick()
     const restoreScrollPosition = (): void => {
       workspaceElement.value?.scrollTo({
@@ -2138,7 +2137,12 @@ function showError(error: unknown): void {
           </span>
           <span>{{ archivedItems.length }}</span>
         </button>
-        <button type="button" @click="openSettings">⚙ 设置</button>
+        <button type="button" @click="openSettings">
+          <span class="sidebar-action-label">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/><path d="M19 13.2v-2.4l-2-.6a7.7 7.7 0 0 0-.7-1.6l1-1.9-1.7-1.7-1.9 1a7.7 7.7 0 0 0-1.6-.7l-.6-2H9.1l-.6 2a7.7 7.7 0 0 0-1.6.7L5 5 3.3 6.7l1 1.9a7.7 7.7 0 0 0-.7 1.6l-2 .6v2.4l2 .6a7.7 7.7 0 0 0 .7 1.6l-1 1.9L5 19l1.9-1a7.7 7.7 0 0 0 1.6.7l.6 2h2.4l.6-2a7.7 7.7 0 0 0 1.6-.7l1.9 1 1.7-1.7-1-1.9a7.7 7.7 0 0 0 .7-1.6l2-.6Z"/></svg>
+            设置
+          </span>
+        </button>
       </div>
     </aside>
 
@@ -2736,7 +2740,7 @@ function showError(error: unknown): void {
     </div>
 
     <div v-if="settingsOpen" class="modal-backdrop" @click.self="closeSettings">
-      <section class="editor-modal recycle-modal" role="dialog" aria-modal="true" aria-label="设置">
+      <section class="editor-modal recycle-modal settings-modal" role="dialog" aria-modal="true" aria-label="设置">
         <div class="modal-header">
           <div><p class="eyebrow">本机设置</p><h2>设置</h2></div>
           <button class="close-button" type="button" aria-label="关闭设置" @click="closeSettings">×</button>
@@ -2766,7 +2770,7 @@ function showError(error: unknown): void {
             type="button"
             :disabled="panelOrderIsDefault"
             @click="resetPanelOrder"
-          >恢复默认顺序</button>
+          >默认顺序</button>
         </div>
         <h3 class="settings-heading">界面渲染</h3>
         <div class="ai-provider-box rendering-provider-box">
@@ -2837,7 +2841,7 @@ function showError(error: unknown): void {
           </div>
           <div v-if="!aiScheduleAgent?.codexPluginInstalled" class="codex-setup-guide">
             <div class="codex-setup-actions">
-              <button class="secondary-button wide-action-button" type="button" @click="openCodexPlugin">安装 Codex 插件</button>
+              <button class="secondary-button wide-action-button" type="button" @click="openCodexPlugin">安装插件</button>
               <button class="secondary-button" type="button" @click="loadAiScheduleAgentStatus">重新检测</button>
             </div>
           </div>
@@ -2862,7 +2866,7 @@ function showError(error: unknown): void {
           <label class="software-update-toggle">
             <span>
               <strong>启动后自动检查更新</strong>
-              <small>不影响软件启动；网络超时或暂时不可用时不会打扰你。</small>
+              <small>后台检查，不影响启动。</small>
             </span>
             <input
               v-model="softwareUpdateSettings.autoCheckEnabled"
@@ -2882,7 +2886,7 @@ function showError(error: unknown): void {
               type="button"
               :disabled="softwareUpdateBusy"
               @click="checkSoftwareUpdate"
-            >{{ softwareUpdateBusy ? '检查中…' : '手动检查更新' }}</button>
+            >{{ softwareUpdateBusy ? '检查中…' : '检查更新' }}</button>
           </div>
         </div>
         <h3 class="settings-heading data-heading">登录凭据</h3>

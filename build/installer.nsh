@@ -9,10 +9,6 @@
   Var GtaskDirectoryDialog
   Var GtaskDirectoryInput
   Var GtaskDirectoryBrowseButton
-  Var GtaskInstallProgressBar
-  Var GtaskInstallProgressText
-  Var GtaskLastLoggedProgress
-  Var GtaskInstallStage
 !endif
 
 !macro EnsureGtaskInstallDirectory PATH_VAR SCRATCH_VAR ROOT_VAR
@@ -36,8 +32,6 @@
 
 !macro customPageAfterChangeDir
   Page custom GtaskDirectoryPageCreate GtaskDirectoryPageLeave
-  !define MUI_PAGE_CUSTOMFUNCTION_SHOW GtaskInstallPageShow
-  !define MUI_PAGE_CUSTOMFUNCTION_LEAVE GtaskInstallPageLeave
 !macroend
 
 !macro customFinishPage
@@ -59,15 +53,12 @@
 
 !macro customInstall
   SetDetailsPrint both
-  DetailPrint "正在写入应用组件"
-  DetailPrint "正在创建快捷方式"
-  DetailPrint "程序文件安装完成"
+  DetailPrint "Gtask 安装完成"
 !macroend
 
 !macro customHeader
   !ifndef BUILD_UNINSTALLER
-    ; electron-builder hides the details pane by default. Keep the real NSIS
-    ; operation log visible and add a percentage/status line above it.
+    ; Gtask's custom install section emits real operations into this pane.
     ShowInstDetails show
 
     Function GtaskDirectoryPageCreate
@@ -125,63 +116,6 @@
 
       !insertmacro EnsureGtaskInstallDirectory $0 $1 $2
       StrCpy $INSTDIR "$0"
-    FunctionEnd
-
-    Function GtaskInstallPageShow
-      GetDlgItem $GtaskInstallProgressBar $HWNDPARENT 1004
-      GetDlgItem $GtaskInstallProgressText $HWNDPARENT 1006
-      StrCpy $GtaskLastLoggedProgress -1
-      StrCpy $GtaskInstallStage ""
-      SetDetailsPrint both
-      DetailPrint "正在准备安装 Gtask..."
-      GetFunctionAddress $0 GtaskRefreshInstallProgress
-      nsDialogs::CreateTimer $0 100
-    FunctionEnd
-
-    Function GtaskRefreshInstallProgress
-      ; installSection temporarily suppresses routine NSIS output. Restore it
-      ; while the page is active so users can see the files and operations.
-      SetDetailsPrint both
-
-      SendMessage $GtaskInstallProgressBar 0x0407 1 0 $1
-      SendMessage $GtaskInstallProgressBar 0x0408 0 0 $0
-      ${If} $1 > 0
-        IntOp $0 $0 * 100
-        IntOp $0 $0 / $1
-      ${Else}
-        StrCpy $0 0
-      ${EndIf}
-
-      ${If} $0 < 8
-        StrCpy $2 "正在检查安装目录和现有版本"
-      ${ElseIf} $0 < 88
-        StrCpy $2 "正在解压程序文件"
-      ${ElseIf} $0 < 98
-        StrCpy $2 "正在写入应用组件"
-      ${ElseIf} $0 < 100
-        StrCpy $2 "正在完成安装配置"
-      ${Else}
-        StrCpy $2 "安装完成"
-      ${EndIf}
-      SendMessage $GtaskInstallProgressText ${WM_SETTEXT} 0 "STR:$2 · $0%"
-
-      ; Log only real progress milestones. The native details list scrolls as
-      ; these entries are appended and preserves the last completed stage.
-      IntOp $3 $0 / 5
-      IntOp $3 $3 * 5
-      ${If} $2 != $GtaskInstallStage
-        StrCpy $GtaskInstallStage $2
-        DetailPrint "$2"
-      ${EndIf}
-      ${If} $3 != $GtaskLastLoggedProgress
-        StrCpy $GtaskLastLoggedProgress $3
-        DetailPrint "安装进度：$3%"
-      ${EndIf}
-    FunctionEnd
-
-    Function GtaskInstallPageLeave
-      GetFunctionAddress $0 GtaskRefreshInstallProgress
-      nsDialogs::KillTimer $0
     FunctionEnd
 
     Function GtaskStartApp

@@ -546,6 +546,7 @@ export interface GachaApi {
   listArchivedChecklistItems: (gameId: GameId) => Promise<ChecklistItem[]>
   createChecklistItem: (input: CreateChecklistItemInput) => Promise<ChecklistItem>
   updateChecklistItem: (input: UpdateChecklistItemInput) => Promise<ChecklistItem>
+  setChecklistCompletion: (id: string, completed: boolean) => Promise<ChecklistItem[]>
   archiveChecklistItem: (id: string) => Promise<void>
   restoreChecklistItem: (id: string) => Promise<ChecklistItem>
   emptyRecycleBin: (gameId: GameId) => Promise<number>

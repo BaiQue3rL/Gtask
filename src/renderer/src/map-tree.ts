@@ -38,18 +38,36 @@ export function buildMapTreeRows(
     return candidates.length === 1 ? keyOf(candidates[0]) : null
   }
   const children = new Map<string, ChecklistItem[]>()
-  const roots: ChecklistItem[] = []
   for (const item of progressItems) {
     const parentKey = parentKeyOf(item)
-    if (!parentKey || parentKey === keyOf(item)) {
-      if (items.some((visible) => keyOf(visible) === keyOf(item))) roots.push(item)
-      continue
-    }
+    if (!parentKey || parentKey === keyOf(item)) continue
     const group = children.get(parentKey) ?? []
     group.push(item)
     children.set(parentKey, group)
   }
   const visibleKeys = new Set(items.map(keyOf))
+  // A filter may hide a completed parent while leaving unfinished children
+  // visible. Preserve the necessary ancestor path as structure instead of
+  // promoting those children into fake root regions.
+  const renderKeys = new Set(visibleKeys)
+  for (const visible of items) {
+    let current: ChecklistItem | undefined = visible
+    const visitedAncestors = new Set<string>()
+    while (current) {
+      const key = keyOf(current)
+      if (visitedAncestors.has(key)) break
+      visitedAncestors.add(key)
+      renderKeys.add(key)
+      const parentKey = parentKeyOf(current)
+      if (!parentKey || parentKey === key) break
+      current = byKey.get(parentKey)
+    }
+  }
+  const roots = progressItems.filter((item) => {
+    if (!renderKeys.has(keyOf(item))) return false
+    const parentKey = parentKeyOf(item)
+    return !parentKey || parentKey === keyOf(item)
+  })
   const displayProgress = new Map<string, number | null>()
   const resolveProgress = (item: ChecklistItem, visiting = new Set<string>()): number | null => {
     const key = keyOf(item)
@@ -78,14 +96,16 @@ export function buildMapTreeRows(
     const key = keyOf(item)
     if (reachable.has(key)) return
     reachable.add(key)
-    for (const child of children.get(key) ?? []) markReachable(child)
+    for (const child of children.get(key) ?? []) {
+      if (renderKeys.has(keyOf(child))) markReachable(child)
+    }
   }
   const visit = (item: ChecklistItem, depth: number): void => {
     const key = keyOf(item)
     if (visited.has(key)) return
     visited.add(key)
     const descendants = children.get(key) ?? []
-    const visibleDescendants = descendants.filter((child) => visibleKeys.has(keyOf(child)))
+    const visibleDescendants = descendants.filter((child) => renderKeys.has(keyOf(child)))
     rows.push({
       item,
       depth,
@@ -97,8 +117,8 @@ export function buildMapTreeRows(
   }
   for (const root of roots) markReachable(root)
   for (const root of roots) visit(root, 0)
-  for (const item of items) {
-    if (!reachable.has(keyOf(item))) visit(item, 0)
+  for (const item of progressItems) {
+    if (renderKeys.has(keyOf(item)) && !reachable.has(keyOf(item))) visit(item, 0)
   }
   return rows
 }

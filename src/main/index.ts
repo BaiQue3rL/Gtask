@@ -1,6 +1,6 @@
 import { cpSync, existsSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { app, BrowserWindow, dialog, ipcMain, net, safeStorage, session, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, net, powerMonitor, safeStorage, session, shell } from 'electron'
 import { terminateApplicationProcess } from './application-exit'
 import { AppDatabase, CURRENT_SCHEMA_VERSION } from './database'
 import {
@@ -169,6 +169,25 @@ function reportBackgroundError(context: string, error: unknown): void {
   console.error(`${context}失败`, error)
 }
 
+function maintainChecklistTimeState(): void {
+  if (!appDatabase || isShuttingDown) return
+  try {
+    // Recurring entries must advance first. Any system time-limited rows left
+    // behind are expired one-off entries and are permanently removed.
+    const changes =
+      appDatabase.resetDueWeeklyItems() +
+      appDatabase.resetDueQuestItems() +
+      appDatabase.rolloverDueCycleItems() +
+      appDatabase.pruneExpiredSystemItems() +
+      appDatabase.markStaleSyncStates()
+    if (changes > 0 && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('checklist:changed')
+    }
+  } catch (error) {
+    reportBackgroundError('清单时间状态后台维护', error)
+  }
+}
+
 function shutdownApplicationRuntime(): void {
   if (isShuttingDown) return
   isShuttingDown = true
@@ -180,6 +199,10 @@ function shutdownApplicationRuntime(): void {
   aiJobProgressTimer = null
   if (softwareUpdateTimer) clearTimeout(softwareUpdateTimer)
   softwareUpdateTimer = null
+  if (app.isReady()) {
+    powerMonitor.removeListener('resume', maintainChecklistTimeState)
+    powerMonitor.removeListener('unlock-screen', maintainChecklistTimeState)
+  }
   aiJobProgressSignatures.clear()
 
   syncOrchestrator?.shutdown()
@@ -786,6 +809,7 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => mainWindow?.show())
+  mainWindow.on('focus', maintainChecklistTimeState)
   mainWindow.on('close', () => {
     shutdownApplicationRuntime()
   })
@@ -1036,6 +1060,11 @@ function registerIpcHandlers(): void {
   ipcMain.handle('checklist:update', (_event, input: unknown) => {
     if (!appDatabase) throw new Error('数据库尚未初始化')
     return appDatabase.updateChecklistItem(parseUpdateChecklistItem(input))
+  })
+  ipcMain.handle('checklist:set-completion', (_event, id: unknown, completed: unknown) => {
+    if (!appDatabase) throw new Error('数据库尚未初始化')
+    if (typeof completed !== 'boolean') throw new Error('完成状态格式不正确')
+    return appDatabase.setChecklistCompletion(parseItemId(id), completed)
   })
   ipcMain.handle('checklist:archive', (_event, id: unknown) => {
     if (!appDatabase) throw new Error('数据库尚未初始化')
@@ -1426,18 +1455,9 @@ if (!app.requestSingleInstanceLock()) {
     syncOrchestrator = createAppSyncOrchestrator(appDatabase)
     registerIpcHandlers()
     createWindow()
-    periodTimer = setInterval(() => {
-      try {
-        const changes =
-          (appDatabase?.resetDueWeeklyItems() ?? 0) +
-          (appDatabase?.resetDueQuestItems() ?? 0) +
-          (appDatabase?.rolloverDueCycleItems() ?? 0) +
-          (appDatabase?.markStaleSyncStates() ?? 0)
-        if (changes > 0) mainWindow?.webContents.send('checklist:changed')
-      } catch (error) {
-        reportBackgroundError('周期状态后台维护', error)
-      }
-    }, 60_000)
+    powerMonitor.on('resume', maintainChecklistTimeState)
+    powerMonitor.on('unlock-screen', maintainChecklistTimeState)
+    periodTimer = setInterval(maintainChecklistTimeState, 15_000)
     let lastDataVersion = appDatabase.getDataVersion()
     let lastChecklistRevision = appDatabase.getChecklistRevision()
     externalChangeTimer = setInterval(() => {

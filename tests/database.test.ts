@@ -1023,7 +1023,7 @@ describe('AppDatabase', () => {
     }
   })
 
-  it('启动时不再按标题和时间自行归并 Codex 尚未处理的历史挑战项', () => {
+  it('启动时不归并仍有效的历史挑战，并硬删除已经到期的系统挑战', () => {
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-endgame-duplicate-cleanup-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
     database = new AppDatabase(databasePath)
@@ -1115,7 +1115,7 @@ describe('AppDatabase', () => {
         .filter((item) => item.modeKey === `${gameId}:historical-mode`)).toHaveLength(0)
     }
     expect(database.listChecklistItems('zenless')
-      .filter((item) => item.modeKey === 'zenless:separate-period-mode')).toHaveLength(2)
+      .filter((item) => item.modeKey === 'zenless:separate-period-mode')).toHaveLength(0)
   })
 
   it.skip('旧融合流程：个人活动按中文名和时间回填公开排期', () => {
@@ -1475,6 +1475,45 @@ describe('AppDatabase', () => {
         parentRemoteKey: 'map:loop:a'
       }
     ])).toThrow('上级必须是一级主地区')
+  })
+
+  it('一级地图完成状态原子级联到全部二级地区', () => {
+    database = new AppDatabase(':memory:')
+    database.mergeSyncedItems('genshin', 'public_schedule', [
+      {
+        remoteKey: 'map:liyue',
+        category: 'exploration',
+        title: '璃月',
+        mapNodeKind: 'region'
+      },
+      {
+        remoteKey: 'map:liyue:minlin',
+        category: 'exploration',
+        title: '珉林',
+        mapNodeKind: 'subregion',
+        parentRemoteKey: 'map:liyue'
+      },
+      {
+        remoteKey: 'map:liyue:chasm',
+        category: 'exploration',
+        title: '层岩巨渊',
+        mapNodeKind: 'subregion',
+        parentRemoteKey: 'map:liyue'
+      }
+    ])
+    const region = database.listChecklistItems('genshin').find(
+      (item) => item.remoteKey === 'map:liyue'
+    )!
+
+    expect(database.setChecklistCompletion(region.id, true)).toHaveLength(3)
+    expect(database.listChecklistItems('genshin').filter(
+      (item) => item.remoteKey?.startsWith('map:liyue')
+    ).every((item) => item.completed)).toBe(true)
+
+    expect(database.setChecklistCompletion(region.id, false)).toHaveLength(3)
+    expect(database.listChecklistItems('genshin').filter(
+      (item) => item.remoteKey?.startsWith('map:liyue')
+    ).every((item) => !item.completed)).toBe(true)
   })
 
   it.skip('旧融合流程：公开排期覆盖个人元数据', () => {
@@ -3017,6 +3056,68 @@ describe('AppDatabase', () => {
     expect(result.expiredRemoved).toBe(1)
     expect(database.listArchivedChecklistItems('genshin')).toEqual([])
     expect(() => database!.restoreChecklistItem(item.id)).toThrow('不存在')
+  })
+
+  it('软件运行期间硬删除到期系统事项、保留手动事项并阻止旧个人快照再生', () => {
+    database = new AppDatabase(':memory:')
+    const accountScope = `miyoushe:${'9'.repeat(64)}`
+    const sourceIdentity = {
+      provider: 'miyoushe',
+      endpoint: 'event-api',
+      externalId: 'runtime-expiry-event'
+    }
+    database.replacePersonalSnapshot('genshin', 'events', accountScope, [{
+      remoteKey: 'personal-event:runtime-expiry',
+      category: 'limited_event',
+      title: '个人到期活动',
+      startsAt: '2030-08-01T00:00:00.000Z',
+      endsAt: '2030-08-10T00:00:00.000Z',
+      sourceIdentity
+    }], 'test-v1', new Date('2030-08-05T00:00:00.000Z'))
+    database.replacePublicCatalog('star-rail', 'events', [{
+      remoteKey: 'public-event:runtime-expiry',
+      category: 'limited_event',
+      title: '公开到期活动',
+      activityTags: ['签到'],
+      startsAt: '2030-08-01T00:00:00.000Z',
+      endsAt: '2030-08-10T00:00:00.000Z'
+    }], '2030-08-05T00:00:00.000Z')
+    const manual = database.createChecklistItem({
+      gameId: 'genshin',
+      category: 'limited_event',
+      title: '手动保留活动',
+      startsAt: '2030-08-01T00:00:00.000Z',
+      endsAt: '2030-08-10T00:00:00.000Z'
+    })
+
+    expect(database.pruneExpiredSystemItems(new Date('2030-08-10T00:00:01.000Z'))).toBe(2)
+    expect(database.listChecklistItems('genshin').map((item) => item.title)).not.toContain('个人到期活动')
+    expect(database.listChecklistItems('star-rail').map((item) => item.title)).not.toContain('公开到期活动')
+    expect(database.listChecklistItems('genshin').find((item) => item.id === manual.id)).toBeDefined()
+    expect(database.listArchivedChecklistItems('genshin')).toEqual([])
+
+    const stale = database.replacePersonalSnapshot('genshin', 'events', accountScope, [{
+      remoteKey: 'personal-event:runtime-expiry',
+      category: 'limited_event',
+      title: '个人到期活动',
+      startsAt: '2030-08-01T00:00:00.000Z',
+      endsAt: '2030-08-10T00:00:00.000Z',
+      sourceIdentity
+    }], 'test-v1', new Date('2030-08-10T00:00:02.000Z'))
+    expect(stale.added).toBe(0)
+    expect(database.listChecklistItems('genshin').map((item) => item.title)).not.toContain('个人到期活动')
+
+    database.replacePersonalSnapshot('genshin', 'events', accountScope, [{
+      remoteKey: 'personal-event:runtime-expiry',
+      category: 'limited_event',
+      title: '个人延期活动',
+      startsAt: '2030-08-01T00:00:00.000Z',
+      endsAt: '2030-09-10T00:00:00.000Z',
+      sourceIdentity
+    }], 'test-v1', new Date('2030-08-10T00:00:03.000Z'))
+    expect(database.listChecklistItems('genshin')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ title: '个人延期活动', source: 'personal_sync' })
+    ]))
   })
 
   it('个人周期缺失时间也进入相同元数据补全任务', () => {

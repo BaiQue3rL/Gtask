@@ -139,6 +139,28 @@ describe('buildMapTreeRows', () => {
     expect(rows.some((row) => row.item.id === 'map:done')).toBe(false)
   })
 
+  it('只看未完成时保留已完成父目录作为结构，不把子地区提升为一级目录', () => {
+    const allItems = [
+      mapItem('region:liyue', '璃月', { completed: true, progressPercent: 100 }),
+      mapItem('map:active', '沉玉谷', {
+        mapNodeKind: 'subregion',
+        completed: false,
+        progressPercent: 80,
+        parentRemoteKey: 'region:liyue'
+      })
+    ]
+    const rows = buildMapTreeRows(
+      allItems.filter((item) => !item.completed),
+      new Set(),
+      allItems
+    )
+
+    expect(rows.map((row) => [row.item.id, row.depth])).toEqual([
+      ['region:liyue', 0],
+      ['map:active', 1]
+    ])
+  })
+
   it('横向布局保持每个一级目录和其二级地区在同一列', () => {
     const rows = buildMapTreeRows([
       mapItem('region:a', '一级 A'),

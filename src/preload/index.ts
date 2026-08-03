@@ -31,6 +31,8 @@ const gachaApi: GachaApi = {
   listArchivedChecklistItems: (gameId) => ipcRenderer.invoke('checklist:list-archived', gameId),
   createChecklistItem: (input) => ipcRenderer.invoke('checklist:create', input),
   updateChecklistItem: (input) => ipcRenderer.invoke('checklist:update', input),
+  setChecklistCompletion: (id, completed) =>
+    ipcRenderer.invoke('checklist:set-completion', id, completed),
   archiveChecklistItem: (id) => ipcRenderer.invoke('checklist:archive', id),
   restoreChecklistItem: (id) => ipcRenderer.invoke('checklist:restore', id),
   emptyRecycleBin: (gameId) => ipcRenderer.invoke('checklist:empty-recycle-bin', gameId),

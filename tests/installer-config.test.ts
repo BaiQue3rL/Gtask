@@ -6,6 +6,7 @@ describe('Windows installer directory', () => {
     const packageJson = JSON.parse(
       readFileSync(new URL('../package.json', import.meta.url), 'utf8')
     ) as {
+      scripts?: Record<string, string>
       build?: {
         electronLanguages?: string[]
         nsis?: {
@@ -37,15 +38,20 @@ describe('Windows installer directory', () => {
     expect(installer).toContain('StrCpy ${PATH_VAR} "${PATH_VAR}\\${APP_FILENAME}"')
     expect(installer).toContain('Function GtaskDirectoryPageLeave')
     expect(installer).toContain('ShowInstDetails show')
-    expect(installer).toContain('Function GtaskRefreshInstallProgress')
-    expect(installer).toContain('0x0407 1 0 $1')
-    expect(installer).toContain('0x0408 0 0 $0')
-    expect(installer).toContain('IntOp $3 $0 / 5')
-    expect(installer).toContain('DetailPrint "安装进度：$3%"')
-    expect(installer).toContain('正在解压程序文件')
+    const packageScript = readFileSync(
+      new URL('../scripts/build-installer-with-details.mjs', import.meta.url),
+      'utf8'
+    )
+    expect(packageJson.scripts?.['package:installer']).toContain('build-installer-with-details.mjs')
+    expect(packageScript).toContain('SetDetailsPrint both')
+    expect(packageScript).toContain('正在检查并移除现有版本…')
+    expect(packageScript).toContain('正在解压程序文件…')
+    expect(packageScript).toContain('程序文件已安装')
+    expect(packageScript).toContain('正在写入安装信息…')
+    expect(packageScript).toContain('正在创建快捷方式…')
+    expect(packageScript).toContain("writeFileSync(installSectionPath, original, 'utf8')")
     expect(installer).toContain('!macro customInstall')
-    expect(installer).toContain('正在写入应用组件')
-    expect(installer).toContain('程序文件安装完成')
+    expect(installer).toContain('Gtask 安装完成')
     expect(installer).toContain('!macro customFinishPage')
     expect(installer).toContain('MUI_FINISHPAGE_SHOWREADME_TEXT "创建桌面快捷方式"')
     expect(installer).toContain('MUI_FINISHPAGE_RUN_TEXT "运行 Gtask"')

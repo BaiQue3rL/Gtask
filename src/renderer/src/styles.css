@@ -71,11 +71,11 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .game-button.selected { border-color: #3e6b9f; box-shadow: inset 3px 0 0 var(--game-accent); }
 .game-icon { width: 28px; height: 28px; flex: 0 0 auto; border: 1px solid rgba(148, 180, 218, .45); border-radius: 7px; object-fit: cover; box-shadow: 0 4px 12px rgba(0, 0, 0, .25); }
 .sidebar-footer { display: grid; gap: 8px; margin-top: auto; padding: 14px 5px 0; border-top: 1px solid #263c5b; color: #b8c6db; }
-.sidebar-footer button { display: flex; justify-content: space-between; padding: 8px 7px; border: 0; border-radius: 6px; color: #b8c6db; background: transparent; text-align: left; cursor: pointer; }
+.sidebar-footer button { display: flex; min-height: 36px; align-items: center; justify-content: space-between; padding: 8px 7px; border: 0; border-radius: 6px; color: #b8c6db; background: transparent; text-align: left; cursor: pointer; }
 .sidebar-footer button:hover { color: white; background: rgba(40, 89, 153, 0.25); }
 .sidebar-footer button > span:last-child { color: #6f8eb5; }
-.sidebar-action-label { display: inline-flex; align-items: center; gap: 8px; color: inherit; }
-.sidebar-action-label svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.sidebar-action-label { display: grid; grid-template-columns: 18px auto; align-items: center; gap: 8px; color: inherit; line-height: 20px; }
+.sidebar-action-label svg { display: block; width: 16px; height: 16px; justify-self: center; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 
 .workspace { isolation: isolate; overflow: auto; overflow-anchor: none; padding: 26px 30px 20px; scrollbar-color: #345a83 transparent; scrollbar-width: thin; }
 .workspace::-webkit-scrollbar, .recycle-list::-webkit-scrollbar, .editor-modal::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -486,7 +486,9 @@ h2 { margin: 0; font-size: 19px; }
 .source-box button { flex: 0 0 auto; padding: 7px 12px; border-radius: 6px; cursor: pointer; }
 .settings-note { margin: 15px 0 0; padding-top: 13px; border-top: 1px solid #2a4362; color: #68819f; font-size: 11px; line-height: 1.6; }
 .credential-actions { display: flex !important; grid-auto-flow: column; gap: 8px !important; flex-shrink: 0; }
-.credential-actions button, .data-location-actions button { box-sizing: border-box; width: 96px; height: var(--control-height); padding: 0 12px; cursor: pointer; }
+.settings-modal button:not(.close-button) { box-sizing: border-box; width: 112px; min-width: 112px; height: var(--control-height); padding: 0 14px; border-radius: 7px; white-space: nowrap; cursor: pointer; }
+.settings-modal button:not(.close-button):disabled { cursor: not-allowed; }
+.credential-actions button, .data-location-actions button { flex: 0 0 112px; }
 .login-backdrop { z-index: 20; }
 .login-modal { width: min(460px, 100%); text-align: center; }
 .login-modal .modal-header { text-align: left; }

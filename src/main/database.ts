@@ -377,6 +377,7 @@ export class AppDatabase {
       this.resetDueWeeklyItems()
       this.resetDueQuestItems()
       this.rolloverDueCycleItems()
+      this.pruneExpiredSystemItems()
       this.markStaleSyncStates()
     } catch (error) {
       this.database.close()
@@ -3200,6 +3201,34 @@ export class AppDatabase {
     return this.runTransaction(() => inputs.map((input) => this.updateChecklistItem(input)))
   }
 
+  setChecklistCompletion(id: string, completed: boolean): ChecklistItem[] {
+    const item = this.getChecklistItem(id)
+    const affectedIds = [item.id]
+    if (item.category === 'exploration' && item.mapNodeKind === 'region') {
+      const children = this.database.prepare(`
+        SELECT id
+        FROM checklist_items
+        WHERE game_id = ? AND category = 'exploration' AND archived = 0
+          AND map_node_kind = 'subregion'
+          AND (
+            (? IS NOT NULL AND parent_remote_key = ?)
+            OR (parent_remote_key IS NULL AND parent_title = ?)
+          )
+        ORDER BY created_at, id
+      `).all(
+        item.gameId,
+        item.remoteKey,
+        item.remoteKey,
+        item.title
+      ) as Array<{ id: string }>
+      affectedIds.push(...children.map((child) => child.id))
+    }
+    return this.updateChecklistItems(affectedIds.map((affectedId) => ({
+      id: affectedId,
+      completed
+    })))
+  }
+
   archiveChecklistItem(id: string): void {
     if (this.isPersistentChecklistId(id)) throw new Error('固定清单事项不能删除')
     const item = this.getChecklistItem(id)
@@ -3738,7 +3767,7 @@ export class AppDatabase {
       for (const selected of targets) {
         this.activateChecklistSourceInTransaction(gameId, selected, 'public_schedule')
       }
-      return this.mergeSyncedItems(
+      const merge = this.mergeSyncedItems(
         gameId,
         'public_schedule',
         items,
@@ -3746,6 +3775,8 @@ export class AppDatabase {
         false,
         options
       )
+      this.pruneExpiredSystemItemsInTransaction(new Date(syncedAt))
+      return merge
     })
   }
 
@@ -4304,6 +4335,87 @@ export class AppDatabase {
       changes += Number(result.changes)
     }
     return changes
+  }
+
+  /**
+   * Permanently removes expired, system-owned time-limited entries.
+   *
+   * Known recurring challenges must be rolled forward before this method is
+   * called. Manual entries are deliberately outside this query: only public
+   * and authenticated snapshots are lifecycle-managed by the application.
+   * Personal provider identities receive an expiry tombstone before the row
+   * is deleted so a stale official snapshot cannot recreate the old period.
+   */
+  pruneExpiredSystemItems(reference = new Date()): number {
+    return this.runTransaction(() => this.pruneExpiredSystemItemsInTransaction(reference))
+  }
+
+  private pruneExpiredSystemItemsInTransaction(reference: Date): number {
+    const now = reference.toISOString()
+    const rows = this.database.prepare(`
+      SELECT i.id, i.game_id AS gameId, i.category, i.source,
+        i.ends_at AS endsAt,
+        b.provider, b.endpoint, b.external_id AS externalId
+      FROM checklist_items i
+      LEFT JOIN source_bindings b
+        ON b.game_id = i.game_id AND b.item_id = i.id
+      WHERE i.source IN ('public_schedule', 'personal_sync')
+        AND i.category IN ('limited_event', 'endgame')
+        AND i.ends_at IS NOT NULL
+        AND julianday(i.ends_at) <= julianday(?)
+      ORDER BY i.id
+    `).all(now) as Array<{
+      id: string
+      gameId: GameId
+      category: Extract<ChecklistCategory, 'limited_event' | 'endgame'>
+      source: Extract<ChecklistSource, 'public_schedule' | 'personal_sync'>
+      endsAt: string
+      provider: string | null
+      endpoint: string | null
+      externalId: string | null
+    }>
+    if (rows.length === 0) return 0
+
+    const upsertExpiry = this.database.prepare(`
+      INSERT INTO personal_expiry_tombstones(
+        game_id, provider, endpoint, external_id, category, expired_ends_at, observed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(game_id, provider, endpoint, external_id) DO UPDATE SET
+        category = excluded.category,
+        expired_ends_at = CASE
+          WHEN julianday(excluded.expired_ends_at) > julianday(personal_expiry_tombstones.expired_ends_at)
+            THEN excluded.expired_ends_at
+          ELSE personal_expiry_tombstones.expired_ends_at
+        END,
+        observed_at = excluded.observed_at
+    `)
+    const deleteItem = this.database.prepare(`
+      DELETE FROM checklist_items
+      WHERE id = ? AND source IN ('public_schedule', 'personal_sync')
+    `)
+    const deleted = new Set<string>()
+    let removed = 0
+    for (const row of rows) {
+      if (
+        row.source === 'personal_sync' &&
+        row.provider && row.endpoint && row.externalId &&
+        row.provider !== 'gtask-cycle-catalog'
+      ) {
+        upsertExpiry.run(
+          row.gameId,
+          row.provider,
+          row.endpoint,
+          row.externalId,
+          row.category,
+          row.endsAt,
+          now
+        )
+      }
+      if (deleted.has(row.id)) continue
+      deleted.add(row.id)
+      removed += Number(deleteItem.run(row.id).changes)
+    }
+    return removed
   }
 
   resetDueQuestItems(reference = new Date()): number {
