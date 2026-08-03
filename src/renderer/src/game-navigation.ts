@@ -1,5 +1,10 @@
 import type { GameSummary, GameVersionSummary } from '../../shared/contracts'
 
+export type GameVersionDeadlineTone = 'distant' | 'normal' | 'urgent'
+
+const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1_000
+const THREE_WEEKS_MS = 3 * ONE_WEEK_MS
+
 function validFutureTimestamp(value: string | null, referenceTime: number): number | null {
   if (!value) return null
   const timestamp = Date.parse(value)
@@ -39,5 +44,17 @@ export function isGameVersionDeadlineUrgent(
   referenceTime: number
 ): boolean {
   const timestamp = validFutureTimestamp(endsAt, referenceTime)
-  return timestamp !== null && timestamp - referenceTime < 72 * 60 * 60 * 1_000
+  return timestamp !== null && timestamp - referenceTime < ONE_WEEK_MS
+}
+
+export function gameVersionDeadlineTone(
+  endsAt: string | null,
+  referenceTime: number
+): GameVersionDeadlineTone | null {
+  const timestamp = validFutureTimestamp(endsAt, referenceTime)
+  if (timestamp === null) return null
+  const remaining = timestamp - referenceTime
+  if (remaining < ONE_WEEK_MS) return 'urgent'
+  if (remaining > THREE_WEEKS_MS) return 'distant'
+  return 'normal'
 }

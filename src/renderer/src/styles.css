@@ -72,6 +72,7 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .game-icon { width: 28px; height: 28px; flex: 0 0 auto; border: 1px solid rgba(148, 180, 218, .45); border-radius: 7px; object-fit: cover; box-shadow: 0 4px 12px rgba(0, 0, 0, .25); }
 .game-name { min-width: 0; line-height: 1.35; }
 .game-version-remaining { grid-column: 1 / -1; overflow: hidden; color: #f0b63a; font-size: 12px; font-weight: 400; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+.game-version-remaining.distant { color: #78aae8; }
 .game-version-remaining.urgent { color: #ef5f56; font-weight: 600; }
 .sidebar-footer { display: grid; gap: 8px; margin-top: auto; padding: 14px 5px 0; border-top: 1px solid #263c5b; color: #b8c6db; }
 .sidebar-footer button { display: flex; min-height: 36px; align-items: center; justify-content: space-between; padding: 8px 7px; border: 0; border-radius: 6px; color: #b8c6db; background: transparent; text-align: left; cursor: pointer; }

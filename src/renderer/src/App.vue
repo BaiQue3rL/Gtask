@@ -33,6 +33,7 @@ import { projectAiJobProgressPhase } from '../../shared/sync-progress'
 import { readHiddenGameIds, writeHiddenGameIds } from './game-visibility'
 import {
   formatGameVersionRemaining,
+  gameVersionDeadlineTone,
   isGameVersionDeadlineUrgent,
   orderGamesByVersion
 } from './game-navigation'
@@ -2118,8 +2119,8 @@ function gameVersionEndsAt(gameId: GameId): string | null {
   return gameVersionSummaries.value.find((summary) => summary.gameId === gameId)?.endsAt ?? null
 }
 
-function isGameVersionUrgent(gameId: GameId): boolean {
-  return isGameVersionDeadlineUrgent(gameVersionEndsAt(gameId), clockNow.value)
+function versionDeadlineToneForGame(gameId: GameId): ReturnType<typeof gameVersionDeadlineTone> {
+  return gameVersionDeadlineTone(gameVersionEndsAt(gameId), clockNow.value)
 }
 
 function isExpired(value: string): boolean {
@@ -2127,8 +2128,7 @@ function isExpired(value: string): boolean {
 }
 
 function isUrgentDeadline(value: string): boolean {
-  const remaining = new Date(value).getTime() - clockNow.value
-  return remaining > 0 && remaining < 72 * 60 * 60 * 1_000
+  return isGameVersionDeadlineUrgent(value, clockNow.value)
 }
 
 function isUpcoming(value: string): boolean {
@@ -2191,7 +2191,7 @@ function showError(error: unknown): void {
           <small
             v-if="versionRemainingForGame(game.id)"
             class="game-version-remaining"
-            :class="{ urgent: isGameVersionUrgent(game.id) }"
+            :class="versionDeadlineToneForGame(game.id)"
           >
             {{ versionRemainingForGame(game.id) }}
           </small>

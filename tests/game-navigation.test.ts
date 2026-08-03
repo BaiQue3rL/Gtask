@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { GameSummary, GameVersionSummary } from '../src/shared/contracts'
 import {
   formatGameVersionRemaining,
+  gameVersionDeadlineTone,
   isGameVersionDeadlineUrgent,
   orderGamesByVersion
 } from '../src/renderer/src/game-navigation'
@@ -37,7 +38,11 @@ describe('sidebar game navigation', () => {
       .toBe('版本剩余 2 天 3 小时')
     expect(formatGameVersionRemaining(null, now)).toBeNull()
     expect(formatGameVersionRemaining('2026-08-03T12:00:00.000Z', now)).toBeNull()
-    expect(isGameVersionDeadlineUrgent('2026-08-06T12:19:59.000Z', now)).toBe(true)
-    expect(isGameVersionDeadlineUrgent('2026-08-06T12:20:00.000Z', now)).toBe(false)
+    expect(isGameVersionDeadlineUrgent('2026-08-10T12:19:59.000Z', now)).toBe(true)
+    expect(isGameVersionDeadlineUrgent('2026-08-10T12:20:00.000Z', now)).toBe(false)
+    expect(gameVersionDeadlineTone('2026-08-10T12:19:59.000Z', now)).toBe('urgent')
+    expect(gameVersionDeadlineTone('2026-08-10T12:20:00.000Z', now)).toBe('normal')
+    expect(gameVersionDeadlineTone('2026-08-24T12:20:00.000Z', now)).toBe('normal')
+    expect(gameVersionDeadlineTone('2026-08-24T12:20:01.000Z', now)).toBe('distant')
   })
 })
