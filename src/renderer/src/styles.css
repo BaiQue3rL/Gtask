@@ -89,7 +89,7 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .workspace::-webkit-scrollbar-track, .recycle-list::-webkit-scrollbar-track, .editor-modal::-webkit-scrollbar-track { background: transparent; }
 .topbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 12px; margin-bottom: 18px; }
 .topbar-actions { display: grid; grid-template-columns: auto auto; align-items: center; justify-content: end; gap: 8px 9px; }
-.topbar-actions .sync-indicator { grid-column: 1 / -1; justify-self: end; }
+.topbar-actions .sync-indicator { grid-column: 1 / -1; justify-content: center; justify-self: stretch; }
 .toolbar-button { min-height: 40px; padding: 9px 14px; border: 1px solid #315276; border-radius: 9px; color: #b1c3da; background: linear-gradient(180deg, rgba(16, 39, 72, .88), rgba(8, 24, 47, .9)); box-shadow: 0 5px 15px rgba(0, 0, 0, .12); cursor: pointer; }
 .toolbar-button:hover, .toolbar-button.active { border-color: #5a8dca; color: #e5f0ff; background: #123360; }
 .toolbar-button:disabled { cursor: wait; opacity: 0.55; }
