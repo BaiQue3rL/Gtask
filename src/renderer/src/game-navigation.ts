@@ -33,3 +33,11 @@ export function formatGameVersionRemaining(
   const hours = totalHours % 24
   return `版本剩余 ${days} 天 ${hours} 小时`
 }
+
+export function isGameVersionDeadlineUrgent(
+  endsAt: string | null,
+  referenceTime: number
+): boolean {
+  const timestamp = validFutureTimestamp(endsAt, referenceTime)
+  return timestamp !== null && timestamp - referenceTime < 72 * 60 * 60 * 1_000
+}

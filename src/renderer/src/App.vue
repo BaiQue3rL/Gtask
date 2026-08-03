@@ -33,6 +33,7 @@ import { projectAiJobProgressPhase } from '../../shared/sync-progress'
 import { readHiddenGameIds, writeHiddenGameIds } from './game-visibility'
 import {
   formatGameVersionRemaining,
+  isGameVersionDeadlineUrgent,
   orderGamesByVersion
 } from './game-navigation'
 import { kuroRoleKey } from './kuro-role-key'
@@ -2110,9 +2111,15 @@ function countdown(value: string, prefix = '剩余'): string {
 }
 
 function versionRemainingForGame(gameId: GameId): string | null {
-  const endsAt = gameVersionSummaries.value.find((summary) => summary.gameId === gameId)?.endsAt
-    ?? null
-  return formatGameVersionRemaining(endsAt, clockNow.value)
+  return formatGameVersionRemaining(gameVersionEndsAt(gameId), clockNow.value)
+}
+
+function gameVersionEndsAt(gameId: GameId): string | null {
+  return gameVersionSummaries.value.find((summary) => summary.gameId === gameId)?.endsAt ?? null
+}
+
+function isGameVersionUrgent(gameId: GameId): boolean {
+  return isGameVersionDeadlineUrgent(gameVersionEndsAt(gameId), clockNow.value)
 }
 
 function isExpired(value: string): boolean {
@@ -2181,7 +2188,11 @@ function showError(error: unknown): void {
         >
           <img class="game-icon" :src="gameIcons[game.id]" alt="" aria-hidden="true">
           <span class="game-name">{{ game.name }}</span>
-          <small v-if="versionRemainingForGame(game.id)" class="game-version-remaining">
+          <small
+            v-if="versionRemainingForGame(game.id)"
+            class="game-version-remaining"
+            :class="{ urgent: isGameVersionUrgent(game.id) }"
+          >
             {{ versionRemainingForGame(game.id) }}
           </small>
         </button>
@@ -2196,7 +2207,7 @@ function showError(error: unknown): void {
         </button>
         <button type="button" @click="openSettings">
           <span class="sidebar-action-label">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4A2 2 0 0 0 4 9.9l.2.1a2 2 0 0 1 1 1.7v.6a2 2 0 0 1-1 1.7l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7v.2a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.7v-.6a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="settings-sidebar-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4A2 2 0 0 0 4 9.9l.2.1a2 2 0 0 1 1 1.7v.6a2 2 0 0 1-1 1.7l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7v.2a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.7v-.6a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></svg>
             设置
           </span>
         </button>
