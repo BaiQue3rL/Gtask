@@ -209,7 +209,7 @@ describe('绝区零个人战绩解析', () => {
       id: 69045,
       has_data: false,
       total_star: 0,
-      challenges: []
+      challenges: [{ has_data: false, star: 0, score: 0, teams: [] }]
     })).toMatchObject({ completed: false })
   })
 

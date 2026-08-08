@@ -42,6 +42,15 @@ export interface CodexScheduleItem extends NormalizedSyncItem {
   matchItemId?: string
 }
 
+export interface CodexVersionWindow {
+  periodKey: string
+  startsAt: string
+  endsAt: string
+  timeZone: string
+  sourceUrl: string
+  confidence: number
+}
+
 export interface CodexArchiveDecision {
   itemId: string
   reason: string

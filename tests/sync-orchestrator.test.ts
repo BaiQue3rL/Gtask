@@ -193,9 +193,7 @@ describe('SyncOrchestrator', () => {
     expect(database.listChecklistItems('genshin').filter((item) => item.category === 'exploration'))
       .toEqual([expect.objectContaining({ title: '璃月', source: 'personal_sync', progressPercent: 86 })])
     expect(database.listChecklistItems('genshin')).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: custom.id, title: '自定义养成计划' }),
-      expect.objectContaining({ id: 'genshin:main_quest' }),
-      expect.objectContaining({ id: 'genshin:side_quest' })
+      expect.objectContaining({ id: custom.id, title: '自定义养成计划' })
     ]))
     expect(database.getSourceBinding('genshin', 'miyoushe', 'personal-map-progress', '6'))
       .toMatchObject({ bindingKind: 'mechanical', confidence: 1 })
@@ -396,7 +394,7 @@ describe('SyncOrchestrator', () => {
       .toMatchObject({ completed: true })
   })
 
-  it('个人周期快照替换挑战但始终保留固定周常', () => {
+  it('个人周期快照只建立官方挑战清单', () => {
     database = new AppDatabase(':memory:')
     database.replacePersonalSnapshot('genshin', 'cycles', accountScope, [{
       remoteKey: 'endgame:spiral-abyss',
@@ -410,10 +408,9 @@ describe('SyncOrchestrator', () => {
         externalId: 'endgame:spiral-abyss|period:genshin:spiral-abyss:42'
       }
     }], 'test-v1')
-    expect(database.listChecklistItems('genshin')).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: 'genshin:weekly', category: 'weekly' }),
+    expect(database.listChecklistItems('genshin')).toEqual([
       expect.objectContaining({ title: '深境螺旋', source: 'personal_sync', completed: true })
-    ]))
+    ])
   })
 
   it('凭据验证失败时保留现有清单', async () => {

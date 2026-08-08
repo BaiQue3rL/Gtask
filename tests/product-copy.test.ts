@@ -39,7 +39,7 @@ describe('product copy', () => {
       'utf8'
     )
 
-    expect(app).toContain("row.item.category === 'weekly' || row.item.source === 'manual'")
+    expect(app).toContain("row.item.resetRule && row.item.source === 'manual'")
     expect(cycleCatalog).not.toContain('按官方周期校准')
   })
 

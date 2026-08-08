@@ -1,5 +1,3 @@
-import type { ChecklistItem } from '../../shared/contracts'
-
 export const MAP_CATALOG_MAX_UNVERIFIED_AGE_MS = 30 * 24 * 60 * 60 * 1000
 
 export interface MapCatalogVersionWindow {
@@ -28,22 +26,21 @@ function validTimestamp(value: string | null | undefined): number | null {
 }
 
 export function selectRelevantVersionWindow(
-  items: Array<Pick<ChecklistItem, 'category' | 'periodKey' | 'startsAt' | 'endsAt'>>,
+  windows: MapCatalogVersionWindow[],
   reference = new Date()
 ): MapCatalogVersionWindow | null {
   const referenceTime = reference.getTime()
-  const windows = items.flatMap((item): MapCatalogVersionWindow[] => {
-    if (item.category !== 'main_quest' && item.category !== 'side_quest') return []
-    const startsAt = validTimestamp(item.startsAt)
-    const endsAt = validTimestamp(item.endsAt)
+  const normalized = windows.flatMap((window): MapCatalogVersionWindow[] => {
+    const startsAt = validTimestamp(window.startsAt)
+    const endsAt = validTimestamp(window.endsAt)
     if (startsAt === null || endsAt === null || startsAt >= endsAt) return []
     return [{
-      periodKey: item.periodKey,
+      periodKey: window.periodKey,
       startsAt: new Date(startsAt).toISOString(),
       endsAt: new Date(endsAt).toISOString()
     }]
   })
-  const unique = [...new Map(windows.map((window) => [
+  const unique = [...new Map(normalized.map((window) => [
     `${window.periodKey ?? ''}\0${window.startsAt}\0${window.endsAt}`,
     window
   ])).values()]

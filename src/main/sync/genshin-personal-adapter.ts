@@ -53,7 +53,7 @@ export class GenshinPersonalAdapter implements SyncAdapter {
       return value
     }
     const profile = ['all', 'exploration'].includes(target)
-      ? await request('正在读取原神地图探索进度', () => this.client.getProfile())
+      ? await request('正在读取原神地图进度', () => this.client.getProfile())
       : undefined
     const spiralAbyss = ['all', 'cycles'].includes(target)
       ? await request('正在读取深境螺旋战绩', () => this.client.getSpiralAbyss())
@@ -108,10 +108,10 @@ export class GenshinPersonalAdapter implements SyncAdapter {
       message: (target === 'events'
         ? '原神活动进度已读取'
         : target === 'exploration'
-          ? '原神地图探索度已同步'
+          ? '原神地图进度已同步'
           : target === 'cycles'
             ? '原神周期战绩已同步'
-            : '原神地图探索和周期战绩已同步；活动进度已读取') + suffix
+            : '原神地图和周期战绩已同步；活动进度已读取') + suffix
     }
   }
 }

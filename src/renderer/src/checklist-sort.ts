@@ -1,10 +1,7 @@
 import type { ChecklistCategory, ChecklistItem } from '../../shared/contracts'
 
 const CATEGORY_ORDER: Record<ChecklistCategory, number> = {
-  main_quest: 10,
-  side_quest: 20,
   limited_event: 30,
-  weekly: 50,
   endgame: 60,
   exploration: 70,
   custom: 80

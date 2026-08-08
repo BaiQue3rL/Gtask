@@ -293,7 +293,7 @@ describe('Genshin personal parsing', () => {
         has_data: false,
         max_floor: '',
         total_star: 0,
-        floors: []
+        floors: [{ star: 0, levels: [{ index: 1, battles: [] }] }]
       }
     })[0]).toMatchObject({ completed: false })
   })
@@ -313,7 +313,7 @@ describe('Genshin personal parsing', () => {
     const result = await adapter.sync('genshin', 'all', (update) => progress.push(update))
     expect(order).toEqual(['profile', 'abyss', 'theater', 'stygian', 'events'])
     expect(progress).toEqual([
-      expect.objectContaining({ message: '正在读取原神地图探索进度', current: 1, total: 5 }),
+      expect.objectContaining({ message: '正在读取原神地图进度', current: 1, total: 5 }),
       expect.objectContaining({ message: '正在读取深境螺旋战绩', current: 2, total: 5 }),
       expect.objectContaining({ message: '正在读取幻想真境剧诗战绩', current: 3, total: 5 }),
       expect.objectContaining({ message: '正在读取幽境危战战绩', current: 4, total: 5 }),

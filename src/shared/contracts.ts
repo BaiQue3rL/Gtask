@@ -1,13 +1,10 @@
 export const SUPPORTED_GAME_IDS = ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const
-export const GTASK_MCP_PROTOCOL_VERSION = '2026-08-02.3'
+export const GTASK_MCP_PROTOCOL_VERSION = '2026-08-05.1'
 
 export type GameId = (typeof SUPPORTED_GAME_IDS)[number]
 
 export const CHECKLIST_CATEGORIES = [
-  'main_quest',
-  'side_quest',
   'limited_event',
-  'weekly',
   'endgame',
   'exploration',
   'custom'
@@ -18,7 +15,7 @@ export type ChecklistSource = 'manual' | 'public_schedule' | 'personal_sync'
 export const MAP_NODE_KINDS = ['region', 'subregion'] as const
 export type MapNodeKind = (typeof MAP_NODE_KINDS)[number]
 
-export const CHECKLIST_SECTIONS = ['tasks', 'events', 'cycles', 'exploration', 'custom'] as const
+export const CHECKLIST_SECTIONS = ['events', 'cycles', 'exploration', 'custom'] as const
 export type ChecklistSection = (typeof CHECKLIST_SECTIONS)[number]
 
 export const SYNC_RUN_MODES = ['manual', 'automatic'] as const
@@ -31,7 +28,7 @@ export type SyncTarget = (typeof SYNC_TARGETS)[number]
 export type SyncIndicatorTarget = SyncTarget
 export type PersonalSyncTarget = Exclude<SyncTarget, 'all' | 'tasks'>
 export type SyncStatus = 'idle' | 'success' | 'error' | 'stale' | 'verification_required'
-export const SCHEDULE_KINDS = ['weekly', 'fixed_window', 'remote_schedule'] as const
+export const SCHEDULE_KINDS = ['fixed_window', 'remote_schedule'] as const
 export type ScheduleKind = (typeof SCHEDULE_KINDS)[number]
 export const CREDENTIAL_PROVIDERS = ['miyoushe', 'kuro-community'] as const
 export type CredentialProvider = (typeof CREDENTIAL_PROVIDERS)[number]
@@ -281,7 +278,7 @@ export interface ActivityTagContractEntry {
 }
 
 export interface PublicSyncContract {
-  schemaVersion: 11
+  schemaVersion: 12
   jobKind: 'public_catalog'
   authority: 'interface_contract'
   decisionAuthority: 'codex'

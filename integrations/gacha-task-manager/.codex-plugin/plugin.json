@@ -1,6 +1,6 @@
 {
   "name": "gacha-task-manager",
-  "version": "1.0.0+codex.20260802135519",
+  "version": "1.0.0+codex.20260805223000",
   "description": "Connect Codex to Gtask to synchronize verified public data and enrich missing personal checklist metadata.",
   "author": {
     "name": "Gtask contributors"

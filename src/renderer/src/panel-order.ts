@@ -7,7 +7,6 @@ import {
 export const PANEL_ORDER_STORAGE_KEY = 'gtask.panel-order.v1'
 
 export const DEFAULT_PANEL_ORDER = [
-  'tasks',
   'events',
   'cycles',
   'exploration',

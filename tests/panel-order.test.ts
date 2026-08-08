@@ -10,11 +10,10 @@ import {
 } from '../src/renderer/src/panel-order'
 
 describe('checklist panel order', () => {
-  it('uses the five-section product order and repairs incomplete preferences', () => {
-    expect(DEFAULT_PANEL_ORDER).toEqual(['tasks', 'events', 'cycles', 'exploration', 'custom'])
-    expect(normalizePanelOrder(['events', 'events', 'unknown', 'tasks'])).toEqual([
+  it('uses the four-section product order and repairs incomplete preferences', () => {
+    expect(DEFAULT_PANEL_ORDER).toEqual(['events', 'cycles', 'exploration', 'custom'])
+    expect(normalizePanelOrder(['events', 'events', 'unknown'])).toEqual([
       'events',
-      'tasks',
       'cycles',
       'exploration',
       'custom'
@@ -23,16 +22,14 @@ describe('checklist panel order', () => {
 
   it('moves a section before or after the target without losing sections', () => {
     expect(movePanelSection(DEFAULT_PANEL_ORDER, 'custom', 'events', 'before')).toEqual([
-      'tasks',
       'custom',
       'events',
       'cycles',
       'exploration'
     ])
-    expect(movePanelSection(DEFAULT_PANEL_ORDER, 'tasks', 'cycles', 'after')).toEqual([
-      'events',
+    expect(movePanelSection(DEFAULT_PANEL_ORDER, 'events', 'cycles', 'after')).toEqual([
       'cycles',
-      'tasks',
+      'events',
       'exploration',
       'custom'
     ])
@@ -44,7 +41,7 @@ describe('checklist panel order', () => {
       { setItem },
       { genshin: [...DEFAULT_PANEL_ORDER] },
       'star-rail',
-      ['cycles', 'tasks', 'events', 'exploration', 'custom']
+      ['cycles', 'events', 'exploration', 'custom']
     )
     expect(saved['star-rail']?.[0]).toBe('cycles')
     expect(setItem).toHaveBeenCalledWith(PANEL_ORDER_STORAGE_KEY, JSON.stringify(saved))

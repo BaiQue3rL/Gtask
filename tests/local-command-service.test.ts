@@ -79,7 +79,7 @@ describe('LocalCommandService', () => {
       command: 'create_items',
       items: [
         { gameId: 'genshin', category: 'custom', title: '事项 A' },
-        { gameId: 'zenless', category: 'weekly', title: '事项 B' }
+        { gameId: 'zenless', category: 'custom', title: '事项 B' }
       ]
     })
     expect(created.command).toBe('create_items')

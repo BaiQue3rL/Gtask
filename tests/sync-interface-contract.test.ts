@@ -102,14 +102,19 @@ describe('同步接口契约', () => {
       .toContain('不得提交第三种节点')
   })
 
-  it('版更校时明确排除卡池、活动和维护期限', () => {
+  it('版更校时优先官方时间并允许可靠暂定值，且排除卡池、活动和维护期限', () => {
     const [tasks] = getPublicSyncContract('tasks').sections
     const criteria = tasks.completionCriteria.join('；')
 
     expect(tasks.inventoryScope).toContain('版本阶段')
+    expect(tasks.inventoryScope).toContain('可靠预计')
     expect(criteria).toContain('下半卡池')
     expect(criteria).toContain('维护补偿')
-    expect(criteria).toContain('不得猜测')
+    expect(criteria).toContain('不得仅因此结束为失败')
+    expect(criteria).toContain('较低 confidence')
+    expect(criteria).toContain('暂定时间不是任意猜测')
+    expect(criteria).toContain('同一 periodKey')
+    expect(getPublicSyncContract('tasks').fieldSemantics.endsAt).toContain('可靠暂定值')
   })
 
   it('个人元数据契约只允许补标签和缺失时间', () => {

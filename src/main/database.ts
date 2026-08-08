@@ -2,7 +2,6 @@ import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 import { backup, DatabaseSync } from 'node:sqlite'
-import { getWeeklyPeriod } from './periods'
 import type {
   ChecklistCategory,
   ChecklistItem,
@@ -52,6 +51,7 @@ import {
   type ActivityTagUpdate,
   type CodexArchiveDecision,
   type CodexScheduleItem,
+  type CodexVersionWindow,
   type NormalizedSyncItem,
   type PersonalMetadataUpdate,
   type PersonalReviewResolution,
@@ -94,9 +94,9 @@ const DEFAULT_GAMES: GameSummary[] = [
   }
 ]
 
-// Gtask 1.0 ships one clean schema baseline. Closed-test databases are disposable,
-// so the release does not carry a historical migration ladder or legacy tables.
-export const CURRENT_SCHEMA_VERSION = 1
+// Version 1 is the public Gtask 1.0 baseline. All later structural changes use
+// explicit forward migrations so existing user data remains intact.
+export const CURRENT_SCHEMA_VERSION = 2
 
 const AI_AGENT_MAX_AGE_MS = 5 * 60 * 1000
 const AI_JOB_CLAIM_MAX_AGE_MS = 15 * 60 * 1000
@@ -368,15 +368,10 @@ export class AppDatabase {
       this.migrate()
       this.loadRuntimeActivityTags()
       this.seedGames()
-      this.seedQuestChecklists()
+      this.ensureVersionWindowStorage()
       this.reconcileSyncTargetStates()
-      this.ensureWeeklyForInitializedGames()
-      this.consolidateFixedWeeklyItems()
       this.normalizeLegacyActivityTags()
       this.normalizeSyncedProgressSafety()
-      this.normalizeWeeklySchedules()
-      this.resetDueWeeklyItems()
-      this.resetDueQuestItems()
       this.rolloverDueCycleItems()
       this.pruneExpiredSystemItems()
       this.markStaleSyncStates()
@@ -488,11 +483,7 @@ export class AppDatabase {
         game_id AS gameId,
         starts_at AS startsAt,
         ends_at AS endsAt
-      FROM checklist_items
-      WHERE archived = 0
-        AND category IN ('main_quest', 'side_quest')
-        AND starts_at IS NOT NULL
-        AND ends_at IS NOT NULL
+      FROM game_version_windows
     `).all() as Array<{ gameId: GameId; startsAt: string; endsAt: string }>
 
     return this.listGames().map((game) => {
@@ -511,6 +502,26 @@ export class AppDatabase {
         endsAt: currentWindow?.endsAt ?? null
       }
     })
+  }
+
+  getRelevantGameVersionWindow(
+    gameId: GameId,
+    reference = new Date()
+  ): { periodKey: string | null; startsAt: string; endsAt: string } | null {
+    const rows = this.database.prepare(`
+      SELECT period_key AS periodKey, starts_at AS startsAt, ends_at AS endsAt
+      FROM game_version_windows
+      WHERE game_id = ?
+    `).all(gameId) as Array<{ periodKey: string; startsAt: string; endsAt: string }>
+    const referenceTime = reference.getTime()
+    const valid = rows.filter((row) => {
+      const startsAt = Date.parse(row.startsAt)
+      const endsAt = Date.parse(row.endsAt)
+      return Number.isFinite(startsAt) && Number.isFinite(endsAt) && startsAt < endsAt
+    })
+    return valid.find((row) =>
+      Date.parse(row.startsAt) <= referenceTime && referenceTime < Date.parse(row.endsAt)
+    ) ?? valid.sort((left, right) => Date.parse(right.startsAt) - Date.parse(left.startsAt))[0] ?? null
   }
 
   getDataVersion(): number {
@@ -1585,7 +1596,8 @@ export class AppDatabase {
     activityTagUpdates: ActivityTagUpdate[] = [],
     verifiedEmptyTargets: Exclude<SyncTarget, 'all'>[] = [],
     archiveItems: CodexArchiveDecision[] = [],
-    contentLocale?: string
+    contentLocale?: string,
+    versionWindow?: CodexVersionWindow
   ): {
     job: AiScheduleJob
     merge: SyncMergeResult
@@ -1604,9 +1616,9 @@ export class AppDatabase {
     }
     const targetCategories: Partial<Record<SyncTarget, ChecklistCategory[]>> = {
       events: ['limited_event'],
-      cycles: ['weekly', 'endgame'],
+      cycles: ['endgame'],
       exploration: ['exploration'],
-      tasks: ['main_quest', 'side_quest']
+      tasks: []
     }
     const allowedCategories = targetCategories[job.target]
     if (allowedCategories) {
@@ -1634,13 +1646,8 @@ export class AppDatabase {
       if (archiveIds.has(decision.itemId)) throw new Error('Codex 删除决定包含重复事项')
       const candidate = matchCandidatesById.get(decision.itemId)
       if (!candidate) throw new Error('Codex 只能删除当前同步版块内提供的同步事项')
-      if (
-        candidate.source === 'manual' ||
-        candidate.category === 'main_quest' ||
-        candidate.category === 'side_quest' ||
-        candidate.category === 'weekly'
-      ) {
-        throw new Error('手动事项及固定任务不能由同步流程删除')
+      if (candidate.source === 'manual') {
+        throw new Error('手动事项不能由同步流程删除')
       }
       archiveIds.add(decision.itemId)
     }
@@ -1655,12 +1662,11 @@ export class AppDatabase {
     ) {
       throw new Error('空版块确认与当前同步目标不一致')
     }
-    const versionItems = items.filter(
-      (item) => item.category === 'main_quest' || item.category === 'side_quest'
-    )
-    if (job.target === 'tasks' || versionItems.length > 0) {
-      this.validateVersionScheduleItems(versionItems, reference)
+    if (job.target === 'tasks' && !versionWindow) throw new Error('版本校时缺少游戏版本窗口')
+    if (job.target !== 'tasks' && job.target !== 'all' && versionWindow) {
+      throw new Error('当前同步目标不允许回写游戏版本窗口')
     }
+    if (versionWindow) this.validateVersionWindow(versionWindow, reference)
     const invalidEventWindow = items.find((item) =>
       item.category === 'limited_event' &&
       (
@@ -1742,18 +1748,11 @@ export class AppDatabase {
       }
     }
     const includesCycles = job.target === 'cycles' || items.some(
-      (item) => item.category === 'weekly' || item.category === 'endgame'
+      (item) => item.category === 'endgame'
     )
-    const mergedItems = includesCycles && !items.some((item) => item.category === 'weekly')
-      ? [...items, {
-          remoteKey: `weekly:${job.gameId}`,
-          category: 'weekly' as const,
-          title: '周常'
-      }]
-      : items
     const coveredTargets: Exclude<SyncTarget, 'all'>[] = job.target === 'all'
       ? [
-          ...(versionItems.length > 0 ? ['tasks' as const] : []),
+          ...(versionWindow ? ['tasks' as const] : []),
           ...(items.some((item) =>
             item.category === 'limited_event'
           ) ||
@@ -1785,6 +1784,7 @@ export class AppDatabase {
       : missingTargets
     const now = reference.toISOString()
     const { merge, archived } = this.runTransaction(() => {
+      if (versionWindow) this.upsertVersionWindow(job.gameId, versionWindow, now)
       for (const coveredTarget of coveredTargets) {
         if (coveredTarget !== 'tasks') {
           this.activateChecklistSourceInTransaction(
@@ -1797,7 +1797,7 @@ export class AppDatabase {
       const result = this.mergeSyncedItems(
         job.gameId,
         'public_schedule',
-        mergedItems,
+        items,
         now,
         false,
         {
@@ -1840,6 +1840,7 @@ export class AppDatabase {
         if (result.changes !== 1) throw new Error('待删除的同步事项已不存在或不允许删除')
         archived += 1
       }
+      this.recalculatePublicMapRegionProgress(job.gameId, reference)
       this.assertActiveMapReferences(job.gameId)
       return { merge: result, archived }
     })
@@ -1851,17 +1852,19 @@ export class AppDatabase {
         ).length
       : 0
     const targetNames: Record<Exclude<SyncTarget, 'all'>, string> = {
-      tasks: '任务',
+      tasks: '版本时间',
       events: '活动',
-      cycles: '周期事项',
-      exploration: '地图探索'
+      cycles: '周期',
+      exploration: '地图'
     }
     const tagMessage = activityTagUpdates.length > 0 ? `，补全标签 ${activityTagUpdates.length}` : ''
     const unresolvedMessage = unresolvedActivityCount > 0
       ? `；仍有 ${unresolvedActivityCount} 项活动经本轮核验后暂为未知`
       : ''
     const archiveMessage = archived > 0 ? `，移入回收站 ${archived}` : ''
-    const mergeMessage = `新增 ${merge.added}，更新 ${merge.updated}${tagMessage}${archiveMessage}，保护 ${merge.preserved}`
+    const mergeMessage = versionWindow && items.length === 0
+      ? '版本时间已校准'
+      : `新增 ${merge.added}，更新 ${merge.updated}${tagMessage}${archiveMessage}，保护 ${merge.preserved}`
     const message = effectiveMissingTargets.length > 0
       ? `AI 资料部分同步完成：${mergeMessage}；仍需补齐${effectiveMissingTargets.map(
           (target) => targetNames[target]
@@ -1870,11 +1873,7 @@ export class AppDatabase {
     if (requiresFullCoverage && effectiveMissingTargets.length > 0) {
       for (const coveredTarget of coveredTargets) {
         this.recordCatalogCoverage(job.gameId, coveredTarget, 'public_schedule', 'complete')
-        if (coveredTarget === 'events' && unresolvedActivityCount > 0) {
-          this.recordSyncTargetAttempt(job.gameId, coveredTarget, 'stale', reference)
-        } else {
-          this.recordSyncTargetSuccess(job.gameId, coveredTarget, reference)
-        }
+        this.recordSyncTargetSuccess(job.gameId, coveredTarget, reference)
       }
       this.recordCatalogCoverage(job.gameId, 'all', 'public_schedule', 'partial')
       this.recordSyncTargetAttempt(job.gameId, 'all', 'stale', reference)
@@ -1916,12 +1915,11 @@ export class AppDatabase {
     const personalIssue = job.scope === 'public_and_personal' &&
       ['error', 'stale', 'verification_required'].includes(current.status)
     const partialPublicResult = job.target === 'all' && effectiveMissingTargets.length > 0
-    const partialActivityTags = unresolvedActivityCount > 0
     const finalStatus = personalIssue
       ? current.status === 'verification_required'
         ? 'verification_required'
         : 'stale'
-      : partialPublicResult || partialActivityTags
+      : partialPublicResult
         ? 'stale'
         : 'success'
     const finalMessage = personalIssue && current.message
@@ -1931,27 +1929,20 @@ export class AppDatabase {
       job.gameId,
       finalStatus,
       finalMessage,
-      !partialPublicResult && !partialActivityTags
+      !partialPublicResult
     )
     if (job.target === 'all') {
       for (const coveredTarget of coveredTargets) {
         this.recordCatalogCoverage(job.gameId, coveredTarget, 'public_schedule', 'complete')
-        if (coveredTarget === 'events' && partialActivityTags) {
-          this.recordSyncTargetAttempt(job.gameId, coveredTarget, 'stale', reference)
-        } else {
-          this.recordSyncTargetSuccess(job.gameId, coveredTarget, reference)
-        }
+        this.recordSyncTargetSuccess(job.gameId, coveredTarget, reference)
       }
-      if (!partialPublicResult && !partialActivityTags) {
+      if (!partialPublicResult) {
         this.recordCatalogCoverage(job.gameId, 'all', 'public_schedule', 'complete')
         this.recordSyncTargetSuccess(job.gameId, 'all', reference, true)
       } else {
         this.recordCatalogCoverage(job.gameId, 'all', 'public_schedule', 'partial')
         this.recordSyncTargetAttempt(job.gameId, 'all', 'stale', reference)
       }
-    } else if (job.target === 'events' && partialActivityTags) {
-      this.recordCatalogCoverage(job.gameId, job.target, 'public_schedule', 'complete')
-      this.recordSyncTargetAttempt(job.gameId, job.target, 'stale', reference)
     } else {
       this.recordCatalogCoverage(job.gameId, job.target, 'public_schedule', 'complete')
       this.recordSyncTargetSuccess(job.gameId, job.target, reference)
@@ -2716,15 +2707,12 @@ export class AppDatabase {
       ? this.listActivityTagEnrichmentTargets(row.gameId, row.requestedAt, row.outputLocale)
       : []
     const targetCategories: Record<SyncTarget, ChecklistCategory[]> = {
-      tasks: ['main_quest', 'side_quest'],
+      tasks: [],
       events: ['limited_event'],
-      cycles: ['weekly', 'endgame'],
+      cycles: ['endgame'],
       exploration: ['exploration'],
       all: [
-        'main_quest',
-        'side_quest',
         'limited_event',
-        'weekly',
         'endgame',
         'exploration'
       ]
@@ -2991,10 +2979,7 @@ export class AppDatabase {
             ELSE 1
           END,
           CASE category
-            WHEN 'main_quest' THEN 10
-            WHEN 'side_quest' THEN 20
             WHEN 'limited_event' THEN 30
-            WHEN 'weekly' THEN 50
             WHEN 'endgame' THEN 60
             WHEN 'exploration' THEN 70
             ELSE 80
@@ -3055,18 +3040,13 @@ export class AppDatabase {
   }
 
   createChecklistItem(input: CreateChecklistItemInput): ChecklistItem {
-    if (input.category === 'main_quest' || input.category === 'side_quest') {
-      throw new Error('主线任务和支线任务是每款游戏唯一的状态项，不能重复新增')
-    }
     const id = randomUUID()
     const now = new Date().toISOString()
     const scheduleKind = input.scheduleKind ?? this.defaultScheduleKind(input.category)
-    const resetWeekday = scheduleKind === 'weekly' ? 1 : input.resetWeekday ?? null
-    const timeZone = scheduleKind === 'weekly' ? input.timeZone ?? 'Asia/Shanghai' : input.timeZone ?? null
-    const weeklyPeriod =
-      scheduleKind === 'weekly' ? getWeeklyPeriod(new Date(), resetWeekday ?? 1, timeZone ?? 'Asia/Shanghai') : null
-    const startsAt = input.startsAt ?? weeklyPeriod?.startsAt ?? null
-    const endsAt = input.endsAt ?? weeklyPeriod?.endsAt ?? null
+    const resetWeekday = input.resetWeekday ?? null
+    const timeZone = input.timeZone ?? null
+    const startsAt = input.startsAt ?? null
+    const endsAt = input.endsAt ?? null
     this.assertTimeWindow(startsAt, endsAt)
 
     this.database
@@ -3095,7 +3075,7 @@ export class AppDatabase {
         startsAt,
         endsAt,
         input.resetRule ?? null,
-        weeklyPeriod?.key ?? null,
+        null,
         scheduleKind,
         resetWeekday,
         timeZone,
@@ -3131,12 +3111,6 @@ export class AppDatabase {
         : requestedCompleted
           ? current.completedAt ?? new Date().toISOString()
           : null
-    if (
-      (category === 'main_quest' || category === 'side_quest') &&
-      category !== current.category
-    ) {
-      throw new Error('不能把其他事项改为主线或支线状态项')
-    }
     const categoryChanged = category !== current.category
     const activityTags = normalizeActivityTags(category === 'limited_event'
       ? input.activityTags === undefined
@@ -3149,29 +3123,19 @@ export class AppDatabase {
           ? this.defaultScheduleKind(category)
           : current.scheduleKind
         : input.scheduleKind
-    const resetWeekday =
-      scheduleKind === 'weekly'
-        ? 1
-        : input.resetWeekday === undefined
-          ? categoryChanged
-            ? null
-            : current.resetWeekday
-          : input.resetWeekday
+    const resetWeekday = input.resetWeekday === undefined
+      ? categoryChanged
+        ? null
+        : current.resetWeekday
+      : input.resetWeekday
     const timeZone =
       input.timeZone === undefined
-        ? scheduleKind === 'weekly'
-          ? current.timeZone ?? 'Asia/Shanghai'
-          : categoryChanged
-            ? null
-            : current.timeZone
+        ? categoryChanged
+          ? null
+          : current.timeZone
         : input.timeZone
-    const weeklyPeriod =
-      scheduleKind === 'weekly'
-        ? getWeeklyPeriod(new Date(), resetWeekday ?? 1, timeZone ?? 'Asia/Shanghai')
-        : null
-    const startsAt =
-      input.startsAt === undefined ? weeklyPeriod?.startsAt ?? current.startsAt : input.startsAt
-    const endsAt = input.endsAt === undefined ? weeklyPeriod?.endsAt ?? current.endsAt : input.endsAt
+    const startsAt = input.startsAt === undefined ? current.startsAt : input.startsAt
+    const endsAt = input.endsAt === undefined ? current.endsAt : input.endsAt
     this.assertTimeWindow(startsAt, endsAt)
 
     this.database
@@ -3215,7 +3179,7 @@ export class AppDatabase {
         startsAt,
         endsAt,
         input.resetRule === undefined ? current.resetRule : input.resetRule,
-        weeklyPeriod?.key ?? (categoryChanged ? null : current.periodKey),
+        categoryChanged ? null : current.periodKey,
         scheduleKind,
         resetWeekday,
         timeZone,
@@ -3227,6 +3191,9 @@ export class AppDatabase {
         input.id
       )
 
+    if (current.category === 'exploration' || category === 'exploration') {
+      this.recalculatePublicMapRegionProgress(current.gameId)
+    }
     return this.getChecklistItem(input.id)
   }
 
@@ -3256,14 +3223,39 @@ export class AppDatabase {
       ) as Array<{ id: string }>
       affectedIds.push(...children.map((child) => child.id))
     }
-    return this.updateChecklistItems(affectedIds.map((affectedId) => ({
+    this.updateChecklistItems(affectedIds.map((affectedId) => ({
       id: affectedId,
-      completed
+      completed,
+      ...(item.category === 'exploration' ? { progressPercent: completed ? 100 : 0 } : {})
     })))
+    if (item.category !== 'exploration') {
+      return affectedIds.map((affectedId) => this.getChecklistItem(affectedId))
+    }
+
+    const relatedIds = new Set(affectedIds)
+    if (item.mapNodeKind === 'subregion') {
+      const parent = this.database.prepare(`
+        SELECT id FROM checklist_items
+        WHERE game_id = ? AND category = 'exploration' AND archived = 0
+          AND map_node_kind = 'region'
+          AND (
+            (? IS NOT NULL AND remote_key = ?)
+            OR (? IS NULL AND title = ?)
+          )
+        LIMIT 1
+      `).get(
+        item.gameId,
+        item.parentRemoteKey,
+        item.parentRemoteKey,
+        item.parentRemoteKey,
+        item.parentTitle
+      ) as { id: string } | undefined
+      if (parent) relatedIds.add(parent.id)
+    }
+    return this.listChecklistItems(item.gameId).filter((candidate) => relatedIds.has(candidate.id))
   }
 
   archiveChecklistItem(id: string): void {
-    if (this.isPersistentChecklistId(id)) throw new Error('固定清单事项不能删除')
     const item = this.getChecklistItem(id)
     if (item.source !== 'manual') throw new Error('系统清单由同步维护，不能删除')
     const result = this.database
@@ -3302,7 +3294,6 @@ export class AppDatabase {
       .run(new Date().toISOString(), id)
 
     if (result.changes === 0) throw new Error('回收站事项不存在或已恢复')
-    this.resetDueWeeklyItems()
     return this.getChecklistItem(id)
   }
 
@@ -3317,11 +3308,6 @@ export class AppDatabase {
           AND completed = 1
           AND archived = 0
           AND source = 'manual'
-          AND id NOT IN (
-            game_id || ':main_quest',
-            game_id || ':side_quest',
-            game_id || ':weekly'
-          )
       `)
       .run(new Date().toISOString(), gameId)
 
@@ -3670,7 +3656,7 @@ export class AppDatabase {
 
       // Replace only the active competing checklist. Rows in the recycle bin are
       // an explicit user choice and remain untouched until restored or emptied.
-      // Fixed quests, weekly and custom items are outside these category sets.
+      // Custom items are outside these category sets.
       this.database.prepare(`
         DELETE FROM checklist_items
         WHERE game_id = ? AND category IN (${placeholders})
@@ -3755,7 +3741,6 @@ export class AppDatabase {
         this.cachePersonalMetadata(gameId, item, requestContext.outputLocale, now)
       }
 
-      if (target === 'cycles') this.ensureFixedWeeklyItem(gameId, reference)
       this.database.prepare(`
         INSERT INTO sync_target_states(
           game_id, target, last_success_at, last_attempt_at, status,
@@ -3877,15 +3862,6 @@ export class AppDatabase {
     }
     const seenRemoteKeys = new Set<string>()
     this.assertMapStructure(gameId, items)
-    const versionItems = items.filter(
-      (item) => item.category === 'main_quest' || item.category === 'side_quest'
-    )
-    if (versionItems.length > 0) {
-      if (source !== 'public_schedule') {
-        throw new Error('主线和支线的版本时间只能由公开资料校时')
-      }
-      this.validateVersionScheduleItems(versionItems, new Date(syncedAt))
-    }
 
     if (manageTransaction) this.database.exec('BEGIN IMMEDIATE')
     try {
@@ -3893,26 +3869,6 @@ export class AppDatabase {
         this.restorePublicCycleCompletionFromHistory(gameId, items, syncedAt)
       }
       for (const item of items) {
-        if (item.category === 'main_quest' || item.category === 'side_quest') {
-          if (source !== 'public_schedule') {
-            throw new Error('主线和支线的版本时间只能由公开资料校时')
-          }
-          this.mergeVersionScheduleItem(gameId, item, syncedAt)
-          result.updated += 1
-          continue
-        }
-        if (item.category === 'weekly') {
-          item.remoteKey = `weekly:${gameId}`
-          item.title = '周常'
-          const weeklyPeriod = getWeeklyPeriod(new Date(syncedAt), 1, 'Asia/Shanghai')
-          item.scheduleKind = 'weekly'
-          item.resetWeekday = 1
-          item.timeZone = 'Asia/Shanghai'
-          item.resetRule = '每周一重置'
-          item.periodKey = weeklyPeriod.key
-          item.startsAt = weeklyPeriod.startsAt
-          item.endsAt = weeklyPeriod.endsAt
-        }
         const remoteKey = item.remoteKey.trim()
         if (!remoteKey || remoteKey.length > 200) throw new Error('远端事项标识格式不正确')
         this.assertTimeWindow(item.startsAt ?? null, item.endsAt ?? null)
@@ -3951,7 +3907,7 @@ export class AppDatabase {
         }
 
         if (!identity) {
-          const id = item.category === 'weekly' ? `${gameId}:weekly` : randomUUID()
+          const id = randomUUID()
           const inferredCompletion = item.category === 'exploration' && item.progressPercent !== undefined
             ? item.progressPercent === 100
             : item.completed
@@ -4103,6 +4059,9 @@ export class AppDatabase {
           )
         result.updated += 1
         if (completionProtected) result.preserved += 1
+      }
+      if (source === 'public_schedule' && items.some((item) => item.category === 'exploration')) {
+        this.recalculatePublicMapRegionProgress(gameId, new Date(syncedAt))
       }
       if (manageTransaction) this.database.exec('COMMIT')
       return result
@@ -4337,39 +4296,6 @@ export class AppDatabase {
     ) as { id: string; archived: number; source: ChecklistSource } | undefined
   }
 
-  resetDueWeeklyItems(reference = new Date()): number {
-    let changes = 0
-    for (let resetWeekday = 1; resetWeekday <= 7; resetWeekday += 1) {
-      const period = getWeeklyPeriod(reference, resetWeekday, 'Asia/Shanghai')
-      const result = this.database
-        .prepare(`
-          UPDATE checklist_items
-          SET completed = 0,
-              completed_at = NULL,
-              manual_completion_locked = 0,
-              period_key = ?,
-              starts_at = ?,
-              ends_at = ?,
-              updated_at = ?
-          WHERE schedule_kind = 'weekly'
-            AND reset_weekday = ?
-            AND timezone = 'Asia/Shanghai'
-            AND archived = 0
-            AND (period_key IS NULL OR period_key <> ?)
-        `)
-        .run(
-          period.key,
-          period.startsAt,
-          period.endsAt,
-          new Date().toISOString(),
-          resetWeekday,
-          period.key
-        )
-      changes += Number(result.changes)
-    }
-    return changes
-  }
-
   /**
    * Permanently removes expired, system-owned time-limited entries.
    *
@@ -4449,25 +4375,6 @@ export class AppDatabase {
       removed += Number(deleteItem.run(row.id).changes)
     }
     return removed
-  }
-
-  resetDueQuestItems(reference = new Date()): number {
-    const now = reference.toISOString()
-    const result = this.database.prepare(`
-      UPDATE checklist_items
-      SET completed = 0,
-          completed_at = NULL,
-          manual_completion_locked = 0,
-          starts_at = NULL,
-          ends_at = NULL,
-          reset_rule = '待同步新版本时间',
-          updated_at = ?
-      WHERE category IN ('main_quest', 'side_quest')
-        AND archived = 0
-        AND ends_at IS NOT NULL
-        AND julianday(ends_at) <= julianday(?)
-    `).run(now, now)
-    return Number(result.changes)
   }
 
   rolloverDueCycleItems(reference = new Date()): number {
@@ -4618,101 +4525,57 @@ export class AppDatabase {
     }
   }
 
-  private validateVersionScheduleItems(items: NormalizedSyncItem[], reference: Date): void {
-    if (items.length !== 2) throw new Error('版更校时必须同时提交主线任务和支线任务')
-    const main = items.find((item) => item.category === 'main_quest')
-    const side = items.find((item) => item.category === 'side_quest')
-    if (!main || !side) throw new Error('版更校时缺少主线任务或支线任务')
-    if (main.title !== '主线任务' || side.title !== '支线任务') {
-      throw new Error('版更校时不能修改固定任务名称')
+  private validateVersionWindow(window: CodexVersionWindow, reference: Date): void {
+    if (!window.periodKey.trim()) throw new Error('版更校时缺少当前版本标识')
+    if (!window.timeZone.trim()) throw new Error('版更校时缺少官方服务器时区')
+    const startsAt = Date.parse(window.startsAt)
+    const endsAt = Date.parse(window.endsAt)
+    if (!Number.isFinite(startsAt) || !Number.isFinite(endsAt) || startsAt >= endsAt) {
+      throw new Error('版更校时缺少有效的版本起止时间')
     }
-    for (const item of items) {
-      if (!item.periodKey?.trim()) throw new Error('版更校时缺少当前版本标识')
-      if (!item.startsAt || !item.endsAt) throw new Error('版更校时缺少完整版本起止时间')
-      if (!item.timeZone?.trim()) throw new Error('版更校时缺少官方服务器时区')
-      if (item.scheduleKind !== 'fixed_window') throw new Error('版更校时必须使用固定时间窗口')
-      if (Date.parse(item.startsAt) > reference.getTime()) {
-        throw new Error('版更校时只能提交当前已经开始的游戏版本')
-      }
-      if (Date.parse(item.endsAt) <= reference.getTime()) {
-        throw new Error('版更校时不能提交已经结束的游戏版本')
-      }
+    if (startsAt > reference.getTime()) throw new Error('版更校时只能提交当前已经开始的游戏版本')
+    if (endsAt <= reference.getTime()) throw new Error('版更校时不能提交已经结束的游戏版本')
+    if (!Number.isFinite(window.confidence) || window.confidence < 0 || window.confidence > 1) {
+      throw new Error('版更校时置信度格式不正确')
     }
-    if (
-      main.periodKey !== side.periodKey ||
-      main.startsAt !== side.startsAt ||
-      main.endsAt !== side.endsAt ||
-      main.timeZone !== side.timeZone
-    ) {
-      throw new Error('主线任务和支线任务必须共享同一版本时间')
+    try {
+      const url = new URL(window.sourceUrl)
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error()
+    } catch {
+      throw new Error('版更校时缺少有效的核验来源')
     }
   }
 
-  private mergeVersionScheduleItem(
+  private upsertVersionWindow(
     gameId: GameId,
-    item: NormalizedSyncItem,
+    window: CodexVersionWindow,
     syncedAt: string
   ): void {
-    const id = `${gameId}:${item.category}`
-    const current = this.getChecklistItem(id)
-    const periodChanged = Boolean(
-      current.periodKey &&
-      item.periodKey &&
-      current.periodKey !== item.periodKey
-    )
     this.database.prepare(`
-      UPDATE checklist_items
-      SET completed = CASE WHEN ? THEN 0 ELSE completed END,
-          completed_at = CASE WHEN ? THEN NULL ELSE completed_at END,
-          manual_completion_locked = CASE WHEN ? THEN 0 ELSE manual_completion_locked END,
-          starts_at = ?,
-          ends_at = ?,
-          reset_rule = NULL,
-          period_key = ?,
-          schedule_kind = 'fixed_window',
-          timezone = ?,
-          mode_key = 'game-version',
-          source = 'public_schedule',
-          remote_key = ?,
-          source_url = ?,
-          last_synced_at = ?,
-          updated_at = ?
-      WHERE id = ? AND archived = 0
+      INSERT INTO game_version_windows(
+        game_id, period_key, starts_at, ends_at, timezone,
+        source_url, confidence, last_synced_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(game_id) DO UPDATE SET
+        period_key = excluded.period_key,
+        starts_at = excluded.starts_at,
+        ends_at = excluded.ends_at,
+        timezone = excluded.timezone,
+        source_url = excluded.source_url,
+        confidence = excluded.confidence,
+        last_synced_at = excluded.last_synced_at,
+        updated_at = excluded.updated_at
     `).run(
-      periodChanged ? 1 : 0,
-      periodChanged ? 1 : 0,
-      periodChanged ? 1 : 0,
-      item.startsAt ?? null,
-      item.endsAt ?? null,
-      item.periodKey ?? null,
-      item.timeZone ?? null,
-      `version:${gameId}:${item.category}`,
-      item.sourceUrl ?? null,
+      gameId,
+      window.periodKey,
+      window.startsAt,
+      window.endsAt,
+      window.timeZone,
+      window.sourceUrl,
+      window.confidence,
       syncedAt,
-      syncedAt,
-      id
+      syncedAt
     )
-  }
-
-  private normalizeWeeklySchedules(): void {
-    this.database
-      .prepare(`
-        UPDATE checklist_items
-        SET schedule_kind = 'weekly',
-            reset_weekday = 1,
-            timezone = 'Asia/Shanghai',
-            reset_rule = '每周一重置',
-            updated_at = ?
-        WHERE category = 'weekly'
-          AND archived = 0
-          AND (
-            schedule_kind IS NOT 'weekly'
-            OR reset_weekday IS NOT 1
-            OR timezone IS NOT 'Asia/Shanghai'
-            OR reset_rule IS NOT '每周一重置'
-          )
-      `)
-      .run(new Date().toISOString())
   }
 
   close(): void {
@@ -4752,9 +4615,13 @@ export class AppDatabase {
       const version = this.database.prepare(
         'SELECT MAX(version) AS version FROM schema_migrations'
       ).get() as { version: number | null }
-      if (version.version !== CURRENT_SCHEMA_VERSION) {
+      if (version.version === 1) this.migrateVersion1To2()
+      const current = this.database.prepare(
+        'SELECT MAX(version) AS version FROM schema_migrations'
+      ).get() as { version: number | null }
+      if (current.version !== CURRENT_SCHEMA_VERSION) {
         throw new Error(
-          `数据库版本不兼容：期望 ${CURRENT_SCHEMA_VERSION}，实际 ${version.version ?? '未知'}`
+          `数据库版本不兼容：期望 ${CURRENT_SCHEMA_VERSION}，实际 ${current.version ?? '未知'}`
         )
       }
       return
@@ -4779,12 +4646,24 @@ export class AppDatabase {
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE game_version_windows (
+        game_id TEXT PRIMARY KEY REFERENCES games(id) ON DELETE CASCADE,
+        period_key TEXT NOT NULL,
+        starts_at TEXT NOT NULL,
+        ends_at TEXT NOT NULL,
+        timezone TEXT NOT NULL,
+        source_url TEXT,
+        confidence REAL NOT NULL DEFAULT 0.5
+          CHECK (confidence >= 0 AND confidence <= 1),
+        last_synced_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
       CREATE TABLE checklist_items (
         id TEXT PRIMARY KEY,
         game_id TEXT NOT NULL REFERENCES games(id) ON DELETE RESTRICT,
         category TEXT NOT NULL CHECK (category IN (
-          'main_quest', 'side_quest', 'limited_event',
-          'weekly', 'endgame', 'exploration', 'custom'
+          'limited_event', 'endgame', 'exploration', 'custom'
         )),
         title TEXT NOT NULL,
         completed INTEGER NOT NULL DEFAULT 0 CHECK (completed IN (0, 1)),
@@ -4806,7 +4685,7 @@ export class AppDatabase {
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         completed_at TEXT,
         schedule_kind TEXT CHECK (
-          schedule_kind IS NULL OR schedule_kind IN ('weekly', 'fixed_window', 'remote_schedule')
+          schedule_kind IS NULL OR schedule_kind IN ('fixed_window', 'remote_schedule')
         ),
         reset_weekday INTEGER CHECK (
           reset_weekday IS NULL OR (reset_weekday >= 1 AND reset_weekday <= 7)
@@ -5074,6 +4953,43 @@ export class AppDatabase {
     `)
   }
 
+  private migrateVersion1To2(): void {
+    const now = new Date().toISOString()
+    this.database.exec('BEGIN IMMEDIATE')
+    try {
+      // Preserve user-authored legacy weekly rows as ordinary custom items.
+      // Canonical fixed rows use the stable `${gameId}:weekly` identity, while
+      // synchronized weekly rows are system-owned and may be removed outright.
+      this.database.prepare(`
+        UPDATE checklist_items
+        SET category = 'custom',
+            schedule_kind = NULL,
+            reset_weekday = NULL,
+            timezone = NULL,
+            period_key = NULL,
+            reset_rule = NULL,
+            remote_key = NULL,
+            source = 'manual',
+            last_synced_at = NULL,
+            updated_at = ?
+        WHERE category = 'weekly'
+          AND source = 'manual'
+          AND id <> (game_id || ':weekly')
+      `).run(now)
+      this.database.prepare(`
+        DELETE FROM checklist_items
+        WHERE category = 'weekly'
+      `).run()
+      this.database.prepare(`
+        INSERT INTO schema_migrations(version, applied_at) VALUES (2, ?)
+      `).run(now)
+      this.database.exec('COMMIT')
+    } catch (error) {
+      this.database.exec('ROLLBACK')
+      throw error
+    }
+  }
+
   private loadRuntimeActivityTags(): void {
     const rows = this.database.prepare(`
       SELECT id, dimension, labels_json AS labelsJson, description,
@@ -5145,108 +5061,62 @@ export class AppDatabase {
     }
   }
 
-  private seedQuestChecklists(): void {
-    const upsertQuest = this.database.prepare(`
-      INSERT INTO checklist_items(
-        id, game_id, category, title, source, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, 'manual', ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        archived = 0,
-        category = excluded.category,
-        updated_at = excluded.updated_at
+  private ensureVersionWindowStorage(): void {
+    this.database.exec(`
+      CREATE TABLE IF NOT EXISTS game_version_windows (
+        game_id TEXT PRIMARY KEY REFERENCES games(id) ON DELETE CASCADE,
+        period_key TEXT NOT NULL,
+        starts_at TEXT NOT NULL,
+        ends_at TEXT NOT NULL,
+        timezone TEXT NOT NULL,
+        source_url TEXT,
+        confidence REAL NOT NULL DEFAULT 0.5
+          CHECK (confidence >= 0 AND confidence <= 1),
+        last_synced_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
     `)
-    const now = new Date().toISOString()
-
-    for (const game of DEFAULT_GAMES) {
-      upsertQuest.run(`${game.id}:main_quest`, game.id, 'main_quest', '主线任务', now, now)
-      upsertQuest.run(`${game.id}:side_quest`, game.id, 'side_quest', '支线任务', now, now)
-    }
-  }
-
-  private ensureWeeklyForInitializedGames(reference = new Date()): void {
-    const initializedGames = this.database.prepare(`
-      SELECT game_id AS gameId FROM sync_states WHERE last_success_at IS NOT NULL
-    `).all() as Array<{ gameId: GameId }>
-    if (initializedGames.length === 0) return
-    const period = getWeeklyPeriod(reference, 1, 'Asia/Shanghai')
-    const now = reference.toISOString()
+    const legacyRows = this.database.prepare(`
+      SELECT game_id AS gameId, period_key AS periodKey,
+        starts_at AS startsAt, ends_at AS endsAt,
+        timezone AS timeZone, source_url AS sourceUrl,
+        COALESCE(last_synced_at, updated_at) AS syncedAt
+      FROM checklist_items
+      WHERE category IN ('main_quest', 'side_quest')
+        AND starts_at IS NOT NULL AND ends_at IS NOT NULL
+      ORDER BY game_id, julianday(starts_at) DESC
+    `).all() as Array<{
+      gameId: GameId
+      periodKey: string | null
+      startsAt: string
+      endsAt: string
+      timeZone: string | null
+      sourceUrl: string | null
+      syncedAt: string
+    }>
+    const migratedGames = new Set<GameId>()
     const insert = this.database.prepare(`
-      INSERT OR IGNORE INTO checklist_items(
-        id, game_id, category, title, completed, starts_at, ends_at,
-        reset_rule, period_key, schedule_kind, reset_weekday, timezone,
-        source, remote_key, last_synced_at, created_at, updated_at
-      ) VALUES (?, ?, 'weekly', '周常', 0, ?, ?, '每周一重置', ?, 'weekly', 1,
-        'Asia/Shanghai', 'public_schedule', ?, ?, ?, ?)
+      INSERT OR IGNORE INTO game_version_windows(
+        game_id, period_key, starts_at, ends_at, timezone,
+        source_url, confidence, last_synced_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 0.5, ?, ?)
     `)
-    for (const { gameId } of initializedGames) {
+    for (const row of legacyRows) {
+      if (migratedGames.has(row.gameId)) continue
+      migratedGames.add(row.gameId)
       insert.run(
-        `${gameId}:weekly`,
-        gameId,
-        period.startsAt,
-        period.endsAt,
-        period.key,
-        `weekly:${gameId}`,
-        now,
-        now,
-        now
+        row.gameId,
+        row.periodKey ?? `legacy:${row.startsAt}`,
+        row.startsAt,
+        row.endsAt,
+        row.timeZone ?? 'Asia/Shanghai',
+        row.sourceUrl,
+        row.syncedAt,
+        row.syncedAt
       )
     }
-  }
-
-  private ensureFixedWeeklyItem(gameId: GameId, reference = new Date()): void {
-    const period = getWeeklyPeriod(reference, 1, 'Asia/Shanghai')
-    const now = reference.toISOString()
     this.database.prepare(`
-      INSERT OR IGNORE INTO checklist_items(
-        id, game_id, category, title, completed, starts_at, ends_at,
-        reset_rule, period_key, schedule_kind, reset_weekday, timezone,
-        source, remote_key, last_synced_at, created_at, updated_at
-      ) VALUES (?, ?, 'weekly', '周常', 0, ?, ?, '每周一重置', ?, 'weekly', 1,
-        'Asia/Shanghai', 'public_schedule', ?, ?, ?, ?)
-    `).run(
-      `${gameId}:weekly`,
-      gameId,
-      period.startsAt,
-      period.endsAt,
-      period.key,
-      `weekly:${gameId}`,
-      now,
-      now,
-      now
-    )
-  }
-
-  private consolidateFixedWeeklyItems(): void {
-    const now = new Date().toISOString()
-    const completedExtras = this.database.prepare(`
-      SELECT game_id AS gameId, MAX(completed) AS completed
-      FROM checklist_items
-      WHERE category = 'weekly'
-        AND archived = 0
-        AND id <> game_id || ':weekly'
-      GROUP BY game_id
-    `).all() as Array<{ gameId: GameId; completed: number }>
-
-    const completeCanonical = this.database.prepare(`
-      UPDATE checklist_items
-      SET completed = 1,
-          completed_at = COALESCE(completed_at, ?),
-          updated_at = ?
-      WHERE id = ?
-        AND archived = 0
-        AND completed = 0
-    `)
-    for (const extra of completedExtras) {
-      if (Boolean(extra.completed)) {
-        completeCanonical.run(now, now, `${extra.gameId}:weekly`)
-      }
-    }
-
-    this.database.prepare(`
-      DELETE FROM checklist_items
-      WHERE category = 'weekly'
-        AND archived = 0
-        AND id <> game_id || ':weekly'
+      DELETE FROM checklist_items WHERE category IN ('main_quest', 'side_quest')
     `).run()
   }
 
@@ -5299,12 +5169,6 @@ export class AppDatabase {
       WHERE category <> 'exploration'
         AND progress_percent IS NOT NULL
     `).run(now)
-  }
-
-  private isPersistentChecklistId(id: string): boolean {
-    return DEFAULT_GAMES.some((game) =>
-      [`${game.id}:main_quest`, `${game.id}:side_quest`, `${game.id}:weekly`].includes(id)
-    )
   }
 
   private getChecklistItem(id: string): ChecklistItem {
@@ -5373,10 +5237,78 @@ export class AppDatabase {
   }
 
   private defaultScheduleKind(category: ChecklistCategory): ChecklistItem['scheduleKind'] {
-    if (category === 'weekly') return 'weekly'
     if (category === 'limited_event') return 'fixed_window'
     if (category === 'endgame') return 'remote_schedule'
     return null
+  }
+
+  private recalculatePublicMapRegionProgress(
+    gameId: GameId,
+    reference = new Date()
+  ): string[] {
+    const regions = this.database.prepare(`
+      SELECT id, remote_key AS remoteKey, title
+      FROM checklist_items
+      WHERE game_id = ? AND category = 'exploration' AND source = 'public_schedule'
+        AND map_node_kind = 'region' AND archived = 0
+    `).all(gameId) as Array<{ id: string; remoteKey: string | null; title: string }>
+    const readChildren = this.database.prepare(`
+      SELECT progress_percent AS progressPercent, completed
+      FROM checklist_items
+      WHERE game_id = ? AND category = 'exploration' AND source = 'public_schedule'
+        AND map_node_kind = 'subregion' AND archived = 0
+        AND (
+          (? IS NOT NULL AND parent_remote_key = ?)
+          OR (parent_remote_key IS NULL AND parent_title = ?)
+        )
+    `)
+    const update = this.database.prepare(`
+      UPDATE checklist_items
+      SET progress_percent = ?,
+          completed = ?,
+          completed_at = CASE
+            WHEN ? = 1 THEN COALESCE(completed_at, ?)
+            ELSE NULL
+          END,
+          manual_completion_locked = 0,
+          updated_at = ?
+      WHERE id = ?
+        AND (
+          progress_percent IS NOT ?
+          OR completed <> ?
+          OR manual_completion_locked <> 0
+        )
+    `)
+    const now = reference.toISOString()
+    const updatedIds: string[] = []
+    for (const region of regions) {
+      const children = readChildren.all(
+        gameId,
+        region.remoteKey,
+        region.remoteKey,
+        region.title
+      ) as Array<{ progressPercent: number | null; completed: number }>
+      if (children.length === 0) continue
+      const progress = Math.round(
+        children.reduce(
+          (sum, child) => sum + (child.progressPercent ?? (child.completed ? 100 : 0)),
+          0
+        ) / children.length * 100
+      ) / 100
+      const completed = progress === 100 ? 1 : 0
+      const result = update.run(
+        progress,
+        completed,
+        completed,
+        now,
+        now,
+        region.id,
+        progress,
+        completed
+      )
+      if (result.changes > 0) updatedIds.push(region.id)
+    }
+    return updatedIds
   }
 
   private assertMapStructure(gameId: GameId, items: NormalizedSyncItem[]): void {

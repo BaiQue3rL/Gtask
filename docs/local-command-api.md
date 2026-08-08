@@ -28,14 +28,14 @@ CLI 与 MCP 在未来执行数据库 schema 升级前会创建一致性备份，
 
 ## AI 公开资料任务协议
 
-“同步清单”在以下任一条件满足时启用：最近五分钟内有 Agent 调用 `register_gacha_schedule_agent`，或本机已经安装并启用 `gacha-task-manager@personal` Codex 插件。点击同步后，桌面端会按活动任务数自动启动最多四个非交互 Codex CLI Worker；每个 Worker 使用唯一 Agent ID 调用 `$sync-gacha-schedules` 领取一项任务，无需用户打开 Codex 或手动发送消息。Agent 按以下顺序工作：
+“同步清单”在以下任一条件满足时启用：最近五分钟内有 Agent 调用 `register_gacha_schedule_agent`，或本机已经安装并启用 `gacha-task-manager@personal` Codex 插件。点击同步后，桌面端使用固定六个执行槽启动非交互 Codex CLI Worker；每个 Worker 使用唯一 Agent ID 调用 `$sync-gacha-schedules` 领取一项任务，无需用户打开 Codex 或手动发送消息。Agent 按以下顺序工作：
 
 1. 登记心跳并声明 `webSearch: true`。
 2. 轮询 `claim_gacha_schedule_job`；无任务时返回 `null`。
 3. 按任务中的游戏联网搜索并交叉验证来源。
 4. 调用 `apply_gacha_public_schedule` 提交 1～200 条排期及 1～20 条证据，或调用失败工具结束任务。
 
-专用提交工具只允许限时活动、周常和深渊/挑战排期字段。接口不接受常驻活动、完成状态、探索度、删除操作或凭据。每个标题必须包含中文，并通过 `titleSourceUrl` 指向同批 `language: zh-CN` 证据；纯英文标题和未经中文来源核对的 AI 翻译会拒绝整批数据。其余重复 `remoteKey`、非法时间窗或未知字段同样会拒绝整批数据。
+专用提交工具只允许限时活动、深渊/挑战排期和两级地图目录字段。接口不接受常驻活动、完成状态、探索度、删除操作或凭据。每个标题必须包含中文，并通过 `titleSourceUrl` 指向同批 `language: zh-CN` 证据；纯英文标题和未经中文来源核对的 AI 翻译会拒绝整批数据。其余重复 `remoteKey`、非法时间窗或未知字段同样会拒绝整批数据。
 
 ## Codex 插件实测
 
@@ -94,7 +94,7 @@ node out/main/local-command-cli.js --request-base64 $encoded
 {
   "command": "get_game_snapshot",
   "gameId": "genshin",
-  "category": "weekly",
+  "category": "custom",
   "completed": false,
   "includeArchived": false
 }
@@ -156,6 +156,6 @@ node out/main/local-command-cli.js --request-base64 $encoded
 }
 ```
 
-有效版块为 `tasks`、`events`、`cycles`、`exploration`、`custom`。所有删除都是软删除，可从回收站恢复。
+有效版块为 `events`、`cycles`、`exploration`、`custom`。批量归档只处理用户手动事项；被归档的手动事项可从回收站恢复，系统同步项不进入回收站。
 
 CLI 在另一个进程提交写入后，运行中的桌面端通过 SQLite `data_version` 检测变化并自动刷新，不需要开放本地 HTTP 端口。

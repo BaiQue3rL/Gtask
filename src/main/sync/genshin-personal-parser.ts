@@ -3,6 +3,7 @@ import {
   type NormalizedSyncItem,
   type SemanticReviewDraft
 } from './types'
+import { hasChallengeRecordEvidence } from './challenge-record-evidence'
 import { finiteNumber } from './numbers'
 
 export interface GenshinPersonalPayload {
@@ -256,11 +257,13 @@ export function parseSpiralAbyss(value: unknown): NormalizedSyncItem {
   const totalStars = finiteNumber(data.total_star) ?? 0
   const maxFloor = typeof data.max_floor === 'string' ? data.max_floor.replaceAll(' ', '') : ''
   const floors = Array.isArray(data.floors) ? data.floors.filter(isRecord) : []
-  const hasChallengeRecord = data.has_data === true || totalStars > 0 || (
-    Boolean(maxFloor) && maxFloor !== '0' && maxFloor !== '0-0'
-  ) || floors.some((floor) => {
-    const levels = Array.isArray(floor.levels) ? floor.levels.filter(isRecord) : []
-    return levels.length > 0 || (finiteNumber(floor.star) ?? 0) > 0
+  const hasChallengeRecord = hasChallengeRecordEvidence({
+    explicitFlags: [data.has_data],
+    positiveValues: [
+      totalStars,
+      maxFloor === '0' || maxFloor === '0-0' ? 0 : parseFloorNumber(maxFloor),
+      ...floors.map((floor) => floor.star)
+    ]
   })
   return {
     remoteKey: 'endgame:spiral-abyss',
@@ -288,7 +291,10 @@ export function parseImaginariumTheater(value: unknown): NormalizedSyncItem | nu
   const medalStates = Array.isArray(stats.get_medal_round_list)
     ? stats.get_medal_round_list.filter((value): value is boolean => typeof value === 'boolean')
     : []
-  const completed = data.has_data === true || bestRecord > 0 || medalStates.some(Boolean)
+  const completed = hasChallengeRecordEvidence({
+    explicitFlags: [data.has_data, ...medalStates],
+    positiveValues: [bestRecord]
+  })
   return {
     remoteKey: 'endgame:imaginarium-theater',
     category: 'endgame',
@@ -317,13 +323,21 @@ export function parseStygianOnslaught(value: unknown): NormalizedSyncItem | null
     remoteKey: 'endgame:stygian-onslaught',
     category: 'endgame',
     title: '幽境危战',
-    completed: single.has_data === true || difficulty > 0,
+    completed: hasChallengeRecordEvidence({
+      explicitFlags: [single.has_data],
+      positiveValues: [difficulty]
+    }),
     startsAt: toIsoDate(schedule.start_time ?? schedule.start_date_time, '幽境危战开始时间'),
     endsAt: toIsoDate(schedule.end_time ?? schedule.end_date_time, '幽境危战结束时间'),
     periodKey: `genshin:stygian-onslaught:${scheduleId}`,
     scheduleKind: 'remote_schedule',
     modeKey: 'stygian-onslaught'
   }
+}
+
+function parseFloorNumber(value: string): number {
+  const matches = value.match(/\d+/g)
+  return matches ? Math.max(...matches.map(Number)) : 0
 }
 
 function toIsoDate(value: unknown, field: string): string {

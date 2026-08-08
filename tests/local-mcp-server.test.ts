@@ -168,7 +168,7 @@ describe('本地 MCP server', () => {
         status: 'claimed',
         progressPhase: 'searching',
         contract: {
-          schemaVersion: 11,
+          schemaVersion: 12,
           authority: 'interface_contract',
           target: 'events',
           requestContext: {
@@ -691,7 +691,7 @@ describe('本地 MCP server', () => {
       })
   })
 
-  it('公开资料 MCP 通过“版更校时”统一校正固定任务时间且不改完成状态', async () => {
+  it('公开资料 MCP 通过“版更校时”更新独立版本窗口而不创建任务事项', async () => {
     const connected = await connect()
     await connected.callTool({
       name: 'register_gacha_schedule_agent',
@@ -702,7 +702,6 @@ describe('本地 MCP server', () => {
         protocolVersion: GTASK_MCP_PROTOCOL_VERSION
       }
     })
-    database!.updateChecklistItem({ id: 'genshin:main_quest', completed: true })
     const queued = database!.createAiScheduleJob(
       'genshin',
       'public_schedule',
@@ -725,63 +724,32 @@ describe('本地 MCP server', () => {
         jobId: queued.id,
         contentLocale: 'zh-CN',
         retrievedAt: new Date(now).toISOString(),
-        items: [
-          {
-            remoteKey: 'version:genshin:main',
-            category: 'main_quest',
-            title: '主线任务',
-            titleSourceUrl: sourceUrl,
-            startsAt,
-            endsAt,
-            periodKey: 'genshin:version:test-current',
-            scheduleKind: 'fixed_window',
-            timeZone: 'Asia/Shanghai',
-            modeKey: 'game-version',
-            sourceUrl,
-            confidence: 0.99
-          },
-          {
-            remoteKey: 'version:genshin:side',
-            category: 'side_quest',
-            title: '支线任务',
-            titleSourceUrl: sourceUrl,
-            startsAt,
-            endsAt,
-            periodKey: 'genshin:version:test-current',
-            scheduleKind: 'fixed_window',
-            timeZone: 'Asia/Shanghai',
-            modeKey: 'game-version',
-            sourceUrl,
-            confidence: 0.99
-          }
-        ],
+        versionWindow: {
+          periodKey: 'genshin:version:test-current',
+          startsAt,
+          endsAt,
+          timeZone: 'Asia/Shanghai',
+          sourceUrl,
+          confidence: 0.78
+        },
+        items: [],
         evidence: [{
           url: sourceUrl,
           platform: '官方平台',
           publisher: '原神官方',
           official: true,
-          language: 'zh-CN'
+          language: 'zh-CN',
+          note: '暂定：由当前版本官方开始时间与已公布后续排期交叉核验。'
         }]
       }
     })
 
     expect(result.isError).not.toBe(true)
-    expect(database!.listChecklistItems('genshin').filter(
-      (item) => item.category === 'main_quest' || item.category === 'side_quest'
-    )).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        category: 'main_quest',
-        completed: true,
-        endsAt,
-        periodKey: 'genshin:version:test-current'
-      }),
-      expect.objectContaining({
-        category: 'side_quest',
-        completed: false,
-        endsAt,
-        periodKey: 'genshin:version:test-current'
-      })
-    ]))
+    expect(database!.listChecklistItems('genshin')).toEqual([])
+    expect(database!.listGameVersionSummaries(new Date(now))[0]).toEqual({
+      gameId: 'genshin',
+      endsAt
+    })
     expect(database!.getSyncTargetStates('genshin')).toContainEqual(
       expect.objectContaining({ target: 'tasks', lastSuccessAt: expect.any(String) })
     )

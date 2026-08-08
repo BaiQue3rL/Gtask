@@ -24,34 +24,19 @@ function activityTagSemantics(outputLocale: string): string {
 
 const tasksContract: SyncSectionContract = {
   target: 'tasks',
-  purpose: '校准当前游戏版本窗口，供主线任务和支线任务显示同一版本结束倒计时。',
+  purpose: '校准当前游戏版本窗口，供游戏导航显示版本剩余时间。',
   inventoryScope:
-    '当前正在运行的正式游戏版本及其全服版本结束时刻；版本阶段、卡池阶段和单个活动窗口不属于版本窗口。',
-  itemShapes: [{
-    name: '当前版本固定任务',
-    categories: ['main_quest', 'side_quest'],
-    requiredFields: [
-      'remoteKey',
-      'category',
-      'title',
-      'startsAt',
-      'endsAt',
-      'periodKey',
-      'scheduleKind',
-      'timeZone',
-      'titleSourceUrl',
-      'sourceUrl',
-      'confidence'
-    ],
-    conditionalFields: [],
-    forbiddenFields: ['completed', 'progressPercent', 'activityTags', 'recurrenceRule']
-  }],
+    '当前正在运行的正式游戏版本及其全服版本结束时刻。优先采用官方已经确认的下次版本维护时刻；官方尚未公布精确时刻时，允许用当前版本官方开始时间、已公布的后续排期与既往稳定版更节奏交叉核验出可靠预计。版本阶段、卡池阶段和单个活动窗口不属于版本窗口。',
+  itemShapes: [],
   completionCriteria: [
-    '恰好提交“主线任务”和“支线任务”两项。',
-    '两项使用完全相同的 startsAt、endsAt、periodKey、scheduleKind=fixed_window 和 timeZone。',
-    '时间覆盖当前版本，而不是已经结束或尚未开始的其他版本。',
+    '通过 apply_gacha_public_schedule 的 versionWindow 提交且 items 保持为空；版本时间不是清单事项。',
+    'versionWindow 必须包含 startsAt、endsAt、periodKey、timeZone、sourceUrl 和 confidence。',
+    '时间覆盖当前正在运行的正式版本，而不是已经结束或尚未开始的其他版本。',
     '正例是官方版本更新公告、版本专题或能够证明整个版本起止时间的排期资料；反例是下半卡池开始时间、单个活动结束时间、维护补偿领取期限和前瞻直播时间。',
-    '若官方公告出现延期、提前更新或来源时区不明，必须交叉核验最新公告与服务器时区；仍不能确认整个版本结束时刻时不得猜测或提交。'
+    '官方已公布精确版更时刻时必须采用官方值，并在 evidence 中保留直接来源。',
+    '官方尚未公布精确版更时刻时，不得仅因此结束为失败；应交叉核验当前版本官方开始时间、官方已公布的后续内容排期、相邻版本维护记录或可靠排期资料，给出最可信的暂定 endsAt，并用较低 confidence 且在 evidence.note 中明确说明“暂定”及推算依据。',
+    '暂定时间不是任意猜测：不能直接拿卡池、单个活动或奖励期限充当版本结束时间；证据互相冲突且无法形成可信结论时才允许失败。',
+    '后续官方公告出现延期、提前更新或精确维护时刻时，必须以同一 periodKey 重新提交并覆盖暂定时间；来源时区不明时先核验服务器时区。'
   ]
 }
 
@@ -95,7 +80,7 @@ const eventsContract: SyncSectionContract = {
 
 const cyclesContract: SyncSectionContract = {
   target: 'cycles',
-  purpose: '校准当前主要周期挑战的名称、周期窗口与模式身份；固定周常由应用机械维护。',
+  purpose: '校准当前主要周期挑战的名称、周期窗口与模式身份。',
   inventoryScope:
     '当前正在进行或官方已经公布下一期的全部主要周期挑战模式及其当期实例。周期挑战是具有独立模式入口、重复结算周期和个人挑战进度的主要常驻终局玩法；单层、单节点、单阶段或当期增益不是独立模式。',
   itemShapes: [
@@ -123,9 +108,8 @@ const cyclesContract: SyncSectionContract = {
     }
   ],
   completionCriteria: [
-    '软件会机械补齐固定周一重置的“周常”，Codex 重点检索所有主要周期挑战。',
     '模式正例：原神“深境螺旋”“幻想真境剧诗”、星铁“混沌回忆”“虚构叙事”“末日幻影”、绝区零“式舆防卫战”“危局强袭战”等具有独立入口和重复周期的主要挑战。',
-    '模式反例：某一层、节点、关卡、难度、当期增益、敌人阵容、奖励档位、周常首领、体力副本或限时活动挑战；这些不能作为新的周期模式。',
+    '模式反例：某一层、节点、关卡、难度、当期增益、敌人阵容、奖励档位、每周首领、体力副本或限时活动挑战；这些不能作为新的周期模式。',
     '每种周期挑战使用稳定 modeKey；每一期使用独立 periodKey 和 remoteKey。',
     '同一模式的本期标题、副标题或期数属于 periodKey 对应的周期实例，不得因为标题变化创建新的 modeKey；不同模式即使时间窗相同也不得合并。',
     '周期 startsAt/endsAt 必须是该期挑战开放与结算窗口，不是奖励领取期限、单个阶段开放时间或版本结束时间。',
@@ -197,7 +181,7 @@ export function getPublicSyncContract(
   requestContext: SyncRequestContext = DEFAULT_REQUEST_CONTEXT
 ): PublicSyncContract {
   return {
-    schemaVersion: 11,
+    schemaVersion: 12,
     jobKind: 'public_catalog',
     authority: 'interface_contract',
     decisionAuthority: 'codex',
@@ -219,7 +203,11 @@ export function getPublicSyncContract(
       'jobId',
       'contentLocale',
       'retrievedAt',
-      'items',
+      ...(target === 'tasks'
+        ? ['versionWindow']
+        : target === 'all'
+          ? ['items', 'versionWindow']
+          : ['items']),
       'evidence'
     ],
     fieldSemantics: {
@@ -229,15 +217,16 @@ export function getPublicSyncContract(
       category: 'Codex 根据资料语义选择最终版块分类；页面或接口的栏目名只是证据，不能代替活动容器、周期模式或地图层级的实际语义判断。',
       title: `由 ${requestContext.outputLocale} 官方本地化资料确认的游戏内名称，不自行翻译。`,
       activityTags: activityTagSemantics(requestContext.outputLocale),
-      startsAt: '活动或周期开始的绝对时刻，ISO-8601 且包含 Z 或明确 UTC 偏移量。',
-      endsAt: '活动或周期结束的绝对时刻，ISO-8601 且包含 Z 或明确 UTC 偏移量。',
+      startsAt: '活动、周期或当前游戏版本开始的绝对时刻，ISO-8601 且包含 Z 或明确 UTC 偏移量。',
+      endsAt: '活动、周期或当前游戏版本结束的绝对时刻，ISO-8601 且包含 Z 或明确 UTC 偏移量。版本校时在官方精确时刻尚未公布时按 tasks 契约提交可靠暂定值，其他版块不得套用该例外。',
       periodKey: '版本或周期实例身份；同一期稳定，不同周期不能复用。周期挑战的标题、副标题或期数变化通常属于 periodKey，而不是新的 modeKey。',
       modeKey: '跨周期稳定的玩法模式身份；单层、节点、阶段、难度、增益或奖励档位不能拥有独立 modeKey。',
       mapNodeKind:
         '地图只有 region 与 subregion。region 是一级主地区且 parentRemoteKey 必须为空；subregion 是二级地区且 parentRemoteKey 必须指向唯一 region。不得提交第三种节点或第三层。个人接口层级只是观测证据，不能单独覆盖规范目录。',
       titleSourceUrl: `能够核验 ${requestContext.outputLocale} 官方本地化名称的直接页面。`,
       sourceUrl: '能够核验该事项核心事实的直接 HTTP(S) 来源。',
-      confidence: 'Codex 对该条结构化结果的 0 到 1 置信度。',
+      confidence: 'Codex 对该条结构化结果的 0 到 1 置信度；任务版更校时的暂定结束时间必须低于官方精确公告的置信度。',
+      versionWindow: '游戏级版本窗口，不是清单事项。只在 tasks 目标提交；包含当前正式版本的 startsAt、endsAt、periodKey、timeZone、sourceUrl 和 confidence。',
       evidence: '本次提交的交叉核验证据；至少一条，且应覆盖所提交事项。'
     },
     activityTagCatalog: serializeActivityTagCatalog(requestContext.outputLocale),

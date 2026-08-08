@@ -20,14 +20,14 @@ const TARGET_PROGRESS_LABELS = {
   all: '全部清单',
   tasks: '当前版本时间',
   events: '活动',
-  cycles: '周期事项',
-  exploration: '地图目录和探索进度'
+  cycles: '周期',
+  exploration: '地图目录和进度'
 } as const
 
 function reviewingMessage(target: SyncProgressUpdate['target']): string {
   if (target === 'tasks') return '正在核对当前版本结束时间'
   if (target === 'events') return '正在核对活动名称、时间和玩法信息'
-  if (target === 'cycles') return '正在核对周期事项名称、时间和完成状态'
+  if (target === 'cycles') return '正在核对周期名称、时间和完成状态'
   if (target === 'exploration') return '正在核对地图目录、归属和探索进度'
   return '正在核对清单信息'
 }

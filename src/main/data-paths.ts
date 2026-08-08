@@ -6,6 +6,7 @@ export interface AppDataPaths {
   root: string
   database: string
   backups: string
+  logs: string
 }
 
 export function resolveAppDataPaths(documentsDirectory: string): AppDataPaths {
@@ -13,6 +14,7 @@ export function resolveAppDataPaths(documentsDirectory: string): AppDataPaths {
   return {
     root,
     database: join(root, 'data', 'gacha-task-manager.sqlite'),
-    backups: join(root, 'backups')
+    backups: join(root, 'backups'),
+    logs: join(root, 'logs')
   }
 }

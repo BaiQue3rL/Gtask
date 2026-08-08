@@ -80,7 +80,7 @@ describe('鸣潮个人进度解析', () => {
       isUnlock: true,
       seasonEndTime: 1787183999,
       difficultyList: [{
-        towerAreaList: [{ star: 0, floorList: [{ floor: 1, star: 0 }] }]
+        towerAreaList: [{ star: 0, floorList: [{ floor: 1, star: 0, hasRecord: true }] }]
       }]
     })).toMatchObject({
       title: '逆境深塔',
@@ -121,17 +121,20 @@ describe('鸣潮个人进度解析', () => {
     expect(parseWutheringWavesTower({
       isUnlock: true,
       seasonEndTime: 1787183999,
-      difficultyList: [{ towerAreaList: [{ star: 0, floorList: [] }] }]
+      difficultyList: [{ towerAreaList: [{ star: 0, floorList: [{ floor: 1, star: 0 }] }] }]
     })).toMatchObject({ completed: false })
     expect(parseWutheringWavesSlash({
       isUnlock: true,
       seasonEndTime: 1787183999,
-      difficultyList: [{ allScore: 0, challengeList: [{ score: 0, halfList: [] }] }]
+      difficultyList: [{
+        allScore: 0,
+        challengeList: [{ score: 0, halfList: [{ half: 1, score: 0 }] }]
+      }]
     })).toMatchObject({ completed: false })
     expect(parseWutheringWavesMatrix({
       isUnlock: true,
       endTime: 1787183999,
-      modeDetails: [{ hasRecord: false, score: 0, passBoss: 0, teams: [] }]
+      modeDetails: [{ hasRecord: false, score: 0, passBoss: 0, teams: [{ roleIds: [] }] }]
     })).toMatchObject({ completed: false })
   })
 

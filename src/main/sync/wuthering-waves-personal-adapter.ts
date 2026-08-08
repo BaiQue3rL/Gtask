@@ -48,7 +48,7 @@ export class WutheringWavesPersonalAdapter implements SyncAdapter {
       return value
     }
     const exploration = ['all', 'exploration'].includes(target)
-      ? await request('正在读取鸣潮地图探索进度', () => this.client.getExploration())
+      ? await request('正在读取鸣潮地图进度', () => this.client.getExploration())
       : undefined
     const tower = ['all', 'cycles'].includes(target)
       ? await request('正在读取逆境深塔战绩', () => this.client.getTower())
@@ -81,10 +81,10 @@ export class WutheringWavesPersonalAdapter implements SyncAdapter {
       snapshotCompleteness: outcomes.every((outcome) => outcome.succeeded) ? 'complete' : 'partial',
       adapterVersion: 'wuthering-waves-personal-v1',
       message: (target === 'exploration'
-        ? '鸣潮地图探索度已同步'
+        ? '鸣潮地图进度已同步'
         : target === 'cycles'
           ? '鸣潮周期挑战记录已同步'
-          : '鸣潮地图探索和周期挑战记录已同步') + suffix
+          : '鸣潮地图和周期挑战记录已同步') + suffix
     }
   }
 }

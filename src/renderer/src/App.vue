@@ -99,14 +99,13 @@ interface ChecklistPanel {
   allowCreate?: boolean
   allowClear?: boolean
   createLabel?: string
-  syncTarget?: Exclude<SyncTarget, 'all'>
+  syncTarget?: PersonalSyncTarget
 }
 
 const panels: ChecklistPanel[] = [
-  { title: '任务', section: 'tasks', categories: ['main_quest', 'side_quest'], defaultCategory: 'side_quest', allowCreate: false, allowClear: false, syncTarget: 'tasks' },
   { title: '活动', section: 'events', categories: ['limited_event'], defaultCategory: 'limited_event', syncTarget: 'events', allowClear: false },
-  { title: '周期事项', section: 'cycles', categories: ['weekly', 'endgame'], defaultCategory: 'endgame', syncTarget: 'cycles', allowClear: false },
-  { title: '地图探索', section: 'exploration', categories: ['exploration'], defaultCategory: 'exploration', syncTarget: 'exploration', allowClear: false },
+  { title: '周期', section: 'cycles', categories: ['endgame'], defaultCategory: 'endgame', syncTarget: 'cycles', allowClear: false },
+  { title: '地图', section: 'exploration', categories: ['exploration'], defaultCategory: 'exploration', syncTarget: 'exploration', allowClear: false },
   { title: '自定义清单', section: 'custom', categories: ['custom'], defaultCategory: 'custom', createLabel: '自定义事项', allowClear: true }
 ]
 const personalReviewTargets: PersonalSyncTarget[] = ['events', 'cycles', 'exploration']
@@ -115,23 +114,10 @@ const panelBySection = new Map(panels.map((panel) => [panel.section, panel]))
 const workspaceElement = ref<HTMLElement | null>(null)
 
 const categoryLabels: Record<ChecklistCategory, string> = {
-  main_quest: '主线任务',
-  side_quest: '支线任务',
   limited_event: '限时活动',
-  weekly: '周常',
   endgame: '深渊/挑战模式',
-  exploration: '地图探索',
+  exploration: '地图',
   custom: '自定义事项'
-}
-
-const weekdayLabels: Record<number, string> = {
-  1: '周一',
-  2: '周二',
-  3: '周三',
-  4: '周四',
-  5: '周五',
-  6: '周六',
-  7: '周日'
 }
 
 const gameEditorExamples: Record<GameId, {
@@ -142,8 +128,8 @@ const gameEditorExamples: Record<GameId, {
 }> = {
   genshin: {
     titles: {
-      main_quest: '例如：主线任务', side_quest: '例如：支线任务', limited_event: '例如：砺行修远',
-      weekly: '例如：周常', endgame: '例如：深境螺旋',
+      limited_event: '例如：砺行修远',
+      endgame: '例如：深境螺旋',
       exploration: '例如：枫丹廷区', custom: '例如：刷角色突破素材'
     },
     parentTitle: '例如：枫丹',
@@ -152,8 +138,8 @@ const gameEditorExamples: Record<GameId, {
   },
   'star-rail': {
     titles: {
-      main_quest: '例如：开拓任务', side_quest: '例如：冒险任务', limited_event: '例如：折纸小鸟对对碰',
-      weekly: '例如：周常', endgame: '例如：混沌回忆',
+      limited_event: '例如：折纸小鸟对对碰',
+      endgame: '例如：混沌回忆',
       exploration: '例如：黄金的时刻', custom: '例如：刷行迹材料'
     },
     parentTitle: '例如：匹诺康尼',
@@ -162,8 +148,8 @@ const gameEditorExamples: Record<GameId, {
   },
   zenless: {
     titles: {
-      main_quest: '例如：主线任务', side_quest: '例如：代理人秘闻', limited_event: '例如：嗯呢从天降',
-      weekly: '例如：周常', endgame: '例如：式舆防卫战',
+      limited_event: '例如：嗯呢从天降',
+      endgame: '例如：式舆防卫战',
       exploration: '例如：六分街', custom: '例如：刷驱动盘'
     },
     parentTitle: '例如：新艾利都',
@@ -172,8 +158,8 @@ const gameEditorExamples: Record<GameId, {
   },
   'wuthering-waves': {
     titles: {
-      main_quest: '例如：潮汐任务', side_quest: '例如：危行任务', limited_event: '例如：限时活动',
-      weekly: '例如：周常', endgame: '例如：逆境深塔',
+      limited_event: '例如：限时活动',
+      endgame: '例如：逆境深塔',
       exploration: '例如：乘霄山', custom: '例如：刷声骸'
     },
     parentTitle: '例如：瑝珑',
@@ -395,18 +381,9 @@ function syncResultNotice(result: SyncResult): ReturnType<typeof userFacingSyncN
   })
 }
 
-const editorCategories = computed(() => {
-  const questCategories: ChecklistCategory[] = ['main_quest', 'side_quest']
-  if (editingItem.value && questCategories.includes(editingItem.value.category)) {
-    return [[editingItem.value.category, categoryLabels[editingItem.value.category]]] as Array<[
-      ChecklistCategory,
-      string
-    ]>
-  }
-  return (Object.entries(categoryLabels) as Array<[ChecklistCategory, string]>).filter(
-    ([category]) => !questCategories.includes(category)
-  )
-})
+const editorCategories = computed(() =>
+  Object.entries(categoryLabels) as Array<[ChecklistCategory, string]>
+)
 const personalPlatform = computed(() =>
   selectedGameId.value === 'wuthering-waves' ? '库街区' : '米游社'
 )
@@ -420,11 +397,11 @@ const pendingPublicSourceSwitchLabel = computed(() =>
   pendingPublicSourceSwitch.value === 'events'
     ? '活动'
     : pendingPublicSourceSwitch.value === 'cycles'
-      ? '周期事项'
-      : '地图探索'
+      ? '周期'
+      : '地图'
 )
 const hasEstablishedCatalog = computed(() => items.value.some((item) =>
-  !['main_quest', 'side_quest', 'custom'].includes(item.category)
+  item.category !== 'custom'
 ))
 const needsInitialSync = computed(() =>
   !syncSettings.value?.initialGuideDismissed &&
@@ -1117,10 +1094,10 @@ const syncProgressPhaseLabels: Record<SyncProgressUpdate['phase'], string> = {
 
 const syncProgressTargetLabels: Record<SyncTarget, string> = {
   all: '全局',
-  tasks: '任务',
+  tasks: '版本',
   events: '活动',
-  cycles: '周期事项',
-  exploration: '地图探索'
+  cycles: '周期',
+  exploration: '地图'
 }
 
 function syncProgressTitle(progress: SyncProgressUpdate): string {
@@ -1675,7 +1652,7 @@ function panelHasActiveSync(panel: ChecklistPanel): boolean {
     isSyncRequestActive('public_schedule', target) ||
     hasActivePublicSyncForTarget(target)
   ) return true
-  return target !== 'tasks' && hasActivePersonalSyncForTarget(target)
+  return hasActivePersonalSyncForTarget(target)
 }
 
 const visiblePanels = computed(() => filterChecklistPanels(
@@ -1908,14 +1885,6 @@ function activateChecklistItem(
   openEdit(item)
 }
 
-function isPersistentItem(item: ChecklistItem): boolean {
-  return [
-    `${item.gameId}:main_quest`,
-    `${item.gameId}:side_quest`,
-    `${item.gameId}:weekly`
-  ].includes(item.id)
-}
-
 function openCreate(category: ChecklistCategory): void {
   editingItem.value = null
   form.category = category
@@ -1925,7 +1894,7 @@ function openCreate(category: ChecklistCategory): void {
   form.parentTitle = ''
   form.startsAt = ''
   form.endsAt = ''
-  form.resetRule = category === 'weekly' ? '每周一重置' : ''
+  form.resetRule = ''
   form.resetWeekday = 1
   form.modeKey = ''
   editorOpen.value = true
@@ -1941,7 +1910,7 @@ function openEdit(item: ChecklistItem): void {
   form.startsAt = toLocalDateTime(item.startsAt)
   form.endsAt = toLocalDateTime(item.endsAt)
   form.resetRule = item.resetRule ?? ''
-  form.resetWeekday = item.category === 'weekly' ? 1 : item.resetWeekday ?? 1
+  form.resetWeekday = item.resetWeekday ?? 1
   form.modeKey = item.modeKey ?? ''
   editorOpen.value = true
 }
@@ -1952,8 +1921,6 @@ async function saveItem(): Promise<void> {
   errorMessage.value = ''
   try {
     const isTimed = ['limited_event', 'endgame'].includes(form.category)
-    const isWeekly = form.category === 'weekly'
-    const isVersionTask = ['main_quest', 'side_quest'].includes(form.category)
     const common: Omit<CreateChecklistItemInput, 'gameId'> = {
       category: form.category,
       title: form.title,
@@ -1962,24 +1929,18 @@ async function saveItem(): Promise<void> {
         : [],
       progressPercent: form.category === 'exploration' ? normalizeProgress(form.progressPercent) : null,
       parentTitle: form.category === 'exploration' ? form.parentTitle.trim() || null : null,
-      startsAt: isWeekly || isVersionTask ? undefined : isTimed ? toIsoOrNull(form.startsAt) : null,
-      endsAt: isWeekly || isVersionTask ? undefined : isTimed ? toIsoOrNull(form.endsAt) : null,
-      resetRule: isWeekly
-        ? `每${weekdayLabels[form.resetWeekday]}重置`
-        : form.category === 'endgame'
+      startsAt: isTimed ? toIsoOrNull(form.startsAt) : null,
+      endsAt: isTimed ? toIsoOrNull(form.endsAt) : null,
+      resetRule: form.category === 'endgame'
           ? form.resetRule.trim() || null
           : null,
-      scheduleKind: isVersionTask
-        ? undefined
-        : isWeekly
-        ? 'weekly'
-        : form.category === 'limited_event'
+      scheduleKind: form.category === 'limited_event'
           ? 'fixed_window'
           : form.category === 'endgame'
             ? 'remote_schedule'
             : null,
-      resetWeekday: isWeekly ? 1 : null,
-      timeZone: isVersionTask ? undefined : isWeekly ? 'Asia/Shanghai' : null,
+      resetWeekday: null,
+      timeZone: null,
       modeKey: form.category === 'endgame' ? form.modeKey.trim() || null : null,
       recurrenceRule: null
     }
@@ -1990,6 +1951,9 @@ async function saveItem(): Promise<void> {
     const index = items.value.findIndex((item) => item.id === saved.id)
     if (index >= 0) items.value[index] = saved
     else items.value.push(saved)
+    if (saved.category === 'exploration') {
+      items.value = await window.gacha.listChecklistItems(selectedGameId.value)
+    }
     editorOpen.value = false
   } catch (error) {
     showError(error)
@@ -2044,7 +2008,7 @@ async function archiveCompletedSection(
   sectionTitle: string
 ): Promise<void> {
   const completedItems = items.value.filter(
-    (item) => categories.includes(item.category) && item.completed && item.source === 'manual' && !isPersistentItem(item)
+    (item) => categories.includes(item.category) && item.completed && item.source === 'manual'
   )
   if (completedItems.length === 0) return
   if (!window.confirm(`确定删除“${sectionTitle}”中的 ${completedItems.length} 个已完成事项吗？`)) return
@@ -2266,6 +2230,15 @@ function showError(error: unknown): void {
                 <strong>同步公开数据</strong>
                 <small>保留正在使用的个人数据版块</small>
               </button>
+              <button
+                role="menuitem"
+                type="button"
+                :disabled="!aiScheduleAvailable || isSyncRequestActive('public_schedule', 'tasks') || hasActivePublicSyncForTarget('tasks')"
+                @click="runSync('public_schedule', 'tasks')"
+              >
+                <strong>版本校时</strong>
+                <small>校准当前游戏的版本结束时间</small>
+              </button>
             </div>
           </div>
           <span
@@ -2426,8 +2399,7 @@ function showError(error: unknown): void {
                 <div class="section-title">
                   <h2>
                     <span class="panel-icon" :class="`panel-icon-${panel.section}`" aria-hidden="true">
-                      <svg v-if="panel.section === 'tasks'" viewBox="0 0 24 24"><path d="M7 4h10a2 2 0 0 1 2 2v14H5V6a2 2 0 0 1 2-2Z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>
-                      <svg v-else-if="panel.section === 'events'" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><path d="M5.6 5.6 18.4 18.4M18.4 5.6 5.6 18.4"/><circle cx="12" cy="12" r="4"/></svg>
+                      <svg v-if="panel.section === 'events'" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><path d="M5.6 5.6 18.4 18.4M18.4 5.6 5.6 18.4"/><circle cx="12" cy="12" r="4"/></svg>
                       <svg v-else-if="panel.section === 'cycles'" viewBox="0 0 24 24"><path d="M20 8a8 8 0 1 0 .3 7"/><path d="M20 3v5h-5"/><path d="M12 7v5l3 2"/></svg>
                       <svg v-else-if="panel.section === 'exploration'" viewBox="0 0 24 24"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Z"/><path d="M9 3v15M15 6v15"/></svg>
                       <svg v-else viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="m8 9 2 2 4-4M8 15h8"/></svg>
@@ -2449,14 +2421,7 @@ function showError(error: unknown): void {
                   </span>
                 </div>
                 <div class="section-actions">
-                  <button
-                    v-if="panel.syncTarget === 'tasks'"
-                    class="section-sync-button"
-                    type="button"
-                    :disabled="!aiScheduleAvailable || isSyncRequestActive('public_schedule', 'tasks') || hasActivePublicSyncForTarget('tasks')"
-                    @click="runSync('public_schedule', 'tasks')"
-                  >↻ 版更校时</button>
-                  <div v-else-if="panel.syncTarget" class="dropdown" @click.stop>
+                  <div v-if="panel.syncTarget" class="dropdown" @click.stop>
                     <button
                       class="section-sync-button"
                       type="button"
@@ -2489,7 +2454,7 @@ function showError(error: unknown): void {
                     v-if="panel.allowClear === true"
                     class="clear-completed-button"
                     type="button"
-                    :disabled="!items.some((item) => panel.categories.includes(item.category) && item.completed && item.source === 'manual' && !isPersistentItem(item))"
+                    :disabled="!items.some((item) => panel.categories.includes(item.category) && item.completed && item.source === 'manual')"
                     @click="archiveCompletedSection(panel.section, panel.categories, panel.title)"
                   >删除已完成</button>
                 </div>
@@ -2610,7 +2575,7 @@ function showError(error: unknown): void {
                         {{ row.displayProgressPercent }}%
                       </span>
                       <span
-                        v-if="row.item.resetRule && (row.item.category === 'weekly' || row.item.source === 'manual')"
+                        v-if="row.item.resetRule && row.item.source === 'manual'"
                         class="reset-detail"
                       >{{ row.item.resetRule }}</span>
                       <span
@@ -2655,7 +2620,7 @@ function showError(error: unknown): void {
 
         <label>事项名称<input v-model="form.title" maxlength="100" autofocus :placeholder="editorExamples.titles[form.category]" /></label>
         <label>分类
-          <select v-model="form.category" :disabled="editingItem ? ['main_quest', 'side_quest'].includes(editingItem.category) || isPersistentItem(editingItem) : false">
+          <select v-model="form.category">
             <option v-for="[category, label] in editorCategories" :key="category" :value="category">{{ label }}</option>
           </select>
         </label>
@@ -2679,9 +2644,6 @@ function showError(error: unknown): void {
             <label>结束时间<input v-model="form.endsAt" type="datetime-local" /></label>
           </div>
         </template>
-        <label v-if="form.category === 'weekly'">每周重置日
-          <input value="周一（固定）" disabled />
-        </label>
         <template v-if="form.category === 'endgame'">
           <label>玩法标识<input v-model="form.modeKey" maxlength="200" :placeholder="editorExamples.modeKey" /></label>
           <label>周期说明<input v-model="form.resetRule" maxlength="200" :placeholder="editorExamples.resetRule" /></label>
@@ -2692,7 +2654,7 @@ function showError(error: unknown): void {
         </div>
 
         <div class="modal-actions">
-          <button v-if="editingItem?.source === 'manual' && !isPersistentItem(editingItem)" class="danger-button" type="button" @click="archiveItem(editingItem)">删除</button>
+          <button v-if="editingItem?.source === 'manual'" class="danger-button" type="button" @click="archiveItem(editingItem)">删除</button>
           <div class="modal-actions-right">
             <button class="secondary-button" type="button" @click="editorOpen = false">取消</button>
             <button class="primary-button" type="submit" :disabled="saving || !form.title.trim()">{{ saving ? '保存中…' : '保存' }}</button>
@@ -2779,7 +2741,7 @@ function showError(error: unknown): void {
           >
             <span class="onboarding-choice-label">推荐</span>
             <strong>同步个人数据</strong>
-            <small>需要登录 {{ personalPlatform }}。活动、周期事项和地图探索会按版块依次同步。</small>
+            <small>需要登录 {{ personalPlatform }}。活动、周期和地图会按版块依次同步。</small>
             <b>{{ onboardingBusy ? '正在处理…' : '使用个人数据开始' }}</b>
           </button>
           <button
@@ -3074,7 +3036,7 @@ function showError(error: unknown): void {
     <div v-if="kuroCredentialOpen" class="modal-backdrop login-backdrop" @click.self="closeKuroCommunityLogin">
       <section class="editor-modal kuro-credential-modal" role="dialog" aria-modal="true" aria-label="登录库街区">
         <div class="modal-header">
-          <div><h2>登录库街区</h2><p>登录后可同步鸣潮挑战与地图探索进度</p></div>
+          <div><h2>登录库街区</h2><p>登录后可同步鸣潮挑战与地图进度</p></div>
           <button
             class="close-button"
             type="button"
@@ -3165,8 +3127,7 @@ function showError(error: unknown): void {
         <span></span><span></span><span></span><span></span><span></span><span></span>
       </span>
       <span class="panel-icon" :class="`panel-icon-${draggingPanel.section}`">
-        <svg v-if="draggingPanel.section === 'tasks'" viewBox="0 0 24 24"><path d="M7 4h10a2 2 0 0 1 2 2v14H5V6a2 2 0 0 1 2-2Z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>
-        <svg v-else-if="draggingPanel.section === 'events'" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><path d="M5.6 5.6 18.4 18.4M18.4 5.6 5.6 18.4"/><circle cx="12" cy="12" r="4"/></svg>
+        <svg v-if="draggingPanel.section === 'events'" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><path d="M5.6 5.6 18.4 18.4M18.4 5.6 5.6 18.4"/><circle cx="12" cy="12" r="4"/></svg>
         <svg v-else-if="draggingPanel.section === 'cycles'" viewBox="0 0 24 24"><path d="M20 8a8 8 0 1 0 .3 7"/><path d="M20 3v5h-5"/><path d="M12 7v5l3 2"/></svg>
         <svg v-else-if="draggingPanel.section === 'exploration'" viewBox="0 0 24 24"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Z"/><path d="M9 3v15M15 6v15"/></svg>
         <svg v-else viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="m8 9 2 2 4-4M8 15h8"/></svg>

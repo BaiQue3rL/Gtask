@@ -26,14 +26,15 @@ import type {
   ActivityTagUpdate,
   CodexArchiveDecision,
   CodexScheduleItem,
+  CodexVersionWindow,
   PersonalMetadataUpdate,
   PersonalReviewResolution
 } from './sync/types'
 
 const gameIdSchema = z.enum(SUPPORTED_GAME_IDS)
 const categorySchema = z.enum(CHECKLIST_CATEGORIES)
-const sectionSchema = z.enum(['tasks', 'events', 'cycles', 'exploration', 'custom'])
-const scheduleKindSchema = z.enum(['weekly', 'fixed_window', 'remote_schedule'])
+const sectionSchema = z.enum(['events', 'cycles', 'exploration', 'custom'])
+const scheduleKindSchema = z.enum(['fixed_window', 'remote_schedule'])
 const mapNodeKindSchema = z.enum(MAP_NODE_KINDS)
 const nullableTextSchema = z.string().max(200).nullable().optional()
 const nullableDateSchema = z.string().nullable().optional()
@@ -49,10 +50,7 @@ const recurrenceRuleSchema = z.string().max(200).refine(
   '自动周期规则格式不正确'
 ).nullable().optional()
 const publicScheduleCategorySchema = z.enum([
-  'main_quest',
-  'side_quest',
   'limited_event',
-  'weekly',
   'endgame',
   'exploration'
 ])
@@ -180,7 +178,7 @@ export function createLocalMcpServer(
     'create_gacha_item',
     {
       title: '新增 Gtask 事项',
-      description: '向指定游戏新增活动、周期事项、地图探索或自定义事项。字段语义与清单记录一致；主线和支线是唯一状态项，不能重复新增。',
+      description: '向指定游戏新增活动、周期事项、地图探索或自定义事项。字段语义与清单记录一致。',
       inputSchema: { gameId: gameIdSchema, ...checklistFields },
       annotations: { destructiveHint: false, openWorldHint: false }
     },
@@ -440,6 +438,15 @@ export function createLocalMcpServer(
         contentLocale: z.string().min(2).max(35)
           .describe('必须等于 job.contract.requestContext.outputLocale'),
         retrievedAt: isoDateSchema.describe('本次资料检索完成的绝对时间'),
+        versionWindow: z.object({
+          periodKey: z.string().min(1).max(200),
+          startsAt: isoDateSchema,
+          endsAt: isoDateSchema,
+          timeZone: z.string().min(1).max(200),
+          sourceUrl: httpUrlSchema,
+          confidence: z.number().min(0).max(1)
+        }).strict().optional()
+          .describe('仅版本校时使用的游戏级窗口；不是清单事项'),
         items: z.array(z.object({
           matchItemId: z.string().min(1).max(100).optional()
             .describe('与领取任务的 matchCandidates 语义相同时填写其 itemId'),
@@ -501,6 +508,7 @@ export function createLocalMcpServer(
       jobId,
       contentLocale,
       retrievedAt,
+      versionWindow,
       items,
       activityTagUpdates,
       archiveItems,
@@ -515,6 +523,7 @@ export function createLocalMcpServer(
           (archiveItems?.length ?? 0) === 0 &&
           (verifiedEmptyTargets?.length ?? 0) === 0 &&
           claimedJob.activityTagTargets.length === 0
+          && !versionWindow
         ) {
           throw new Error('公开数据提交没有包含可处理的清单结果')
         }
@@ -535,9 +544,9 @@ export function createLocalMcpServer(
           new Date(),
           (activityTagUpdates ?? []) as ActivityTagUpdate[],
           verifiedEmptyTargets ?? [],
-          (archiveItems ?? []) as CodexArchiveDecision[]
-          ,
-          contentLocale
+          (archiveItems ?? []) as CodexArchiveDecision[],
+          contentLocale,
+          versionWindow as CodexVersionWindow | undefined
         )
         return toolResult({ command: 'apply_public_schedule', ...result })
       } catch (error) {

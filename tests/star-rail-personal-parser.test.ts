@@ -149,7 +149,12 @@ describe('Star Rail personal parsing', () => {
         star_num: 0,
         max_floor: '',
         has_data: false,
-        all_floor_detail: [],
+        all_floor_detail: [{
+          star_num: 0,
+          is_fast: false,
+          node_1: { challenge_time: null },
+          node_2: { challenge_time: null }
+        }],
         groups: [season(203, '虚构叙事')]
       },
       anomalyArbitration: {

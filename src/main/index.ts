@@ -1,7 +1,9 @@
 import { cpSync, existsSync, mkdirSync } from 'node:fs'
+import { arch, cpus, release, totalmem } from 'node:os'
 import { dirname, join } from 'node:path'
 import { app, BrowserWindow, dialog, ipcMain, net, powerMonitor, safeStorage, screen, session, shell } from 'electron'
 import { terminateApplicationProcess } from './application-exit'
+import { ApplicationLogger } from './application-logger'
 import {
   calculatePortraitWindowSize,
   PORTRAIT_WINDOW_ASPECT_RATIO
@@ -65,14 +67,12 @@ import {
   writeSoftwareUpdateSettings
 } from './software-update'
 import { resolveAppDataPaths } from './data-paths'
-import { getFixedWeeklyBootstrap } from './sync/public-sync-bootstrap'
 import {
   getBundledMapCatalog,
   getBundledMapCatalogVerifiedAt
 } from './sync/map-catalog'
 import {
   evaluateMapCatalogFreshness,
-  selectRelevantVersionWindow,
   type MapCatalogAuditReason
 } from './sync/map-catalog-freshness'
 import {
@@ -136,9 +136,8 @@ function parseRequestedRenderingMode(value: unknown): RenderingMode {
 }
 
 const SECTION_CATEGORIES = {
-  tasks: ['main_quest', 'side_quest'],
   events: ['limited_event'],
-  cycles: ['weekly', 'endgame'],
+  cycles: ['endgame'],
   exploration: ['exploration'],
   custom: ['custom']
 } as const
@@ -162,16 +161,27 @@ let appDataRoot: string | null = null
 let codexWorkerEnvironment: NodeJS.ProcessEnv = {}
 let codexWorkerTransportMode: CodexWorkerTransportMode = 'websocket_preferred'
 let softwareUpdateService: SoftwareUpdateService | null = null
+let applicationLogger: ApplicationLogger | null = null
 let isShuttingDown = false
 
 function reportBackgroundError(context: string, error: unknown): void {
   const message = error instanceof Error ? error.message : String(error)
   if (/database is locked|SQLITE_BUSY/i.test(message)) {
+    applicationLogger?.warn('background_database_busy', { context, error })
     console.warn(`${context}暂时遇到数据库占用，稍后自动重试`)
     return
   }
+  applicationLogger?.error('background_error', { context, error })
   console.error(`${context}失败`, error)
 }
+
+process.on('uncaughtExceptionMonitor', (error, origin) => {
+  applicationLogger?.error('uncaught_exception', { origin, error })
+})
+
+process.on('unhandledRejection', (reason) => {
+  applicationLogger?.error('unhandled_rejection', { reason })
+})
 
 function maintainChecklistTimeState(): void {
   if (!appDatabase || isShuttingDown) return
@@ -179,8 +189,6 @@ function maintainChecklistTimeState(): void {
     // Recurring entries must advance first. Any system time-limited rows left
     // behind are expired one-off entries and are permanently removed.
     const changes =
-      appDatabase.resetDueWeeklyItems() +
-      appDatabase.resetDueQuestItems() +
       appDatabase.rolloverDueCycleItems() +
       appDatabase.pruneExpiredSystemItems() +
       appDatabase.markStaleSyncStates()
@@ -195,6 +203,7 @@ function maintainChecklistTimeState(): void {
 function shutdownApplicationRuntime(): void {
   if (isShuttingDown) return
   isShuttingDown = true
+  applicationLogger?.info('application_stopping')
   if (periodTimer) clearInterval(periodTimer)
   periodTimer = null
   if (externalChangeTimer) clearInterval(externalChangeTimer)
@@ -349,7 +358,7 @@ async function queueAiScheduleSync(
   if (!appDatabase) throw new Error('数据库尚未初始化')
   if (scope === 'public_and_personal') {
     if (!syncOrchestrator) throw new Error('个人数据同步服务尚未初始化')
-    if (target === 'tasks') throw new Error('任务版块不支持同步个人数据')
+    if (target === 'tasks') throw new Error('版本校时不支持同步个人数据')
     return syncOrchestrator.syncPersonalOnly(gameId, target, requestContext)
   }
   const overlappingPersonalTargets = target === 'all'
@@ -380,10 +389,7 @@ async function queueAiScheduleSync(
     const freshness = evaluateMapCatalogFreshness({
       bundledVerifiedAt: getBundledMapCatalogVerifiedAt(gameId),
       lastCodexAuditAt: appDatabase.getLastCompletedCatalogAuditAt(gameId, 'exploration'),
-      versionWindow: selectRelevantVersionWindow(
-        appDatabase.listChecklistItems(gameId),
-        reference
-      ),
+      versionWindow: appDatabase.getRelevantGameVersionWindow(gameId, reference),
       reference
     })
     mapAuditReason = freshness.reason
@@ -410,20 +416,7 @@ async function queueAiScheduleSync(
     }
   }
   const sources: SyncResult['sources'] = []
-  const fixedWeeklyMerge = target === 'all' || target === 'cycles'
-    ? appDatabase.mergeSyncedItems(
-        gameId,
-        'public_schedule',
-        getFixedWeeklyBootstrap(gameId, target)
-      )
-    : null
-  let bootstrapMerge = mapMerge ?? (fixedWeeklyMerge
-    ? {
-        added: fixedWeeklyMerge.added,
-        updated: fixedWeeklyMerge.updated,
-        preserved: fixedWeeklyMerge.preserved
-      }
-    : null)
+  let bootstrapMerge = mapMerge
   try {
     const job = appDatabase.createAiScheduleJob(
       gameId,
@@ -456,9 +449,6 @@ async function queueAiScheduleSync(
     sendAiJobProgress(activeJob)
     const publicMessage = '同步任务已开始'
     const localMessages = [
-      fixedWeeklyMerge
-        ? `固定周常已维护（新增 ${fixedWeeklyMerge.added}，更新 ${fixedWeeklyMerge.updated}）`
-        : '',
       mapMerge
         ? `地图基准目录已维护（新增 ${mapMerge.added}，更新 ${mapMerge.updated}）；${mapAuditReason === 'version_started'
           ? '检测到新版本，正在核验增量'
@@ -545,6 +535,18 @@ function queuePersonalMetadataEnrichment(
 }
 
 function handleCodexScheduleWorkerEvent(event: CodexScheduleWorkerEvent): void {
+  applicationLogger?.info('codex_worker_event', {
+    agentId: event.agentId,
+    jobId: event.jobId,
+    phase: event.phase,
+    current: event.current,
+    total: event.total,
+    exitCode: event.exitCode,
+    timedOut: event.timedOut,
+    model: event.model,
+    reasoningEffort: event.reasoningEffort,
+    message: event.message
+  })
   if (!appDatabase) return
   if (
     (event.phase === 'authorization' || event.phase === 'configuration') &&
@@ -851,6 +853,19 @@ function createWindow(): void {
     })
     scheduleStartupUpdateCheck()
   })
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    applicationLogger?.error('renderer_process_gone', details)
+  })
+  mainWindow.webContents.on('preload-error', (_event, preloadPath, error) => {
+    applicationLogger?.error('preload_error', { preloadPath, error })
+  })
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedUrl) => {
+    applicationLogger?.error('renderer_load_failed', {
+      errorCode,
+      errorDescription,
+      validatedUrl
+    })
+  })
 
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
     void mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
@@ -1156,7 +1171,7 @@ function registerIpcHandlers(): void {
     const parsedTarget = parseSyncTarget(target)
     const parsedRequestContext = parseSyncRequestContext(requestContext)
     if (parsedTarget === 'all' || parsedTarget === 'tasks') {
-      throw new Error('同步个人数据只能从活动、周期事项或地图探索版块发起')
+      throw new Error('同步个人数据只能从活动、周期或地图版块发起')
     }
     if (!supportsPersonalSyncTarget(parsedGameId, parsedTarget)) {
       throw new Error('当前游戏的个人数据接口不提供该版块进度')
@@ -1253,7 +1268,7 @@ function registerIpcHandlers(): void {
       cancelled = Boolean(result)
     } else {
       if (parsedTarget === 'all' || parsedTarget === 'tasks') {
-        throw new Error('个人数据取消只支持活动、周期事项和地图探索版块')
+        throw new Error('个人数据取消只支持活动、周期和地图版块')
       }
       const adapterCancelled = syncOrchestrator.cancelPersonalSync(
         parsedGameId,
@@ -1395,6 +1410,40 @@ if (!app.requestSingleInstanceLock()) {
     const dataPaths = resolveAppDataPaths(app.getPath('documents'))
     const databasePath = dataPaths.database
     const backupDirectory = dataPaths.backups
+    try {
+      applicationLogger = new ApplicationLogger(dataPaths.logs)
+      const primaryDisplay = screen.getPrimaryDisplay()
+      applicationLogger.info('application_started', {
+        appVersion: app.getVersion(),
+        packaged: app.isPackaged,
+        runtime: {
+          electron: process.versions.electron,
+          chromium: process.versions.chrome,
+          node: process.versions.node
+        },
+        system: {
+          platform: process.platform,
+          release: release(),
+          architecture: arch(),
+          logicalProcessorCount: cpus().length,
+          totalMemoryMiB: Math.round(totalmem() / 1024 / 1024),
+          locale: app.getLocale(),
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+        },
+        display: {
+          width: primaryDisplay.size.width,
+          height: primaryDisplay.size.height,
+          workAreaWidth: primaryDisplay.workAreaSize.width,
+          workAreaHeight: primaryDisplay.workAreaSize.height,
+          scaleFactor: primaryDisplay.scaleFactor,
+          colorDepth: primaryDisplay.colorDepth
+        },
+        renderingMode: activeRenderingMode
+      })
+    } catch (error) {
+      // A damaged or unavailable log directory must not prevent the app from opening.
+      console.error('初始化本地日志失败', error)
+    }
     appDataRoot = dataPaths.root
     appBackupDirectory = backupDirectory
     appDatabasePath = databasePath
@@ -1454,6 +1503,7 @@ if (!app.requestSingleInstanceLock()) {
       await createDailyBackup(appDatabase, backupDirectory)
       pruneDailyBackups(backupDirectory)
     } catch (error) {
+      applicationLogger?.error('daily_backup_failed', { error })
       console.error('创建或整理每日数据库备份失败', error)
     }
     try {
@@ -1462,6 +1512,7 @@ if (!app.requestSingleInstanceLock()) {
         refreshCodexMcpLauncher(launcherOptions)
       }
     } catch (error) {
+      applicationLogger?.error('codex_launcher_refresh_failed', { error })
       console.error('刷新 Codex MCP 启动路径失败', error)
     }
     codexScheduleWorkerPool = createCodexWorkerPool()
@@ -1514,6 +1565,16 @@ function parseQrLoginSessionId(value: unknown): string {
 
 function createAppSyncOrchestrator(database: AppDatabase): SyncOrchestrator {
   const reportProgress = (progress: SyncProgressUpdate): void => {
+    applicationLogger?.info('sync_progress', {
+      gameId: progress.gameId,
+      target: progress.target,
+      source: progress.source,
+      phase: progress.phase,
+      status: progress.status,
+      retryKind: progress.retryKind,
+      current: progress.current,
+      total: progress.total
+    })
     mainWindow?.webContents.send('sync:progress', progress)
   }
   if (!credentialVault) {

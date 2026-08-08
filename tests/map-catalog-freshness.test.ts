@@ -5,25 +5,22 @@ import {
 } from '../src/main/sync/map-catalog-freshness'
 
 describe('map catalog freshness', () => {
-  it('uses the active task version window instead of a future or expired duplicate', () => {
+  it('uses the active game version window instead of a future or expired duplicate', () => {
     const selected = selectRelevantVersionWindow([
       {
-        category: 'main_quest',
         periodKey: '3.4',
         startsAt: '2026-06-01T00:00:00.000Z',
         endsAt: '2026-07-01T00:00:00.000Z'
       },
       {
-        category: 'side_quest',
         periodKey: '3.5',
         startsAt: '2026-07-01T00:00:00.000Z',
         endsAt: '2026-08-12T00:00:00.000Z'
       },
       {
-        category: 'limited_event',
-        periodKey: 'event',
-        startsAt: '2026-07-20T00:00:00.000Z',
-        endsAt: '2026-08-20T00:00:00.000Z'
+        periodKey: '3.6',
+        startsAt: '2026-08-20T00:00:00.000Z',
+        endsAt: '2026-10-01T00:00:00.000Z'
       }
     ], new Date('2026-07-31T00:00:00.000Z'))
 

@@ -3,6 +3,7 @@ import {
   type NormalizedSyncItem,
   type SemanticReviewDraft
 } from './types'
+import { hasChallengeRecordEvidence } from './challenge-record-evidence'
 import { finiteNumber } from './numbers'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -196,11 +197,10 @@ export function parseZenlessShiyuDefense(value: unknown): NormalizedSyncItem {
   const scheduleId = requiredIdentifier(data.schedule_id, '式舆防卫战 schedule_id')
   const brief = isRecord(data.brief_info) ? data.brief_info : {}
   const score = finiteNumber(brief.score)
-  const hasChallengeRecord =
-    data.has_data === true ||
-    data.has_challenge_record === true ||
-    data.passed_fifth_floor === true ||
-    (score ?? 0) > 0
+  const hasChallengeRecord = hasChallengeRecordEvidence({
+    explicitFlags: [data.has_data, data.has_challenge_record, data.passed_fifth_floor],
+    positiveValues: [score]
+  })
 
   return {
     remoteKey: 'endgame:shiyu-defense',
@@ -220,14 +220,13 @@ export function parseZenlessDeadlyAssault(value: unknown): NormalizedSyncItem {
   const scheduleId = requiredIdentifier(data.id, '危局强袭战 id')
   const challenges = Array.isArray(data.challenges) ? data.challenges.filter(isRecord) : []
   const earnedStars = finiteNumber(data.total_star) ?? 0
-  const completed =
-    data.has_data === true ||
-    earnedStars > 0 ||
-    challenges.some((challenge) =>
-      challenge.has_data === true ||
-      (finiteNumber(challenge.star) ?? 0) > 0 ||
-      (finiteNumber(challenge.score) ?? 0) > 0
-    )
+  const completed = hasChallengeRecordEvidence({
+    explicitFlags: [data.has_data, ...challenges.map((challenge) => challenge.has_data)],
+    positiveValues: [
+      earnedStars,
+      ...challenges.flatMap((challenge) => [challenge.star, challenge.score])
+    ]
+  })
 
   return {
     remoteKey: 'endgame:deadly-assault',

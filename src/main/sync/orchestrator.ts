@@ -301,9 +301,9 @@ export class SyncOrchestrator {
         total: null
       })
       const targetCategories = {
-        tasks: ['main_quest', 'side_quest'],
+        tasks: [],
         events: ['limited_event'],
-        cycles: ['weekly', 'endgame'],
+        cycles: ['endgame'],
         exploration: ['exploration']
       } as const
       const categories = target === 'all' ? undefined : targetCategories[target]

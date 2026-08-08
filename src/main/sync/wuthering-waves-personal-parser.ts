@@ -3,6 +3,7 @@ import {
   type NormalizedSyncItem,
   type SemanticReviewDraft
 } from './types'
+import { hasChallengeRecordEvidence } from './challenge-record-evidence'
 import { finiteNumber } from './numbers'
 
 export interface WutheringWavesPersonalPayload {
@@ -123,34 +124,51 @@ export function extractWutheringWavesExplorationReviewCandidates(
 export function parseWutheringWavesTower(value: unknown): NormalizedSyncItem {
   const root = requiredRecord(value, '逆境深塔')
   const difficulties = recordArray(root.difficultyList)
-  const completed = difficulties.some((difficulty) =>
-    recordArray(difficulty.towerAreaList).some((area) => {
-      const floors = recordArray(area.floorList)
-      return floors.length > 0 || (finiteNumber(area.star) ?? 0) > 0
-    })
-  )
+  const areas = difficulties.flatMap((difficulty) => recordArray(difficulty.towerAreaList))
+  const floors = areas.flatMap((area) => recordArray(area.floorList))
+  const completed = hasChallengeRecordEvidence({
+    explicitFlags: [
+      root.hasRecord,
+      ...difficulties.map((difficulty) => difficulty.hasRecord),
+      ...areas.map((area) => area.hasRecord),
+      ...floors.map((floor) => floor.hasRecord)
+    ],
+    positiveValues: [
+      ...areas.map((area) => area.star),
+      ...floors.flatMap((floor) => [floor.star, floor.score])
+    ]
+  })
   return endgameItem('tower-of-adversity', '逆境深塔', completed)
 }
 
 export function parseWutheringWavesSlash(value: unknown): NormalizedSyncItem {
   const root = requiredRecord(value, '冥歌海墟')
-  const completed = recordArray(root.difficultyList).some((difficulty) =>
-    (finiteNumber(difficulty.allScore) ?? 0) > 0 ||
-    recordArray(difficulty.challengeList).some((challenge) =>
-      recordArray(challenge.halfList).length > 0 || (finiteNumber(challenge.score) ?? 0) > 0
-    )
-  )
+  const difficulties = recordArray(root.difficultyList)
+  const challenges = difficulties.flatMap((difficulty) => recordArray(difficulty.challengeList))
+  const halves = challenges.flatMap((challenge) => recordArray(challenge.halfList))
+  const completed = hasChallengeRecordEvidence({
+    explicitFlags: [
+      root.hasRecord,
+      ...difficulties.map((difficulty) => difficulty.hasRecord),
+      ...challenges.map((challenge) => challenge.hasRecord),
+      ...halves.map((half) => half.hasRecord)
+    ],
+    positiveValues: [
+      ...difficulties.map((difficulty) => difficulty.allScore),
+      ...challenges.map((challenge) => challenge.score),
+      ...halves.map((half) => half.score)
+    ]
+  })
   return endgameItem('whimpering-wastes', '冥歌海墟', completed)
 }
 
 export function parseWutheringWavesMatrix(value: unknown): NormalizedSyncItem {
   const root = requiredRecord(value, '终焉矩阵')
-  const completed = recordArray(root.modeDetails).some((mode) =>
-    mode.hasRecord === true ||
-    (finiteNumber(mode.score) ?? 0) > 0 ||
-    (finiteNumber(mode.passBoss) ?? 0) > 0 ||
-    recordArray(mode.teams).length > 0
-  )
+  const modes = recordArray(root.modeDetails)
+  const completed = hasChallengeRecordEvidence({
+    explicitFlags: [root.hasRecord, ...modes.map((mode) => mode.hasRecord)],
+    positiveValues: modes.flatMap((mode) => [mode.score, mode.passBoss])
+  })
   return endgameItem('endstate-matrix', '终焉矩阵', completed)
 }
 

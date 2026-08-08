@@ -17,9 +17,8 @@ import {
 } from './validation'
 
 const SECTION_CATEGORIES = {
-  tasks: ['main_quest', 'side_quest'],
   events: ['limited_event'],
-  cycles: ['weekly', 'endgame'],
+  cycles: ['endgame'],
   exploration: ['exploration'],
   custom: ['custom']
 } as const

@@ -3,6 +3,7 @@ import {
   type NormalizedSyncItem,
   type SemanticReviewDraft
 } from './types'
+import { hasChallengeRecordEvidence } from './challenge-record-evidence'
 import { finiteNumber } from './numbers'
 
 export interface StarRailPersonalPayload {
@@ -116,11 +117,10 @@ function parseChallengeMode(definition: ChallengeModeDefinition): NormalizedSync
   const stars = Math.max(0, (finiteNumber(root.star_num) ?? 0) + (finiteNumber(root.extra_star_num) ?? 0))
   const floors = Array.isArray(root.all_floor_detail) ? root.all_floor_detail.filter(isRecord) : []
   const maxFloor = parseFloorNumber(root.max_floor)
-  const completed =
-    root.has_data === true ||
-    stars > 0 ||
-    maxFloor > 0 ||
-    floors.some(hasFloorRecord)
+  const completed = hasChallengeRecordEvidence({
+    explicitFlags: [root.has_data, ...floors.map((floor) => floor.is_fast)],
+    positiveValues: [stars, maxFloor, ...floors.map((floor) => floor.star_num)]
+  })
   const startsAt = toIsoDate(root.begin_time ?? season?.begin_time, `${definition.label}开始时间`)
   const endsAt = toIsoDate(root.end_time ?? season?.end_time, `${definition.label}结束时间`)
   return {
@@ -152,12 +152,14 @@ function parseAnomalyArbitration(value: unknown): NormalizedSyncItem | null {
   const miniBossRecords = Array.isArray(record.mob_records) ? record.mob_records.filter(isRecord) : []
   const bossStars = Math.max(0, finiteNumber(record.boss_stars) ?? 0)
   const miniBossStars = Math.max(0, finiteNumber(record.mob_stars) ?? 0)
-  const hasData =
-    record.has_challenge_record === true ||
-    bossRecord?.has_challenge_record === true ||
-    miniBossRecords.some((candidate) => candidate.has_challenge_record === true) ||
-    bossStars > 0 ||
-    miniBossStars > 0
+  const hasData = hasChallengeRecordEvidence({
+    explicitFlags: [
+      record.has_challenge_record,
+      bossRecord?.has_challenge_record,
+      ...miniBossRecords.map((candidate) => candidate.has_challenge_record)
+    ],
+    positiveValues: [bossStars, miniBossStars]
+  })
   return {
     remoteKey: 'endgame:anomaly-arbitration',
     category: 'endgame',
@@ -169,11 +171,6 @@ function parseAnomalyArbitration(value: unknown): NormalizedSyncItem | null {
     scheduleKind: 'remote_schedule',
     modeKey: 'anomaly-arbitration'
   }
-}
-
-function hasFloorRecord(floor: Record<string, unknown>): boolean {
-  return ['node_1', 'node_2', 'node_3'].some((key) => isRecord(floor[key])) ||
-    (finiteNumber(floor.star_num) ?? 0) > 0 || floor.is_fast === true
 }
 
 function parseFloorNumber(value: unknown): number {
