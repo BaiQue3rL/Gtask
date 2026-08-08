@@ -75,12 +75,17 @@ describe('鸣潮个人进度解析', () => {
     ]))
   })
 
-  it('挑战模式只要存在本期挑战记录就判定完成，不要求满星或满分', () => {
+  it('挑战模式只要必须手动的本期关卡有记录就完成，不要求满星或满分', () => {
     expect(parseWutheringWavesTower({
       isUnlock: true,
       seasonEndTime: 1787183999,
       difficultyList: [{
-        towerAreaList: [{ star: 0, floorList: [{ floor: 1, star: 0, hasRecord: true }] }]
+        difficultyName: '深境区',
+        towerAreaList: [{
+          areaName: '残响之塔',
+          star: 0,
+          floorList: [{ floor: 4, star: 0, hasRecord: true }]
+        }]
       }]
     })).toMatchObject({
       title: '逆境深塔',
@@ -95,7 +100,7 @@ describe('鸣潮个人进度解析', () => {
       seasonEndTime: 1787183999,
       difficultyList: [{
         allScore: 0,
-        challengeList: [{ score: 1, halfList: [] }]
+        challengeList: [{ challengeId: 9, score: 1, halfList: [] }]
       }]
     })).toMatchObject({
       title: '冥歌海墟',
@@ -136,6 +141,52 @@ describe('鸣潮个人进度解析', () => {
       endTime: 1787183999,
       modeDetails: [{ hasRecord: false, score: 0, passBoss: 0, teams: [{ roleIds: [] }] }]
     })).toMatchObject({ completed: false })
+  })
+
+  it('逆境深塔继承层与海墟第 7、8 关不算手动记录', () => {
+    expect(parseWutheringWavesTower({
+      isUnlock: true,
+      difficultyList: [{
+        difficultyName: '稳定区',
+        towerAreaList: [{
+          areaName: '稳定之塔',
+          floorList: [{ floor: 4, star: 3, hasRecord: true }]
+        }]
+      }, {
+        difficultyName: '深境区',
+        towerAreaList: [{
+          areaName: '残响之塔',
+          star: 9,
+          floorList: [
+            { floor: 1, star: 3, hasRecord: true },
+            { floor: 2, star: 3, hasRecord: true },
+            { floor: 3, star: 3, hasRecord: true }
+          ]
+        }]
+      }]
+    })).toMatchObject({ completed: false })
+
+    expect(parseWutheringWavesSlash({
+      isUnlock: true,
+      difficultyList: [{
+        allScore: 10000,
+        challengeList: [
+          { challengeId: 7, score: 5000, hasRecord: true },
+          { challengeId: 8, score: 5000, hasRecord: true }
+        ]
+      }]
+    })).toMatchObject({ completed: false })
+
+    expect(parseWutheringWavesSlash({
+      isUnlock: true,
+      difficultyList: [{
+        challengeList: [{
+          challengeId: 12,
+          score: 0,
+          halfList: [{ half: 1, score: 0, hasRecord: true }]
+        }]
+      }]
+    })).toMatchObject({ completed: true })
   })
 
   it('适配器按版块请求数据并保留部分成功结果', async () => {

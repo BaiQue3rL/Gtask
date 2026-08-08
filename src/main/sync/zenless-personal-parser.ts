@@ -198,7 +198,7 @@ export function parseZenlessShiyuDefense(value: unknown): NormalizedSyncItem {
   const brief = isRecord(data.brief_info) ? data.brief_info : {}
   const score = finiteNumber(brief.score)
   const hasChallengeRecord = hasChallengeRecordEvidence({
-    explicitFlags: [data.has_data, data.has_challenge_record, data.passed_fifth_floor],
+    explicitFlags: [data.passed_fifth_floor],
     positiveValues: [score]
   })
 

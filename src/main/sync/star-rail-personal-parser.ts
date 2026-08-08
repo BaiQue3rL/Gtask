@@ -114,13 +114,8 @@ function parseChallengeMode(definition: ChallengeModeDefinition): NormalizedSync
     root.schedule_id ?? season?.schedule_id,
     `${definition.label} schedule_id`
   )
-  const stars = Math.max(0, (finiteNumber(root.star_num) ?? 0) + (finiteNumber(root.extra_star_num) ?? 0))
   const floors = Array.isArray(root.all_floor_detail) ? root.all_floor_detail.filter(isRecord) : []
-  const maxFloor = parseFloorNumber(root.max_floor)
-  const completed = hasChallengeRecordEvidence({
-    explicitFlags: [root.has_data, ...floors.map((floor) => floor.is_fast)],
-    positiveValues: [stars, maxFloor, ...floors.map((floor) => floor.star_num)]
-  })
+  const completed = floors.some(hasManualChallengeFloorRecord)
   const startsAt = toIsoDate(root.begin_time ?? season?.begin_time, `${definition.label}开始时间`)
   const endsAt = toIsoDate(root.end_time ?? season?.end_time, `${definition.label}结束时间`)
   return {
@@ -173,11 +168,33 @@ function parseAnomalyArbitration(value: unknown): NormalizedSyncItem | null {
   }
 }
 
-function parseFloorNumber(value: unknown): number {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value !== 'string') return 0
-  const matches = value.match(/\d+/g)
-  return matches ? Number(matches.at(-1)) : 0
+function hasManualChallengeFloorRecord(floor: Record<string, unknown>): boolean {
+  if (floor.is_fast === true) return false
+  const nodes = [floor.node_1, floor.node_2].filter(isRecord)
+  return hasChallengeRecordEvidence({
+    explicitFlags: [
+      floor.has_challenge_record,
+      ...nodes.map((node) => node.has_challenge_record)
+    ],
+    positiveValues: [
+      floor.star_num,
+      floor.score,
+      floor.round_num,
+      ...nodes.flatMap((node) => [
+        node.star_num,
+        node.score,
+        node.round_num,
+        challengeTimeEvidence(node.challenge_time)
+      ])
+    ]
+  })
+}
+
+function challengeTimeEvidence(value: unknown): number {
+  const direct = finiteNumber(value)
+  if (direct !== null) return direct
+  if (!isRecord(value)) return 0
+  return Object.values(value).some((part) => (finiteNumber(part) ?? 0) > 0) ? 1 : 0
 }
 
 function toIsoDate(value: unknown, field: string): string {

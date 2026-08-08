@@ -1601,6 +1601,11 @@ describe('AppDatabase', () => {
     const maps = database.listChecklistItems('genshin')
     const first = maps.find((item) => item.remoteKey === 'map:fontaine:a')!
     const second = maps.find((item) => item.remoteKey === 'map:fontaine:b')!
+    database.updateChecklistItem({ id: first.id, completed: true })
+    expect(database.listChecklistItems('genshin').find(
+      (item) => item.remoteKey === 'map:fontaine'
+    )).toMatchObject({ progressPercent: 50, completed: false })
+    database.updateChecklistItem({ id: first.id, completed: false })
     database.updateChecklistItem({ id: first.id, progressPercent: 100 })
     database.updateChecklistItem({ id: second.id, progressPercent: 50 })
     expect(database.listChecklistItems('genshin').find(
@@ -1649,6 +1654,49 @@ describe('AppDatabase', () => {
       expect.objectContaining({ remoteKey: 'map:fontaine', progressPercent: 100, completed: true }),
       expect.objectContaining({ remoteKey: 'map:fontaine:b', progressPercent: 100, completed: true })
     ]))
+  })
+
+  it('启动时修复旧版公开子地图已完成但进度为零的状态', () => {
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-public-map-progress-repair-'))
+    const databasePath = join(temporaryDirectory, 'test.sqlite')
+    database = new AppDatabase(databasePath)
+    database.mergeSyncedItems('star-rail', 'public_schedule', [{
+      remoteKey: 'map:jarilo',
+      category: 'exploration',
+      title: '雅利洛-VI',
+      mapNodeKind: 'region'
+    }, {
+      remoteKey: 'map:jarilo:a',
+      category: 'exploration',
+      title: '行政区',
+      mapNodeKind: 'subregion',
+      parentRemoteKey: 'map:jarilo'
+    }, {
+      remoteKey: 'map:jarilo:b',
+      category: 'exploration',
+      title: '城郊雪原',
+      mapNodeKind: 'subregion',
+      parentRemoteKey: 'map:jarilo'
+    }])
+    for (const child of database.listChecklistItems('star-rail').filter(
+      (item) => item.mapNodeKind === 'subregion'
+    )) {
+      database.updateChecklistItem({ id: child.id, completed: true })
+    }
+    expect(database.listChecklistItems('star-rail').filter(
+      (item) => item.mapNodeKind === 'subregion'
+    ).every((item) => item.completed && item.progressPercent === 0)).toBe(true)
+
+    database.close()
+    database = null
+    database = new AppDatabase(databasePath)
+
+    expect(database.listChecklistItems('star-rail').find(
+      (item) => item.remoteKey === 'map:jarilo'
+    )).toMatchObject({ completed: true, progressPercent: 100 })
+    expect(database.listChecklistItems('star-rail').filter(
+      (item) => item.mapNodeKind === 'subregion'
+    ).every((item) => item.completed && item.progressPercent === 100)).toBe(true)
   })
 
   it('个人地图保留官方一级探索度，不使用二级地区平均值覆盖', () => {

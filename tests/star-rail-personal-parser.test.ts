@@ -13,27 +13,34 @@ const season = (scheduleId: number, name: string) => ({
   end_time: { year: 2026, month: 8, day: 3, hour: 3, minute: 59, second: 59 }
 })
 
+const manualFloor = (starNum: number) => ({
+  star_num: starNum,
+  is_fast: false,
+  node_1: { challenge_time: { year: 2026, month: 7, day: 21, hour: 20 } },
+  node_2: { challenge_time: null }
+})
+
 const payload = {
   memoryOfChaos: {
     star_num: 33,
     extra_star_num: 0,
     max_floor: '12',
     has_data: true,
-    all_floor_detail: [],
+    all_floor_detail: [manualFloor(2)],
     groups: [season(101, '混沌回忆')]
   },
   pureFiction: {
     star_num: 9,
     max_floor: '03',
     has_data: true,
-    all_floor_detail: [],
+    all_floor_detail: [manualFloor(1)],
     groups: [season(102, '虚构叙事')]
   },
   apocalypticShadow: {
     star_num: 12,
     max_floor: '04',
     has_data: true,
-    all_floor_detail: [],
+    all_floor_detail: [manualFloor(1)],
     groups: [season(103, '末日幻影')]
   },
   anomalyArbitration: {
@@ -125,13 +132,13 @@ describe('Star Rail personal parsing', () => {
     expect(JSON.stringify(candidates)).not.toContain('uid')
   })
 
-  it('treats any current-period record as completed without requiring a last-floor marker', () => {
+  it('只要本期手动关卡有记录就完成，不要求最后一层或满星', () => {
     const items = parseStarRailPersonalData({
       pureFiction: {
         star_num: 12,
         max_floor: '',
         has_data: true,
-        all_floor_detail: [],
+        all_floor_detail: [manualFloor(1)],
         groups: [season(202, '虚构叙事')]
       }
     })
@@ -141,6 +148,38 @@ describe('Star Rail personal parsing', () => {
       completed: true
     })
     expect(items[0]).not.toHaveProperty('progressPercent')
+  })
+
+  it('快速解锁层的星数不算手动记录，后续手动关卡才算', () => {
+    const fastOnly = parseStarRailPersonalData({
+      memoryOfChaos: {
+        star_num: 18,
+        max_floor: '06',
+        has_data: true,
+        all_floor_detail: [{
+          star_num: 3,
+          is_fast: true,
+          node_1: { challenge_time: { year: 2026, month: 7, day: 20 } },
+          node_2: { challenge_time: { year: 2026, month: 7, day: 20 } }
+        }],
+        groups: [season(205, '混沌回忆')]
+      }
+    })
+    expect(fastOnly[0]).toMatchObject({ completed: false })
+
+    const withManualFloor = parseStarRailPersonalData({
+      memoryOfChaos: {
+        star_num: 18,
+        max_floor: '07',
+        has_data: true,
+        all_floor_detail: [
+          { ...manualFloor(3), is_fast: true },
+          manualFloor(0)
+        ],
+        groups: [season(206, '混沌回忆')]
+      }
+    })
+    expect(withManualFloor[0]).toMatchObject({ completed: true })
   })
 
   it('only marks a challenge incomplete when the current period has no record', () => {

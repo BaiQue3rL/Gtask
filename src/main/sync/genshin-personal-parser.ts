@@ -254,16 +254,15 @@ function normalizeExplorationTitle(value: string): string {
 export function parseSpiralAbyss(value: unknown): NormalizedSyncItem {
   const data = requiredRecord(value, '深境螺旋')
   const scheduleId = requiredIdentifier(data.schedule_id, '深境螺旋 schedule_id')
-  const totalStars = finiteNumber(data.total_star) ?? 0
-  const maxFloor = typeof data.max_floor === 'string' ? data.max_floor.replaceAll(' ', '') : ''
   const floors = Array.isArray(data.floors) ? data.floors.filter(isRecord) : []
+  const battles = floors.flatMap((floor) => {
+    const levels = Array.isArray(floor.levels) ? floor.levels.filter(isRecord) : []
+    return levels.flatMap((level) => (
+      Array.isArray(level.battles) ? level.battles.filter(isRecord) : []
+    ))
+  })
   const hasChallengeRecord = hasChallengeRecordEvidence({
-    explicitFlags: [data.has_data],
-    positiveValues: [
-      totalStars,
-      maxFloor === '0' || maxFloor === '0-0' ? 0 : parseFloorNumber(maxFloor),
-      ...floors.map((floor) => floor.star)
-    ]
+    positiveValues: [data.total_battle_times, battles.length]
   })
   return {
     remoteKey: 'endgame:spiral-abyss',
@@ -333,11 +332,6 @@ export function parseStygianOnslaught(value: unknown): NormalizedSyncItem | null
     scheduleKind: 'remote_schedule',
     modeKey: 'stygian-onslaught'
   }
-}
-
-function parseFloorNumber(value: string): number {
-  const matches = value.match(/\d+/g)
-  return matches ? Math.max(...matches.map(Number)) : 0
 }
 
 function toIsoDate(value: unknown, field: string): string {

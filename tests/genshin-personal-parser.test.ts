@@ -17,6 +17,7 @@ const payload = {
     schedule_id: 123,
     start_time: 1784505600,
     end_time: 1785715199,
+    total_battle_times: 11,
     max_floor: '12-3',
     total_star: 33,
     floors: []
@@ -262,6 +263,7 @@ describe('Genshin personal parsing', () => {
         schedule_id: 1001,
         start_time: 1784505600,
         end_time: 1785715199,
+        total_battle_times: 1,
         max_floor: '9-1',
         total_star: 1,
         floors: []
@@ -296,6 +298,40 @@ describe('Genshin personal parsing', () => {
         floors: [{ star: 0, levels: [{ index: 1, battles: [] }] }]
       }
     })[0]).toMatchObject({ completed: false })
+  })
+
+  it('深境螺旋跳过层只有继承星数时不算手动挑战', () => {
+    expect(parseGenshinPersonalData({
+      spiralAbyss: {
+        schedule_id: 1005,
+        start_time: 1784505600,
+        end_time: 1785715199,
+        has_data: true,
+        total_battle_times: 0,
+        max_floor: '10-3',
+        total_star: 18,
+        floors: [{
+          index: 10,
+          star: 9,
+          levels: [{ index: 1, star: 3, battles: [] }]
+        }]
+      }
+    })[0]).toMatchObject({ completed: false })
+
+    expect(parseGenshinPersonalData({
+      spiralAbyss: {
+        schedule_id: 1006,
+        start_time: 1784505600,
+        end_time: 1785715199,
+        total_battle_times: 0,
+        total_star: 0,
+        floors: [{
+          index: 11,
+          star: 0,
+          levels: [{ index: 1, battles: [{ timestamp: 1784505700 }] }]
+        }]
+      }
+    })[0]).toMatchObject({ completed: true })
   })
 
   it('the adapter requests each source sequentially and rejects other games', async () => {

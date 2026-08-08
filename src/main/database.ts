@@ -372,6 +372,7 @@ export class AppDatabase {
       this.reconcileSyncTargetStates()
       this.normalizeLegacyActivityTags()
       this.normalizeSyncedProgressSafety()
+      this.normalizePublicMapProgressConsistency()
       this.rolloverDueCycleItems()
       this.pruneExpiredSystemItems()
       this.markStaleSyncStates()
@@ -5171,6 +5172,23 @@ export class AppDatabase {
     `).run(now)
   }
 
+  private normalizePublicMapProgressConsistency(reference = new Date()): void {
+    const now = reference.toISOString()
+    this.database.prepare(`
+      UPDATE checklist_items
+      SET progress_percent = 100, updated_at = ?
+      WHERE category = 'exploration'
+        AND source = 'public_schedule'
+        AND map_node_kind = 'subregion'
+        AND archived = 0
+        AND completed = 1
+        AND (progress_percent IS NULL OR progress_percent <> 100)
+    `).run(now)
+    for (const game of DEFAULT_GAMES) {
+      this.recalculatePublicMapRegionProgress(game.id, reference)
+    }
+  }
+
   private getChecklistItem(id: string): ChecklistItem {
     const row = this.database
       .prepare(`
@@ -5291,7 +5309,7 @@ export class AppDatabase {
       if (children.length === 0) continue
       const progress = Math.round(
         children.reduce(
-          (sum, child) => sum + (child.progressPercent ?? (child.completed ? 100 : 0)),
+          (sum, child) => sum + (child.completed ? 100 : (child.progressPercent ?? 0)),
           0
         ) / children.length * 100
       ) / 100

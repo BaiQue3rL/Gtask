@@ -123,20 +123,19 @@ export function extractWutheringWavesExplorationReviewCandidates(
 
 export function parseWutheringWavesTower(value: unknown): NormalizedSyncItem {
   const root = requiredRecord(value, '逆境深塔')
-  const difficulties = recordArray(root.difficultyList)
-  const areas = difficulties.flatMap((difficulty) => recordArray(difficulty.towerAreaList))
-  const floors = areas.flatMap((area) => recordArray(area.floorList))
+  const difficulties = recordArray(root.difficultyList).filter(isRecurringTowerDifficulty)
+  const manualFloors = difficulties.flatMap((difficulty) => {
+    const areas = recordArray(difficulty.towerAreaList)
+    return areas.flatMap((area, areaIndex) => {
+      const isCentralArea = isCentralTowerArea(area, areaIndex, areas.length)
+      return recordArray(area.floorList).filter((floor) => (
+        isCentralArea || (finiteNumber(floor.floor) ?? 0) >= 4
+      ))
+    })
+  })
   const completed = hasChallengeRecordEvidence({
-    explicitFlags: [
-      root.hasRecord,
-      ...difficulties.map((difficulty) => difficulty.hasRecord),
-      ...areas.map((area) => area.hasRecord),
-      ...floors.map((floor) => floor.hasRecord)
-    ],
-    positiveValues: [
-      ...areas.map((area) => area.star),
-      ...floors.flatMap((floor) => [floor.star, floor.score])
-    ]
+    explicitFlags: manualFloors.map((floor) => floor.hasRecord),
+    positiveValues: manualFloors.flatMap((floor) => [floor.star, floor.score])
   })
   return endgameItem('tower-of-adversity', '逆境深塔', completed)
 }
@@ -144,17 +143,21 @@ export function parseWutheringWavesTower(value: unknown): NormalizedSyncItem {
 export function parseWutheringWavesSlash(value: unknown): NormalizedSyncItem {
   const root = requiredRecord(value, '冥歌海墟')
   const difficulties = recordArray(root.difficultyList)
-  const challenges = difficulties.flatMap((difficulty) => recordArray(difficulty.challengeList))
+  const challenges = difficulties
+    .flatMap((difficulty) => recordArray(difficulty.challengeList))
+    .filter((challenge) => {
+      const challengeId = finiteNumber(
+        challenge.challengeId ?? challenge.challenge_id ?? challenge.id
+      )
+      return challengeId !== null && challengeId >= 9 && challengeId <= 12
+    })
   const halves = challenges.flatMap((challenge) => recordArray(challenge.halfList))
   const completed = hasChallengeRecordEvidence({
     explicitFlags: [
-      root.hasRecord,
-      ...difficulties.map((difficulty) => difficulty.hasRecord),
       ...challenges.map((challenge) => challenge.hasRecord),
       ...halves.map((half) => half.hasRecord)
     ],
     positiveValues: [
-      ...difficulties.map((difficulty) => difficulty.allScore),
       ...challenges.map((challenge) => challenge.score),
       ...halves.map((half) => half.score)
     ]
@@ -198,6 +201,25 @@ function percentage(value: unknown, field: string): number {
 
 function recordArray(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value) ? value.filter(isRecord) : []
+}
+
+function isRecurringTowerDifficulty(difficulty: Record<string, unknown>): boolean {
+  const name = normalizedTitle(difficulty.difficultyName ?? difficulty.name)
+  return name.includes('深境区') || /hazard\s*zone|deep\s*zone/iu.test(name)
+}
+
+function isCentralTowerArea(
+  area: Record<string, unknown>,
+  index: number,
+  areaCount: number
+): boolean {
+  const name = normalizedTitle(area.areaName ?? area.name)
+  if (name.includes('深境之塔') || /hazard\s*tower|deep\s*tower/iu.test(name)) return true
+  return areaCount >= 3 && index > 0 && index < areaCount - 1
+}
+
+function normalizedTitle(value: unknown): string {
+  return typeof value === 'string' ? value.normalize('NFKC').trim().replace(/\s+/gu, '') : ''
 }
 
 function requiredRecord(value: unknown, field: string): Record<string, unknown> {

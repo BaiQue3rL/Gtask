@@ -201,6 +201,8 @@ describe('绝区零个人战绩解析', () => {
   it('只在本期完全没有挑战记录时保持未完成', () => {
     expect(parseZenlessShiyuDefense({
       schedule_id: 62055,
+      has_data: true,
+      has_challenge_record: true,
       passed_fifth_floor: false,
       brief_info: { score: 0, max_score: 150000 }
     })).toMatchObject({ completed: false })
