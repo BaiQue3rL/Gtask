@@ -385,7 +385,9 @@ async function queueAiScheduleSync(
   let mapMerge: { added: number; updated: number; preserved: number } | null = null
   if (target === 'exploration') {
     const reference = new Date()
-    mapMerge = maintainBundledMapCatalog(appDatabase, gameId, reference, false)
+    mapMerge = maintainBundledMapCatalog(appDatabase, gameId, reference, {
+      recordSuccess: false
+    })
     const freshness = evaluateMapCatalogFreshness({
       bundledVerifiedAt: getBundledMapCatalogVerifiedAt(gameId),
       lastCodexAuditAt: appDatabase.getLastCompletedCatalogAuditAt(gameId, 'exploration'),
@@ -1467,7 +1469,11 @@ if (!app.requestSingleInstanceLock()) {
           explorationState?.catalogCoverage === 'complete' &&
           explorationState.catalogSource === 'public_schedule'
         ) {
-          maintainBundledMapCatalog(appDatabase, gameId, new Date(), false)
+          maintainBundledMapCatalog(appDatabase, gameId, new Date(), {
+            recordSuccess: false,
+            preserveActiveSourceState: true
+          })
+          appDatabase.recoverInterruptedPublicCatalogMaintenance(gameId, 'exploration')
         }
       }
     } catch (error) {
@@ -1650,14 +1656,18 @@ function maintainBundledMapCatalog(
   database: AppDatabase,
   gameId: GameId,
   reference = new Date(),
-  recordSuccess = true
+  options: {
+    recordSuccess?: boolean
+    preserveActiveSourceState?: boolean
+  } = {}
 ): { added: number; updated: number; preserved: number } {
+  const { recordSuccess = true, preserveActiveSourceState = false } = options
   const merge = database.replacePublicCatalog(
     gameId,
     'exploration',
     getBundledMapCatalog(gameId),
     reference.toISOString(),
-    { identityPolicy: 'remote-key-only' }
+    { identityPolicy: 'remote-key-only', preserveActiveSourceState }
   )
   database.recordCatalogCoverage(gameId, 'exploration', 'public_schedule', 'complete')
   if (recordSuccess) database.recordSyncTargetSuccess(gameId, 'exploration', reference)

@@ -716,6 +716,88 @@ describe('AppDatabase', () => {
     )).toBe(true)
   })
 
+  it('启动维护已激活的公开地图目录时保留上次同步终态', () => {
+    database = new AppDatabase(':memory:')
+    const initialCatalog = [{
+      remoteKey: 'star-rail:map:test-region',
+      category: 'exploration' as const,
+      title: '测试一级地区',
+      modeKey: 'test-region',
+      mapNodeKind: 'region' as const
+    }, {
+      remoteKey: 'star-rail:map:test-subregion',
+      category: 'exploration' as const,
+      title: '测试二级地区',
+      modeKey: 'test-subregion',
+      mapNodeKind: 'subregion' as const,
+      parentRemoteKey: 'star-rail:map:test-region'
+    }]
+    const successAt = new Date('2026-08-08T14:15:59.303Z')
+
+    database.replacePublicCatalog(
+      'star-rail',
+      'exploration',
+      initialCatalog,
+      successAt.toISOString(),
+      { identityPolicy: 'remote-key-only' }
+    )
+    database.recordCatalogCoverage('star-rail', 'exploration', 'public_schedule', 'complete')
+    database.recordSyncTargetSuccess('star-rail', 'exploration', successAt)
+
+    database.replacePublicCatalog(
+      'star-rail',
+      'exploration',
+      initialCatalog,
+      '2026-08-08T14:17:23.000Z',
+      { identityPolicy: 'remote-key-only', preserveActiveSourceState: true }
+    )
+    database.recordCatalogCoverage('star-rail', 'exploration', 'public_schedule', 'complete')
+
+    expect(database.getSyncTargetStates('star-rail')).toContainEqual(expect.objectContaining({
+      target: 'exploration',
+      lastSuccessAt: successAt.toISOString(),
+      lastAttemptAt: successAt.toISOString(),
+      status: 'success',
+      catalogCoverage: 'complete',
+      catalogSource: 'public_schedule'
+    }))
+
+    database.recordSyncTargetAttempt('star-rail', 'exploration', 'idle', successAt)
+    expect(database.recoverInterruptedPublicCatalogMaintenance(
+      'star-rail',
+      'exploration'
+    )).toBe(true)
+    expect(database.getSyncTargetStates('star-rail')).toContainEqual(expect.objectContaining({
+      target: 'exploration',
+      lastSuccessAt: successAt.toISOString(),
+      lastAttemptAt: successAt.toISOString(),
+      status: 'success',
+      catalogCoverage: 'complete',
+      catalogSource: 'public_schedule'
+    }))
+
+    const activeAt = new Date('2026-08-08T14:20:00.000Z')
+    database.createAiScheduleJob(
+      'star-rail',
+      'public_schedule',
+      activeAt,
+      true,
+      'exploration'
+    )
+    database.recordSyncTargetSuccess('star-rail', 'exploration', activeAt)
+    database.recordSyncTargetAttempt('star-rail', 'exploration', 'idle', activeAt)
+    expect(database.recoverInterruptedPublicCatalogMaintenance(
+      'star-rail',
+      'exploration'
+    )).toBe(false)
+    expect(database.getSyncTargetStates('star-rail')).toContainEqual(expect.objectContaining({
+      target: 'exploration',
+      lastSuccessAt: activeAt.toISOString(),
+      lastAttemptAt: activeAt.toISOString(),
+      status: 'idle'
+    }))
+  })
+
   it('清空回收站仅永久删除当前游戏的已归档事项', () => {
     database = new AppDatabase(':memory:')
     const genshin = database.createChecklistItem({

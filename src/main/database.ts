@@ -130,6 +130,10 @@ interface SyncMergeOptions {
   outputLocale?: string
 }
 
+interface PublicCatalogReplacementOptions extends SyncMergeOptions {
+  preserveActiveSourceState?: boolean
+}
+
 function stableJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`
   if (value && typeof value === 'object') {
@@ -739,6 +743,27 @@ export class AppDatabase {
     for (const resolvedTarget of targets) {
       statement.run(gameId, resolvedTarget, timestamp, timestamp)
     }
+  }
+
+  recoverInterruptedPublicCatalogMaintenance(
+    gameId: GameId,
+    target: PersonalSyncTarget
+  ): boolean {
+    const hasActiveJob = this.listActiveAiScheduleJobs(gameId).some(
+      (job) => job.target === target || job.target === 'all'
+    )
+    if (hasActiveJob) return false
+    const result = this.database.prepare(`
+      UPDATE sync_target_states
+      SET status = 'success'
+      WHERE game_id = ? AND target = ?
+        AND status = 'idle'
+        AND catalog_coverage = 'complete'
+        AND catalog_source = 'public_schedule'
+        AND last_success_at IS NOT NULL
+        AND last_attempt_at = last_success_at
+    `).run(gameId, target)
+    return result.changes > 0
   }
 
   private reconcileSyncTargetStates(): void {
@@ -3775,7 +3800,7 @@ export class AppDatabase {
     target: SyncTarget,
     items: NormalizedSyncItem[],
     syncedAt = new Date().toISOString(),
-    options: SyncMergeOptions = {}
+    options: PublicCatalogReplacementOptions = {}
   ): SyncMergeResult {
     return this.runTransaction(() => {
       const targets: PersonalSyncTarget[] = target === 'all'
@@ -3784,6 +3809,17 @@ export class AppDatabase {
           ? [target]
           : []
       for (const selected of targets) {
+        if (options.preserveActiveSourceState) {
+          const current = this.database.prepare(`
+            SELECT catalog_source AS catalogSource
+            FROM sync_target_states
+            WHERE game_id = ? AND target = ?
+          `).get(gameId, selected) as { catalogSource: string | null } | undefined
+          if (current?.catalogSource !== 'public_schedule') {
+            throw new Error('只能在公开资料已激活时保留目录同步状态')
+          }
+          continue
+        }
         this.activateChecklistSourceInTransaction(gameId, selected, 'public_schedule')
       }
       const merge = this.mergeSyncedItems(
