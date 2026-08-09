@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  extractWutheringWavesExplorationReviewCandidates,
+  extractWutheringWavesExplorationProgressCandidates,
   parseWutheringWavesExploration,
   parseWutheringWavesMatrix,
   parseWutheringWavesPersonalData,
@@ -44,7 +44,7 @@ describe('鸣潮个人进度解析', () => {
   })
 
   it('地图语义候选同时发送一级主地区和二级地区', () => {
-    const candidates = extractWutheringWavesExplorationReviewCandidates({
+    const candidates = extractWutheringWavesExplorationProgressCandidates({
       exploreList: [{
         country: { countryId: 1, countryName: '瑝珑' },
         countryProgress: 78.4,

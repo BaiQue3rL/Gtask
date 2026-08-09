@@ -55,7 +55,7 @@ describe('cycle catalog', () => {
     expect(missing.every((item) => item.sourceIdentity?.provider === 'gtask-cycle-catalog')).toBe(true)
   })
 
-  it('未绑定当前周期窗口的个人挑战记录不会让新占位直接完成', () => {
+  it('官方返回手动挑战记录时即使周期窗口不完整也判定已完成', () => {
     const reference = new Date('2026-08-02T01:00:00.000Z')
     const incoming = {
       remoteKey: 'endgame:endstate-matrix',
@@ -72,7 +72,7 @@ describe('cycle catalog', () => {
       'wuthering-waves', [incoming], [], 'personal_sync', reference
     )
     expect(first.find((item) => item.modeKey === 'endstate-matrix')).toMatchObject({
-      completed: false,
+      completed: true,
       endsAt: incoming.endsAt
     })
 

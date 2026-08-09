@@ -331,33 +331,11 @@ export function completeCycleCatalog(
       candidate.category === 'endgame' && candidate.source === source &&
       (candidate.modeKey === definition.modeKey || candidate.remoteKey === definition.remoteKey)
     )
-    const normalizedItem = normalizedKnownItem(
+    return normalizedKnownItem(
       definition,
       item,
       predictCycleWindow(definition, reference, existing)
     )
-    // A challenge record cannot be attributed to the current period until the
-    // period window is known. Some official endpoints retain the previous
-    // period's record while already exposing the next mode entry. Start a new
-    // unbound personal period as incomplete; after metadata binds the window,
-    // a later official snapshot may mechanically apply the current record.
-    if (
-      source === 'personal_sync' &&
-      item.completed === true &&
-      (!item.startsAt || !item.endsAt) &&
-      !(
-        existing?.startsAt && existing.endsAt &&
-        Date.parse(existing.startsAt) <= reference.getTime() &&
-        Date.parse(existing.endsAt) > reference.getTime() &&
-        (
-          existing.periodKey === item.periodKey ||
-          (item.endsAt && existing.endsAt === item.endsAt)
-        )
-      )
-    ) {
-      normalizedItem.completed = false
-    }
-    return normalizedItem
   }).filter((item) => item.category !== 'endgame' || !isFutureCycleItem(item, reference))
   const presentModes = new Set(normalized
     .filter((item) => item.category === 'endgame' && isCurrentCycleItem(item, reference))

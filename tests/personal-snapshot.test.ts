@@ -66,7 +66,13 @@ describe('personal snapshot normalization', () => {
         parentRemoteKey: 'personal-map:miyoushe:root', progressPercent: 100
       })
     ])
-    expect(() => personalMapsFromCandidates('miyoushe', [candidates[1]]))
-      .toThrow('缺少同批次一级父地区')
+    expect(personalMapsFromCandidates('miyoushe', [candidates[1]])).toEqual([
+      expect.objectContaining({
+        title: '二级地区',
+        mapNodeKind: 'subregion',
+        parentRemoteKey: null,
+        progressPercent: 100
+      })
+    ])
   })
 })

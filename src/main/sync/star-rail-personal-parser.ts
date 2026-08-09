@@ -1,7 +1,6 @@
 import {
-  officialPersonalFactAuthority,
   type NormalizedSyncItem,
-  type SemanticReviewDraft
+  type PersonalProgressCandidate
 } from './types'
 import { hasChallengeRecordEvidence } from './challenge-record-evidence'
 import { finiteNumber } from './numbers'
@@ -51,7 +50,7 @@ export function parseStarRailPersonalData(
   return items
 }
 
-export function extractStarRailEventReviewCandidates(value: unknown): SemanticReviewDraft[] {
+export function extractStarRailEventProgressCandidates(value: unknown): PersonalProgressCandidate[] {
   const root = requiredRecord(value, '活动日历')
   const events = Array.isArray(root.act_list) ? root.act_list.filter(isRecord) : []
   return events.map((event) => {
@@ -63,11 +62,6 @@ export function extractStarRailEventReviewCandidates(value: unknown): SemanticRe
       target: 'events',
       kind: 'personal-item-semantics',
       payload: {
-        factAuthority: officialPersonalFactAuthority(
-          'identity',
-          'localized_title',
-          'time_window'
-        ),
         sourceContext: 'miyoushe-star-rail-event-calendar',
         officialEventId: id,
         title: title.replaceAll('\\n', ' '),

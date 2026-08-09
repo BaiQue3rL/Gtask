@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+﻿import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -52,7 +52,7 @@ afterEach(() => {
 
 describe('AppDatabase', () => {
   it('周期挑战到期后生成当前预测期，并允许官方延期校时恢复手工状态', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.replacePublicCatalog('genshin', 'cycles', [{
       remoteKey: 'endgame:spiral-abyss',
       category: 'endgame',
@@ -97,27 +97,8 @@ describe('AppDatabase', () => {
     })
   })
 
-  it('持久化仅供 Gtask 后台使用的 Codex 推理设置', () => {
-    database = new AppDatabase(':memory:')
-    expect(database.getCodexWorkerPreferences()).toEqual({
-      strategy: 'fixed',
-      model: 'gpt-5.6-sol',
-      reasoningEffort: 'medium'
-    })
-
-    expect(database.updateCodexWorkerPreferences({
-      strategy: 'fixed',
-      model: 'gpt-5.6-terra',
-      reasoningEffort: 'xhigh'
-    })).toEqual({
-      strategy: 'fixed',
-      model: 'gpt-5.6-terra',
-      reasoningEffort: 'xhigh'
-    })
-  })
-
   it('新用户初始化游戏但不创建任务版块事项', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
 
     expect(database.listGames().map((game) => game.id)).toEqual([
       'genshin',
@@ -132,7 +113,7 @@ describe('AppDatabase', () => {
   })
 
   it('只向侧栏提供当前进行中版本的结束时间', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     applyVersionWindow(
       database,
       'genshin',
@@ -160,7 +141,7 @@ describe('AppDatabase', () => {
   })
 
   it('新增、编辑、手动完成和软删除事项', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const created = database.createChecklistItem({
       gameId: 'genshin',
       category: 'exploration',
@@ -197,7 +178,7 @@ describe('AppDatabase', () => {
   })
 
   it('活动玩法标签可编辑，切出活动分类后自动清空', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const created = database.createChecklistItem({
       gameId: 'genshin',
       category: 'limited_event',
@@ -220,7 +201,7 @@ describe('AppDatabase', () => {
   })
 
   it('公开资料刷新不会融合或改写旧个人活动', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.mergeSyncedItems('star-rail', 'personal_sync', [{
       remoteKey: 'personal:event:legacy',
       category: 'limited_event',
@@ -247,7 +228,7 @@ describe('AppDatabase', () => {
   })
 
   it('四款游戏的活动同步都会把有效未知活动列为强制标签补全目标', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const reference = new Date('2026-07-26T00:00:00.000Z')
     database.registerAiScheduleAgent('tag-target-agent', '标签补全 Agent', reference)
 
@@ -302,7 +283,7 @@ describe('AppDatabase', () => {
   })
 
   it('活动标签无法确认时允许留空，不阻塞其他可靠清单结果', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const reference = new Date('2026-07-26T00:00:00.000Z')
     database.mergeSyncedItems('star-rail', 'public_schedule', [{
       remoteKey: 'personal:event:must-enrich',
@@ -354,7 +335,7 @@ describe('AppDatabase', () => {
   })
 
   it('公开活动重复同步全部命中稳定身份时仍视为目录成功', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const reference = new Date('2026-08-08T13:00:00.000Z')
     const events = [
       {
@@ -399,7 +380,7 @@ describe('AppDatabase', () => {
   })
 
   it('标签专用回写只修改玩法标签并保留个人活动的时间、来源和完成状态', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const reference = new Date('2026-07-26T00:00:00.000Z')
     database.mergeSyncedItems('star-rail', 'public_schedule', [{
       remoteKey: 'personal:event:tag-only',
@@ -451,7 +432,7 @@ describe('AppDatabase', () => {
   })
 
   it('无法确认的活动不能用未知标签结束任务，必须继续检索', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const reference = new Date('2026-07-26T00:00:00.000Z')
     database.mergeSyncedItems('zenless', 'public_schedule', [{
       remoteKey: 'personal:event:unresolved',
@@ -492,7 +473,7 @@ describe('AppDatabase', () => {
   it('启动时把旧限时活动的空标签、待识别和英文分类键统一为中文', () => {
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-activity-tags-test-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
-    database = new AppDatabase(databasePath)
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     const empty = database.createChecklistItem({
       gameId: 'genshin',
       category: 'limited_event',
@@ -528,7 +509,7 @@ describe('AppDatabase', () => {
       .run('["限时活动","个人数据","战斗"]', structural.id)
     raw.close()
 
-    database = new AppDatabase(databasePath)
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     expect(database.listChecklistItems('genshin').find((item) => item.id === empty.id))
       .toMatchObject({ activityTags: ['未知'] })
     expect(database.listChecklistItems('genshin').find((item) => item.id === legacy.id))
@@ -542,7 +523,7 @@ describe('AppDatabase', () => {
   it('关闭并重新打开数据库后保留数据且迁移可重复执行', () => {
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-task-manager-test-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
-    database = new AppDatabase(databasePath)
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     const created = database.createChecklistItem({
       gameId: 'star-rail',
       category: 'custom',
@@ -550,14 +531,14 @@ describe('AppDatabase', () => {
     })
     database.close()
 
-    database = new AppDatabase(databasePath)
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     const items = database.listChecklistItems('star-rail')
     expect(items.find((item) => item.id === created.id)?.title).toBe('持久化测试')
     expect(items).toHaveLength(1)
   })
 
   it('批量删除只归档自定义清单内的已完成手动事项', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const completedEvent = database.createChecklistItem({
       gameId: 'genshin',
       category: 'limited_event',
@@ -586,7 +567,7 @@ describe('AppDatabase', () => {
   })
 
   it('目录覆盖度只会由局部升级为完整，不会被后续个人增量降级', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.recordCatalogCoverage('genshin', 'events', 'personal_data', 'partial')
     expect(database.getSyncTargetStates('genshin')).toContainEqual(expect.objectContaining({
       target: 'events',
@@ -603,7 +584,7 @@ describe('AppDatabase', () => {
   })
 
   it('同一版块中临期事项优先、完成事项沉底', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const normal = database.createChecklistItem({
       gameId: 'genshin',
       category: 'limited_event',
@@ -639,7 +620,7 @@ describe('AppDatabase', () => {
   })
 
   it('挑战事项到期后不再自动重置完成状态', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const abyss = database.createChecklistItem({
       gameId: 'genshin',
       category: 'endgame',
@@ -661,20 +642,18 @@ describe('AppDatabase', () => {
     })
   })
 
-  it('同步设置固定为手动模式', () => {
-    database = new AppDatabase(':memory:')
+  it('同步设置默认启用启动后自动同步', () => {
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     expect(database.getSyncSettings('genshin')).toMatchObject({
-      runMode: 'manual',
-      autoScope: 'public_schedule'
+      autoSyncEnabled: true
     })
     expect(database.getSyncSettings('star-rail')).toMatchObject({
-      runMode: 'manual',
-      autoScope: 'public_schedule'
+      autoSyncEnabled: true
     })
   })
 
   it('分别记录全局和版块同步时间', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     expect(database.getSyncTargetStates('genshin')).toEqual([
       { gameId: 'genshin', target: 'all', lastSuccessAt: null, lastAttemptAt: null, status: 'idle', catalogCoverage: 'empty', catalogSource: null },
       { gameId: 'genshin', target: 'tasks', lastSuccessAt: null, lastAttemptAt: null, status: 'idle', catalogCoverage: 'empty', catalogSource: null },
@@ -717,7 +696,7 @@ describe('AppDatabase', () => {
   })
 
   it('启动维护已激活的公开地图目录时保留上次同步终态', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const initialCatalog = [{
       remoteKey: 'star-rail:map:test-region',
       category: 'exploration' as const,
@@ -799,7 +778,7 @@ describe('AppDatabase', () => {
   })
 
   it('清空回收站仅永久删除当前游戏的已归档事项', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const genshin = database.createChecklistItem({
       gameId: 'genshin',
       category: 'custom',
@@ -818,7 +797,7 @@ describe('AppDatabase', () => {
   })
 
   it('changes the checklist revision only for checklist item writes', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const initialRevision = database.getChecklistRevision()
     database.registerAiScheduleAgent(
       'revision-agent',
@@ -843,7 +822,7 @@ describe('AppDatabase', () => {
   })
 
   it('版更校时独立更新游戏版本窗口且不创建清单事项', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     applyVersionWindow(
       database,
       'genshin',
@@ -875,7 +854,7 @@ describe('AppDatabase', () => {
   it('启动时迁移封闭测试期任务时间并移除旧任务事项', () => {
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-version-window-migration-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
-    database = new AppDatabase(databasePath)
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     database.close()
     database = null
 
@@ -900,7 +879,7 @@ describe('AppDatabase', () => {
     )
     raw.close()
 
-    database = new AppDatabase(databasePath)
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     expect(database.listChecklistItems('genshin')).toEqual([])
     expect(database.getRelevantGameVersionWindow(
       'genshin', new Date('2026-08-05T00:00:00.000Z')
@@ -914,7 +893,7 @@ describe('AppDatabase', () => {
   it('v1 升级到 v2 时删除系统周常并保留用户事项', () => {
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-weekly-removal-migration-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
-    database = new AppDatabase(databasePath)
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     database.close()
     database = null
 
@@ -933,7 +912,7 @@ describe('AppDatabase', () => {
     insert.run('legacy-public-weekly', '旧同步周常', 0, 'public_schedule', 'weekly:legacy')
     raw.close()
 
-    database = new AppDatabase(databasePath)
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     expect(database.listChecklistItems('genshin')).toEqual([
       expect.objectContaining({
         id: 'legacy-user-weekly',
@@ -955,7 +934,7 @@ describe('AppDatabase', () => {
   })
 
   it('同步合并保留手动事项、手动完成锁和已归档远端事项', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const manual = database.createChecklistItem({
       gameId: 'genshin',
       category: 'custom',
@@ -1015,7 +994,7 @@ describe('AppDatabase', () => {
   })
 
   it('同步批次异常时事务回滚且不删除上次成功数据', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.mergeSyncedItems('zenless', 'public_schedule', [
       { remoteKey: 'event:stable', category: 'limited_event', title: '已保存活动' }
     ])
@@ -1035,7 +1014,7 @@ describe('AppDatabase', () => {
   })
 
   it.skip('旧融合流程：公开排期和个人数据使用同一规范标识时合并', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.mergeSyncedItems('genshin', 'public_schedule', [
       {
         remoteKey: 'endgame:abyss:2026-07-b',
@@ -1075,7 +1054,7 @@ describe('AppDatabase', () => {
   })
 
   it('四款游戏同一期挑战即使远端键和周期键格式变化也只保留一项', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const gameIds = ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const
 
     for (const gameId of gameIds) {
@@ -1118,7 +1097,7 @@ describe('AppDatabase', () => {
   })
 
   it('四款游戏的活动和地图不会因远端键变化产生重复项', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const gameIds = ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const
 
     for (const gameId of gameIds) {
@@ -1165,7 +1144,7 @@ describe('AppDatabase', () => {
   it('启动时不归并仍有效的历史挑战，并硬删除已经到期的系统挑战', () => {
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-endgame-duplicate-cleanup-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
-    database = new AppDatabase(databasePath)
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     database.close()
     database = null
 
@@ -1246,7 +1225,7 @@ describe('AppDatabase', () => {
     )
     raw.close()
 
-    database = new AppDatabase(databasePath)
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     for (const gameId of gameIds) {
       expect(database.listChecklistItems(gameId)
         .filter((item) => item.modeKey === `${gameId}:historical-mode`)).toHaveLength(2)
@@ -1258,7 +1237,7 @@ describe('AppDatabase', () => {
   })
 
   it.skip('旧融合流程：个人活动按中文名和时间回填公开排期', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.mergeSyncedItems('star-rail', 'public_schedule', [{
       remoteKey: 'event:public:paper-bird',
       category: 'limited_event',
@@ -1291,7 +1270,7 @@ describe('AppDatabase', () => {
   })
 
   it.skip('旧融合流程：个人活动标题子串匹配公开活动', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const startsAt = '2026-07-18T02:00:00.000Z'
     const endsAt = '2026-08-02T19:59:59.000Z'
     database.mergeSyncedItems('genshin', 'public_schedule', [{
@@ -1338,7 +1317,7 @@ describe('AppDatabase', () => {
   })
 
   it('四款游戏的无时间个人条目都不能凭空创建为活动', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const gameIds = ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const
 
     for (const gameId of gameIds) {
@@ -1356,7 +1335,7 @@ describe('AppDatabase', () => {
   })
 
   it('底层合并器不按历史挑战名称替 Codex 决定分类', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const cases = [
       ['genshin', '幽境危战·本期'],
       ['star-rail', '虚构叙事·本期'],
@@ -1381,7 +1360,7 @@ describe('AppDatabase', () => {
   })
 
   it('四款游戏的未来活动都不能被个人数据提前标记完成', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const gameIds = ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const
 
     for (const gameId of gameIds) {
@@ -1406,7 +1385,7 @@ describe('AppDatabase', () => {
   it.skip('旧融合流程：启动时保留 Codex 写入的个人活动状态', () => {
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-task-manager-star-rail-completion-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
-    database = new AppDatabase(databasePath)
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     database.mergeSyncedItems('star-rail', 'public_schedule', [{
       remoteKey: 'event:public:auto-wrong',
       category: 'limited_event',
@@ -1433,7 +1412,7 @@ describe('AppDatabase', () => {
     database.updateChecklistItem({ id: manual.id, completed: true })
     database.close()
 
-    database = new AppDatabase(databasePath)
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     expect(database.listChecklistItems('star-rail')
       .find((item) => item.id === automatic.id)).toMatchObject({
         completed: true,
@@ -1448,7 +1427,7 @@ describe('AppDatabase', () => {
   })
 
   it.skip('旧融合流程：无时间个人条目补充公开活动', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.mergeSyncedItems('wuthering-waves', 'public_schedule', [{
       remoteKey: 'event:public:double-drop',
       category: 'limited_event',
@@ -1481,7 +1460,7 @@ describe('AppDatabase', () => {
   it('启动时不再擅自归档 Codex 尚未处理的无时间个人活动', () => {
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-task-manager-untimed-cleanup-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
-    database = new AppDatabase(databasePath)
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     database.close()
     database = null
 
@@ -1503,7 +1482,7 @@ describe('AppDatabase', () => {
     }
     raw.close()
 
-    database = new AppDatabase(databasePath)
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     for (const gameId of ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const) {
       expect(database.listChecklistItems(gameId)
         .some((item) => item.id === `untimed-${gameId}`)).toBe(true)
@@ -1515,7 +1494,7 @@ describe('AppDatabase', () => {
   it('启动时不再按标题关键词擅自归档疑似错位活动', () => {
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-task-manager-section-cleanup-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
-    database = new AppDatabase(databasePath)
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     database.close()
     database = null
 
@@ -1533,7 +1512,7 @@ describe('AppDatabase', () => {
     )
     raw.close()
 
-    database = new AppDatabase(databasePath)
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     expect(database.listChecklistItems('genshin')
       .some((item) => item.id === 'misclassified-stygian')).toBe(true)
     expect(database.listArchivedChecklistItems('genshin')
@@ -1541,7 +1520,7 @@ describe('AppDatabase', () => {
   })
 
   it.skip('旧融合流程：个人地图进度回填公开地图', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.mergeSyncedItems('genshin', 'public_schedule', [{
       remoteKey: 'exploration:public:fontaine',
       category: 'exploration',
@@ -1573,7 +1552,7 @@ describe('AppDatabase', () => {
   })
 
   it('地图层级只做引用与循环校验，不硬编码游戏目录', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.mergeSyncedItems('star-rail', 'public_schedule', [
       {
         remoteKey: 'map:world:a',
@@ -1617,7 +1596,7 @@ describe('AppDatabase', () => {
   })
 
   it('一级地图完成状态原子级联到全部二级地区', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.mergeSyncedItems('genshin', 'public_schedule', [
       {
         remoteKey: 'map:liyue',
@@ -1656,7 +1635,7 @@ describe('AppDatabase', () => {
   })
 
   it('公开地图一级进度随二级地区修改、同步增删实时派生', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const baseMaps = [
       {
         remoteKey: 'map:fontaine',
@@ -1741,7 +1720,7 @@ describe('AppDatabase', () => {
   it('启动时修复旧版公开子地图已完成但进度为零的状态', () => {
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-public-map-progress-repair-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
-    database = new AppDatabase(databasePath)
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     database.mergeSyncedItems('star-rail', 'public_schedule', [{
       remoteKey: 'map:jarilo',
       category: 'exploration',
@@ -1771,7 +1750,7 @@ describe('AppDatabase', () => {
 
     database.close()
     database = null
-    database = new AppDatabase(databasePath)
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
 
     expect(database.listChecklistItems('star-rail').find(
       (item) => item.remoteKey === 'map:jarilo'
@@ -1781,98 +1760,8 @@ describe('AppDatabase', () => {
     ).every((item) => item.completed && item.progressPercent === 100)).toBe(true)
   })
 
-  it('个人地图保留官方一级探索度，不使用二级地区平均值覆盖', () => {
-    database = new AppDatabase(':memory:')
-    const identity = (externalId: string) => ({
-      provider: 'miyoushe',
-      endpoint: 'world-exploration',
-      externalId
-    })
-    database.replacePersonalSnapshot('genshin', 'exploration', `miyoushe:${'a'.repeat(64)}`, [
-      {
-        remoteKey: 'personal-map:fontaine',
-        category: 'exploration',
-        title: '枫丹',
-        progressPercent: 42,
-        mapNodeKind: 'region',
-        parentRemoteKey: null,
-        sourceIdentity: identity('fontaine')
-      },
-      {
-        remoteKey: 'personal-map:fontaine:a',
-        category: 'exploration',
-        title: '枫丹廷区',
-        progressPercent: 100,
-        mapNodeKind: 'subregion',
-        parentRemoteKey: 'personal-map:fontaine',
-        sourceIdentity: identity('fontaine-a')
-      },
-      {
-        remoteKey: 'personal-map:fontaine:b',
-        category: 'exploration',
-        title: '白露区',
-        progressPercent: 0,
-        mapNodeKind: 'subregion',
-        parentRemoteKey: 'personal-map:fontaine',
-        sourceIdentity: identity('fontaine-b')
-      }
-    ], 'test-v1')
-    expect(database.listChecklistItems('genshin').find(
-      (item) => item.remoteKey === 'personal-map:fontaine'
-    )).toMatchObject({ progressPercent: 42, completed: false, source: 'personal_sync' })
-  })
-
-  it.skip('旧融合流程：公开排期覆盖个人元数据', () => {
-    database = new AppDatabase(':memory:')
-    const remoteKey = 'endgame:shiyu-defense'
-    database.mergeSyncedItems('zenless', 'personal_sync', [
-      {
-        remoteKey,
-        category: 'endgame',
-        title: '个人接口内部名称',
-        completed: true,
-        progressPercent: 80,
-        startsAt: '2026-07-01T00:00:00.000Z'
-      }
-    ])
-    database.mergeSyncedItems('zenless', 'public_schedule', [
-      {
-        remoteKey,
-        category: 'endgame',
-        title: '式舆防卫战',
-        sourceUrl: 'https://example.com/zenless/shiyu',
-        startsAt: '2026-07-16T20:00:00.000Z',
-        endsAt: '2026-08-01T19:59:59.999Z'
-      }
-    ])
-    database.mergeSyncedItems('zenless', 'personal_sync', [
-      {
-        remoteKey,
-        category: 'endgame',
-        title: '又一次个人接口名称',
-        completed: false,
-        progressPercent: 90,
-        startsAt: '2026-07-02T00:00:00.000Z'
-      }
-    ])
-
-    const matches = database
-      .listChecklistItems('zenless')
-      .filter((item) => item.remoteKey === remoteKey)
-    expect(matches).toHaveLength(1)
-    expect(matches[0]).toMatchObject({
-      source: 'public_schedule',
-      title: '式舆防卫战',
-      completed: false,
-      progressPercent: null,
-      startsAt: '2026-07-16T20:00:00.000Z',
-      endsAt: '2026-08-01T19:59:59.999Z',
-      sourceUrl: 'https://example.com/zenless/shiyu'
-    })
-  })
-
   it('挑战玩法进入新周期时新增清单并保留上一期完成记录', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.mergeSyncedItems('zenless', 'public_schedule', [
       {
         remoteKey: 'endgame:shiyu-defense',
@@ -1914,7 +1803,7 @@ describe('AppDatabase', () => {
   })
 
   it.skip('旧融合流程：个人战绩匹配公开挑战周期', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.mergeSyncedItems('zenless', 'public_schedule', [
       {
         remoteKey: 'official:shiyu:2026-07-a',
@@ -1964,7 +1853,7 @@ describe('AppDatabase', () => {
   })
 
   it.skip('旧融合流程：个人挑战按标题归并公开模式', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.mergeSyncedItems('wuthering-waves', 'public_schedule', [{
       remoteKey: 'official:whimpering-wastes:2026-07',
       category: 'endgame',
@@ -2000,9 +1889,9 @@ describe('AppDatabase', () => {
   it('可检测其他本地进程写入数据库，供 AI 命令触发界面刷新', () => {
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-task-manager-version-test-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
-    database = new AppDatabase(databasePath)
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     const before = database.getDataVersion()
-    const externalConnection = new AppDatabase(databasePath)
+    const externalConnection = new AppDatabase(databasePath, { seedBundledBaselines: false })
     try {
       externalConnection.createChecklistItem({
         gameId: 'wuthering-waves',
@@ -2016,7 +1905,7 @@ describe('AppDatabase', () => {
   })
 
   it('已安装 Codex 插件时可在没有活动心跳的情况下先排队', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
 
     expect(() => database!.createAiScheduleJob('genshin', 'public_schedule')).toThrow('尚未连接')
     const queued = database.createAiScheduleJob(
@@ -2066,18 +1955,10 @@ describe('AppDatabase', () => {
       message: '正在核验第 2 个资料来源'
     })
 
-    const upgraded = database.createAiScheduleJob(
-      'genshin',
-      'public_and_personal',
-      new Date('2026-07-21T14:46:00.000Z'),
-      true
-    )
-    expect(upgraded).toMatchObject({ id: queued.id, scope: 'public_and_personal' })
-    expect(database.getSyncSettings('genshin').lastScope).toBe('public_and_personal')
   })
 
   it('按任务精确领取并只使用当前配置重试基础设施故障', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const first = database.createAiScheduleJob(
       'genshin',
       'public_schedule',
@@ -2153,7 +2034,7 @@ describe('AppDatabase', () => {
   })
 
   it('Codex 在接单前退出只重试一次基础设施故障且不会切换配置', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const job = database.createAiScheduleJob(
       'zenless',
       'public_schedule',
@@ -2191,7 +2072,7 @@ describe('AppDatabase', () => {
   })
 
   it('separately records the last completed Codex catalog audit', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const requestedAt = new Date('2026-07-31T00:00:00.000Z')
     const completedAt = new Date('2026-07-31T00:02:00.000Z')
     const job = database.createAiScheduleJob(
@@ -2224,7 +2105,7 @@ describe('AppDatabase', () => {
   })
 
   it('同一游戏的不同版块任务可同时排队且不会互相覆盖', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const reference = new Date('2026-07-26T14:00:00.000Z')
     const eventsJob = database.createAiScheduleJob(
       'genshin',
@@ -2263,7 +2144,7 @@ describe('AppDatabase', () => {
   })
 
   it('公开资料提交语言必须与统一接口请求上下文一致', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.registerAiScheduleAgent('locale-agent', '语言契约 Agent')
     const queued = database.createAiScheduleJob(
       'genshin',
@@ -2305,7 +2186,7 @@ describe('AppDatabase', () => {
   })
 
   it('Codex 长时间未接单时保持排队，等待可用 Worker 或用户取消', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const queuedAt = new Date('2026-07-24T10:00:00.000Z')
     const queued = database.createAiScheduleJob(
       'wuthering-waves',
@@ -2331,7 +2212,7 @@ describe('AppDatabase', () => {
   })
 
   it('Codex 接单后十五分钟无进度时重新排队且不会因等待继续失败', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const startedAt = new Date('2026-07-24T10:00:00.000Z')
     database.registerAiScheduleAgent('stale-agent', '掉线 Agent', startedAt)
     const queued = database.createAiScheduleJob(
@@ -2363,7 +2244,7 @@ describe('AppDatabase', () => {
   })
 
   it('Codex 自动启动和连接重试会刷新等待进度及超时计时', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const startedAt = new Date('2026-07-24T10:00:00.000Z')
     database.createAiScheduleJob(
       'star-rail',
@@ -2392,7 +2273,7 @@ describe('AppDatabase', () => {
   })
 
   it('应用关闭时只把后台 Codex 领取的任务立即放回队列', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const startedAt = new Date('2026-07-24T10:00:00.000Z')
     database.registerAiScheduleAgent('gacha-app-background-worker', '后台 Codex', startedAt)
     database.createAiScheduleJob('zenless', 'public_schedule', startedAt, false, 'events')
@@ -2413,7 +2294,7 @@ describe('AppDatabase', () => {
   })
 
   it('四个唯一 Agent 可以并行领取四个游戏的独立任务', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const startedAt = new Date('2026-07-24T10:00:00.000Z')
     const gameIds = ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const
     for (const [index, gameId] of gameIds.entries()) {
@@ -2437,7 +2318,7 @@ describe('AppDatabase', () => {
   })
 
   it('持续上报进度的 Codex 任务不会按最初接单时间误判超时', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const queuedAt = new Date('2026-07-23T10:00:00.000Z')
     database.registerAiScheduleAgent('long-running-agent', '长任务 Agent', queuedAt)
     const queued = database.createAiScheduleJob(
@@ -2480,48 +2361,8 @@ describe('AppDatabase', () => {
     })
   })
 
-  it('公开排期回写后保留同轮个人数据需要验证的状态', () => {
-    database = new AppDatabase(':memory:')
-    database.registerAiScheduleAgent('agent-personal-state', '测试 Agent')
-    const queued = database.createAiScheduleJob(
-      'zenless',
-      'public_and_personal',
-      new Date(),
-      false,
-      'events'
-    )
-    const claimed = database.claimAiScheduleJob('agent-personal-state')!
-    expect(claimed.id).toBe(queued.id)
-    database.recordSyncOutcome(
-      'zenless',
-      'verification_required',
-      '米游社需要完成滑块或设备验证',
-      false
-    )
-
-    database.applyAiScheduleJob(
-      queued.id,
-      'agent-personal-state',
-      [{
-        remoteKey: 'event:test-public',
-        category: 'limited_event',
-        title: '公开活动',
-        activityTags: ['战斗', '挑战', '剧情'],
-        startsAt: '2026-07-20T10:00:00+08:00',
-        endsAt: '2026-08-01T03:59:00+08:00'
-      }],
-      []
-    )
-
-    expect(database.getSyncSettings('zenless')).toMatchObject({
-      status: 'verification_required',
-      message: expect.stringContaining('米游社需要完成滑块或设备验证')
-    })
-    expect(database.getSyncSettings('zenless').lastSuccessAt).not.toBeNull()
-  })
-
   it('后续全局同步也会保存已核验版块并继续追查缺失版块', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const reference = new Date('2026-07-25T12:00:00.000Z')
     database.registerAiScheduleAgent('agent-partial-all', '部分同步 Agent', reference)
     const queued = database.createAiScheduleJob(
@@ -2585,7 +2426,7 @@ describe('AppDatabase', () => {
   })
 
   it('首次全局同步保存已核验版块但必须继续补齐全部版块后才能结束', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const reference = new Date('2026-07-25T12:00:00.000Z')
     database.registerAiScheduleAgent('agent-initial-all', '首次同步 Agent', reference)
     const queued = database.createAiScheduleJob(
@@ -2692,7 +2533,7 @@ describe('AppDatabase', () => {
   })
 
   it('版块同步任务拒绝跨版块回写', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.registerAiScheduleAgent('agent-section', '版块测试 Agent')
     const queued = database.createAiScheduleJob(
       'genshin',
@@ -2712,7 +2553,7 @@ describe('AppDatabase', () => {
   })
 
   it('AI 活动回写必须提供带时区的完整起止时间', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.registerAiScheduleAgent('agent-event-time', '活动时间测试 Agent')
     const queued = database.createAiScheduleJob(
       'star-rail',
@@ -2738,7 +2579,7 @@ describe('AppDatabase', () => {
   })
 
   it('活动版块允许 Codex 用证据明确确认当前没有限时活动', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const reference = new Date('2026-07-23T12:00:00.000Z')
     database.registerAiScheduleAgent('agent-empty-events', '空活动核验 Agent', reference)
     const queued = database.createAiScheduleJob(
@@ -2770,7 +2611,7 @@ describe('AppDatabase', () => {
   })
 
   it('公开资料严格执行 Codex 指定的匹配 ID，不再自行按标题或时间合并', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.mergeSyncedItems('star-rail', 'public_schedule', [{
       remoteKey: 'star-rail:event:existing',
       category: 'limited_event',
@@ -2825,7 +2666,7 @@ describe('AppDatabase', () => {
   })
 
   it('四款游戏均允许 Codex 硬删除错误同步项且回收站只保留手动项', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.registerAiScheduleAgent('agent-codex-cleanup', 'Codex 清单纠错 Agent')
 
     for (const gameId of ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const) {
@@ -2877,7 +2718,7 @@ describe('AppDatabase', () => {
   })
 
   it('归档地图父级时必须在同一提交中重新挂接仍启用的子地图', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.mergeSyncedItems('zenless', 'public_schedule', [
       {
         remoteKey: 'map:new-eridu',
@@ -2938,7 +2779,7 @@ describe('AppDatabase', () => {
   })
 
   it('原神周期同步接受 Codex 判定的清单', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.registerAiScheduleAgent('agent-genshin-cycles', '原神周期测试 Agent')
     const queued = database.createAiScheduleJob(
       'genshin',
@@ -2972,7 +2813,7 @@ describe('AppDatabase', () => {
   })
 
   it('四款游戏的周期同步都不使用硬编码玩法目录否决 Codex', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.registerAiScheduleAgent('agent-cycle-completeness', '周期完整性测试 Agent')
     const gameIds = ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const
 
@@ -3003,7 +2844,7 @@ describe('AppDatabase', () => {
   })
 
   it.skip('旧融合流程：个人地图只补充公开目录探索度', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.mergeSyncedItems('genshin', 'public_schedule', [{
       remoteKey: 'official-map:natlan',
       category: 'exploration',
@@ -3027,7 +2868,7 @@ describe('AppDatabase', () => {
   })
 
   it.skip('旧融合流程：个人战绩按模式键补全公开排期', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.mergeSyncedItems('genshin', 'public_schedule', [{
       remoteKey: 'official:hard-challenge:202607',
       category: 'endgame',
@@ -3060,7 +2901,7 @@ describe('AppDatabase', () => {
   })
 
   it('成功同步超过时限后只标记过期并保留最后成功时间', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.recordSyncOutcome('genshin', 'success', '同步成功')
     const success = database.getSyncSettings('genshin')
     const future = new Date(new Date(success.lastSuccessAt!).getTime() + 25 * 60 * 60 * 1000)
@@ -3072,802 +2913,10 @@ describe('AppDatabase', () => {
     })
   })
 
-  it('四款游戏会机械淘汰已到期的个人活动和周期并阻止同一身份复活', () => {
-    database = new AppDatabase(':memory:')
-    const reference = new Date('2026-08-01T12:00:00.000Z')
-    const accountScope = `official:${'a'.repeat(64)}`
-    for (const gameId of ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const) {
-      for (const target of ['events', 'cycles'] as const) {
-        const category = target === 'events' ? 'limited_event' as const : 'endgame' as const
-        const identity = {
-          provider: gameId === 'wuthering-waves' ? 'kuro-community' : 'miyoushe',
-          endpoint: `test-${target}`,
-          externalId: `${gameId}-${target}-expired`
-        }
-        const expired = {
-          remoteKey: `personal:${gameId}:${target}:expired`,
-          category,
-          title: `${gameId} 已到期${target}`,
-          startsAt: '2026-07-01T00:00:00.000Z',
-          endsAt: '2026-07-31T23:59:59.000Z',
-          sourceIdentity: identity
-        }
-        const first = database.replacePersonalSnapshot(
-          gameId,
-          target,
-          accountScope,
-          [expired],
-          'test-v1',
-          reference
-        )
-        expect(first.expiredRemoved).toBe(0)
-        expect(database.listChecklistItems(gameId).some((item) => item.title === expired.title))
-          .toBe(false)
-
-        database.replacePersonalSnapshot(
-          gameId,
-          target,
-          accountScope,
-          [{ ...expired, startsAt: null, endsAt: null }],
-          'test-v1',
-          reference
-        )
-        expect(database.listChecklistItems(gameId).some((item) => item.title === expired.title))
-          .toBe(false)
-
-        database.replacePersonalSnapshot(
-          gameId,
-          target,
-          accountScope,
-          [{
-            ...expired,
-            title: `${gameId} 官方延期${target}`,
-            endsAt: '2026-08-20T00:00:00.000Z'
-          }],
-          'test-v1',
-          reference
-        )
-        expect(database.listChecklistItems(gameId)).toEqual(expect.arrayContaining([
-          expect.objectContaining({ title: `${gameId} 官方延期${target}`, source: 'personal_sync' })
-        ]))
-      }
-    }
-  })
-
-  it('个人活动先建表再由 Codex 补全标签和时间，并在下次快照复用缓存', () => {
-    database = new AppDatabase(':memory:')
-    const reference = new Date('2026-08-01T12:00:00.000Z')
-    const accountScope = `miyoushe:${'b'.repeat(64)}`
-    const event = {
-      remoteKey: 'personal-event:miyoushe:event-api:metadata-1',
-      category: 'limited_event' as const,
-      title: '待补全活动',
-      sourceIdentity: {
-        provider: 'miyoushe',
-        endpoint: 'event-api',
-        externalId: 'metadata-1'
-      }
-    }
-    database.replacePersonalSnapshot('genshin', 'events', accountScope, [event], 'test-v1', reference)
-    database.registerAiScheduleAgent('metadata-agent', '元数据 Agent', reference)
-    const queued = database.createPersonalMetadataJob(
-      'genshin',
-      'events',
-      { outputLocale: 'zh-CN', userTimeZone: 'Asia/Shanghai' },
-      reference
-    )!
-    expect(queued).toMatchObject({ jobKind: 'personal_metadata', target: 'events' })
-    expect(queued.metadataTargets).toEqual([
-      expect.objectContaining({
-        title: '待补全活动',
-        missingFields: ['activityTags', 'startsAt', 'endsAt']
-      })
-    ])
-    const claimed = database.claimAiScheduleJob('metadata-agent', reference)!
-    const target = claimed.metadataTargets[0]
-    database.applyPersonalMetadataJob(
-      claimed.id,
-      'metadata-agent',
-      [{
-        itemId: target.itemId,
-        title: target.title,
-        activityTags: ['战斗', '解谜', '挑战'],
-        activityTagEvidence: [
-          { tagId: 'combat', sourceUrl: 'https://example.com/cn/event-metadata', note: '规则包含战斗关卡。' },
-          { tagId: 'puzzle', sourceUrl: 'https://example.com/cn/event-metadata', note: '规则包含机关解谜。' },
-          { tagId: 'challenge', sourceUrl: 'https://example.com/cn/event-metadata', note: '规则包含限时挑战目标。' }
-        ],
-        startsAt: '2026-08-01T10:00:00+08:00',
-        endsAt: '2026-08-20T03:59:00+08:00',
-        sourceUrl: 'https://example.com/cn/event-metadata',
-        confidence: 0.98
-      }],
-      { evidence: ['test'] },
-      'zh-CN',
-      reference
-    )
-    expect(database.listChecklistItems('genshin').find((item) => item.title === '待补全活动'))
-      .toMatchObject({
-        activityTags: ['战斗', '解谜', '挑战'],
-        startsAt: '2026-08-01T10:00:00+08:00',
-        endsAt: '2026-08-20T03:59:00+08:00',
-        completed: false,
-        source: 'personal_sync'
-      })
-
-    database.replacePersonalSnapshot(
-      'genshin',
-      'events',
-      accountScope,
-      [event],
-      'test-v1',
-      new Date('2026-08-02T12:00:00.000Z')
-    )
-    expect(database.listChecklistItems('genshin').find((item) => item.title === '待补全活动'))
-      .toMatchObject({
-        activityTags: ['战斗', '解谜', '挑战'],
-        startsAt: '2026-08-01T10:00:00+08:00',
-        endsAt: '2026-08-20T03:59:00+08:00'
-      })
-  })
-
-  it('个人活动的泛化占位标签不能绕过元数据补全', () => {
-    database = new AppDatabase(':memory:')
-    const reference = new Date('2026-08-01T12:00:00.000Z')
-    const accountScope = `miyoushe:${'f'.repeat(64)}`
-    database.replacePersonalSnapshot('star-rail', 'events', accountScope, [{
-      remoteKey: 'personal-event:miyoushe:event-api:generic-tag',
-      category: 'limited_event',
-      title: '泛化标签活动',
-      activityTags: ['活动玩法'],
-      startsAt: '2026-08-01T00:00:00.000Z',
-      endsAt: '2026-08-20T00:00:00.000Z',
-      sourceIdentity: {
-        provider: 'miyoushe',
-        endpoint: 'event-api',
-        externalId: 'generic-tag'
-      }
-    }], 'test-v1', reference)
-    database.registerAiScheduleAgent('generic-tag-agent', '泛化标签补全 Agent', reference)
-
-    const job = database.createPersonalMetadataJob(
-      'star-rail',
-      'events',
-      { outputLocale: 'zh-CN', userTimeZone: 'Asia/Shanghai' },
-      reference
-    )!
-
-    expect(job.metadataTargets).toEqual([
-      expect.objectContaining({
-        title: '泛化标签活动',
-        currentTags: [],
-        missingFields: ['activityTags']
-      })
-    ])
-  })
-
-  it('个人活动标签缺乏可靠依据时可保持空白且不阻塞元数据任务', () => {
-    database = new AppDatabase(':memory:')
-    const reference = new Date('2026-08-01T12:00:00.000Z')
-    database.replacePersonalSnapshot('genshin', 'events', `miyoushe:${'e'.repeat(64)}`, [{
-      remoteKey: 'personal-event:miyoushe:event-api:uncertain-tags',
-      category: 'limited_event',
-      title: '玩法尚未公开的活动',
-      startsAt: '2026-08-01T00:00:00.000Z',
-      endsAt: '2026-08-20T00:00:00.000Z',
-      sourceIdentity: {
-        provider: 'miyoushe',
-        endpoint: 'event-api',
-        externalId: 'uncertain-tags'
-      }
-    }], 'test-v1', reference)
-    database.registerAiScheduleAgent('uncertain-tag-agent', '标签核验 Agent', reference)
-    const queued = database.createPersonalMetadataJob(
-      'genshin',
-      'events',
-      { outputLocale: 'zh-CN', userTimeZone: 'Asia/Shanghai' },
-      reference
-    )!
-    const claimed = database.claimAiScheduleJob('uncertain-tag-agent', reference)!
-    const target = claimed.metadataTargets[0]!
-
-    const result = database.applyPersonalMetadataJob(
-      queued.id,
-      'uncertain-tag-agent',
-      [{
-        itemId: target.itemId,
-        title: target.title,
-        unresolvedFields: ['activityTags'],
-        unresolvedReason: '官方仅公布活动名称与时间，尚未公开实际玩法',
-        sourceUrl: 'https://example.com/cn/event-preview',
-        confidence: 0.8
-      }],
-      { evidence: ['官方预告'] },
-      'zh-CN',
-      reference
-    )
-
-    expect(result.job.status).toBe('completed')
-    expect(database.listChecklistItems('genshin').find(
-      (item) => item.title === '玩法尚未公开的活动'
-    )?.activityTags).toEqual([])
-  })
-
-  it('到期个人事项直接硬删除且不能进入手动回收站', () => {
-    database = new AppDatabase(':memory:')
-    const accountScope = `miyoushe:${'d'.repeat(64)}`
-    const identity = { provider: 'miyoushe', endpoint: 'event-api', externalId: 'archive-expired' }
-    database.replacePersonalSnapshot('genshin', 'events', accountScope, [{
-      remoteKey: 'personal-event:archive-expired',
-      category: 'limited_event',
-      title: '即将到期活动',
-      endsAt: '2026-08-10T00:00:00.000Z',
-      sourceIdentity: identity
-    }], 'test-v1', new Date('2026-08-01T00:00:00.000Z'))
-    const item = database.listChecklistItems('genshin').find(
-      (candidate) => candidate.title === '即将到期活动'
-    )!
-    expect(() => database!.archiveChecklistItem(item.id)).toThrow('系统清单由同步维护，不能删除')
-    expect(database.listArchivedChecklistItems('genshin')).toHaveLength(0)
-
-    const result = database.replacePersonalSnapshot('genshin', 'events', accountScope, [{
-      remoteKey: 'personal-event:archive-expired',
-      category: 'limited_event',
-      title: '即将到期活动',
-      endsAt: '2026-08-10T00:00:00.000Z',
-      sourceIdentity: identity
-    }], 'test-v1', new Date('2026-08-11T00:00:00.000Z'))
-    expect(result.expiredRemoved).toBe(1)
-    expect(database.listArchivedChecklistItems('genshin')).toEqual([])
-    expect(() => database!.restoreChecklistItem(item.id)).toThrow('不存在')
-  })
-
-  it('软件运行期间硬删除到期系统事项、保留手动事项并阻止旧个人快照再生', () => {
-    database = new AppDatabase(':memory:')
-    const accountScope = `miyoushe:${'9'.repeat(64)}`
-    const sourceIdentity = {
-      provider: 'miyoushe',
-      endpoint: 'event-api',
-      externalId: 'runtime-expiry-event'
-    }
-    database.replacePersonalSnapshot('genshin', 'events', accountScope, [{
-      remoteKey: 'personal-event:runtime-expiry',
-      category: 'limited_event',
-      title: '个人到期活动',
-      startsAt: '2030-08-01T00:00:00.000Z',
-      endsAt: '2030-08-10T00:00:00.000Z',
-      sourceIdentity
-    }], 'test-v1', new Date('2030-08-05T00:00:00.000Z'))
-    database.replacePublicCatalog('star-rail', 'events', [{
-      remoteKey: 'public-event:runtime-expiry',
-      category: 'limited_event',
-      title: '公开到期活动',
-      activityTags: ['签到'],
-      startsAt: '2030-08-01T00:00:00.000Z',
-      endsAt: '2030-08-10T00:00:00.000Z'
-    }], '2030-08-05T00:00:00.000Z')
-    const manual = database.createChecklistItem({
-      gameId: 'genshin',
-      category: 'limited_event',
-      title: '手动保留活动',
-      startsAt: '2030-08-01T00:00:00.000Z',
-      endsAt: '2030-08-10T00:00:00.000Z'
-    })
-
-    expect(database.pruneExpiredSystemItems(new Date('2030-08-10T00:00:01.000Z'))).toBe(2)
-    expect(database.listChecklistItems('genshin').map((item) => item.title)).not.toContain('个人到期活动')
-    expect(database.listChecklistItems('star-rail').map((item) => item.title)).not.toContain('公开到期活动')
-    expect(database.listChecklistItems('genshin').find((item) => item.id === manual.id)).toBeDefined()
-    expect(database.listArchivedChecklistItems('genshin')).toEqual([])
-
-    const stale = database.replacePersonalSnapshot('genshin', 'events', accountScope, [{
-      remoteKey: 'personal-event:runtime-expiry',
-      category: 'limited_event',
-      title: '个人到期活动',
-      startsAt: '2030-08-01T00:00:00.000Z',
-      endsAt: '2030-08-10T00:00:00.000Z',
-      sourceIdentity
-    }], 'test-v1', new Date('2030-08-10T00:00:02.000Z'))
-    expect(stale.added).toBe(0)
-    expect(database.listChecklistItems('genshin').map((item) => item.title)).not.toContain('个人到期活动')
-
-    database.replacePersonalSnapshot('genshin', 'events', accountScope, [{
-      remoteKey: 'personal-event:runtime-expiry',
-      category: 'limited_event',
-      title: '个人延期活动',
-      startsAt: '2030-08-01T00:00:00.000Z',
-      endsAt: '2030-09-10T00:00:00.000Z',
-      sourceIdentity
-    }], 'test-v1', new Date('2030-08-10T00:00:03.000Z'))
-    expect(database.listChecklistItems('genshin')).toEqual(expect.arrayContaining([
-      expect.objectContaining({ title: '个人延期活动', source: 'personal_sync' })
-    ]))
-  })
-
-  it('个人周期缺失时间也进入相同元数据补全任务', () => {
-    database = new AppDatabase(':memory:')
-    const reference = new Date('2026-08-01T12:00:00.000Z')
-    database.replacePersonalSnapshot(
-      'star-rail',
-      'cycles',
-      `miyoushe:${'c'.repeat(64)}`,
-      [{
-        remoteKey: 'personal-cycle:star-rail:memory:42',
-        category: 'endgame',
-        title: '混沌回忆·第42期',
-        completed: true,
-        periodKey: '42',
-        modeKey: 'memory-of-chaos',
-        sourceIdentity: {
-          provider: 'miyoushe',
-          endpoint: 'personal-challenge-record',
-          externalId: 'memory-of-chaos|period:42'
-        }
-      }],
-      'test-v1',
-      reference
-    )
-    database.registerAiScheduleAgent('cycle-metadata-agent', '周期元数据 Agent', reference)
-    const job = database.createPersonalMetadataJob(
-      'star-rail',
-      'cycles',
-      { outputLocale: 'zh-CN', userTimeZone: 'Asia/Shanghai' },
-      reference
-    )!
-    expect(job.metadataTargets).toEqual([
-      expect.objectContaining({
-        title: '混沌回忆·第42期',
-        missingFields: ['startsAt', 'endsAt'],
-        timeWindowPolicy: 'full_cycle'
-      })
-    ])
-    const claimed = database.claimAiScheduleJob('cycle-metadata-agent', reference)!
-    const target = claimed.metadataTargets[0]
-    expect(() => database!.applyPersonalMetadataJob(
-      claimed.id,
-      'cycle-metadata-agent',
-      [{
-        itemId: target.itemId,
-        title: target.title,
-        unresolvedFields: ['startsAt', 'endsAt'],
-        unresolvedReason: '尚未找到时间',
-        sourceUrl: 'https://example.com/cycle',
-        confidence: 0.5
-      }],
-      { evidence: ['test'] },
-      'zh-CN',
-      reference
-    )).toThrow('必须补齐当前期完整时间')
-  })
-
-  it('本地周期占位不是官方身份墓碑，下一期允许用相同等待身份重新建立', () => {
-    database = new AppDatabase(':memory:')
-    const accountScope = `official:${'f'.repeat(64)}`
-    const placeholder = {
-      remoteKey: 'endgame:endstate-matrix',
-      category: 'endgame' as const,
-      title: '终焉矩阵',
-      completed: false,
-      modeKey: 'endstate-matrix',
-      periodKey: 'predicted:wuthering-waves:endstate-matrix:awaiting-official-window',
-      startsAt: '2026-07-10T04:00:00+08:00',
-      endsAt: '2026-08-01T04:00:00+08:00',
-      sourceIdentity: {
-        provider: 'gtask-cycle-catalog',
-        endpoint: 'predicted-cycle-window',
-        externalId: 'endstate-matrix|awaiting-official-window'
-      }
-    }
-    const afterExpiry = new Date('2026-08-02T00:00:00.000Z')
-
-    database.replacePersonalSnapshot(
-      'wuthering-waves', 'cycles', accountScope, [placeholder], 'test-v1', afterExpiry
-    )
-    expect(database.listChecklistItems('wuthering-waves').some(
-      (item) => item.title === '终焉矩阵'
-    )).toBe(false)
-
-    database.replacePersonalSnapshot(
-      'wuthering-waves',
-      'cycles',
-      accountScope,
-      [{ ...placeholder, startsAt: null, endsAt: null }],
-      'test-v1',
-      afterExpiry
-    )
-    expect(database.listChecklistItems('wuthering-waves')).toEqual(expect.arrayContaining([
-      expect.objectContaining({ title: '终焉矩阵', source: 'personal_sync' })
-    ]))
-    database.registerAiScheduleAgent('catalog-metadata-agent', '周期校时 Agent', afterExpiry)
-    const job = database.createPersonalMetadataJob(
-      'wuthering-waves',
-      'cycles',
-      { outputLocale: 'zh-CN', userTimeZone: 'Asia/Shanghai' },
-      afterExpiry
-    )!
-    expect(job.metadataTargets).toEqual([expect.objectContaining({
-      title: '终焉矩阵',
-      missingFields: ['startsAt', 'endsAt'],
-      timeWindowPolicy: 'current_playable_phase',
-      sourceIdentity: expect.objectContaining({ provider: 'gtask-cycle-catalog' })
-    })])
-  })
-
-  it('固定周期模式不复用上一期时间缓存，已过期官方身份也能重建当前期', () => {
-    database = new AppDatabase(':memory:')
-    const accountScope = `kuro-community:${'9'.repeat(64)}`
-    const identity = {
-      provider: 'kuro-community',
-      endpoint: 'personal-challenge-record',
-      externalId: 'endgame:endstate-matrix|period:wuthering-waves:endstate-matrix:current'
-    }
-    const currentPeriod = {
-      remoteKey: 'endgame:endstate-matrix',
-      category: 'endgame' as const,
-      title: '终焉矩阵',
-      completed: true,
-      modeKey: 'endstate-matrix',
-      periodKey: 'wuthering-waves:endstate-matrix:current',
-      startsAt: '2026-07-17T04:00:00+08:00',
-      endsAt: '2026-08-01T04:00:00+08:00',
-      sourceIdentity: identity
-    }
-    database.replacePersonalSnapshot(
-      'wuthering-waves',
-      'cycles',
-      accountScope,
-      [currentPeriod],
-      'test-v1',
-      new Date('2026-07-20T00:00:00.000Z')
-    )
-
-    const afterExpiry = new Date('2026-08-02T01:00:00.000Z')
-    database.replacePersonalSnapshot(
-      'wuthering-waves',
-      'cycles',
-      accountScope,
-      [],
-      'test-v1',
-      afterExpiry
-    )
-    expect(database.listChecklistItems('wuthering-waves').some(
-      (item) => item.title === '终焉矩阵'
-    )).toBe(false)
-
-    database.replacePersonalSnapshot(
-      'wuthering-waves',
-      'cycles',
-      accountScope,
-      [{ ...currentPeriod, completed: true, startsAt: null, endsAt: null }],
-      'test-v1',
-      new Date('2026-08-02T01:01:00.000Z')
-    )
-    expect(database.listChecklistItems('wuthering-waves').find(
-      (item) => item.title === '终焉矩阵'
-    )).toMatchObject({
-      source: 'personal_sync',
-      completed: false,
-      startsAt: null,
-      endsAt: null
-    })
-
-    database.registerAiScheduleAgent(
-      'renewed-cycle-metadata-agent',
-      '新周期校时 Agent',
-      afterExpiry
-    )
-    const job = database.createPersonalMetadataJob(
-      'wuthering-waves',
-      'cycles',
-      { outputLocale: 'zh-CN', userTimeZone: 'Asia/Shanghai' },
-      afterExpiry
-    )!
-    expect(job.metadataTargets).toEqual([expect.objectContaining({
-      title: '终焉矩阵',
-      missingFields: ['startsAt', 'endsAt'],
-      timeWindowPolicy: 'current_playable_phase'
-    })])
-
-    const claimed = database.claimAiScheduleJob(
-      'renewed-cycle-metadata-agent',
-      new Date('2026-08-02T01:02:00.000Z')
-    )!
-    const target = claimed.metadataTargets[0]
-    database.recordSyncTargetAttempt(
-      'wuthering-waves',
-      'cycles',
-      'idle',
-      new Date('2026-08-02T01:02:30.000Z')
-    )
-    database.applyPersonalMetadataJob(
-      claimed.id,
-      'renewed-cycle-metadata-agent',
-      [{
-        itemId: target.itemId,
-        title: target.title,
-        startsAt: '2026-08-01T04:00:00+08:00',
-        endsAt: '2026-08-16T04:00:00+08:00',
-        sourceUrl: 'https://example.com/current-cycle',
-        confidence: 1
-      }],
-      { evidence: ['current-cycle'] },
-      'zh-CN',
-      new Date('2026-08-02T01:03:00.000Z')
-    )
-    expect(database.listChecklistItems('wuthering-waves').find(
-      (item) => item.title === '终焉矩阵'
-    )).toMatchObject({
-      completed: false,
-      startsAt: '2026-08-01T04:00:00+08:00',
-      endsAt: '2026-08-16T04:00:00+08:00'
-    })
-    expect(database.getSyncTargetStates('wuthering-waves').find(
-      (state) => state.target === 'cycles'
-    )).toMatchObject({
-      status: 'success',
-      lastSuccessAt: '2026-08-02T01:03:00.000Z'
-    })
-
-    database.replacePersonalSnapshot(
-      'wuthering-waves',
-      'cycles',
-      accountScope,
-      [{ ...currentPeriod, completed: true, startsAt: null, endsAt: null }],
-      'test-v1',
-      new Date('2026-08-02T01:04:00.000Z')
-    )
-    expect(database.listChecklistItems('wuthering-waves').find(
-      (item) => item.title === '终焉矩阵'
-    )).toMatchObject({ completed: true })
-  })
-
-  it('个人活动新官方 ID 只在首次进入 Codex 异常旁路并缓存可复用规则', () => {
-    database = new AppDatabase(':memory:')
-    const reference = new Date('2026-08-01T12:00:00.000Z')
-    const accountScope = `miyoushe:${'e'.repeat(64)}`
-    const item = {
-      remoteKey: 'personal-event:miyoushe:event-api:new-event',
-      category: 'limited_event' as const,
-      title: '全新限时活动',
-      startsAt: '2026-08-01T00:00:00.000Z',
-      endsAt: '2026-08-20T00:00:00.000Z',
-      sourceIdentity: {
-        provider: 'miyoushe',
-        endpoint: 'event-api',
-        externalId: 'new-event'
-      }
-    }
-    const draft = {
-      target: 'events' as const,
-      kind: 'personal-item-semantics',
-      payload: {
-        provider: 'miyoushe',
-        sourceContext: 'event-api',
-        officialEventId: 'new-event',
-        title: item.title,
-        observedStatus: { isFinished: false },
-        reviewIssues: ['classification', 'completion_semantics'],
-        proposedItem: item
-      }
-    }
-    const staged = database.preparePersonalReviewJob(
-      'genshin',
-      'events',
-      accountScope,
-      [item],
-      [draft],
-      'test-v1',
-      { outputLocale: 'zh-CN', userTimeZone: 'Asia/Shanghai' },
-      reference
-    )
-    expect(staged.job).toMatchObject({
-      jobKind: 'personal_review',
-      target: 'events',
-      reviewTargets: [expect.objectContaining({ issues: expect.arrayContaining(['classification']) })]
-    })
-    expect(staged.items).toEqual([
-      expect.objectContaining({ title: item.title })
-    ])
-    database.replacePersonalSnapshot(
-      'genshin',
-      'events',
-      accountScope,
-      staged.items,
-      'test-v1',
-      reference
-    )
-    expect(database.listChecklistItems('genshin').some((entry) => entry.title === item.title))
-      .toBe(true)
-
-    database.registerAiScheduleAgent('personal-review-agent', '个人异常 Agent', reference)
-    const claimed = database.claimAiScheduleJob('personal-review-agent', reference)!
-    const candidateId = claimed.reviewTargets[0]!.candidateId
-    database.applyPersonalReviewJob(
-      claimed.id,
-      'personal-review-agent',
-      [{
-        candidateId,
-        decision: 'include',
-        eventScope: 'limited',
-        reason: '已确认是独立限时活动，并建立官方状态字段规则',
-        completed: false,
-        completionRule: {
-          fieldPath: 'observedStatus.isFinished',
-          completedValues: [true],
-          incompleteValues: [false]
-        },
-        confidence: 0.95
-      }],
-      [{ url: 'https://example.com/event', note: '核验记录' }],
-      'zh-CN',
-      reference
-    )
-    expect(database.listChecklistItems('genshin')).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        title: item.title,
-        source: 'personal_sync',
-        completed: false,
-        activityTags: []
-      })
-    ]))
-
-    const cachedDraft = {
-      ...draft,
-      payload: {
-        ...draft.payload,
-        observedStatus: { isFinished: true },
-        proposedItem: item
-      }
-    }
-    const cached = database.preparePersonalReviewJob(
-      'genshin',
-      'events',
-      accountScope,
-      [item],
-      [cachedDraft],
-      'test-v1',
-      { outputLocale: 'zh-CN', userTimeZone: 'Asia/Shanghai' },
-      new Date('2026-08-02T12:00:00.000Z')
-    )
-    expect(cached.job).toBeNull()
-    expect(cached.items).toEqual([
-      expect.objectContaining({ title: item.title, completed: true, activityTags: [] })
-    ])
-  })
-
-  it('个人接口中的常驻内容由生命周期决定排除，不进入限时活动快照', () => {
-    database = new AppDatabase(':memory:')
-    const reference = new Date('2026-08-02T08:00:00.000Z')
-    const accountScope = `miyoushe:${'a'.repeat(64)}`
-    const proposed = {
-      remoteKey: 'personal-event:miyoushe:event-api:permanent-mode',
-      category: 'limited_event' as const,
-      title: '常驻经营玩法',
-      sourceIdentity: {
-        provider: 'miyoushe', endpoint: 'event-api', externalId: 'permanent-mode'
-      }
-    }
-    const staged = database.preparePersonalReviewJob(
-      'star-rail',
-      'events',
-      accountScope,
-      [proposed],
-      [{
-        target: 'events',
-        kind: 'personal-item-semantics',
-        payload: {
-          provider: 'miyoushe',
-          sourceContext: 'event-api',
-          officialEventId: 'permanent-mode',
-          title: proposed.title,
-          reviewIssues: ['classification'],
-          proposedItem: proposed
-        }
-      }],
-      'test-v1',
-      { outputLocale: 'zh-CN', userTimeZone: 'Asia/Shanghai' },
-      reference
-    )
-    database.replacePersonalSnapshot(
-      'star-rail',
-      'events',
-      accountScope,
-      staged.items,
-      'test-v1',
-      reference
-    )
-    expect(database.listChecklistItems('star-rail').some(
-      (item) => item.title === proposed.title
-    )).toBe(true)
-    database.registerAiScheduleAgent('permanent-event-agent', '常驻识别 Agent', reference)
-    const claimed = database.claimAiScheduleJob('permanent-event-agent', reference)!
-    database.applyPersonalReviewJob(
-      staged.job!.id,
-      'permanent-event-agent',
-      [{
-        candidateId: claimed.reviewTargets[0]!.candidateId,
-        decision: 'exclude',
-        eventScope: 'permanent',
-        reason: '官方资料确认该玩法长期开放且没有限时活动窗口',
-        confidence: 1
-      }],
-      [{ url: 'https://example.com/permanent', note: '官方常驻说明' }],
-      'zh-CN',
-      reference
-    )
-    expect(database.listChecklistItems('star-rail').some(
-      (item) => item.title === proposed.title
-    )).toBe(false)
-  })
-
-  it('个人地图层级异常暂存期间保留旧快照，取消后不能迟到写入', () => {
-    database = new AppDatabase(':memory:')
-    const accountScope = `miyoushe:${'f'.repeat(64)}`
-    const reference = new Date('2026-08-01T12:00:00.000Z')
-    database.replacePersonalSnapshot('genshin', 'exploration', accountScope, [{
-      remoteKey: 'personal-map:miyoushe:old-root',
-      category: 'exploration',
-      title: '旧一级地区',
-      progressPercent: 50,
-      mapNodeKind: 'region',
-      parentRemoteKey: null,
-      sourceIdentity: {
-        provider: 'miyoushe', endpoint: 'personal-map-progress', externalId: 'old-root'
-      }
-    }], 'test-v1', reference)
-    const proposed = {
-      remoteKey: 'personal-map:miyoushe:new-child',
-      category: 'exploration' as const,
-      title: '新二级地区',
-      progressPercent: 20,
-      sourceIdentity: {
-        provider: 'miyoushe', endpoint: 'personal-map-progress', externalId: 'new-child'
-      }
-    }
-    const staged = database.preparePersonalReviewJob(
-      'genshin',
-      'exploration',
-      accountScope,
-      [],
-      [{
-        target: 'exploration',
-        kind: 'personal-map-progress',
-        payload: {
-          provider: 'miyoushe', sourceContext: 'personal-map-progress',
-          officialId: 'new-child', officialTitle: '新二级地区', observedProgress: 20,
-          observedNodeKind: 'subregion', observedParentId: 'new-root',
-          reviewIssues: ['hierarchy'], proposedItem: proposed
-        }
-      }],
-      'test-v2',
-      { outputLocale: 'zh-CN', userTimeZone: 'Asia/Shanghai' },
-      reference
-    )
-    expect(staged.job?.jobKind).toBe('personal_review')
-    expect(database.listChecklistItems('genshin').some((item) => item.title === '旧一级地区'))
-      .toBe(true)
-    database.registerAiScheduleAgent('cancel-personal-review', '取消测试 Agent', reference)
-    const claimed = database.claimAiScheduleJob('cancel-personal-review', reference)!
-    database.cancelActiveAiScheduleJob('genshin', 'exploration', reference, 'personal_review')
-    expect(() => database!.applyPersonalReviewJob(
-      claimed.id,
-      'cancel-personal-review',
-      [{
-        candidateId: claimed.reviewTargets[0]!.candidateId,
-        decision: 'exclude',
-        reason: '无法确认父级',
-        confidence: 0.5
-      }],
-      [],
-      'zh-CN',
-      reference
-    )).toThrow('未由当前 Agent 领取')
-  })
-
   it('旧程序拒绝打开更高版本数据库，避免降级写入', () => {
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-newer-schema-test-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
-    database = new AppDatabase(databasePath)
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     database.close()
     database = null
 
@@ -3875,7 +2924,7 @@ describe('AppDatabase', () => {
     newerDatabase.prepare('INSERT INTO schema_migrations(version) VALUES (?)').run(CURRENT_SCHEMA_VERSION + 1)
     newerDatabase.close()
 
-    expect(() => new AppDatabase(databasePath)).toThrow(
+    expect(() => new AppDatabase(databasePath, { seedBundledBaselines: false })).toThrow(
       `期望 ${CURRENT_SCHEMA_VERSION}，实际 ${CURRENT_SCHEMA_VERSION + 1}`
     )
   })

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  extractZenlessExplorationReviewCandidates,
-  extractZenlessEventReviewCandidates,
+  extractZenlessExplorationProgressCandidates,
+  extractZenlessEventProgressCandidates,
   parseZenlessDeadlyAssault,
   parseZenlessPersonalData,
   parseZenlessShiyuDefense
@@ -10,7 +10,7 @@ import { ZenlessPersonalAdapter } from '../src/main/sync/zenless-personal-adapte
 
 describe('绝区零个人战绩解析', () => {
   it('把官方区域收集解析为一级、二级地图进度候选', () => {
-    expect(extractZenlessExplorationReviewCandidates({
+    expect(extractZenlessExplorationProgressCandidates({
       area_collections: [{
         urban_area_group_id: 21,
         name: '罗斯凯利法',
@@ -135,7 +135,7 @@ describe('绝区零个人战绩解析', () => {
   })
 
   it('活动状态只脱敏进入 Codex 核验，不由本地状态枚举直接判完成', () => {
-    const candidates = extractZenlessEventReviewCandidates({
+    const candidates = extractZenlessEventProgressCandidates({
       uid: '不应读取',
       activity_list: [{
         activity_id: 7001,

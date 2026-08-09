@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { GenshinPersonalAdapter } from '../src/main/sync/genshin-personal-adapter'
 import {
-  extractGenshinExplorationReviewCandidates,
-  extractGenshinEventReviewCandidates,
+  extractGenshinExplorationProgressCandidates,
+  extractGenshinEventProgressCandidates,
   parseGenshinPersonalData
 } from '../src/main/sync/genshin-personal-parser'
 
@@ -166,7 +166,7 @@ describe('Genshin personal parsing', () => {
   })
 
   it('地图语义候选保留一级地区和全部二级地区', () => {
-    const candidates = extractGenshinExplorationReviewCandidates({
+    const candidates = extractGenshinExplorationProgressCandidates({
       world_explorations: [{
         id: 10,
         parent_id: 0,
@@ -226,7 +226,7 @@ describe('Genshin personal parsing', () => {
   })
 
   it('活动只提取必要字段送入 Codex，不在本地猜分类、时间或完成状态', () => {
-    const candidates = extractGenshinEventReviewCandidates({
+    const candidates = extractGenshinEventProgressCandidates({
       uid: '不应读取',
       act_list: [{
         id: 9010,

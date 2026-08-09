@@ -1,5 +1,5 @@
 export const SUPPORTED_GAME_IDS = ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const
-export const GTASK_MCP_PROTOCOL_VERSION = '2026-08-05.1'
+export const GTASK_MCP_PROTOCOL_VERSION = '2026-08-09.1'
 
 export type GameId = (typeof SUPPORTED_GAME_IDS)[number]
 
@@ -18,10 +18,7 @@ export type MapNodeKind = (typeof MAP_NODE_KINDS)[number]
 export const CHECKLIST_SECTIONS = ['events', 'cycles', 'exploration', 'custom'] as const
 export type ChecklistSection = (typeof CHECKLIST_SECTIONS)[number]
 
-export const SYNC_RUN_MODES = ['manual', 'automatic'] as const
-export type SyncRunMode = (typeof SYNC_RUN_MODES)[number]
-export const SYNC_SCOPES = ['public_schedule', 'public_and_personal'] as const
-export type SyncScope = (typeof SYNC_SCOPES)[number]
+export type SyncScope = 'public_schedule'
 export type SyncRequestScope = SyncScope | 'personal_data'
 export const SYNC_TARGETS = ['all', 'tasks', 'events', 'cycles', 'exploration'] as const
 export type SyncTarget = (typeof SYNC_TARGETS)[number]
@@ -134,7 +131,7 @@ export interface BackupSummary {
 }
 
 export type AiScheduleJobStatus = 'pending' | 'claimed' | 'completed' | 'failed'
-export type AiScheduleJobKind = 'public_catalog' | 'personal_metadata' | 'personal_review'
+export type AiScheduleJobKind = 'public_catalog'
 export const SYNC_PROGRESS_PHASES = [
   'queued',
   'fetching',
@@ -173,23 +170,8 @@ export interface SyncProgressUpdate {
   updatedAt: string
 }
 
-export type CodexConnectionRepairMode = 'proxy' | 'https'
-
-export interface CodexConnectionRepairResult {
-  mode: CodexConnectionRepairMode
-  message: string
-}
-
-export interface CodexPluginInstallResult {
-  pluginId: string
-  version: string
-  installedPath: string
-  message: string
-}
-
 export interface AiScheduleAgentStatus {
   connected: boolean
-  codexPluginInstalled: boolean
   agentId: string | null
   name: string | null
   lastSeenAt: string | null
@@ -204,25 +186,6 @@ export interface ActivityTagEnrichmentTarget {
   sourceUrl: string | null
   startsAt: string | null
   endsAt: string | null
-}
-
-export type PersonalMetadataField = 'activityTags' | 'startsAt' | 'endsAt'
-export type PersonalCycleTimeWindowPolicy = 'full_cycle' | 'current_playable_phase'
-
-export interface PersonalMetadataEnrichmentTarget {
-  itemId: string
-  title: string
-  category: Extract<ChecklistCategory, 'limited_event' | 'endgame'>
-  currentTags: string[]
-  startsAt: string | null
-  endsAt: string | null
-  missingFields: PersonalMetadataField[]
-  timeWindowPolicy?: PersonalCycleTimeWindowPolicy
-  sourceIdentity: {
-    provider: string
-    endpoint: string
-    externalId: string
-  }
 }
 
 export interface AiScheduleMatchCandidate {
@@ -294,50 +257,6 @@ export interface PublicSyncContract {
   sections: SyncSectionContract[]
 }
 
-export interface PersonalMetadataContract {
-  schemaVersion: 6
-  jobKind: 'personal_metadata'
-  authority: 'interface_contract'
-  decisionAuthority: 'codex'
-  executorPolicy: 'mechanical_validation_only'
-  allowedMutations: ['update_metadata']
-  target: Extract<PersonalSyncTarget, 'events' | 'cycles'>
-  requestContext: SyncRequestContext
-  workflow: ['inspect_targets', 'research_missing_fields', 'verify', 'submit_metadata']
-  fieldSemantics: Record<string, string>
-  activityTagCatalog: ActivityTagContractEntry[]
-  completionCriteria: string[]
-}
-
-export type PersonalReviewIssue =
-  | 'item_identity'
-  | 'classification'
-  | 'completion_semantics'
-  | 'time_window'
-  | 'hierarchy'
-
-export interface PersonalReviewTarget {
-  candidateId: string
-  kind: string
-  issues: PersonalReviewIssue[]
-  payload: Record<string, unknown>
-}
-
-export interface PersonalReviewContract {
-  schemaVersion: 4
-  jobKind: 'personal_review'
-  authority: 'interface_contract'
-  decisionAuthority: 'codex'
-  executorPolicy: 'mechanical_validation_only'
-  allowedMutations: ['refine_active_personal_snapshot']
-  target: PersonalSyncTarget
-  requestContext: SyncRequestContext
-  workflow: ['inspect_official_facts', 'research_exceptions', 'resolve_every_target', 'refine_active_snapshot']
-  fieldSemantics: Record<string, string>
-  activityTagCatalog: ActivityTagContractEntry[]
-  completionCriteria: string[]
-}
-
 export interface AiScheduleJob {
   id: string
   jobKind: AiScheduleJobKind
@@ -364,10 +283,8 @@ export interface AiScheduleJob {
   assignedReasoningEffort: CodexReasoningEffort | null
   lastFailureKind: string | null
   activityTagTargets: ActivityTagEnrichmentTarget[]
-  metadataTargets: PersonalMetadataEnrichmentTarget[]
-  reviewTargets: PersonalReviewTarget[]
   matchCandidates: AiScheduleMatchCandidate[]
-  contract: PublicSyncContract | PersonalMetadataContract | PersonalReviewContract
+  contract: PublicSyncContract
 }
 
 export interface GameSummary {
@@ -465,11 +382,8 @@ export interface ArchiveCompletedSectionInput {
 
 export interface SyncSettings {
   gameId: GameId
-  runMode: SyncRunMode
-  autoScope: SyncScope
-  initialGuideDismissed: boolean
+  autoSyncEnabled: boolean
   status: SyncStatus
-  lastScope: SyncScope | null
   lastAttemptAt: string | null
   lastSuccessAt: string | null
   message: string | null
@@ -492,9 +406,6 @@ export interface SyncSourceResult {
   added: number
   updated: number
   preserved: number
-  pendingReview?: number
-  reviewMode?: 'background' | 'blocking'
-  requiresCodexPlugin?: boolean
 }
 
 export interface SyncResult {
@@ -511,7 +422,7 @@ export interface SyncResult {
 export interface SyncCancellationResult {
   gameId: GameId
   target: SyncTarget
-  source: 'public_schedule' | 'personal_data'
+  source: 'personal_data'
   cancelled: boolean
   message: string
 }
@@ -531,18 +442,6 @@ export interface GachaApi {
   listBackups: () => Promise<BackupSummary[]>
   createBackup: () => Promise<BackupSummary>
   restoreBackup: (fileName: string) => Promise<boolean>
-  getAiScheduleAgentStatus: () => Promise<AiScheduleAgentStatus>
-  getActiveAiScheduleJob: (gameId: GameId, target?: SyncTarget) => Promise<AiScheduleJob | null>
-  listActiveAiScheduleJobs: (gameId?: GameId) => Promise<AiScheduleJob[]>
-  openCodexPlugin: () => Promise<void>
-  updateCodexPlugin: () => Promise<CodexPluginInstallResult>
-  repairCodexConnection: (
-    mode: CodexConnectionRepairMode
-  ) => Promise<CodexConnectionRepairResult>
-  getCodexWorkerPreferences: () => Promise<CodexWorkerPreferences>
-  updateCodexWorkerPreferences: (
-    preferences: CodexWorkerPreferences
-  ) => Promise<CodexWorkerPreferences>
   listGames: () => Promise<GameSummary[]>
   listGameVersionSummaries: () => Promise<GameVersionSummary[]>
   listChecklistItems: (gameId: GameId) => Promise<ChecklistItem[]>
@@ -555,15 +454,12 @@ export interface GachaApi {
   emptyRecycleBin: (gameId: GameId) => Promise<number>
   archiveCompletedSection: (input: ArchiveCompletedSectionInput) => Promise<number>
   getSyncSettings: (gameId: GameId) => Promise<SyncSettings>
-  dismissInitialSyncGuide: (gameId: GameId) => Promise<SyncSettings>
+  updateSyncSettings: (
+    gameId: GameId,
+    settings: Pick<SyncSettings, 'autoSyncEnabled'>
+  ) => Promise<SyncSettings>
   getSyncTargetStates: (gameId: GameId) => Promise<SyncTargetState[]>
   getPersonalSyncTargets: (gameId: GameId) => Promise<PersonalSyncTarget[]>
-  syncGame: (
-    gameId: GameId,
-    scope: SyncScope,
-    target?: SyncTarget,
-    requestContext?: SyncRequestContext
-  ) => Promise<SyncResult>
   syncPersonalData: (
     gameId: GameId,
     target?: SyncTarget,
@@ -571,8 +467,7 @@ export interface GachaApi {
   ) => Promise<SyncResult>
   cancelSync: (
     gameId: GameId,
-    target: SyncTarget,
-    source: 'public_schedule' | 'personal_data'
+    target: SyncTarget
   ) => Promise<SyncCancellationResult>
   listCredentialStatuses: () => Promise<CredentialStatus[]>
   startMiyousheQrLogin: () => Promise<MiyousheQrLoginState>

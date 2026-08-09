@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { StarRailPersonalAdapter } from '../src/main/sync/star-rail-personal-adapter'
 import {
-  extractStarRailEventReviewCandidates,
+  extractStarRailEventProgressCandidates,
   parseStarRailPersonalData
 } from '../src/main/sync/star-rail-personal-parser'
 
@@ -99,7 +99,7 @@ describe('Star Rail personal parsing', () => {
   })
 
   it('只把活动必要字段脱敏后送入 Codex 核验候选', () => {
-    const candidates = extractStarRailEventReviewCandidates({
+    const candidates = extractStarRailEventProgressCandidates({
       uid: '不应读取',
       act_list: [{
         id: 6011,

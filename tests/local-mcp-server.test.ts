@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+﻿import { afterEach, describe, expect, it } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -27,7 +27,7 @@ afterEach(async () => {
 })
 
 async function connect(): Promise<Client> {
-  database = new AppDatabase(':memory:')
+  database = new AppDatabase(':memory:', { seedBundledBaselines: false })
   temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-mcp-resource-test-'))
   await createDailyBackup(database, temporaryDirectory, new Date('2026-07-20T08:00:00+08:00'))
   server = createLocalMcpServer(database, { backupDirectory: temporaryDirectory })
@@ -51,12 +51,11 @@ describe('本地 MCP server', () => {
       'archive_gacha_item',
       'archive_completed_gacha_section',
       'register_gacha_schedule_agent',
+      'queue_gacha_baseline_maintenance',
       'claim_gacha_schedule_job',
       'update_gacha_schedule_job_progress',
       'register_gacha_activity_tag',
       'apply_gacha_public_schedule',
-      'apply_gacha_personal_metadata',
-      'apply_gacha_personal_review',
       'fail_gacha_schedule_job'
     ])
     const updateTool = tools.tools.find((tool) => tool.name === 'update_gacha_item')
@@ -755,175 +754,22 @@ describe('本地 MCP server', () => {
     )
   })
 
-  it('个人活动标签使用当前固定配置提交且不会触发自动切模', async () => {
+  it('可在无界面和无在线 Agent 时创建基准表维护任务', async () => {
     const connected = await connect()
-    const reference = new Date('2026-08-02T12:00:00.000Z')
-    await connected.callTool({
-      name: 'register_gacha_schedule_agent',
+    const queued = await connected.callTool({
+      name: 'queue_gacha_baseline_maintenance',
       arguments: {
-        agentId: 'metadata-escalation-agent',
-        name: '标签核验 Agent',
-        webSearch: true,
-        protocolVersion: GTASK_MCP_PROTOCOL_VERSION
-      }
-    })
-    database!.replacePersonalSnapshot(
-      'star-rail',
-      'events',
-      `miyoushe:${'b'.repeat(64)}`,
-      [{
-        remoteKey: 'personal-event:miyoushe:event-api:check-in',
-        category: 'limited_event',
-        title: '测试签到活动',
-        startsAt: '2026-08-01T00:00:00.000Z',
-        endsAt: '2026-08-20T00:00:00.000Z',
-        sourceIdentity: {
-          provider: 'miyoushe', endpoint: 'event-api', externalId: 'check-in'
-        }
-      }],
-      'test-v1',
-      reference
-    )
-    const queued = database!.createPersonalMetadataJob(
-      'star-rail',
-      'events',
-      { outputLocale: 'zh-CN', userTimeZone: 'Asia/Shanghai' },
-      reference,
-      true
-    )!
-    const claimed = await connected.callTool({
-      name: 'claim_gacha_schedule_job',
-      arguments: {
-        agentId: 'metadata-escalation-agent',
-        jobId: queued.id,
-        model: 'gpt-5.6-terra',
-        reasoningEffort: 'medium'
-      }
-    })
-    const job = (claimed.structuredContent as {
-      job: { id: string; metadataTargets: Array<{ itemId: string; title: string }> }
-    }).job
-    const applied = await connected.callTool({
-      name: 'apply_gacha_personal_metadata',
-      arguments: {
-        agentId: 'metadata-escalation-agent',
-        jobId: job.id,
-        contentLocale: 'zh-CN',
-        retrievedAt: '2026-08-02T12:02:00.000Z',
-        updates: [{
-          itemId: job.metadataTargets[0]!.itemId,
-          title: job.metadataTargets[0]!.title,
-          activityTags: ['sign-in'],
-          sourceUrl: 'https://example.com/check-in',
-          confidence: 0.87
-        }],
-        evidence: []
-      }
-    })
-    expect(applied.isError).not.toBe(true)
-    expect(applied.structuredContent).toMatchObject({
-      command: 'apply_personal_metadata',
-      job: { id: queued.id, status: 'completed', routingTier: 0 }
-    })
-    expect(database!.listChecklistItems('star-rail').find(
-      (item) => item.title === '测试签到活动'
-    )?.activityTags).toEqual(['签到'])
-  })
-
-  it('通过专用 MCP 契约一次性解决个人异常批次并激活快照', async () => {
-    const connected = await connect()
-    await connected.callTool({
-      name: 'register_gacha_schedule_agent',
-      arguments: {
-        agentId: 'personal-review-mcp-agent',
-        name: '个人异常 MCP Agent',
-        webSearch: true,
-        protocolVersion: GTASK_MCP_PROTOCOL_VERSION
-      }
-    })
-    const proposed = {
-      remoteKey: 'personal-event:miyoushe:event-api:mcp-event',
-      category: 'limited_event' as const,
-      title: 'MCP 核验活动',
-      startsAt: '2026-08-01T00:00:00.000Z',
-      endsAt: '2026-08-20T00:00:00.000Z',
-      sourceIdentity: {
-        provider: 'miyoushe', endpoint: 'event-api', externalId: 'mcp-event'
-      }
-    }
-    database!.preparePersonalReviewJob(
-      'genshin',
-      'events',
-      `miyoushe:${'a'.repeat(64)}`,
-      [proposed],
-      [{
+        gameId: 'genshin',
         target: 'events',
-        kind: 'personal-item-semantics',
-        payload: {
-          provider: 'miyoushe', sourceContext: 'event-api', officialEventId: 'mcp-event',
-          title: proposed.title, observedStatus: { isFinished: false },
-          reviewIssues: ['classification', 'completion_semantics'], proposedItem: proposed
-        }
-      }],
-      'test-v1',
-      { outputLocale: 'zh-CN', userTimeZone: 'Asia/Shanghai' },
-      new Date('2026-08-01T12:00:00.000Z')
-    )
-    const claimed = await connected.callTool({
-      name: 'claim_gacha_schedule_job',
-      arguments: { agentId: 'personal-review-mcp-agent' }
-    })
-    expect(claimed.structuredContent).toMatchObject({
-      job: {
-        jobKind: 'personal_review',
-        contract: {
-          jobKind: 'personal_review',
-          fieldSemantics: { sourceIsolation: expect.any(String) }
-        },
-        reviewTargets: [expect.objectContaining({ issues: expect.arrayContaining(['classification']) })]
+        outputLocale: 'zh-CN',
+        userTimeZone: 'Asia/Shanghai'
       }
     })
-    const job = (claimed.structuredContent as {
-      job: { id: string; reviewTargets: Array<{ candidateId: string }> }
-    }).job
-    const applied = await connected.callTool({
-      name: 'apply_gacha_personal_review',
-      arguments: {
-        agentId: 'personal-review-mcp-agent',
-        jobId: job.id,
-        contentLocale: 'zh-CN',
-        retrievedAt: '2026-08-01T12:05:00.000Z',
-        resolutions: [{
-          candidateId: job.reviewTargets[0]!.candidateId,
-          decision: 'include',
-          eventScope: 'limited',
-          reason: '确认是独立限时活动',
-          completed: false,
-          completionRule: {
-            fieldPath: 'observedStatus.isFinished',
-            completedValues: [true],
-            incompleteValues: [false]
-          },
-          confidence: 0.95
-        }],
-        evidence: [{
-          url: 'https://example.com/mcp-event',
-          platform: '官方社区',
-          publisher: '发行商',
-          official: true,
-          language: 'zh-CN',
-          note: '活动说明'
-        }]
-      }
+    expect(queued.isError).not.toBe(true)
+    expect(queued.structuredContent).toMatchObject({
+      command: 'queue_baseline_maintenance',
+      job: { gameId: 'genshin', target: 'events', status: 'pending' }
     })
-    expect(applied.isError).not.toBe(true)
-    expect(database!.listChecklistItems('genshin')).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        title: proposed.title,
-        source: 'personal_sync',
-        activityTags: []
-      })
-    ]))
   })
 
 })

@@ -35,7 +35,7 @@ describe('同步展示文案', () => {
     expect(userFacingProgressMessage(progress('正在解析个人 snapshot 的 externalId')))
       .toBe('正在核对活动名称、时间和玩法信息')
     expect(userFacingProgressMessage(progress(
-      '已读取 personal_review 契约，正在检查 resolution 与 eventScope'
+      '内部实现正在处理不应展示的字段名'
     ))).toBe('正在核对活动名称、时间和玩法信息')
     expect(userFacingProgressMessage(progress(
       '正在按 zh-CN / Asia/Shanghai 契约提交 contentLocale',
@@ -47,12 +47,12 @@ describe('同步展示文案', () => {
     expect(userFacingProgressMessage(progress('任意内部说明', 'queued')))
       .toBe('同步任务正在排队')
     expect(userFacingProgressMessage(progress('任意内部说明', 'fetching')))
-      .toBe('正在读取活动个人数据')
+      .toBe('正在读取活动进度')
     expect(userFacingProgressMessage(progress('任意内部说明', 'searching', {
       source: 'public_schedule'
-    }))).toBe('正在查找活动公开数据')
+    }))).toBe('正在核对活动名称、时间和玩法信息')
     expect(userFacingProgressMessage(progress('任意内部说明', 'structuring')))
-      .toBe('正在整理活动个人清单')
+      .toBe('正在整理活动进度')
     expect(userFacingProgressMessage(progress('任意内部说明', 'retrying')))
       .toBe('连接不稳定，正在重试 2/5')
     expect(userFacingProgressMessage(progress('任意内部说明', 'verification')))

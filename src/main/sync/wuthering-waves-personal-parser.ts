@@ -1,7 +1,6 @@
 import {
-  officialPersonalFactAuthority,
   type NormalizedSyncItem,
-  type SemanticReviewDraft
+  type PersonalProgressCandidate
 } from './types'
 import { hasChallengeRecordEvidence } from './challenge-record-evidence'
 import { finiteNumber } from './numbers'
@@ -65,12 +64,12 @@ export function parseWutheringWavesExploration(value: unknown): NormalizedSyncIt
   return items
 }
 
-export function extractWutheringWavesExplorationReviewCandidates(
+export function extractWutheringWavesExplorationProgressCandidates(
   value: unknown
-): SemanticReviewDraft[] {
+): PersonalProgressCandidate[] {
   const root = requiredRecord(value, '地图探索')
   const groups = Array.isArray(root.exploreList) ? root.exploreList.filter(isRecord) : []
-  const drafts: SemanticReviewDraft[] = []
+  const drafts: PersonalProgressCandidate[] = []
   for (const group of groups) {
     const country = requiredRecord(group.country, '地图大区域')
     const countryId = requiredIdentifier(country.countryId, '地图大区域 id')
@@ -79,12 +78,6 @@ export function extractWutheringWavesExplorationReviewCandidates(
       target: 'exploration',
       kind: 'personal-map-progress',
       payload: {
-        factAuthority: officialPersonalFactAuthority(
-          'identity',
-          'localized_title',
-          'progress',
-          'hierarchy'
-        ),
         provider: 'kuro-community',
         officialId: countryId,
         officialTitle: countryName,
@@ -101,12 +94,6 @@ export function extractWutheringWavesExplorationReviewCandidates(
         target: 'exploration',
         kind: 'personal-map-progress',
         payload: {
-          factAuthority: officialPersonalFactAuthority(
-            'identity',
-            'localized_title',
-            'progress',
-            'hierarchy'
-          ),
           provider: 'kuro-community',
           officialId: `area:${areaId}`,
           officialTitle: areaName,

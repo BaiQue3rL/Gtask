@@ -1,6 +1,6 @@
 import type { GameId, SyncTarget } from '../../shared/contracts'
 import {
-  extractStarRailEventReviewCandidates,
+  extractStarRailEventProgressCandidates,
   parseStarRailPersonalData
 } from './star-rail-personal-parser'
 import {
@@ -10,7 +10,7 @@ import {
   type PersonalRequestOutcome
 } from './personal-sync-settler'
 import type { SyncAdapter, SyncAdapterOutput, SyncProgressReporter } from './types'
-import { assemblePersonalEventsFromCandidates, withPersonalIdentity } from './personal-snapshot'
+import { personalEventsFromCandidates, withPersonalIdentity } from './personal-snapshot'
 
 export interface StarRailBattleChronicleClient {
   getMemoryOfChaos: () => Promise<unknown>
@@ -45,14 +45,13 @@ export class StarRailPersonalAdapter implements SyncAdapter {
         outcomes
       )
       assertAnyPersonalRequestSucceeded(outcomes)
-      const eventSnapshot = assemblePersonalEventsFromCandidates(
+      const eventItems = personalEventsFromCandidates(
         'star-rail',
         'miyoushe',
-        extractStarRailEventReviewCandidates(eventCalendar)
+        extractStarRailEventProgressCandidates(eventCalendar)
       )
       return {
-        items: eventSnapshot.items,
-        reviewCandidates: eventSnapshot.reviewCandidates,
+        items: eventItems,
         snapshotCompleteness: 'complete',
         adapterVersion: 'star-rail-personal-v1',
         message: '星铁活动进度已读取'
@@ -109,18 +108,17 @@ export class StarRailPersonalAdapter implements SyncAdapter {
       : []
     const eventCandidates = eventCalendar === undefined
       ? []
-      : extractStarRailEventReviewCandidates(eventCalendar)
-    const eventSnapshot = assemblePersonalEventsFromCandidates(
+      : extractStarRailEventProgressCandidates(eventCalendar)
+    const eventItems = personalEventsFromCandidates(
       'star-rail',
       'miyoushe',
       eventCandidates
     )
     return {
       items: [
-        ...eventSnapshot.items,
+        ...eventItems,
         ...withPersonalIdentity(cycleItems, 'miyoushe', 'personal-challenge-record')
       ],
-      reviewCandidates: eventSnapshot.reviewCandidates,
       snapshotCompleteness: outcomes.every((outcome) => outcome.succeeded) ? 'complete' : 'partial',
       adapterVersion: 'star-rail-personal-v1',
       message: '星铁四种周期战绩已同步' + suffix

@@ -42,19 +42,13 @@ export function userFacingProgressMessage(progress: SyncProgressUpdate): string 
     case 'queued':
       return '同步任务正在排队'
     case 'fetching':
-      return progress.source === 'personal_data'
-        ? `正在读取${target}个人数据`
-        : `正在读取${target}公开数据`
+      return `正在读取${target}进度`
     case 'searching':
-      return progress.source === 'public_schedule'
-        ? `正在查找${target}公开数据`
-        : reviewingMessage(progress.target)
+      return reviewingMessage(progress.target)
     case 'verifying':
       return reviewingMessage(progress.target)
     case 'structuring':
-      return progress.source === 'personal_data'
-        ? `正在整理${target}个人清单`
-        : `正在整理${target}公开数据`
+      return `正在整理${target}进度`
     case 'writing':
     case 'merging':
       return `正在更新${target}清单`

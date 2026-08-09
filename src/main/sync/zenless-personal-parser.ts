@@ -1,7 +1,6 @@
 import {
-  officialPersonalFactAuthority,
   type NormalizedSyncItem,
-  type SemanticReviewDraft
+  type PersonalProgressCandidate
 } from './types'
 import { hasChallengeRecordEvidence } from './challenge-record-evidence'
 import { finiteNumber } from './numbers'
@@ -37,12 +36,12 @@ function explorationPercent(value: unknown, field: string): number {
   return Math.round(progress * 100) / 100
 }
 
-export function extractZenlessExplorationReviewCandidates(value: unknown): SemanticReviewDraft[] {
+export function extractZenlessExplorationProgressCandidates(value: unknown): PersonalProgressCandidate[] {
   const root = requiredRecord(value, '区域收集')
   const groups = Array.isArray(root.area_collections)
     ? root.area_collections.filter(isRecord)
     : []
-  const drafts: SemanticReviewDraft[] = []
+  const drafts: PersonalProgressCandidate[] = []
   for (const group of groups) {
     const groupId = requiredIdentifier(group.urban_area_group_id, '一级区域 id')
     const groupName = requiredString(group.name, '一级区域名称')
@@ -50,12 +49,6 @@ export function extractZenlessExplorationReviewCandidates(value: unknown): Seman
       target: 'exploration',
       kind: 'personal-map-progress',
       payload: {
-        factAuthority: officialPersonalFactAuthority(
-          'identity',
-          'localized_title',
-          'progress',
-          'hierarchy'
-        ),
         provider: 'miyoushe',
         officialId: `group:${groupId}`,
         officialTitle: groupName,
@@ -78,12 +71,6 @@ export function extractZenlessExplorationReviewCandidates(value: unknown): Seman
         target: 'exploration',
         kind: 'personal-map-progress',
         payload: {
-          factAuthority: officialPersonalFactAuthority(
-            'identity',
-            'localized_title',
-            'progress',
-            'hierarchy'
-          ),
           provider: 'miyoushe',
           officialId: `area:${areaId}`,
           officialTitle: areaName,
@@ -138,7 +125,7 @@ function optionalChinaDateTime(value: unknown, field: string): string | undefine
   return parsed.toISOString()
 }
 
-export function extractZenlessEventReviewCandidates(value: unknown): SemanticReviewDraft[] {
+export function extractZenlessEventProgressCandidates(value: unknown): PersonalProgressCandidate[] {
   const root = requiredRecord(value, '活动日历')
   const events = Array.isArray(root.activity_list) ? root.activity_list.filter(isRecord) : []
   return events.map((event) => {
@@ -149,11 +136,6 @@ export function extractZenlessEventReviewCandidates(value: unknown): SemanticRev
       target: 'events',
       kind: 'personal-item-semantics',
       payload: {
-        factAuthority: officialPersonalFactAuthority(
-          'identity',
-          'localized_title',
-          'time_window'
-        ),
         sourceContext: 'miyoushe-zenless-event-calendar',
         officialEventId: id,
         title,

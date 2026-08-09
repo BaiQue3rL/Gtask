@@ -1,26 +1,18 @@
 import {
   CHECKLIST_CATEGORIES,
   CHECKLIST_SECTIONS,
-  CODEX_REASONING_EFFORTS,
-  CODEX_WORKER_STRATEGIES,
-  CODEX_WORKER_MODELS,
   CREDENTIAL_PROVIDERS,
   MAP_NODE_KINDS,
   SCHEDULE_KINDS,
-  SYNC_RUN_MODES,
-  SYNC_SCOPES,
   SYNC_TARGETS,
   SUPPORTED_GAME_IDS,
   type ChecklistCategory,
   type ChecklistSection,
-  type CodexWorkerPreferences,
   type CredentialProvider,
   type CreateChecklistItemInput,
   type GameId,
   type MapNodeKind,
   type ScheduleKind,
-  type SyncRunMode,
-  type SyncScope,
   type SyncRequestContext,
   type SyncTarget,
   type UpdateChecklistItemInput
@@ -203,20 +195,6 @@ export function parseChecklistSection(value: unknown): ChecklistSection {
   return value as ChecklistSection
 }
 
-export function parseSyncRunMode(value: unknown): SyncRunMode {
-  if (typeof value !== 'string' || !SYNC_RUN_MODES.includes(value as SyncRunMode)) {
-    throw new Error('不支持的同步运行模式')
-  }
-  return value as SyncRunMode
-}
-
-export function parseSyncScope(value: unknown): SyncScope {
-  if (typeof value !== 'string' || !SYNC_SCOPES.includes(value as SyncScope)) {
-    throw new Error('不支持的同步范围')
-  }
-  return value as SyncScope
-}
-
 export function parseSyncTarget(value: unknown): SyncTarget {
   if (typeof value !== 'string' || !SYNC_TARGETS.includes(value as SyncTarget)) {
     throw new Error('不支持的同步版块')
@@ -266,33 +244,4 @@ export function parseExternalUrl(value: unknown): string {
   }
   if (!['http:', 'https:'].includes(url.protocol)) throw new Error('仅允许打开 HTTP/HTTPS 链接')
   return url.toString()
-}
-
-export function parseCodexWorkerPreferences(value: unknown): CodexWorkerPreferences {
-  if (!isRecord(value)) throw new Error('Codex 后台设置格式不正确')
-  if (
-    typeof value.strategy !== 'string' ||
-    !CODEX_WORKER_STRATEGIES.includes(value.strategy as CodexWorkerPreferences['strategy'])
-  ) {
-    throw new Error('不支持的 Codex 后台调度策略')
-  }
-  if (
-    typeof value.model !== 'string' ||
-    !CODEX_WORKER_MODELS.includes(value.model as CodexWorkerPreferences['model'])
-  ) {
-    throw new Error('不支持的 Codex 后台模型')
-  }
-  if (
-    typeof value.reasoningEffort !== 'string' ||
-    !CODEX_REASONING_EFFORTS.includes(
-      value.reasoningEffort as CodexWorkerPreferences['reasoningEffort']
-    )
-  ) {
-    throw new Error('不支持的 Codex 推理强度')
-  }
-  return {
-    strategy: value.strategy as CodexWorkerPreferences['strategy'],
-    model: value.model as CodexWorkerPreferences['model'],
-    reasoningEffort: value.reasoningEffort as CodexWorkerPreferences['reasoningEffort']
-  }
 }

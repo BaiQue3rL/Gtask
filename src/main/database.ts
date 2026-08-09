@@ -10,14 +10,11 @@ import type {
   AiScheduleAgentStatus,
   AiScheduleJob,
   AiScheduleJobKind,
-  CodexWorkerPreferences,
   CreateChecklistItemInput,
   GameId,
   GameSummary,
   GameVersionSummary,
   PersonalSyncTarget,
-  PersonalMetadataEnrichmentTarget,
-  PersonalReviewTarget,
   SyncProgressPhase,
   SyncScope,
   SyncTarget,
@@ -27,11 +24,7 @@ import type {
   SyncRequestContext,
   UpdateChecklistItemInput
 } from '../shared/contracts'
-import {
-  getPersonalMetadataContract,
-  getPersonalReviewContract,
-  getPublicSyncContract
-} from './sync/interface-contract'
+import { getPublicSyncContract } from './sync/interface-contract'
 import {
   ACTIVITY_TAG_DIMENSIONS,
   ACTIVITY_TAG_TAXONOMY_VERSION,
@@ -45,17 +38,19 @@ import {
   type ActivityTagDefinition,
   type ActivityTagDimension
 } from './activity-tags'
-import { findCycleMode, nextCyclePeriod } from './sync/cycle-catalog'
+import { completeCycleCatalog, findCycleMode, nextCyclePeriod } from './sync/cycle-catalog'
+import { getBundledMapCatalog, getBundledMapCatalogVerifiedAt } from './sync/map-catalog'
 import {
-  hasOfficialPersonalFact,
+  BUNDLED_BASELINE_VERIFIED_AT,
+  getBundledActivityCatalog,
+  getBundledVersionWindow
+} from './sync/baseline-catalog'
+import {
   type ActivityTagUpdate,
   type CodexArchiveDecision,
   type CodexScheduleItem,
   type CodexVersionWindow,
   type NormalizedSyncItem,
-  type PersonalMetadataUpdate,
-  type PersonalReviewResolution,
-  type SemanticReviewDraft,
   type SyncMergeResult
 } from './sync/types'
 
@@ -96,33 +91,10 @@ const DEFAULT_GAMES: GameSummary[] = [
 
 // Version 1 is the public Gtask 1.0 baseline. All later structural changes use
 // explicit forward migrations so existing user data remains intact.
-export const CURRENT_SCHEMA_VERSION = 2
+export const CURRENT_SCHEMA_VERSION = 3
 
 const AI_AGENT_MAX_AGE_MS = 5 * 60 * 1000
 const AI_JOB_CLAIM_MAX_AGE_MS = 15 * 60 * 1000
-
-export type PersonalCompletionState = 'completed' | 'incomplete' | 'unknown'
-export type SourceBindingKind = 'mechanical' | 'codex'
-type PersonalRuleValue = string | number | boolean
-
-export interface PersonalCompletionRule {
-  fieldPath: string
-  completedValues: PersonalRuleValue[]
-  incompleteValues: PersonalRuleValue[]
-}
-
-export interface SourceBinding {
-  gameId: GameId
-  provider: string
-  endpoint: string
-  externalId: string
-  itemId: string
-  bindingKind: SourceBindingKind
-  confidence: number
-  stateRule: PersonalCompletionRule | null
-  createdAt: string
-  updatedAt: string
-}
 
 interface SyncMergeOptions {
   codexReviewed?: boolean
@@ -145,23 +117,6 @@ function stableJson(value: unknown): string {
   return JSON.stringify(value) ?? 'null'
 }
 
-function assertSanitizedSemanticPayload(value: unknown, path = 'payload'): void {
-  if (Array.isArray(value)) {
-    value.forEach((entry, index) => assertSanitizedSemanticPayload(entry, `${path}[${index}]`))
-    return
-  }
-  if (!value || typeof value !== 'object') return
-  const forbidden = new Set([
-    'cookie', 'token', 'authorization', 'password', 'secret', 'uid',
-    'roleid', 'accountid', 'phone', 'email'
-  ])
-  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
-    const normalizedKey = key.toLocaleLowerCase('en-US').replace(/[^a-z0-9]/g, '')
-    if (forbidden.has(normalizedKey)) throw new Error(`语义核验数据禁止包含敏感字段：${path}.${key}`)
-    assertSanitizedSemanticPayload(entry, `${path}.${key}`)
-  }
-}
-
 function assertAccountScope(value: string): void {
   if (!/^[a-z0-9-]+:[a-f0-9]{64}$/u.test(value)) {
     throw new Error('个人账号作用域格式不正确')
@@ -177,103 +132,6 @@ function assertSourceIdentity(provider: string, endpoint: string, externalId: st
     if (!value.trim() || value !== value.trim() || value.length > maximum) {
       throw new Error(`${label}格式不正确`)
     }
-  }
-}
-
-function readSemanticSourceIdentity(
-  kind: string,
-  payload: Record<string, unknown>
-): { provider: string; endpoint: string; externalId: string } | null {
-  const provider = typeof payload.provider === 'string'
-    ? payload.provider.trim()
-    : typeof payload.sourceContext === 'string' && payload.sourceContext.startsWith('miyoushe-')
-      ? 'miyoushe'
-      : null
-  const externalId = [
-    payload.officialId,
-    payload.officialEventId,
-    payload.observedRemoteKey
-  ].find((value) => typeof value === 'string' || typeof value === 'number')
-  if (!provider || externalId === undefined) return null
-  const baseExternalId = String(externalId).trim()
-  const observedPeriodKey = typeof payload.observedPeriodKey === 'string'
-    ? payload.observedPeriodKey.trim()
-    : ''
-  const normalizedExternalId = kind === 'personal-challenge-record' && observedPeriodKey
-    ? `${baseExternalId}|period:${observedPeriodKey}`
-    : baseExternalId
-  const endpoint = typeof payload.sourceContext === 'string' && payload.sourceContext.trim()
-    ? payload.sourceContext.trim()
-    : kind.trim()
-  if (!normalizedExternalId || !endpoint) return null
-  return { provider, endpoint, externalId: normalizedExternalId }
-}
-
-function readPersonalDraftState(
-  draft: SemanticReviewDraft,
-  completionRule?: PersonalCompletionRule | null
-): { completionState: PersonalCompletionState; progressPercent: number | null } | null {
-  if (draft.target === 'exploration') {
-    const progress = draft.payload.observedProgress ?? draft.payload.observedProgressPercent
-    if (typeof progress !== 'number' || !Number.isFinite(progress) || progress < 0 || progress > 100) {
-      return null
-    }
-    return {
-      completionState: progress === 100 ? 'completed' : 'incomplete',
-      progressPercent: progress
-    }
-  }
-  if (draft.target === 'cycles' && typeof draft.payload.observedHasChallengeRecord === 'boolean') {
-    return {
-      completionState: draft.payload.observedHasChallengeRecord ? 'completed' : 'incomplete',
-      progressPercent: null
-    }
-  }
-  if (draft.target === 'events' && completionRule) {
-    const value = readPayloadPath(draft.payload, completionRule.fieldPath)
-    if (completionRule.completedValues.some((candidate) => Object.is(candidate, value))) {
-      return { completionState: 'completed', progressPercent: null }
-    }
-    if (completionRule.incompleteValues.some((candidate) => Object.is(candidate, value))) {
-      return { completionState: 'incomplete', progressPercent: null }
-    }
-  }
-  return null
-}
-
-function readPayloadPath(payload: Record<string, unknown>, path: string): unknown {
-  let current: unknown = payload
-  for (const segment of path.split('.')) {
-    if (!segment || !current || typeof current !== 'object' || Array.isArray(current)) {
-      return undefined
-    }
-    current = (current as Record<string, unknown>)[segment]
-  }
-  return current
-}
-
-function assertPersonalCompletionRule(rule: PersonalCompletionRule): void {
-  if (
-    !/^observedStatus(?:\.[A-Za-z][A-Za-z0-9_]*)+$/u.test(rule.fieldPath) ||
-    rule.fieldPath.length > 160
-  ) {
-    throw new Error('活动完成语义规则必须指向 observedStatus 下的具体字段')
-  }
-  if (
-    rule.completedValues.length === 0 ||
-    rule.completedValues.length > 20 ||
-    rule.incompleteValues.length > 20
-  ) {
-    throw new Error('活动完成语义规则的状态取值数量不正确')
-  }
-  const values = [...rule.completedValues, ...rule.incompleteValues]
-  if (values.some((value) => !['string', 'number', 'boolean'].includes(typeof value))) {
-    throw new Error('活动完成语义规则只能使用字符串、数字或布尔值')
-  }
-  if (rule.completedValues.some((value) =>
-    rule.incompleteValues.some((candidate) => Object.is(candidate, value))
-  )) {
-    throw new Error('活动完成与未完成状态取值不能重叠')
   }
 }
 
@@ -328,43 +186,13 @@ function activityTagsNeedReview(tags: string[]): boolean {
   return !activityTagsMeetQualityContract(tags)
 }
 
-function assertActivityTagEvidence(
-  title: string,
-  tags: string[],
-  evidence: PersonalMetadataUpdate['activityTagEvidence'],
-  outputLocale: string
-): void {
-  // Per-tag notes are optional audit context. Requiring one URL per label made
-  // agents optimize for the submission shape instead of choosing the smallest
-  // accurate semantic set. Source-level evidence remains mandatory.
-  if (!evidence || evidence.length === 0) return
-  const normalizedTags = normalizeActivityTags(tags, outputLocale)
-  if (evidence.length !== normalizedTags.length) {
-    throw new Error(`活动“${title}”必须为每个玩法标签分别提交一条直接资料依据`)
-  }
-  const covered = new Set<string>()
-  for (const entry of evidence) {
-    const [tagId] = normalizeActivityTags([entry.tagId], outputLocale)
-    if (!tagId || tagId === 'unknown' || !normalizedTags.includes(tagId) || covered.has(tagId)) {
-      throw new Error(`活动“${title}”的逐标签依据包含未知、重复或未提交的标签`)
-    }
-    try {
-      const url = new URL(entry.sourceUrl)
-      if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error()
-    } catch {
-      throw new Error(`活动“${title}”的标签“${tagId}”缺少有效资料地址`)
-    }
-    if (!entry.note.trim() || entry.note.trim().length > 300) {
-      throw new Error(`活动“${title}”的标签“${tagId}”缺少简洁的玩法依据`)
-    }
-    covered.add(tagId)
-  }
-}
-
 export class AppDatabase {
   private readonly database: DatabaseSync
 
-  constructor(databasePath: string) {
+  constructor(
+    databasePath: string,
+    options: { seedBundledBaselines?: boolean } = {}
+  ) {
     mkdirSync(dirname(databasePath), { recursive: true })
     this.database = new DatabaseSync(databasePath)
     try {
@@ -373,6 +201,10 @@ export class AppDatabase {
       this.loadRuntimeActivityTags()
       this.seedGames()
       this.ensureVersionWindowStorage()
+      if (options.seedBundledBaselines !== false) {
+        this.seedBundledBaselines()
+        this.absorbLegacyPersonalProgressIntoBaselines()
+      }
       this.reconcileSyncTargetStates()
       this.normalizeLegacyActivityTags()
       this.normalizeSyncedProgressSafety()
@@ -560,11 +392,8 @@ export class AppDatabase {
       .prepare(`
         SELECT
           game_id AS gameId,
-          run_mode AS runMode,
-          auto_scope AS autoScope,
-          initial_guide_dismissed AS initialGuideDismissed,
+          auto_sync_enabled AS autoSyncEnabled,
           status,
-          last_scope AS lastScope,
           last_attempt_at AS lastAttemptAt,
           last_success_at AS lastSuccessAt,
           message
@@ -575,60 +404,21 @@ export class AppDatabase {
 
     if (!row) throw new Error('游戏同步设置不存在')
     return {
-      ...(row as Omit<SyncSettings, 'initialGuideDismissed'> & {
-        initialGuideDismissed: number
-      }),
-      initialGuideDismissed: Boolean(
-        (row as { initialGuideDismissed: number }).initialGuideDismissed
-      )
+      ...(row as Omit<SyncSettings, 'autoSyncEnabled'> & { autoSyncEnabled: number }),
+      autoSyncEnabled: Boolean((row as { autoSyncEnabled: number }).autoSyncEnabled)
     }
   }
 
-  getCodexWorkerPreferences(): CodexWorkerPreferences {
-    const row = this.database.prepare(`
-      SELECT strategy, model, reasoning_effort AS reasoningEffort
-      FROM codex_worker_settings
-      WHERE singleton = 1
-    `).get() as ({
-      strategy: string
-      model: CodexWorkerPreferences['model']
-      reasoningEffort: CodexWorkerPreferences['reasoningEffort']
-    }) | undefined
-    if (!row) throw new Error('Codex 后台设置不存在')
-    if (row.strategy !== 'fixed') {
-      return {
-        strategy: 'fixed',
-        model: 'gpt-5.6-sol',
-        reasoningEffort: 'medium'
-      }
-    }
-    return { strategy: 'fixed', model: row.model, reasoningEffort: row.reasoningEffort }
-  }
-
-  updateCodexWorkerPreferences(
-    preferences: CodexWorkerPreferences,
+  updateSyncSettings(
+    gameId: GameId,
+    settings: Pick<SyncSettings, 'autoSyncEnabled'>,
     reference = new Date()
-  ): CodexWorkerPreferences {
-    const result = this.database.prepare(`
-      UPDATE codex_worker_settings
-      SET strategy = ?, model = ?, reasoning_effort = ?, updated_at = ?
-      WHERE singleton = 1
-    `).run(
-      'fixed',
-      preferences.model,
-      preferences.reasoningEffort,
-      reference.toISOString()
-    )
-    if (result.changes !== 1) throw new Error('Codex 后台设置不存在')
-    return this.getCodexWorkerPreferences()
-  }
-
-  dismissInitialSyncGuide(gameId: GameId, reference = new Date()): SyncSettings {
+  ): SyncSettings {
     const result = this.database.prepare(`
       UPDATE sync_states
-      SET initial_guide_dismissed = 1, updated_at = ?
+      SET auto_sync_enabled = ?, updated_at = ?
       WHERE game_id = ?
-    `).run(reference.toISOString(), gameId)
+    `).run(settings.autoSyncEnabled ? 1 : 0, reference.toISOString(), gameId)
     if (result.changes !== 1) throw new Error('游戏同步设置不存在')
     return this.getSyncSettings(gameId)
   }
@@ -817,23 +607,12 @@ export class AppDatabase {
     }
   }
 
-  recordSyncAttempt(gameId: string, scope: SyncScope): void {
-    const now = new Date().toISOString()
-    this.database
-      .prepare(`
-        UPDATE sync_states
-        SET status = 'idle', last_scope = ?, last_attempt_at = ?, message = NULL, updated_at = ?
-        WHERE game_id = ?
-      `)
-      .run(scope, now, now, gameId)
-  }
-
   recordPersonalSyncAttempt(gameId: string): void {
     const now = new Date().toISOString()
     this.database
       .prepare(`
         UPDATE sync_states
-        SET status = 'idle', last_scope = NULL, last_attempt_at = ?, message = NULL, updated_at = ?
+        SET status = 'idle', last_attempt_at = ?, message = NULL, updated_at = ?
         WHERE game_id = ?
       `)
       .run(now, now, gameId)
@@ -874,7 +653,7 @@ export class AppDatabase {
         last_seen_at = excluded.last_seen_at,
         updated_at = excluded.updated_at
     `).run(agentId, name, now, now, now)
-    return { connected: true, codexPluginInstalled: false, agentId, name, lastSeenAt: now }
+    return { connected: true, agentId, name, lastSeenAt: now }
   }
 
   getAiScheduleAgentStatus(reference = new Date()): AiScheduleAgentStatus {
@@ -885,106 +664,13 @@ export class AppDatabase {
       WHERE last_seen_at >= ?
       ORDER BY last_seen_at DESC
       LIMIT 1
-    `).get(threshold) as Omit<AiScheduleAgentStatus, 'connected' | 'codexPluginInstalled'> | undefined
-    return row ? { connected: true, codexPluginInstalled: false, ...row } : {
+    `).get(threshold) as Omit<AiScheduleAgentStatus, 'connected'> | undefined
+    return row ? { connected: true, ...row } : {
       connected: false,
-      codexPluginInstalled: false,
       agentId: null,
       name: null,
       lastSeenAt: null
     }
-  }
-
-  getSourceBinding(
-    gameId: GameId,
-    provider: string,
-    endpoint: string,
-    externalId: string
-  ): SourceBinding | null {
-    const row = this.database.prepare(`
-      SELECT game_id AS gameId, provider, endpoint, external_id AS externalId,
-        item_id AS itemId, binding_kind AS bindingKind, confidence,
-        state_rule_json AS stateRuleJson,
-        created_at AS createdAt, updated_at AS updatedAt
-      FROM source_bindings
-      WHERE game_id = ? AND provider = ? AND endpoint = ? AND external_id = ?
-    `).get(gameId, provider, endpoint, externalId) as (
-      Omit<SourceBinding, 'stateRule'> & { stateRuleJson: string | null }
-    ) | undefined
-    if (!row) return null
-    const { stateRuleJson, ...binding } = row
-    return {
-      ...binding,
-      stateRule: stateRuleJson
-        ? JSON.parse(stateRuleJson) as PersonalCompletionRule
-        : null
-    }
-  }
-
-  upsertSourceBinding(
-    binding: Omit<SourceBinding, 'createdAt' | 'updatedAt' | 'stateRule'> & {
-      stateRule?: PersonalCompletionRule | null
-    },
-    reference = new Date()
-  ): SourceBinding {
-    assertSourceIdentity(binding.provider, binding.endpoint, binding.externalId)
-    if (!Number.isFinite(binding.confidence) || binding.confidence < 0 || binding.confidence > 1) {
-      throw new Error('来源绑定置信度格式不正确')
-    }
-    if (binding.stateRule) assertPersonalCompletionRule(binding.stateRule)
-    const item = this.database.prepare(`
-      SELECT game_id AS gameId FROM checklist_items WHERE id = ?
-    `).get(binding.itemId) as { gameId: GameId } | undefined
-    if (!item || item.gameId !== binding.gameId) {
-      throw new Error('来源绑定指向的清单项不存在或不属于当前游戏')
-    }
-    const existing = this.getSourceBinding(
-      binding.gameId,
-      binding.provider,
-      binding.endpoint,
-      binding.externalId
-    )
-    if (
-      existing &&
-      existing.itemId !== binding.itemId &&
-      binding.bindingKind !== 'codex'
-    ) {
-      throw new Error('来源标识已经绑定到其他清单项，必须交由 Codex 处理冲突')
-    }
-    const now = reference.toISOString()
-    this.database.prepare(`
-      INSERT INTO source_bindings(
-        game_id, provider, endpoint, external_id, item_id, binding_kind,
-        confidence, state_rule_json, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(game_id, provider, endpoint, external_id) DO UPDATE SET
-        item_id = excluded.item_id,
-        binding_kind = excluded.binding_kind,
-        confidence = excluded.confidence,
-        state_rule_json = CASE
-          WHEN ? = 1 THEN excluded.state_rule_json
-          ELSE source_bindings.state_rule_json
-        END,
-        updated_at = excluded.updated_at
-    `).run(
-      binding.gameId,
-      binding.provider,
-      binding.endpoint,
-      binding.externalId,
-      binding.itemId,
-      binding.bindingKind,
-      binding.confidence,
-      binding.stateRule ? stableJson(binding.stateRule) : null,
-      now,
-      now,
-      binding.stateRule !== undefined ? 1 : 0
-    )
-    return this.getSourceBinding(
-      binding.gameId,
-      binding.provider,
-      binding.endpoint,
-      binding.externalId
-    )!
   }
 
   createAiScheduleJob(
@@ -1007,7 +693,7 @@ export class AppDatabase {
     }
     this.requeueStaleAiScheduleJobs(reference)
     const active = this.database.prepare(`
-      SELECT id, scope, target FROM ai_schedule_jobs
+      SELECT id, target FROM ai_schedule_jobs
       WHERE game_id = ? AND job_kind = 'public_catalog' AND status IN ('pending', 'claimed')
         AND (
           target = ?
@@ -1017,21 +703,11 @@ export class AppDatabase {
       ORDER BY requested_at ASC LIMIT 1
     `).get(gameId, target, target) as {
       id: string
-      scope: SyncScope
       target: SyncTarget
     } | undefined
     if (active) {
       if (active.target !== target) {
         throw new Error('全局同步与版块同步不能重复排队，请等待当前全局任务完成')
-      }
-      if (scope === 'public_and_personal' && active.scope === 'public_schedule') {
-        const now = reference.toISOString()
-        this.database.prepare(`
-          UPDATE ai_schedule_jobs SET scope = 'public_and_personal', updated_at = ? WHERE id = ?
-        `).run(now, active.id)
-        this.database.prepare(`
-          UPDATE sync_states SET last_scope = 'public_and_personal', updated_at = ? WHERE game_id = ?
-        `).run(now, gameId)
       }
       return this.getAiScheduleJob(active.id)
     }
@@ -1056,239 +732,12 @@ export class AppDatabase {
     )
     this.database.prepare(`
       UPDATE sync_states
-      SET status = 'idle', last_scope = ?, last_attempt_at = ?,
+      SET status = 'idle', last_attempt_at = ?,
           message = '公开资料任务已提交给 AI，等待检索', updated_at = ?
       WHERE game_id = ?
-    `).run(scope, now, now, gameId)
+    `).run(now, now, gameId)
     this.recordSyncTargetAttempt(gameId, target, 'idle', reference)
     return this.getAiScheduleJob(id)
-  }
-
-  createPersonalMetadataJob(
-    gameId: GameId,
-    target: Extract<PersonalSyncTarget, 'events' | 'cycles'>,
-    requestContext: SyncRequestContext,
-    reference = new Date(),
-    allowWithoutAgent = false
-  ): AiScheduleJob | null {
-    this.completeEmptyPersonalMetadataJobs(reference, gameId, target)
-    const targets = this.listPersonalMetadataEnrichmentTargets(
-      gameId,
-      target,
-      requestContext.outputLocale,
-      reference
-    )
-    if (targets.length === 0) return null
-    const agent = this.getAiScheduleAgentStatus(reference)
-    if (!agent.connected && !allowWithoutAgent) return null
-    this.requeueStaleAiScheduleJobs(reference)
-    const active = this.database.prepare(`
-      SELECT id FROM ai_schedule_jobs
-      WHERE game_id = ? AND target = ? AND job_kind = 'personal_metadata'
-        AND status IN ('pending', 'claimed')
-      ORDER BY requested_at ASC LIMIT 1
-    `).get(gameId, target) as { id: string } | undefined
-    if (active) return this.getAiScheduleJob(active.id)
-    const id = randomUUID()
-    const now = reference.toISOString()
-    this.database.prepare(`
-      INSERT INTO ai_schedule_jobs(
-        id, game_id, scope, target, user_timezone, output_locale, job_kind, status,
-        requested_at, progress_phase, progress_current, progress_total,
-        progress_updated_at, message, updated_at
-      ) VALUES (?, ?, 'public_schedule', ?, ?, ?, 'personal_metadata', 'pending', ?,
-        'queued', 0, ?, ?, '个人清单已建立，等待 Codex 补全标签与时间', ?)
-    `).run(
-      id,
-      gameId,
-      target,
-      requestContext.userTimeZone,
-      requestContext.outputLocale,
-      now,
-      targets.length,
-      now,
-      now
-    )
-    return this.getAiScheduleJob(id)
-  }
-
-  preparePersonalReviewJob(
-    gameId: GameId,
-    target: PersonalSyncTarget,
-    accountScope: string,
-    items: NormalizedSyncItem[],
-    drafts: SemanticReviewDraft[],
-    adapterVersion: string,
-    requestContext: SyncRequestContext,
-    reference = new Date()
-  ): { job: AiScheduleJob | null; items: NormalizedSyncItem[] } {
-    assertAccountScope(accountScope)
-    if (!adapterVersion.trim() || adapterVersion.length > 100) {
-      throw new Error('个人数据适配器版本格式不正确')
-    }
-    const relevant = drafts.filter((draft) => draft.target === target)
-    if (relevant.length === 0) return { job: null, items }
-
-    const identities = new Set<string>()
-    const reviewedIdentities = new Set<string>()
-    const unresolvedIdentities = new Set<string>()
-    const reviewTargets: PersonalReviewTarget[] = []
-    const cachedItems: NormalizedSyncItem[] = []
-    for (const draft of relevant) {
-      assertSanitizedSemanticPayload(draft.payload)
-      const identity = readSemanticSourceIdentity(draft.kind, draft.payload)
-      if (!identity) throw new Error('个人语义异常缺少可审计的官方来源标识')
-      const identityKey = `${identity.provider}\u0000${identity.endpoint}\u0000${identity.externalId}`
-      if (identities.has(identityKey)) throw new Error('个人语义异常包含重复官方标识')
-      identities.add(identityKey)
-      reviewedIdentities.add(identityKey)
-      const candidateId = randomUUID()
-      const cached = this.database.prepare(`
-        SELECT resolution_json AS resolutionJson
-        FROM personal_review_rules
-        WHERE game_id = ? AND provider = ? AND endpoint = ? AND external_id = ?
-          AND target = ? AND rule_version = 'personal-review-v3'
-      `).get(
-        gameId,
-        identity.provider,
-        identity.endpoint,
-        identity.externalId,
-        target
-      ) as { resolutionJson: string } | undefined
-      if (cached) {
-        try {
-          const resolution = JSON.parse(cached.resolutionJson) as PersonalReviewResolution
-          cachedItems.push(...this.materializePersonalReviewResolution(
-            target,
-            { candidateId, kind: draft.kind, issues: [], payload: draft.payload },
-            {
-              ...resolution,
-              candidateId,
-              // The stored boolean was only the observation at review time.
-              // Reuse the rule against the current official payload instead.
-              completed: undefined
-            },
-            requestContext.outputLocale
-          ))
-          continue
-        } catch {
-          // A stale rule must never block a new official snapshot. Re-review it.
-        }
-      }
-      const rawIssues = Array.isArray(draft.payload.reviewIssues)
-        ? draft.payload.reviewIssues.filter((issue): issue is PersonalReviewTarget['issues'][number] =>
-            typeof issue === 'string' && [
-              'item_identity',
-              'classification',
-              'completion_semantics',
-              'time_window',
-              'hierarchy'
-            ].includes(issue)
-          )
-        : []
-      reviewTargets.push({
-        candidateId,
-        kind: draft.kind,
-        issues: rawIssues.length > 0 ? [...new Set(rawIssues)] : ['item_identity'],
-        payload: draft.payload
-      })
-      unresolvedIdentities.add(identityKey)
-    }
-
-    const baseItems = items.filter((item) => {
-      if (!item.sourceIdentity) return true
-      const key = `${item.sourceIdentity.provider}\u0000${item.sourceIdentity.endpoint}\u0000${item.sourceIdentity.externalId}`
-      return !reviewedIdentities.has(key)
-    })
-    const resolvedItems = [...baseItems, ...cachedItems]
-    if (reviewTargets.length === 0) return { job: null, items: resolvedItems }
-
-    // Authenticated activities are safe to show as a provisional official
-    // snapshot once their stable identity and basic shape pass deterministic
-    // validation. Lifecycle/classification and completion semantics are refined
-    // asynchronously by the review job. Structural map anomalies still block
-    // activation because an invalid parent graph cannot be written safely.
-    const provisionalItems = target === 'events'
-      ? items.filter((item) => {
-          if (!item.sourceIdentity) return false
-          const key = `${item.sourceIdentity.provider}\u0000${item.sourceIdentity.endpoint}\u0000${item.sourceIdentity.externalId}`
-          return unresolvedIdentities.has(key)
-        })
-      : []
-
-    const active = this.getActiveAiScheduleJob(gameId, target, 'personal_review')
-    if (active) throw new Error('该版块仍有同步任务正在处理，请先等待或取消')
-    const id = randomUUID()
-    const now = reference.toISOString()
-    this.runTransaction(() => {
-      this.database.prepare(`
-        INSERT INTO ai_schedule_jobs(
-          id, game_id, scope, target, user_timezone, output_locale, job_kind, status,
-          requested_at, progress_phase, progress_current, progress_total,
-          progress_updated_at, message, updated_at
-        ) VALUES (?, ?, 'public_schedule', ?, ?, ?, 'personal_review', 'pending', ?,
-          'queued', 0, ?, ?, ?, ?)
-      `).run(
-        id,
-        gameId,
-        target,
-        requestContext.userTimeZone,
-        requestContext.outputLocale,
-        now,
-        reviewTargets.length,
-        now,
-        target === 'events'
-          ? '个人活动清单已建立，正在确认活动信息'
-          : '个人数据已暂存，正在确认清单结构',
-        now
-      )
-      this.database.prepare(`
-        INSERT INTO personal_review_batches(
-          job_id, game_id, target, account_scope, adapter_version,
-          base_items_json, review_targets_json, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        id,
-        gameId,
-        target,
-        accountScope,
-        adapterVersion.trim(),
-        stableJson(resolvedItems),
-        stableJson(reviewTargets),
-        now,
-        now
-      )
-    })
-    return {
-      job: this.getAiScheduleJob(id),
-      items: target === 'events' ? [...resolvedItems, ...provisionalItems] : []
-    }
-  }
-
-  private completeEmptyPersonalMetadataJobs(
-    reference = new Date(),
-    gameId?: GameId,
-    target?: Extract<PersonalSyncTarget, 'events' | 'cycles'>
-  ): number {
-    const rows = this.database.prepare(`
-      SELECT id FROM ai_schedule_jobs
-      WHERE job_kind = 'personal_metadata' AND status IN ('pending', 'claimed')
-        ${gameId ? 'AND game_id = ?' : ''}
-        ${target ? 'AND target = ?' : ''}
-    `).all(...[...(gameId ? [gameId] : []), ...(target ? [target] : [])]) as Array<{ id: string }>
-    const now = reference.toISOString()
-    let completed = 0
-    for (const row of rows) {
-      if (this.getAiScheduleJob(row.id).metadataTargets.length > 0) continue
-      completed += Number(this.database.prepare(`
-        UPDATE ai_schedule_jobs
-        SET status = 'completed', completed_at = ?, message = '个人清单元数据已经完整',
-            progress_phase = 'completed', progress_current = progress_total,
-            progress_updated_at = ?, updated_at = ?
-        WHERE id = ? AND status IN ('pending', 'claimed')
-      `).run(now, now, now, row.id).changes)
-    }
-    return completed
   }
 
   claimAiScheduleJob(
@@ -1571,7 +1020,6 @@ export class AppDatabase {
   }
 
   maintainAiScheduleJobs(reference = new Date()): { requeued: number; expired: number } {
-    this.completeEmptyPersonalMetadataJobs(reference)
     const requeued = this.requeueStaleAiScheduleJobs(reference)
     const expired = this.expireUnclaimedAiScheduleJobs(reference)
     return { requeued, expired }
@@ -1937,24 +1385,12 @@ export class AppDatabase {
           progress_updated_at = ?, updated_at = ?
       WHERE id = ? AND status = 'claimed' AND agent_id = ?
     `).run(now, JSON.stringify(evidence), message, now, now, jobId, agentId)
-    const current = this.getSyncSettings(job.gameId)
-    const personalIssue = job.scope === 'public_and_personal' &&
-      ['error', 'stale', 'verification_required'].includes(current.status)
     const partialPublicResult = job.target === 'all' && effectiveMissingTargets.length > 0
-    const finalStatus = personalIssue
-      ? current.status === 'verification_required'
-        ? 'verification_required'
-        : 'stale'
-      : partialPublicResult
-        ? 'stale'
-        : 'success'
-    const finalMessage = personalIssue && current.message
-      ? `${message}；${current.message}`
-      : message
+    const finalStatus = partialPublicResult ? 'stale' : 'success'
     this.recordSyncOutcome(
       job.gameId,
       finalStatus,
-      finalMessage,
+      message,
       !partialPublicResult
     )
     if (job.target === 'all') {
@@ -1979,513 +1415,6 @@ export class AppDatabase {
       archived,
       remainingTargets: effectiveMissingTargets
     }
-  }
-
-  applyPersonalMetadataJob(
-    jobId: string,
-    agentId: string,
-    updates: PersonalMetadataUpdate[],
-    evidence: unknown,
-    contentLocale: string,
-    reference = new Date()
-  ): {
-    job: AiScheduleJob
-    updated: number
-    expiredRemoved: number
-    unresolved: number
-  } {
-    const job = this.getAiScheduleJob(jobId)
-    if (job.jobKind !== 'personal_metadata') throw new Error('当前任务不是个人清单元数据补全任务')
-    if (job.status !== 'claimed' || job.agentId !== agentId) {
-      throw new Error('AI 资料任务未由当前 Agent 领取或已经结束')
-    }
-    if (contentLocale !== job.requestContext.outputLocale) {
-      throw new Error('提交内容语言与接口请求语言不一致')
-    }
-    const requiredById = new Map(job.metadataTargets.map((target) => [target.itemId, target]))
-    if (requiredById.size === 0) throw new Error('本次个人清单没有待补全元数据')
-    const submittedIds = new Set<string>()
-    for (const update of updates) {
-      const target = requiredById.get(update.itemId)
-      if (!target) throw new Error(`元数据目标“${update.title}”不在本次待补全清单中`)
-      if (submittedIds.has(update.itemId)) throw new Error(`事项“${update.title}”重复提交元数据`)
-      submittedIds.add(update.itemId)
-      if (update.title !== target.title) throw new Error(`元数据目标“${update.title}”已经变化`)
-      if (!Number.isFinite(update.confidence) || update.confidence < 0 || update.confidence > 1) {
-        throw new Error(`事项“${update.title}”的置信度格式不正确`)
-      }
-      try {
-        const url = new URL(update.sourceUrl)
-        if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error()
-      } catch {
-        throw new Error(`事项“${update.title}”缺少有效核验来源`)
-      }
-      const unresolved = new Set(update.unresolvedFields ?? [])
-      if ([...unresolved].some((field) => !target.missingFields.includes(field))) {
-        throw new Error(`事项“${update.title}”提交了未请求的 unresolvedFields`)
-      }
-      if (update.activityTags !== undefined && !target.missingFields.includes('activityTags')) {
-        throw new Error(`事项“${update.title}”不允许改写已有活动标签`)
-      }
-      if (update.startsAt !== undefined && !target.missingFields.includes('startsAt')) {
-        throw new Error(`事项“${update.title}”不允许改写已有开始时间`)
-      }
-      if (update.endsAt !== undefined && !target.missingFields.includes('endsAt')) {
-        throw new Error(`事项“${update.title}”不允许改写已有结束时间`)
-      }
-      for (const field of target.missingFields) {
-        if (field === 'activityTags') {
-          if (unresolved.has(field)) continue
-          const tags = normalizeActivityTags(update.activityTags ?? [], contentLocale)
-          if (!activityTagsMeetQualityContract(tags, contentLocale)) {
-            throw new Error(
-              `活动“${update.title}”必须提供 ${MIN_AI_ACTIVITY_TAGS} 到 ${MAX_AI_ACTIVITY_TAGS} 个有证据、含核心玩法的有效标签`
-            )
-          }
-          assertActivityTagEvidence(
-            update.title,
-            tags,
-            update.activityTagEvidence,
-            contentLocale
-          )
-        } else if ((update[field] === undefined || update[field] === null) && !unresolved.has(field)) {
-          throw new Error(`事项“${update.title}”遗漏字段 ${field}`)
-        }
-      }
-      if (unresolved.size > 0 && !update.unresolvedReason?.trim()) {
-        throw new Error(`事项“${update.title}”的未确认字段必须说明原因`)
-      }
-      if (
-        target.category === 'endgame' &&
-        (unresolved.has('startsAt') || unresolved.has('endsAt'))
-      ) {
-        throw new Error(`周期挑战“${update.title}”必须补齐当前期完整时间，不能提交未知时间`)
-      }
-      for (const field of ['startsAt', 'endsAt'] as const) {
-        const value = update[field]
-        if (value === undefined || value === null) continue
-        if (!/(?:Z|[+-]\d{2}:?\d{2})$/i.test(value) || Number.isNaN(Date.parse(value))) {
-          throw new Error(`事项“${update.title}”的 ${field} 必须是带时区的绝对时间`)
-        }
-      }
-      if (target.category === 'endgame') {
-        const startsAt = update.startsAt ?? target.startsAt
-        const endsAt = update.endsAt ?? target.endsAt
-        if (!startsAt || !endsAt) {
-          throw new Error(`周期挑战“${update.title}”必须补齐当前期完整起止时间`)
-        }
-        if (
-          Date.parse(startsAt) > reference.getTime() ||
-          Date.parse(endsAt) <= reference.getTime()
-        ) {
-          throw new Error(`周期挑战“${update.title}”必须提交当前正在进行的一期，不能提交过期或未来周期`)
-        }
-      }
-    }
-    const missingUpdates = job.metadataTargets.filter((target) => !submittedIds.has(target.itemId))
-    if (missingUpdates.length > 0) {
-      throw new Error(`个人元数据补全遗漏 ${missingUpdates.length} 项`)
-    }
-
-    const now = reference.toISOString()
-    let updated = 0
-    let expiredRemoved = 0
-    let unresolved = 0
-    this.runTransaction(() => {
-      for (const update of updates) {
-        const target = requiredById.get(update.itemId)!
-        const current = this.database.prepare(`
-          SELECT title, category, activity_tags_json AS activityTagsJson,
-            starts_at AS startsAt, ends_at AS endsAt, source_url AS sourceUrl
-          FROM checklist_items
-          WHERE id = ? AND game_id = ? AND source = 'personal_sync' AND archived = 0
-        `).get(update.itemId, job.gameId) as {
-          title: string
-          category: Extract<ChecklistCategory, 'limited_event' | 'endgame'>
-          activityTagsJson: string
-          startsAt: string | null
-          endsAt: string | null
-          sourceUrl: string | null
-        } | undefined
-        if (!current || current.title !== target.title || current.category !== target.category) continue
-        let currentTags: string[] = []
-        try {
-          const parsed = JSON.parse(current.activityTagsJson)
-          if (Array.isArray(parsed)) {
-            currentTags = parsed.filter((tag): tag is string => typeof tag === 'string')
-          }
-        } catch {
-          currentTags = []
-        }
-        const unresolvedFields = new Set(update.unresolvedFields ?? [])
-        const activityTags = target.missingFields.includes('activityTags') &&
-          !unresolvedFields.has('activityTags')
-          ? normalizeActivityTags(update.activityTags ?? [], contentLocale)
-          : normalizeActivityTags(currentTags, contentLocale)
-        const startsAt = target.missingFields.includes('startsAt') && update.startsAt !== undefined
-          ? update.startsAt
-          : current.startsAt
-        const endsAt = target.missingFields.includes('endsAt') && update.endsAt !== undefined
-          ? update.endsAt
-          : current.endsAt
-        this.assertTimeWindow(startsAt, endsAt)
-        const cacheItem: NormalizedSyncItem = {
-          remoteKey: `metadata:${target.sourceIdentity.externalId}`,
-          category: current.category,
-          title: current.title,
-          activityTags,
-          startsAt,
-          endsAt,
-          sourceUrl: update.sourceUrl,
-          sourceIdentity: target.sourceIdentity
-        }
-        this.cachePersonalMetadata(
-          job.gameId,
-          cacheItem,
-          contentLocale,
-          now,
-          update.confidence
-        )
-        if (endsAt && Date.parse(endsAt) <= reference.getTime()) {
-          this.database.prepare(`
-            INSERT INTO personal_expiry_tombstones(
-              game_id, provider, endpoint, external_id, category, expired_ends_at, observed_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(game_id, provider, endpoint, external_id) DO UPDATE SET
-              category = excluded.category,
-              expired_ends_at = excluded.expired_ends_at,
-              observed_at = excluded.observed_at
-          `).run(
-            job.gameId,
-            target.sourceIdentity.provider,
-            target.sourceIdentity.endpoint,
-            target.sourceIdentity.externalId,
-            current.category,
-            endsAt,
-            now
-          )
-          expiredRemoved += Number(this.database.prepare(`
-            DELETE FROM checklist_items
-            WHERE id = ? AND game_id = ? AND source = 'personal_sync'
-          `).run(update.itemId, job.gameId).changes)
-        } else {
-          const result = this.database.prepare(`
-            UPDATE checklist_items
-            SET activity_tags_json = ?, starts_at = ?, ends_at = ?,
-                source_url = COALESCE(source_url, ?), last_synced_at = ?, updated_at = ?
-            WHERE id = ? AND game_id = ? AND source = 'personal_sync' AND archived = 0
-          `).run(
-            JSON.stringify(current.category === 'limited_event' ? activityTags : []),
-            startsAt,
-            endsAt,
-            update.sourceUrl,
-            now,
-            now,
-            update.itemId,
-            job.gameId
-          )
-          updated += Number(result.changes)
-          if (current.category === 'endgame' && startsAt && endsAt) {
-            // A verified current window is the only point at which an expiry
-            // tombstone for a stable provider identity may be released.
-            this.database.prepare(`
-              DELETE FROM personal_expiry_tombstones
-              WHERE game_id = ? AND provider = ? AND endpoint = ? AND external_id = ?
-            `).run(
-              job.gameId,
-              target.sourceIdentity.provider,
-              target.sourceIdentity.endpoint,
-              target.sourceIdentity.externalId
-            )
-          }
-        }
-        unresolved += update.unresolvedFields?.length ?? 0
-      }
-      const message = `个人清单元数据补全完成：更新 ${updated}，淘汰到期 ${expiredRemoved}${
-        unresolved > 0 ? `，仍有 ${unresolved} 个时间字段无法可靠确认` : ''
-      }`
-      this.database.prepare(`
-        UPDATE ai_schedule_jobs
-        SET status = 'completed', completed_at = ?, evidence_json = ?, message = ?,
-            progress_phase = 'completed', progress_current = progress_total,
-            progress_updated_at = ?, updated_at = ?
-        WHERE id = ? AND status = 'claimed' AND agent_id = ?
-      `).run(now, JSON.stringify(evidence), message, now, now, jobId, agentId)
-      // The MCP worker opens the same database in a separate process. Its
-      // startup reconciliation marks an active metadata job as idle/syncing.
-      // Once the bounded metadata write commits, settle the section back to a
-      // successful terminal state so the renderer does not remain on “同步中”.
-      this.recordSyncTargetSuccess(job.gameId, job.target, reference)
-    })
-    return {
-      job: this.getAiScheduleJob(jobId),
-      updated,
-      expiredRemoved,
-      unresolved
-    }
-  }
-
-  applyPersonalReviewJob(
-    jobId: string,
-    agentId: string,
-    resolutions: PersonalReviewResolution[],
-    evidence: unknown,
-    contentLocale: string,
-    reference = new Date()
-  ): { job: AiScheduleJob; merge: SyncMergeResult } {
-    const job = this.getAiScheduleJob(jobId)
-    if (job.jobKind !== 'personal_review') {
-      throw new Error('当前任务不是个人数据异常核验任务')
-    }
-    if (job.status !== 'claimed' || job.agentId !== agentId) {
-      throw new Error('个人数据异常任务未由当前 Agent 领取或已经结束')
-    }
-    if (contentLocale !== job.requestContext.outputLocale) {
-      throw new Error('提交内容语言与接口请求语言不一致')
-    }
-    const batch = this.database.prepare(`
-      SELECT account_scope AS accountScope, adapter_version AS adapterVersion,
-        base_items_json AS baseItemsJson, review_targets_json AS reviewTargetsJson
-      FROM personal_review_batches WHERE job_id = ?
-    `).get(jobId) as {
-      accountScope: string
-      adapterVersion: string
-      baseItemsJson: string
-      reviewTargetsJson: string
-    } | undefined
-    if (!batch) throw new Error('个人数据异常暂存批次不存在')
-    const targets = JSON.parse(batch.reviewTargetsJson) as PersonalReviewTarget[]
-    const baseItems = JSON.parse(batch.baseItemsJson) as NormalizedSyncItem[]
-    const targetIds = new Set(targets.map((target) => target.candidateId))
-    if (targetIds.size !== targets.length || resolutions.length !== targets.length) {
-      throw new Error('必须逐项提交本批次全部个人数据异常')
-    }
-    const resolutionById = new Map<string, PersonalReviewResolution>()
-    for (const resolution of resolutions) {
-      if (!targetIds.has(resolution.candidateId) || resolutionById.has(resolution.candidateId)) {
-        throw new Error('个人数据异常提交包含未知或重复 candidateId')
-      }
-      resolutionById.set(resolution.candidateId, resolution)
-    }
-    const resolvedItems: NormalizedSyncItem[] = []
-    for (const target of targets) {
-      resolvedItems.push(...this.materializePersonalReviewResolution(
-        job.target as PersonalSyncTarget,
-        target,
-        resolutionById.get(target.candidateId)!,
-        contentLocale
-      ))
-    }
-    const finalItems = [...baseItems, ...resolvedItems]
-    if (job.target === 'exploration') {
-      const titleByRemoteKey = new Map(finalItems.map((item) => [item.remoteKey, item.title]))
-      for (const item of finalItems) {
-        if (item.category !== 'exploration' || item.mapNodeKind !== 'subregion') continue
-        item.parentTitle = item.parentRemoteKey
-          ? titleByRemoteKey.get(item.parentRemoteKey) ?? item.parentTitle ?? null
-          : null
-      }
-    }
-    const now = reference.toISOString()
-    const merge = this.runTransaction(() => {
-      for (const target of targets) {
-        const resolution = resolutionById.get(target.candidateId)!
-        const identity = readSemanticSourceIdentity(target.kind, target.payload)
-        if (!identity) throw new Error('个人语义异常缺少可缓存的官方身份')
-        this.database.prepare(`
-          INSERT INTO personal_review_rules(
-            game_id, provider, endpoint, external_id, target, rule_version,
-            resolution_json, evidence_json, confidence, verified_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, 'personal-review-v3', ?, ?, ?, ?, ?)
-          ON CONFLICT(game_id, provider, endpoint, external_id, target) DO UPDATE SET
-            rule_version = excluded.rule_version,
-            resolution_json = excluded.resolution_json,
-            evidence_json = excluded.evidence_json,
-            confidence = excluded.confidence,
-            verified_at = excluded.verified_at,
-            updated_at = excluded.updated_at
-        `).run(
-          job.gameId,
-          identity.provider,
-          identity.endpoint,
-          identity.externalId,
-          job.target,
-          stableJson(resolution),
-          stableJson(evidence),
-          resolution.confidence,
-          now,
-          now
-        )
-      }
-      const replaced = this.replacePersonalSnapshot(
-        job.gameId,
-        job.target as PersonalSyncTarget,
-        batch.accountScope,
-        finalItems,
-        batch.adapterVersion,
-        reference,
-        job.requestContext,
-        false
-      )
-      this.database.prepare(`
-        UPDATE ai_schedule_jobs
-        SET status = 'completed', completed_at = ?, evidence_json = ?,
-            message = ?, progress_phase = 'completed',
-            progress_current = progress_total, progress_updated_at = ?, updated_at = ?
-        WHERE id = ? AND status = 'claimed' AND agent_id = ?
-      `).run(
-        now,
-        stableJson(evidence),
-        `个人数据异常核验完成：处理 ${targets.length} 项`,
-        now,
-        now,
-        jobId,
-        agentId
-      )
-      return replaced
-    })
-    return { job: this.getAiScheduleJob(jobId), merge }
-  }
-
-  private materializePersonalReviewResolution(
-    target: PersonalSyncTarget,
-    review: PersonalReviewTarget,
-    resolution: PersonalReviewResolution,
-    outputLocale: string
-  ): NormalizedSyncItem[] {
-    if (!resolution.reason.trim() || resolution.reason.length > 500) {
-      throw new Error('个人数据异常决定必须包含简洁理由')
-    }
-    if (!Number.isFinite(resolution.confidence) || resolution.confidence < 0 || resolution.confidence > 1) {
-      throw new Error('个人数据异常决定的置信度格式不正确')
-    }
-    if (target === 'events') {
-      if (!resolution.eventScope) {
-        throw new Error('个人活动异常必须明确 limited、permanent 或 unknown 生命周期')
-      }
-      if (resolution.eventScope === 'limited' && resolution.decision !== 'include') {
-        throw new Error('已确认的限时活动必须使用 include')
-      }
-      if (resolution.eventScope !== 'limited' && resolution.decision !== 'exclude') {
-        throw new Error('常驻或仍无法确认的内容不能进入限时活动清单')
-      }
-    }
-    if (resolution.decision === 'exclude') return []
-    const identity = readSemanticSourceIdentity(review.kind, review.payload)
-    if (!identity) throw new Error('个人数据异常缺少官方来源标识')
-    const proposed = review.payload.proposedItem &&
-      typeof review.payload.proposedItem === 'object' &&
-      !Array.isArray(review.payload.proposedItem)
-      ? review.payload.proposedItem as Partial<NormalizedSyncItem>
-      : {}
-    const officialTitle = typeof review.payload.title === 'string'
-      ? review.payload.title.trim()
-      : typeof review.payload.officialTitle === 'string'
-        ? review.payload.officialTitle.trim()
-        : ''
-    const title = officialTitle || resolution.title?.trim() || proposed.title?.trim() || ''
-    if (!title) throw new Error('Codex 必须为保留的个人事项提交名称')
-
-    if (target === 'events') {
-      const activityTags = normalizeActivityTags(resolution.activityTags ?? [], outputLocale)
-      if (activityTags.length > 0 && !activityTagsMeetQualityContract(activityTags, outputLocale)) {
-        throw new Error(
-          `个人活动“${title}”若在异常审核中提交标签，必须提供 ${MIN_AI_ACTIVITY_TAGS} 到 ${MAX_AI_ACTIVITY_TAGS} 个有证据、含核心玩法的标签；也可省略并交给后续元数据任务`
-        )
-      }
-      let completed: boolean | undefined
-      if (resolution.completionRule) {
-        assertPersonalCompletionRule(resolution.completionRule)
-        const state = readPersonalDraftState(
-          { target: 'events', kind: review.kind, payload: review.payload },
-          resolution.completionRule
-        )
-        if (state) completed = state.completionState === 'completed'
-      }
-      if (resolution.completed !== undefined && completed !== resolution.completed) {
-        throw new Error(`活动“${title}”的完成规则无法机械复现提交状态`)
-      }
-      return [{
-        remoteKey: proposed.remoteKey ??
-          `personal-event:${identity.provider}:${identity.endpoint}:${identity.externalId}`,
-        category: 'limited_event',
-        title,
-        activityTags,
-        completed,
-        startsAt: proposed.startsAt ?? resolution.startsAt ?? null,
-        endsAt: proposed.endsAt ?? resolution.endsAt ?? null,
-        scheduleKind: 'fixed_window',
-        modeKey: proposed.modeKey ?? resolution.modeKey ?? `official-event-${identity.externalId}`,
-        sourceUrl: resolution.sourceUrl ?? proposed.sourceUrl ?? null,
-        sourceIdentity: identity
-      }]
-    }
-
-    if (target === 'exploration') {
-      const progress = review.payload.observedProgress
-      if (typeof progress !== 'number' || !Number.isFinite(progress) || progress < 0 || progress > 100) {
-        throw new Error(`个人地图“${title}”缺少可信探索度`)
-      }
-      const mapNodeKind = resolution.mapNodeKind ?? proposed.mapNodeKind
-      if (mapNodeKind !== 'region' && mapNodeKind !== 'subregion') {
-        throw new Error(`个人地图“${title}”缺少一级/二级层级决定`)
-      }
-      const parentExternalId = resolution.parentExternalId ?? (
-        typeof review.payload.observedParentId === 'string' ||
-        typeof review.payload.observedParentId === 'number'
-          ? String(review.payload.observedParentId).trim()
-          : null
-      )
-      if (mapNodeKind === 'region' && parentExternalId) {
-        throw new Error(`一级地图“${title}”不能包含父级`)
-      }
-      if (mapNodeKind === 'subregion' && !parentExternalId) {
-        throw new Error(`二级地图“${title}”必须提交一级父地区官方 ID`)
-      }
-      return [{
-        remoteKey: `personal-map:${identity.provider}:${identity.externalId}`,
-        category: 'exploration',
-        title,
-        completed: progress === 100,
-        progressPercent: progress,
-        parentTitle: typeof review.payload.observedParentTitle === 'string'
-          ? review.payload.observedParentTitle.trim() || null
-          : null,
-        mapNodeKind,
-        parentRemoteKey: mapNodeKind === 'subregion'
-          ? `personal-map:${identity.provider}:${parentExternalId}`
-          : null,
-        modeKey: resolution.modeKey ?? `official-map-${identity.externalId}`,
-        sourceUrl: resolution.sourceUrl ?? null,
-        sourceIdentity: identity
-      }]
-    }
-
-    const observed = readPersonalDraftState(
-      { target: 'cycles', kind: review.kind, payload: review.payload }
-    )
-    const completed = observed
-      ? observed.completionState === 'completed'
-      : resolution.completed
-    if (typeof completed !== 'boolean') {
-      throw new Error(`个人周期事项“${title}”缺少可信挑战记录语义`)
-    }
-    const modeKey = resolution.modeKey?.trim() || proposed.modeKey?.trim() || ''
-    if (!modeKey) throw new Error(`个人周期事项“${title}”缺少稳定模式标识`)
-    return [{
-      remoteKey: proposed.remoteKey ??
-        `personal-cycle:${identity.provider}:${identity.endpoint}:${identity.externalId}`,
-      category: 'endgame',
-      title,
-      completed,
-      startsAt: proposed.startsAt ?? resolution.startsAt ?? null,
-      endsAt: proposed.endsAt ?? resolution.endsAt ?? null,
-      periodKey: proposed.periodKey ?? resolution.periodKey ?? null,
-      scheduleKind: 'remote_schedule',
-      modeKey,
-      sourceUrl: resolution.sourceUrl ?? proposed.sourceUrl ?? null,
-      sourceIdentity: identity
-    }]
   }
 
   failAiScheduleJob(jobId: string, agentId: string, message: string, reference = new Date()): AiScheduleJob {
@@ -2723,8 +1652,7 @@ export class AppDatabase {
       WHERE j.id = ?
     `).get(id) as Omit<
       AiScheduleJob,
-      'activityTagTargets' | 'metadataTargets' | 'reviewTargets' |
-      'matchCandidates' | 'contract' | 'requestContext'
+      'activityTagTargets' | 'matchCandidates' | 'contract' | 'requestContext'
     > | undefined
     if (!row) throw new Error('AI 资料任务不存在')
     const activityTagTargets = row.jobKind === 'public_catalog' && (
@@ -2764,20 +1692,6 @@ export class AppDatabase {
         completed: item.completed,
         progressPercent: item.progressPercent
       })) : []
-    const metadataTargets = row.jobKind === 'personal_metadata' &&
-      (row.status === 'pending' || row.status === 'claimed') &&
-      (row.target === 'events' || row.target === 'cycles')
-      ? this.listPersonalMetadataEnrichmentTargets(
-          row.gameId,
-          row.target,
-          row.outputLocale,
-          new Date(row.requestedAt)
-        )
-      : []
-    const reviewTargets = row.jobKind === 'personal_review' &&
-      (row.status === 'pending' || row.status === 'claimed')
-      ? this.readPersonalReviewTargets(row.id)
-      : []
     return {
       ...row,
       requestContext: {
@@ -2785,109 +1699,12 @@ export class AppDatabase {
         userTimeZone: row.userTimeZone
       },
       activityTagTargets,
-      metadataTargets,
-      reviewTargets,
       matchCandidates,
-      contract: row.jobKind === 'personal_review' &&
-        (row.target === 'events' || row.target === 'cycles' || row.target === 'exploration')
-        ? getPersonalReviewContract(row.target, {
-            outputLocale: row.outputLocale,
-            userTimeZone: row.userTimeZone
-          })
-        : row.jobKind === 'personal_metadata' &&
-          (row.target === 'events' || row.target === 'cycles')
-          ? getPersonalMetadataContract(row.target, {
-            outputLocale: row.outputLocale,
-            userTimeZone: row.userTimeZone
-          })
-        : getPublicSyncContract(row.target, {
-            outputLocale: row.outputLocale,
-            userTimeZone: row.userTimeZone
-          })
+      contract: getPublicSyncContract(row.target, {
+        outputLocale: row.outputLocale,
+        userTimeZone: row.userTimeZone
+      })
     }
-  }
-
-  private readPersonalReviewTargets(jobId: string): PersonalReviewTarget[] {
-    const row = this.database.prepare(`
-      SELECT review_targets_json AS reviewTargetsJson
-      FROM personal_review_batches WHERE job_id = ?
-    `).get(jobId) as { reviewTargetsJson: string } | undefined
-    if (!row) return []
-    const value = JSON.parse(row.reviewTargetsJson) as unknown
-    if (!Array.isArray(value)) throw new Error('个人数据异常暂存格式不正确')
-    return value as PersonalReviewTarget[]
-  }
-
-  private listPersonalMetadataEnrichmentTargets(
-    gameId: GameId,
-    target: Extract<PersonalSyncTarget, 'events' | 'cycles'>,
-    outputLocale: string,
-    reference = new Date()
-  ): PersonalMetadataEnrichmentTarget[] {
-    const category = target === 'events' ? 'limited_event' : 'endgame'
-    const rows = this.database.prepare(`
-      SELECT i.id AS itemId, i.title, i.category,
-        i.activity_tags_json AS activityTagsJson,
-        i.starts_at AS startsAt, i.ends_at AS endsAt,
-        i.mode_key AS modeKey,
-        b.provider, b.endpoint, b.external_id AS externalId
-      FROM checklist_items i
-      INNER JOIN source_bindings b ON b.game_id = i.game_id AND b.item_id = i.id
-      WHERE i.game_id = ? AND i.category = ? AND i.source = 'personal_sync'
-        AND i.archived = 0
-        AND (i.ends_at IS NULL OR julianday(i.ends_at) > julianday(?))
-      ORDER BY COALESCE(i.starts_at, i.created_at), i.created_at
-    `).all(gameId, category, reference.toISOString()) as Array<{
-      itemId: string
-      title: string
-      category: Extract<ChecklistCategory, 'limited_event' | 'endgame'>
-      activityTagsJson: string
-      startsAt: string | null
-      endsAt: string | null
-      modeKey: string | null
-      provider: string
-      endpoint: string
-      externalId: string
-    }>
-    return rows.flatMap((row) => {
-      let currentTags: string[] = []
-      try {
-        const parsed = JSON.parse(row.activityTagsJson)
-        if (Array.isArray(parsed)) {
-          currentTags = parsed.filter((tag): tag is string => typeof tag === 'string')
-        }
-      } catch {
-        // Invalid stored values require enrichment.
-      }
-      currentTags = normalizeActivityTags(currentTags, outputLocale)
-      const missingFields: PersonalMetadataEnrichmentTarget['missingFields'] = []
-      if (target === 'events' && activityTagsNeedReview(currentTags)) {
-        missingFields.push('activityTags')
-      }
-      if (!row.startsAt) missingFields.push('startsAt')
-      if (!row.endsAt) missingFields.push('endsAt')
-      if (missingFields.length === 0) return []
-      return [{
-        itemId: row.itemId,
-        title: row.title,
-        category: row.category,
-        currentTags,
-        startsAt: row.startsAt,
-        endsAt: row.endsAt,
-        missingFields,
-        ...(target === 'cycles' ? {
-          timeWindowPolicy:
-            gameId === 'wuthering-waves' && row.modeKey === 'endstate-matrix'
-              ? 'current_playable_phase' as const
-              : 'full_cycle' as const
-        } : {}),
-        sourceIdentity: {
-          provider: row.provider,
-          endpoint: row.endpoint,
-          externalId: row.externalId
-        }
-      }]
-    })
   }
 
   private listActivityTagEnrichmentTargets(
@@ -3340,120 +2157,79 @@ export class AppDatabase {
     return Number(result.changes)
   }
 
-  private hydratePersonalMetadataFromCache(
+  private findBaselineItemForPersonalProgress(
     gameId: GameId,
-    item: NormalizedSyncItem,
-    outputLocale: string,
-    reference: Date
-  ): NormalizedSyncItem {
-    if (
-      !item.sourceIdentity ||
-      (item.category !== 'limited_event' && item.category !== 'endgame')
-    ) return { ...item }
-    const cached = this.database.prepare(`
-      SELECT activity_tags_json AS activityTagsJson,
-        starts_at AS startsAt, ends_at AS endsAt, source_url AS sourceUrl
-      FROM personal_metadata_cache
-      WHERE game_id = ? AND provider = ? AND endpoint = ? AND external_id = ?
-        AND output_locale = ? AND taxonomy_version = ?
-    `).get(
-      gameId,
-      item.sourceIdentity.provider,
-      item.sourceIdentity.endpoint,
-      item.sourceIdentity.externalId,
-      outputLocale,
-      ACTIVITY_TAG_TAXONOMY_VERSION
-    ) as {
-      activityTagsJson: string | null
-      startsAt: string | null
-      endsAt: string | null
-      sourceUrl: string | null
-    } | undefined
-    if (!cached) return { ...item }
-    let cachedTags: string[] = []
-    try {
-      const parsed = cached.activityTagsJson ? JSON.parse(cached.activityTagsJson) : []
-      if (Array.isArray(parsed)) {
-        cachedTags = parsed.filter((tag): tag is string => typeof tag === 'string')
-      }
-    } catch {
-      cachedTags = []
+    item: NormalizedSyncItem
+  ): ChecklistItem | null {
+    const identity = item.sourceIdentity
+    if (identity) {
+      const bound = this.database.prepare(`
+        SELECT checklist.id
+        FROM source_bindings binding
+        JOIN checklist_items checklist ON checklist.id = binding.item_id
+        WHERE binding.game_id = ? AND binding.provider = ? AND binding.endpoint = ?
+          AND binding.external_id = ? AND checklist.archived = 0
+          AND checklist.source = 'public_schedule'
+        LIMIT 1
+      `).get(
+        gameId,
+        identity.provider,
+        identity.endpoint,
+        identity.externalId
+      ) as { id: string } | undefined
+      if (bound) return this.getChecklistItem(bound.id)
     }
-    const currentTags = normalizeActivityTags(item.activityTags ?? [], outputLocale)
-    const cachedEndsAt = cached.endsAt ? Date.parse(cached.endsAt) : Number.NaN
-    // Recurring challenge identities may remain stable across periods.  A
-    // cached window that has already ended describes the previous period and
-    // must not make a fresh official response expire before it can be
-    // enriched with the current window.
-    const reuseCachedWindow = item.category !== 'endgame' ||
-      !Number.isFinite(cachedEndsAt) || cachedEndsAt > reference.getTime()
-    return {
-      ...item,
-      activityTags: item.category === 'limited_event' && activityTagsNeedReview(currentTags)
-        ? cachedTags.length > 0 ? cachedTags : currentTags
-        : currentTags,
-      startsAt: item.startsAt || (reuseCachedWindow ? cached.startsAt : null),
-      endsAt: item.endsAt || (reuseCachedWindow ? cached.endsAt : null),
-      sourceUrl: item.sourceUrl || cached.sourceUrl
-    }
-  }
 
-  private cachePersonalMetadata(
-    gameId: GameId,
-    item: NormalizedSyncItem,
-    outputLocale: string,
-    verifiedAt: string,
-    confidence = 1
-  ): void {
-    if (
-      !item.sourceIdentity ||
-      (item.category !== 'limited_event' && item.category !== 'endgame')
-    ) return
-    const normalizedTags = item.category === 'limited_event'
-      ? normalizeActivityTags(item.activityTags ?? [], outputLocale)
-      : []
-    const activityTagsJson = normalizedTags.length > 0 && !activityTagsNeedReview(normalizedTags)
-      ? JSON.stringify(normalizedTags)
-      : null
-    if (!activityTagsJson && !item.startsAt && !item.endsAt) return
-    this.database.prepare(`
-      INSERT INTO personal_metadata_cache(
-        game_id, provider, endpoint, external_id, output_locale, category,
-        activity_tags_json, starts_at, ends_at, source_url, confidence,
-        verified_at, updated_at, taxonomy_version
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(game_id, provider, endpoint, external_id, output_locale) DO UPDATE SET
-        category = excluded.category,
-        activity_tags_json = COALESCE(excluded.activity_tags_json, personal_metadata_cache.activity_tags_json),
-        starts_at = COALESCE(excluded.starts_at, personal_metadata_cache.starts_at),
-        ends_at = COALESCE(excluded.ends_at, personal_metadata_cache.ends_at),
-        source_url = COALESCE(excluded.source_url, personal_metadata_cache.source_url),
-        confidence = COALESCE(excluded.confidence, personal_metadata_cache.confidence),
-        taxonomy_version = excluded.taxonomy_version,
-        verified_at = excluded.verified_at,
-        updated_at = excluded.updated_at
-    `).run(
-      gameId,
-      item.sourceIdentity.provider,
-      item.sourceIdentity.endpoint,
-      item.sourceIdentity.externalId,
-      outputLocale,
-      item.category,
-      activityTagsJson,
-      item.startsAt ?? null,
-      item.endsAt ?? null,
-      item.sourceUrl ?? null,
-      confidence,
-      verifiedAt,
-      verifiedAt,
-      ACTIVITY_TAG_TAXONOMY_VERSION
+    const candidates = this.listChecklistItems(gameId).filter((candidate) =>
+      candidate.source === 'public_schedule' && candidate.category === item.category
     )
+    const remoteMatch = candidates.find((candidate) => candidate.remoteKey === item.remoteKey)
+    if (remoteMatch) return remoteMatch
+
+    if (item.category === 'endgame') {
+      const modeMatch = candidates.find((candidate) =>
+        Boolean(item.modeKey) && candidate.modeKey === item.modeKey
+      )
+      if (modeMatch) return modeMatch
+      const definition = findCycleMode(gameId, item)
+      if (definition) {
+        return candidates.find((candidate) => candidate.modeKey === definition.modeKey) ?? null
+      }
+    }
+
+    const title = normalizeSourceTitle(item.title)
+    if (item.category === 'exploration') {
+      const nodeKind = item.mapNodeKind ?? null
+      const parent = item.parentTitle ? normalizeSourceTitle(item.parentTitle) : null
+      const matches = candidates.filter((candidate) =>
+        normalizeSourceTitle(candidate.title) === title &&
+        (!nodeKind || candidate.mapNodeKind === nodeKind) &&
+        (!parent || normalizeSourceTitle(candidate.parentTitle ?? '') === parent)
+      )
+      return matches.length === 1 ? matches[0] : null
+    }
+
+    if (item.category === 'limited_event') {
+      const matches = candidates.filter((candidate) =>
+        eventTitlesEquivalent(candidate.title, item.title) &&
+        (
+          !item.startsAt || !item.endsAt || !candidate.startsAt || !candidate.endsAt ||
+          itemTimeWindowOverlapsPayload(candidate, {
+            observedStartsAt: item.startsAt,
+            observedEndsAt: item.endsAt
+          })
+        )
+      )
+      return matches.length === 1 ? matches[0] : null
+    }
+
+    return candidates.find((candidate) => normalizeSourceTitle(candidate.title) === title) ?? null
   }
 
   /**
-   * Switches one section to a complete authenticated snapshot.  Public and
-   * personal rows are deliberately not reconciled: the selected source owns
-   * the section until the user explicitly chooses the other source.
+   * Applies an authenticated progress snapshot to the persistent baseline.
+   * The adapter may prove completion and progress, but it never owns titles,
+   * time windows, tags or hierarchy and therefore cannot replace the catalog.
    */
   replacePersonalSnapshot(
     gameId: GameId,
@@ -3492,12 +2268,28 @@ export class AppDatabase {
       if (identities.has(identity)) throw new Error(`个人快照包含重复官方标识：${item.title}`)
       identities.add(identity)
     }
-    const preparedItems = items.map((item) => this.hydratePersonalMetadataFromCache(
-      gameId,
-      item,
-      requestContext.outputLocale,
-      reference
-    ))
+    const preparedItems = items.flatMap((item): NormalizedSyncItem[] => {
+      const baseline = this.findBaselineItemForPersonalProgress(gameId, item)
+      if (!baseline?.remoteKey) return []
+      return [{
+        ...item,
+        remoteKey: baseline.remoteKey,
+        title: baseline.title,
+        activityTags: baseline.activityTags,
+        parentTitle: baseline.parentTitle,
+        mapNodeKind: baseline.mapNodeKind,
+        parentRemoteKey: baseline.parentRemoteKey,
+        startsAt: baseline.startsAt,
+        endsAt: baseline.endsAt,
+        resetRule: baseline.resetRule,
+        periodKey: baseline.periodKey,
+        scheduleKind: baseline.scheduleKind,
+        resetWeekday: baseline.resetWeekday,
+        timeZone: baseline.timeZone,
+        modeKey: baseline.modeKey,
+        sourceUrl: baseline.sourceUrl
+      }]
+    })
     const activeItems: NormalizedSyncItem[] = []
     const expiredItems: NormalizedSyncItem[] = []
     const suppressedItems: NormalizedSyncItem[] = []
@@ -3557,8 +2349,6 @@ export class AppDatabase {
       }
       activeItems.push(item)
     }
-    this.assertStandaloneMapStructure(activeItems)
-
     const replace = (): SyncMergeResult => {
       const now = reference.toISOString()
       const categories = expectedCategories[target]
@@ -3680,22 +2470,6 @@ export class AppDatabase {
         now
       )
 
-      // Replace only the active competing checklist. Rows in the recycle bin are
-      // an explicit user choice and remain untouched until restored or emptied.
-      // Custom items are outside these category sets.
-      this.database.prepare(`
-        DELETE FROM checklist_items
-        WHERE game_id = ? AND category IN (${placeholders})
-          AND source <> 'personal_sync' AND archived = 0
-      `).run(gameId, ...categories)
-      if (target !== 'events') {
-        this.database.prepare(`
-          UPDATE checklist_items
-          SET manual_completion_locked = 0
-          WHERE game_id = ? AND category IN (${placeholders}) AND source = 'personal_sync'
-        `).run(gameId, ...categories)
-      }
-
       const merge = this.mergeSyncedItems(
         gameId,
         'personal_sync',
@@ -3704,6 +2478,7 @@ export class AppDatabase {
         false,
         { codexReviewed: true, identityPolicy: 'remote-key-only' }
       )
+      merge.preserved += items.length - preparedItems.length + suppressedItems.length
       const remoteKeys = activeItems.map((item) => item.remoteKey)
       if (remoteKeys.length === 0) {
         this.database.prepare(`
@@ -3723,8 +2498,8 @@ export class AppDatabase {
 
       const findItem = this.database.prepare(`
         SELECT id, archived FROM checklist_items
-        WHERE game_id = ? AND source = 'personal_sync' AND remote_key = ?
-        ORDER BY archived ASC, updated_at DESC
+        WHERE game_id = ? AND source IN ('public_schedule', 'personal_sync') AND remote_key = ?
+        ORDER BY archived ASC, CASE WHEN source = 'public_schedule' THEN 0 ELSE 1 END, updated_at DESC
         LIMIT 1
       `)
       const bind = this.database.prepare(`
@@ -3764,20 +2539,19 @@ export class AppDatabase {
           now,
           now
         )
-        this.cachePersonalMetadata(gameId, item, requestContext.outputLocale, now)
       }
 
       this.database.prepare(`
         INSERT INTO sync_target_states(
           game_id, target, last_success_at, last_attempt_at, status,
           catalog_coverage, catalog_source, active_account_scope, active_snapshot_id
-        ) VALUES (?, ?, ?, ?, 'success', 'complete', 'personal_data', ?, ?)
+        ) VALUES (?, ?, ?, ?, 'success', 'complete', 'public_schedule', ?, ?)
         ON CONFLICT(game_id, target) DO UPDATE SET
           last_success_at = excluded.last_success_at,
           last_attempt_at = excluded.last_attempt_at,
           status = 'success',
           catalog_coverage = 'complete',
-          catalog_source = 'personal_data',
+          catalog_source = 'public_schedule',
           active_account_scope = excluded.active_account_scope,
           active_snapshot_id = excluded.active_snapshot_id
       `).run(gameId, target, now, now, accountScope, snapshotId)
@@ -3847,15 +2621,6 @@ export class AppDatabase {
     }
     const selected = categories[target]
     const placeholders = selected.map(() => '?').join(', ')
-    const now = new Date().toISOString()
-    this.database.prepare(`
-      UPDATE ai_schedule_jobs
-      SET status = 'failed', completed_at = ?, message = '清单已切换为公开资料，个人数据 Codex 任务已取消',
-          progress_phase = 'failed', progress_current = NULL, progress_total = NULL,
-          progress_updated_at = ?, updated_at = ?
-      WHERE game_id = ? AND target = ? AND job_kind IN ('personal_metadata', 'personal_review')
-        AND status IN ('pending', 'claimed')
-    `).run(now, now, now, gameId, target)
     this.database.prepare(`
       DELETE FROM checklist_items
       WHERE game_id = ? AND category IN (${placeholders})
@@ -4086,7 +2851,9 @@ export class AppDatabase {
             item.timeZone === undefined ? current.timeZone : item.timeZone,
             item.modeKey === undefined ? current.modeKey : item.modeKey,
             null,
-            source,
+            identity.source === 'public_schedule' && source === 'personal_sync'
+              ? 'public_schedule'
+              : source,
             item.sourceUrl === undefined ? current.sourceUrl : item.sourceUrl,
             manualCompletionLocked ? 1 : 0,
             completedAt,
@@ -4122,10 +2889,10 @@ export class AppDatabase {
         FROM checklist_items
         WHERE game_id = ?
           AND remote_key = ?
-          AND source = ?
-        ORDER BY updated_at DESC
+          AND (source = ? OR (? = 'personal_sync' AND source = 'public_schedule'))
+        ORDER BY CASE WHEN source = 'public_schedule' THEN 0 ELSE 1 END, updated_at DESC
         LIMIT 1
-      `).get(gameId, remoteKey, source) as {
+      `).get(gameId, remoteKey, source, source) as {
         id: string
         archived: number
         source: ChecklistSource
@@ -4653,6 +3420,10 @@ export class AppDatabase {
         'SELECT MAX(version) AS version FROM schema_migrations'
       ).get() as { version: number | null }
       if (version.version === 1) this.migrateVersion1To2()
+      const migrated = this.database.prepare(
+        'SELECT MAX(version) AS version FROM schema_migrations'
+      ).get() as { version: number | null }
+      if (migrated.version === 2) this.migrateVersion2To3()
       const current = this.database.prepare(
         'SELECT MAX(version) AS version FROM schema_migrations'
       ).get() as { version: number | null }
@@ -4745,21 +3516,14 @@ export class AppDatabase {
 
       CREATE TABLE sync_states (
         game_id TEXT PRIMARY KEY REFERENCES games(id) ON DELETE CASCADE,
-        mode TEXT NOT NULL DEFAULT 'manual'
-          CHECK (mode IN ('manual', 'public_schedule', 'personal_sync')),
         status TEXT NOT NULL DEFAULT 'idle'
           CHECK (status IN ('idle', 'success', 'error', 'stale', 'verification_required')),
         last_attempt_at TEXT,
         last_success_at TEXT,
         message TEXT,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        run_mode TEXT NOT NULL DEFAULT 'manual' CHECK (run_mode = 'manual'),
-        auto_scope TEXT NOT NULL DEFAULT 'public_schedule' CHECK (auto_scope = 'public_schedule'),
-        last_scope TEXT CHECK (
-          last_scope IS NULL OR last_scope IN ('public_schedule', 'public_and_personal')
-        ),
-        initial_guide_dismissed INTEGER NOT NULL DEFAULT 0
-          CHECK (initial_guide_dismissed IN (0, 1))
+        auto_sync_enabled INTEGER NOT NULL DEFAULT 1
+          CHECK (auto_sync_enabled IN (0, 1))
       );
 
       CREATE TABLE sync_target_states (
@@ -4789,7 +3553,7 @@ export class AppDatabase {
       CREATE TABLE ai_schedule_jobs (
         id TEXT PRIMARY KEY,
         game_id TEXT NOT NULL REFERENCES games(id) ON DELETE RESTRICT,
-        scope TEXT NOT NULL CHECK (scope IN ('public_schedule', 'public_and_personal')),
+        scope TEXT NOT NULL CHECK (scope = 'public_schedule'),
         status TEXT NOT NULL CHECK (status IN ('pending', 'claimed', 'completed', 'failed')),
         requested_at TEXT NOT NULL,
         claimed_at TEXT,
@@ -4810,7 +3574,7 @@ export class AppDatabase {
         progress_updated_at TEXT,
         output_locale TEXT NOT NULL DEFAULT 'zh-CN',
         job_kind TEXT NOT NULL DEFAULT 'public_catalog'
-          CHECK (job_kind IN ('public_catalog', 'personal_metadata', 'personal_review')),
+          CHECK (job_kind = 'public_catalog'),
         routing_tier INTEGER NOT NULL DEFAULT 0,
         attempt_count INTEGER NOT NULL DEFAULT 0,
         assigned_model TEXT,
@@ -4879,53 +3643,6 @@ export class AppDatabase {
       CREATE INDEX personal_sync_snapshots_target
         ON personal_sync_snapshots(game_id, target, activated_at DESC);
 
-      CREATE TABLE personal_review_batches (
-        job_id TEXT PRIMARY KEY REFERENCES ai_schedule_jobs(id) ON DELETE CASCADE,
-        game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-        target TEXT NOT NULL CHECK (target IN ('events', 'cycles', 'exploration')),
-        account_scope TEXT NOT NULL,
-        adapter_version TEXT NOT NULL,
-        base_items_json TEXT NOT NULL,
-        review_targets_json TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-      CREATE INDEX personal_review_batches_target
-        ON personal_review_batches(game_id, target, created_at DESC);
-
-      CREATE TABLE personal_review_rules (
-        game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-        provider TEXT NOT NULL,
-        endpoint TEXT NOT NULL,
-        external_id TEXT NOT NULL,
-        target TEXT NOT NULL CHECK (target IN ('events', 'cycles', 'exploration')),
-        rule_version TEXT NOT NULL,
-        resolution_json TEXT NOT NULL,
-        evidence_json TEXT NOT NULL,
-        confidence REAL NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
-        verified_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        PRIMARY KEY(game_id, provider, endpoint, external_id, target)
-      );
-
-      CREATE TABLE personal_metadata_cache (
-        game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-        provider TEXT NOT NULL,
-        endpoint TEXT NOT NULL,
-        external_id TEXT NOT NULL,
-        output_locale TEXT NOT NULL,
-        category TEXT NOT NULL CHECK (category IN ('limited_event', 'endgame')),
-        activity_tags_json TEXT,
-        starts_at TEXT,
-        ends_at TEXT,
-        source_url TEXT,
-        confidence REAL CHECK (confidence IS NULL OR (confidence >= 0 AND confidence <= 1)),
-        verified_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        taxonomy_version INTEGER NOT NULL DEFAULT 1,
-        PRIMARY KEY(game_id, provider, endpoint, external_id, output_locale)
-      );
-
       CREATE TABLE personal_expiry_tombstones (
         game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
         provider TEXT NOT NULL,
@@ -4973,18 +3690,6 @@ export class AppDatabase {
         updated_at TEXT NOT NULL
       );
 
-      CREATE TABLE codex_worker_settings (
-        singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-        strategy TEXT NOT NULL DEFAULT 'fixed' CHECK (strategy = 'fixed'),
-        model TEXT NOT NULL DEFAULT 'gpt-5.6-sol'
-          CHECK (model IN ('inherit', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna')),
-        reasoning_effort TEXT NOT NULL DEFAULT 'medium'
-          CHECK (reasoning_effort IN ('inherit', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra')),
-        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-      );
-      INSERT INTO codex_worker_settings(singleton, strategy, model, reasoning_effort)
-        VALUES (1, 'fixed', 'gpt-5.6-sol', 'medium');
-
       INSERT INTO schema_migrations(version) VALUES (${CURRENT_SCHEMA_VERSION});
       COMMIT;
     `)
@@ -5019,6 +3724,66 @@ export class AppDatabase {
       `).run()
       this.database.prepare(`
         INSERT INTO schema_migrations(version, applied_at) VALUES (2, ?)
+      `).run(now)
+      this.database.exec('COMMIT')
+    } catch (error) {
+      this.database.exec('ROLLBACK')
+      throw error
+    }
+  }
+
+  private migrateVersion2To3(): void {
+    const now = new Date().toISOString()
+    this.database.exec('BEGIN IMMEDIATE')
+    try {
+      const syncStateColumns = this.database.prepare(`PRAGMA table_info(sync_states)`).all() as Array<{
+        name: string
+      }>
+      if (!syncStateColumns.some((column) => column.name === 'auto_sync_enabled')) {
+        this.database.exec(`
+          ALTER TABLE sync_states ADD COLUMN auto_sync_enabled INTEGER NOT NULL DEFAULT 1
+            CHECK (auto_sync_enabled IN (0, 1));
+        `)
+      }
+      // Existing personal rows remain in place until startup has seeded the
+      // complete baseline. Their progress is then absorbed deterministically
+      // into matching baseline rows and the obsolete personal structure is
+      // removed without ever becoming the catalog itself.
+      // User-authored rows from the formerly editable built-in sections stay
+      // fully editable by moving into the one section that remains local.
+      this.database.prepare(`
+        UPDATE checklist_items
+        SET category = 'custom', activity_tags_json = '[]', progress_percent = NULL,
+            parent_title = NULL, map_node_kind = NULL, parent_remote_key = NULL,
+            starts_at = NULL, ends_at = NULL, reset_rule = NULL, period_key = NULL,
+            schedule_kind = NULL, reset_weekday = NULL, timezone = NULL,
+            mode_key = NULL, recurrence_rule = NULL, remote_key = NULL,
+            source_url = NULL, last_synced_at = NULL, updated_at = ?
+        WHERE source = 'manual' AND category <> 'custom'
+      `).run(now)
+      for (const column of [
+        'mode',
+        'run_mode',
+        'auto_scope',
+        'last_scope',
+        'initial_guide_dismissed'
+      ]) {
+        if (syncStateColumns.some((candidate) => candidate.name === column)) {
+          this.database.exec(`ALTER TABLE sync_states DROP COLUMN ${column}`)
+        }
+      }
+      this.database.exec(`
+        DROP TABLE IF EXISTS personal_review_batches;
+        DROP TABLE IF EXISTS personal_review_rules;
+        DROP TABLE IF EXISTS personal_metadata_cache;
+        DROP TABLE IF EXISTS codex_worker_settings;
+      `)
+      this.database.prepare(`
+        DELETE FROM ai_schedule_jobs
+        WHERE job_kind IN ('personal_metadata', 'personal_review')
+      `).run()
+      this.database.prepare(`
+        INSERT INTO schema_migrations(version, applied_at) VALUES (3, ?)
       `).run(now)
       this.database.exec('COMMIT')
     } catch (error) {
@@ -5081,8 +3846,8 @@ export class AppDatabase {
     `)
 
     const insertSyncState = this.database.prepare(`
-      INSERT OR IGNORE INTO sync_states(game_id, mode, status)
-      VALUES (?, 'manual', 'idle')
+      INSERT OR IGNORE INTO sync_states(game_id, status)
+      VALUES (?, 'idle')
     `)
 
     for (const game of DEFAULT_GAMES) {
@@ -5157,6 +3922,105 @@ export class AppDatabase {
     `).run()
   }
 
+  private seedBundledBaselines(reference = new Date()): void {
+    const bundledVerifiedAt = new Date(BUNDLED_BASELINE_VERIFIED_AT).toISOString()
+    for (const game of DEFAULT_GAMES) {
+      const gameId = game.id
+      const storedVersion = this.database.prepare(`
+        SELECT last_synced_at AS lastSyncedAt
+        FROM game_version_windows
+        WHERE game_id = ?
+      `).get(gameId) as { lastSyncedAt: string | null } | undefined
+      if (!storedVersion?.lastSyncedAt || storedVersion.lastSyncedAt < bundledVerifiedAt) {
+        this.upsertVersionWindow(
+          gameId,
+          getBundledVersionWindow(gameId),
+          bundledVerifiedAt
+        )
+      }
+
+      this.mergeSyncedItems(
+        gameId,
+        'public_schedule',
+        getBundledActivityCatalog(gameId),
+        bundledVerifiedAt
+      )
+      this.recordCatalogCoverage(gameId, 'events', 'public_schedule', 'complete')
+      this.mergeSyncedItems(
+        gameId,
+        'public_schedule',
+        completeCycleCatalog(gameId, [], [], 'public_schedule', reference),
+        reference.toISOString()
+      )
+      this.recordCatalogCoverage(gameId, 'cycles', 'public_schedule', 'complete')
+      this.mergeSyncedItems(
+        gameId,
+        'public_schedule',
+        getBundledMapCatalog(gameId),
+        getBundledMapCatalogVerifiedAt(gameId),
+        true,
+        { identityPolicy: 'remote-key-only' }
+      )
+      this.recordCatalogCoverage(gameId, 'exploration', 'public_schedule', 'complete')
+    }
+  }
+
+  private absorbLegacyPersonalProgressIntoBaselines(): void {
+    const legacyRows = this.database.prepare(`
+      SELECT id FROM checklist_items
+      WHERE source = 'personal_sync' AND archived = 0
+      ORDER BY created_at ASC, id ASC
+    `).all() as Array<{ id: string }>
+    if (legacyRows.length === 0) return
+
+    this.runTransaction(() => {
+      const applyProgress = this.database.prepare(`
+        UPDATE checklist_items
+        SET completed = ?, progress_percent = ?, manual_completion_locked = ?,
+            completed_at = ?, last_synced_at = COALESCE(?, last_synced_at), updated_at = ?
+        WHERE id = ? AND source = 'public_schedule' AND archived = 0
+      `)
+      const moveBindings = this.database.prepare(`
+        UPDATE source_bindings SET item_id = ?, updated_at = ?
+        WHERE item_id = ?
+      `)
+      const now = new Date().toISOString()
+      for (const row of legacyRows) {
+        const legacy = this.getChecklistItem(row.id)
+        const baseline = this.findBaselineItemForPersonalProgress(legacy.gameId, {
+          remoteKey: legacy.remoteKey ?? `legacy-personal:${legacy.id}`,
+          category: legacy.category,
+          title: legacy.title,
+          completed: legacy.completed,
+          progressPercent: legacy.progressPercent,
+          parentTitle: legacy.parentTitle,
+          mapNodeKind: legacy.mapNodeKind,
+          parentRemoteKey: legacy.parentRemoteKey,
+          startsAt: legacy.startsAt,
+          endsAt: legacy.endsAt,
+          modeKey: legacy.modeKey
+        })
+        if (!baseline) continue
+        applyProgress.run(
+          legacy.completed ? 1 : 0,
+          legacy.category === 'exploration' ? legacy.progressPercent : null,
+          legacy.manualCompletionLocked ? 1 : 0,
+          legacy.completedAt,
+          legacy.lastSyncedAt,
+          now,
+          baseline.id
+        )
+        moveBindings.run(baseline.id, now, legacy.id)
+      }
+      this.database.prepare(`DELETE FROM checklist_items WHERE source = 'personal_sync'`).run()
+      this.database.prepare(`
+        UPDATE sync_target_states
+        SET catalog_source = 'public_schedule'
+        WHERE target IN ('events', 'cycles', 'exploration')
+      `).run()
+    })
+  }
+
   private normalizeLegacyActivityTags(): void {
     const rows = this.database.prepare(`
       SELECT id, activity_tags_json AS activityTagsJson
@@ -5225,7 +4089,7 @@ export class AppDatabase {
     }
   }
 
-  private getChecklistItem(id: string): ChecklistItem {
+  getChecklistItem(id: string): ChecklistItem {
     const row = this.database
       .prepare(`
         SELECT

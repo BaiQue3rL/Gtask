@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+﻿import { afterEach, describe, expect, it } from 'vitest'
 import { AppDatabase } from '../src/main/database'
 import { LocalCommandService } from '../src/main/local-command-service'
 
@@ -11,7 +11,7 @@ afterEach(() => {
 
 describe('LocalCommandService', () => {
   it('可以自描述支持范围和破坏性命令', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const result = new LocalCommandService(database).execute({ command: 'describe_commands' })
     expect(result).toMatchObject({
       schemaVersion: 1,
@@ -22,7 +22,7 @@ describe('LocalCommandService', () => {
   })
 
   it('提供适合本地 AI 调用的游戏快照和筛选', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const service = new LocalCommandService(database)
     service.execute({
       command: 'create_item',
@@ -41,12 +41,12 @@ describe('LocalCommandService', () => {
       game: { id: 'genshin' },
       items: [{ title: '刷天赋素材' }],
       archivedItems: [],
-      syncSettings: { runMode: 'manual' }
+      syncSettings: { autoSyncEnabled: true }
     })
   })
 
   it('允许更新和恢复，但删除必须显式确认', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const service = new LocalCommandService(database)
     const created = service.execute({
       command: 'create_item',
@@ -73,7 +73,7 @@ describe('LocalCommandService', () => {
   })
 
   it('一次读取四游戏快照并以事务执行批量写入', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const service = new LocalCommandService(database)
     const created = service.execute({
       command: 'create_items',
@@ -105,7 +105,7 @@ describe('LocalCommandService', () => {
   })
 
   it('批量命令先校验全部输入，非法项不会留下部分写入', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const service = new LocalCommandService(database)
     expect(() =>
       service.execute({
@@ -120,7 +120,7 @@ describe('LocalCommandService', () => {
   })
 
   it('批量更新中途发生数据库错误时回滚前面的更新', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const service = new LocalCommandService(database)
     const created = service.execute({
       command: 'create_item',
@@ -143,7 +143,7 @@ describe('LocalCommandService', () => {
   })
 
   it('批量删除同样要求确认并在任一 ID 无效时回滚', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const service = new LocalCommandService(database)
     const created = service.execute({
       command: 'create_item',
@@ -162,7 +162,7 @@ describe('LocalCommandService', () => {
   })
 
   it('拒绝静默忽略错误的读取筛选和过长事项 ID', () => {
-    database = new AppDatabase(':memory:')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const service = new LocalCommandService(database)
     expect(() =>
       service.execute({ command: 'get_all_snapshots', includeArchived: 'yes' })

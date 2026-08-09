@@ -3,11 +3,9 @@ import type {
   PersonalSyncTarget,
   SyncResult,
   SyncProgressUpdate,
-  SyncScope,
-  SyncTarget,
   SyncSourceResult,
-  SyncStatus
-  , SyncRequestContext
+  SyncStatus,
+  SyncRequestContext
 } from '../../shared/contracts'
 import type { AppDatabase } from '../database'
 import {
@@ -15,15 +13,11 @@ import {
   SyncCancelledError,
   SyncVerificationRequiredError,
   throwIfSyncCancelled,
-  officialPersonalFactAuthority,
-  type NormalizedSyncItem,
-  type SemanticReviewDraft,
   type SyncAdapter,
   type SyncAdapterProgress,
   type SyncAdapterRegistry
 } from './types'
 import { normalizeSyncItems } from './normalization'
-import { getPersonalSyncTargets } from './personal-sync-capabilities'
 import { completeCycleCatalog } from './cycle-catalog'
 
 const PERSONAL_PLATFORM_NAMES: Record<GameId, string> = {
@@ -34,7 +28,6 @@ const PERSONAL_PLATFORM_NAMES: Record<GameId, string> = {
 }
 
 export class SyncOrchestrator {
-  private readonly inFlight = new Map<string, { scope: SyncScope; operation: Promise<SyncResult> }>()
   private readonly personalInFlight = new Map<
     string,
     { controller: AbortController; operation: Promise<SyncSourceResult> }
@@ -44,94 +37,12 @@ export class SyncOrchestrator {
   constructor(
     private readonly database: AppDatabase,
     private readonly adapters: SyncAdapterRegistry = { publicSchedule: {}, personalData: {} },
-    private readonly onProgress?: (progress: SyncProgressUpdate) => void,
-    // Kept temporarily for binary/source compatibility with older callers.
-    // Personal snapshots no longer invoke public-catalog preparation.
-    _obsoletePreparePersonalCatalog?: (gameId: GameId, target: SyncTarget) => void | Promise<void>
+    private readonly onProgress?: (progress: SyncProgressUpdate) => void
   ) {}
-
-  syncGame(gameId: GameId, scope: SyncScope, target: SyncTarget = 'all'): Promise<SyncResult> {
-    const key = `${gameId}:${target}`
-    const existing = this.inFlight.get(key)
-    if (existing?.scope === scope) return existing.operation
-    if (existing) return existing.operation.then(() => this.syncGame(gameId, scope, target))
-    const operation = this.performSync(gameId, scope, target).finally(() => {
-      this.inFlight.delete(key)
-    })
-    this.inFlight.set(key, { scope, operation })
-    return operation
-  }
-
-  private async performSync(gameId: GameId, scope: SyncScope, target: SyncTarget): Promise<SyncResult> {
-    const startedAt = new Date().toISOString()
-    this.database.recordSyncAttempt(gameId, scope)
-
-    const sources: SyncSourceResult[] = []
-    sources.push(
-      await this.runAdapter(
-        gameId,
-        'public_schedule',
-        this.adapters.publicSchedule[gameId],
-        '公开资料适配器尚未接入',
-        target
-      )
-    )
-
-    if (scope === 'public_and_personal') {
-      sources.push(
-        await this.runAdapter(
-          gameId,
-          'personal_data',
-          this.adapters.personalData[gameId],
-          `${PERSONAL_PLATFORM_NAMES[gameId]}个人数据适配器尚未接入`,
-          target
-        )
-      )
-    }
-
-    const successCount = sources.filter((source) => source.status === 'success').length
-    const hasPendingReview = sources.some((source) =>
-      (source.pendingReview ?? 0) > 0 && source.reviewMode !== 'background'
-    )
-    const status: SyncResult['status'] =
-      successCount === sources.length && !hasPendingReview
-        ? 'success'
-        : successCount > 0
-          ? 'partial'
-          : 'error'
-    const message = sources.map((source) => source.message).join('；')
-    const databaseStatus: SyncStatus = sources.some(
-      (source) => source.status === 'verification_required'
-    )
-      ? 'verification_required'
-      : status === 'success'
-        ? 'success'
-        : status === 'partial'
-          ? 'stale'
-          : 'error'
-    this.database.recordSyncOutcome(gameId, databaseStatus, message, successCount > 0)
-    if (
-      sources[0]?.status === 'success' &&
-      (!(sources[0].pendingReview ?? 0) || sources[0].reviewMode === 'background')
-    ) {
-      this.database.recordSyncTargetSuccess(gameId, target, new Date(), true)
-    }
-
-    return {
-      gameId,
-      requestedScope: scope,
-      requestedTarget: target,
-      status,
-      startedAt,
-      finishedAt: new Date().toISOString(),
-      sources,
-      message
-    }
-  }
 
   async syncPersonalOnly(
     gameId: GameId,
-    target: SyncTarget = 'all',
+    target: PersonalSyncTarget,
     requestContext: SyncRequestContext = {
       outputLocale: 'zh-CN',
       userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
@@ -153,19 +64,17 @@ export class SyncOrchestrator {
         message: '应用已退出，任务已取消'
       }
     }
-    const hasPendingReview = (personal.pendingReview ?? 0) > 0 &&
-      personal.reviewMode !== 'background'
     const status: SyncResult['status'] = personal.status === 'cancelled'
       ? 'cancelled'
       : personal.status === 'success'
-      ? hasPendingReview ? 'partial' : 'success'
+      ? 'success'
       : 'error'
     const databaseStatus: SyncStatus = personal.status === 'verification_required'
       ? 'verification_required'
       : personal.status === 'cancelled'
         ? 'stale'
         : personal.status === 'success'
-        ? hasPendingReview ? 'stale' : 'success'
+        ? 'success'
         : 'error'
     this.database.recordSyncOutcome(
       gameId,
@@ -173,7 +82,7 @@ export class SyncOrchestrator {
       personal.message,
       personal.status === 'success' && (personal.added + personal.updated) > 0
     )
-    if (personal.status === 'success' && !hasPendingReview) {
+    if (personal.status === 'success') {
       this.database.recordSyncTargetSuccess(gameId, target)
     } else {
       this.database.recordSyncTargetAttempt(
@@ -183,9 +92,7 @@ export class SyncOrchestrator {
           ? 'verification_required'
           : personal.status === 'cancelled'
             ? 'stale'
-          : hasPendingReview
-            ? 'stale'
-            : 'error'
+          : 'error'
       )
     }
     return {
@@ -202,7 +109,7 @@ export class SyncOrchestrator {
 
   syncPersonalData(
     gameId: GameId,
-    target: SyncTarget = 'all',
+    target: PersonalSyncTarget,
     requestContext: SyncRequestContext = {
       outputLocale: 'zh-CN',
       userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
@@ -212,9 +119,8 @@ export class SyncOrchestrator {
     const existing = this.personalInFlight.get(key)
     if (existing) return existing.operation
     const controller = new AbortController()
-    const operation = this.runAdapter(
+    const operation = this.runPersonalAdapter(
       gameId,
-      'personal_data',
       this.adapters.personalData[gameId],
       `${PERSONAL_PLATFORM_NAMES[gameId]}个人数据适配器尚未接入`,
       target,
@@ -232,7 +138,7 @@ export class SyncOrchestrator {
     return [...this.personalInFlight.keys()].some((key) => key.startsWith(prefix))
   }
 
-  cancelPersonalSync(gameId: GameId, target: SyncTarget): boolean {
+  cancelPersonalSync(gameId: GameId, target: PersonalSyncTarget): boolean {
     let cancelled = false
     const prefix = `${gameId}:${target}:`
     for (const [key, active] of this.personalInFlight) {
@@ -258,12 +164,11 @@ export class SyncOrchestrator {
     return this.cancelAllPersonalSync()
   }
 
-  private async runAdapter(
+  private async runPersonalAdapter(
     gameId: GameId,
-    source: SyncSourceResult['source'],
     adapter: SyncAdapter | undefined,
     unavailableMessage: string,
-    target: SyncTarget = 'all',
+    target: PersonalSyncTarget,
     requestContext: SyncRequestContext = {
       outputLocale: 'zh-CN',
       userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
@@ -272,7 +177,7 @@ export class SyncOrchestrator {
   ): Promise<SyncSourceResult> {
     if (!adapter) {
       return {
-        source,
+        source: 'personal_data',
         status: 'error',
         message: unavailableMessage,
         added: 0,
@@ -283,11 +188,11 @@ export class SyncOrchestrator {
 
     try {
       const reportProgress = (progress: SyncAdapterProgress): void => {
-        this.emitProgress(gameId, target, source, progress)
+        this.emitProgress(gameId, target, progress)
       }
       reportProgress({
         phase: 'fetching',
-        message: source === 'personal_data' ? '正在连接个人数据服务' : '正在连接公开资料来源',
+        message: '正在连接个人进度服务',
         current: 0,
         total: null
       })
@@ -301,97 +206,49 @@ export class SyncOrchestrator {
         total: null
       })
       const targetCategories = {
-        tasks: [],
         events: ['limited_event'],
         cycles: ['endgame'],
         exploration: ['exploration']
       } as const
-      const categories = target === 'all' ? undefined : targetCategories[target]
+      const categories = targetCategories[target]
       let normalizedItems = normalizeSyncItems(result.items).filter(
-        (item) => !categories || (categories as readonly string[]).includes(item.category)
+        (item) => (categories as readonly string[]).includes(item.category)
       )
-      if (target === 'all' || target === 'cycles') {
+      if (target === 'cycles') {
         normalizedItems = completeCycleCatalog(
           gameId,
           normalizedItems,
           this.database.listChecklistItems(gameId),
-          source === 'personal_data' ? 'personal_sync' : 'public_schedule',
+          'personal_sync',
           new Date()
         )
       }
-      const personalReviewDrafts = source === 'personal_data'
-        ? detectPersonalReviewDrafts(normalizedItems, result.reviewCandidates ?? [])
-        : []
       throwIfSyncCancelled(signal)
       reportProgress({
         phase: 'merging',
-        message: source === 'personal_data'
-          ? '内容整理完成，正在切换为官方个人清单'
-          : '内容整理完成，正在写入公开清单',
+        message: '内容整理完成，正在更新个人进度',
         current: 1,
         total: 1
       })
       const merge = { added: 0, updated: 0, preserved: 0, expiredRemoved: 0 }
-      let pendingReview = 0
-      let reviewMode: SyncSourceResult['reviewMode']
-      if (source === 'personal_data') {
-        if (result.snapshotCompleteness === 'partial') {
-          throw new Error('个人接口只返回了部分数据，已保留上次个人清单，请稍后重试')
-        }
-        if (!result.accountScope) throw new Error('个人数据缺少安全账号作用域，请重新登录')
-        const personalTargets: PersonalSyncTarget[] = target === 'all'
-          ? getPersonalSyncTargets(gameId)
-          : target === 'events' || target === 'cycles' || target === 'exploration'
-            ? [target]
-            : []
-        if (personalTargets.length === 0) throw new Error('当前版块不支持同步个人数据')
-        const byTarget: Record<PersonalSyncTarget, typeof normalizedItems> = {
-          events: normalizedItems.filter((item) => item.category === 'limited_event'),
-          cycles: normalizedItems.filter((item) => item.category === 'endgame'),
-          exploration: normalizedItems.filter((item) => item.category === 'exploration')
-        }
-        for (const personalTarget of personalTargets) {
-          throwIfSyncCancelled(signal)
-          const prepared = this.database.preparePersonalReviewJob(
-            gameId,
-            personalTarget,
-            result.accountScope,
-            byTarget[personalTarget],
-            personalReviewDrafts,
-            result.adapterVersion ?? 'personal-adapter-v1',
-            requestContext,
-            new Date()
-          )
-          if (prepared.job) {
-            pendingReview += prepared.job.reviewTargets.length
-            if (personalTarget === 'events' && reviewMode !== 'blocking') {
-              reviewMode = 'background'
-            } else if (personalTarget !== 'events') {
-              reviewMode = 'blocking'
-              continue
-            }
-          }
-          const replaced = this.database.replacePersonalSnapshot(
-            gameId,
-            personalTarget,
-            result.accountScope,
-            prepared.items,
-            result.adapterVersion ?? 'personal-adapter-v1',
-            new Date(),
-            requestContext
-          )
-          merge.added += replaced.added
-          merge.updated += replaced.updated
-          merge.preserved += replaced.preserved
-          merge.expiredRemoved += replaced.expiredRemoved ?? 0
-        }
-      } else {
-        const merged = this.database.replacePublicCatalog(gameId, target, normalizedItems)
-        merge.added += merged.added
-        merge.updated += merged.updated
-        merge.preserved += merged.preserved
-        this.database.recordCatalogCoverage(gameId, target, 'public_schedule', 'complete')
+      if (result.snapshotCompleteness === 'partial') {
+        throw new Error('个人接口只返回了部分进度，已保留上次结果，请稍后重试')
       }
+      if (!result.accountScope) throw new Error('个人进度缺少安全账号作用域，请重新登录')
+      throwIfSyncCancelled(signal)
+      const replaced = this.database.replacePersonalSnapshot(
+        gameId,
+        target,
+        result.accountScope,
+        normalizedItems,
+        result.adapterVersion ?? 'personal-adapter-v1',
+        new Date(),
+        requestContext
+      )
+      merge.added += replaced.added
+      merge.updated += replaced.updated
+      merge.preserved += replaced.preserved
+      merge.expiredRemoved += replaced.expiredRemoved ?? 0
       throwIfSyncCancelled(signal)
       const changes = merge.added + merge.updated
       const changeMessage = changes > 0
@@ -401,39 +258,23 @@ export class SyncOrchestrator {
       const expiredMessage = (merge.expiredRemoved ?? 0) > 0
         ? `，淘汰到期 ${merge.expiredRemoved}`
         : ''
-      reportProgress(pendingReview > 0
-        ? {
-            phase: reviewMode === 'background' ? 'completed' : 'queued',
-            status: reviewMode === 'background' ? 'completed' : 'waiting',
-            message: reviewMode === 'background'
-              ? '个人清单已建立，正在完善清单信息'
-              : '个人数据已暂存，正在确认清单结构',
-            current: reviewMode === 'background' ? 1 : 0,
-            total: reviewMode === 'background' ? 1 : pendingReview
-          }
-        : {
-            phase: 'completed',
-            status: 'completed',
-            message: '同步完成',
-            current: 1,
-            total: 1
-          })
+      reportProgress({
+        phase: 'completed',
+        status: 'completed',
+        message: '同步完成',
+        current: 1,
+        total: 1
+      })
       return {
-        source,
+        source: 'personal_data',
         status: 'success',
-        message: pendingReview > 0
-          ? reviewMode === 'background'
-            ? `${result.message}；清单已建立，正在完善清单信息`
-            : `${result.message}；数据已安全暂存，确认完成后会更新清单`
-          : `${result.message}（${changeMessage}${preservedMessage}${expiredMessage}）`,
-        pendingReview,
-        reviewMode,
+        message: `${result.message}（${changeMessage}${preservedMessage}${expiredMessage}）`,
         ...merge
       }
     } catch (error) {
       const cancelled = isSyncCancelledError(error) || signal?.aborted === true
       if (cancelled) {
-        this.emitProgress(gameId, target, source, {
+        this.emitProgress(gameId, target, {
           phase: 'cancelled',
           status: 'cancelled',
           message: '已取消',
@@ -441,7 +282,7 @@ export class SyncOrchestrator {
           total: null
         })
         return {
-          source,
+          source: 'personal_data',
           status: 'cancelled',
           message: '已取消',
           added: 0,
@@ -450,7 +291,7 @@ export class SyncOrchestrator {
         }
       }
       const verificationRequired = error instanceof SyncVerificationRequiredError
-      this.emitProgress(gameId, target, source, {
+      this.emitProgress(gameId, target, {
         phase: verificationRequired ? 'verification' : 'failed',
         status: verificationRequired ? 'verification_required' : 'error',
         message: error instanceof Error ? error.message : '同步来源发生未知错误',
@@ -458,7 +299,7 @@ export class SyncOrchestrator {
         total: null
       })
       return {
-        source,
+        source: 'personal_data',
         status: verificationRequired ? 'verification_required' : 'error',
         message: error instanceof Error ? error.message : '同步来源发生未知错误',
         added: 0,
@@ -470,14 +311,13 @@ export class SyncOrchestrator {
 
   private emitProgress(
     gameId: GameId,
-    target: SyncTarget,
-    source: SyncSourceResult['source'],
+    target: PersonalSyncTarget,
     progress: SyncAdapterProgress
   ): void {
     this.onProgress?.({
       gameId,
       target,
-      source,
+      source: 'personal_data',
       phase: progress.phase,
       status: progress.status ?? 'running',
       retryKind: progress.phase === 'retrying' ? 'source_request' : null,
@@ -489,95 +329,4 @@ export class SyncOrchestrator {
       updatedAt: new Date().toISOString()
     })
   }
-}
-
-function detectPersonalReviewDrafts(
-  items: NormalizedSyncItem[],
-  supplied: SemanticReviewDraft[]
-): SemanticReviewDraft[] {
-  const drafts = [...supplied]
-  const suppliedIdentities = new Set(supplied.flatMap((draft) => {
-    const proposed = draft.payload.proposedItem
-    if (!proposed || typeof proposed !== 'object' || Array.isArray(proposed)) return []
-    const identity = (proposed as Partial<NormalizedSyncItem>).sourceIdentity
-    return identity
-      ? [`${identity.provider}\u0000${identity.endpoint}\u0000${identity.externalId}`]
-      : []
-  }))
-  const mapKeys = new Set(items
-    .filter((item) => item.category === 'exploration')
-    .map((item) => item.remoteKey))
-  const cycleGroups = new Map<string, NormalizedSyncItem[]>()
-  for (const item of items) {
-    if (item.category !== 'endgame') continue
-    const key = `${item.modeKey ?? ''}\u0000${item.periodKey ?? ''}`
-    const group = cycleGroups.get(key) ?? []
-    group.push(item)
-    cycleGroups.set(key, group)
-  }
-  for (const item of items) {
-    const identity = item.sourceIdentity
-    if (!identity) continue
-    const identityKey = `${identity.provider}\u0000${identity.endpoint}\u0000${identity.externalId}`
-    if (suppliedIdentities.has(identityKey)) continue
-    let issues: Array<'item_identity' | 'classification' | 'hierarchy'> = []
-    if (item.category === 'limited_event') issues = ['classification']
-    if (item.category === 'endgame') {
-      const groupKey = `${item.modeKey ?? ''}\u0000${item.periodKey ?? ''}`
-      if (!item.modeKey || !item.periodKey || (cycleGroups.get(groupKey)?.length ?? 0) > 1) {
-        issues = ['item_identity']
-      }
-    }
-    if (item.category === 'exploration' && (
-      (item.mapNodeKind !== 'region' && item.mapNodeKind !== 'subregion') ||
-      (item.mapNodeKind === 'region' && Boolean(item.parentRemoteKey)) ||
-      (item.mapNodeKind === 'subregion' && (
-        !item.parentRemoteKey || !mapKeys.has(item.parentRemoteKey)
-      ))
-    )) issues = ['hierarchy']
-    if (issues.length === 0) continue
-    const factAuthority = item.category === 'exploration'
-      ? officialPersonalFactAuthority('identity', 'localized_title', 'progress')
-      : item.category === 'endgame'
-        ? officialPersonalFactAuthority(
-            'identity', 'localized_title', 'time_window', 'challenge_record'
-          )
-        : officialPersonalFactAuthority('identity', 'localized_title', 'time_window')
-    drafts.push({
-      target: item.category === 'limited_event'
-        ? 'events'
-        : item.category === 'endgame'
-          ? 'cycles'
-          : 'exploration',
-      kind: item.category === 'limited_event'
-        ? 'personal-item-semantics'
-        : item.category === 'endgame'
-          ? 'personal-cycle-exception'
-          : 'personal-map-progress',
-      payload: {
-        factAuthority,
-        provider: identity.provider,
-        sourceContext: identity.endpoint,
-        officialId: identity.externalId,
-        officialEventId: item.category === 'limited_event' ? identity.externalId : undefined,
-        observedRemoteKey: identity.externalId,
-        title: item.title,
-        officialTitle: item.title,
-        observedProgress: item.progressPercent,
-        observedNodeKind: item.mapNodeKind,
-        observedParentId: item.parentRemoteKey?.startsWith(`personal-map:${identity.provider}:`)
-          ? item.parentRemoteKey.slice(`personal-map:${identity.provider}:`.length)
-          : null,
-        observedParentTitle: item.parentTitle ?? null,
-        observedModeKey: item.modeKey ?? null,
-        observedPeriodKey: item.periodKey ?? null,
-        observedStartsAt: item.startsAt ?? null,
-        observedEndsAt: item.endsAt ?? null,
-        observedHasChallengeRecord: item.category === 'endgame' ? item.completed : undefined,
-        reviewIssues: issues,
-        proposedItem: item
-      }
-    })
-  }
-  return drafts
 }

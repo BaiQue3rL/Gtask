@@ -32,7 +32,7 @@ export function resolveCodexWorkerRoute(
     label: '自定义配置',
     timeoutMs: 20 * 60_000,
     totalBudgetMs: 25 * 60_000,
-    requiresWeb: job.jobKind !== 'personal_review' || job.target === 'events'
+    requiresWeb: true
   }
 }
 
@@ -71,13 +71,10 @@ export function selectCodexWorkerRoutes({
     if (route.model === 'gpt-5.6-sol') solCount += 1
   }
 
-  const priorities = { personal_review: 0, personal_metadata: 1, public_catalog: 2 } as const
   const selected: CodexWorkerRoute[] = []
   for (const job of jobs
     .filter((candidate) => candidate.status === 'pending' && !runningJobIds.has(candidate.id))
-    .sort((left, right) =>
-      priorities[left.jobKind] - priorities[right.jobKind] ||
-      left.requestedAt.localeCompare(right.requestedAt))) {
+    .sort((left, right) => left.requestedAt.localeCompare(right.requestedAt))) {
     if (runningRoutes.length + selected.length >= maxWorkers) break
     if ((gameCounts.get(job.gameId) ?? 0) >= maxPerGame) continue
     const route = resolveCodexWorkerRoute(job, preferences)
@@ -195,22 +192,8 @@ export interface CodexScheduleWorkerPoolOptions
 }
 
 function backgroundPrompt(agentId: string, route: CodexWorkerRoute): string {
-  return `必须使用 $sync-gacha-schedules 技能处理 Gtask 的后台同步队列。
-你是由桌面应用自动启动的本地后台 Agent，不要修改项目源码，也不要要求用户回复。
-用户已经在桌面应用中主动点击同步，明确授权本轮读取公开资料，并由你决定对本次契约范围内的同步数据执行新增、更新或软删除；该授权不包含凭据读取、跨版块写入或删除受保护的手动数据。
-请使用固定 Agent ID“${agentId}”、名称“Gtask 后台 Codex”登记联网能力。
-只允许领取指定任务“${route.jobId}”；调用领取工具时必须传入 jobId="${route.jobId}"、model="${route.model}"、reasoningEffort="${route.reasoningEffort}"。若任务不存在或已被领取则立即退出，不得改领其他任务。
-本次使用“${route.label}”。模型和推理强度由用户设置，本任务不得自行切换模型或推理等级。
-领取任务后先读取 job.contract；它是当前版块所需数据、字段语义和完成条件的唯一权威来源。先按契约建立完整目录，再逐项检索必需字段，不要从提示词猜字段要求。
-必须按 job.contract.requestContext 的 outputLocale 和 userTimeZone 组织结果，并在提交时原样回传 contentLocale。
-只领取一项任务并完整处理，先按 job.jobKind 选择公开清单、个人异常核验或个人元数据流程，严格按技能要求更新每个阶段的用户可见进度；已领取任务必须提交或明确失败。
-若 target=all，先提交已核验版块以安全保存；只要工具返回 remainingTargets 或任务仍为 claimed，就继续使用 Codex 原生联网检索自主补齐，不得把部分结果宣布为完成。
-公开资料任务根据结果自由调整关键词和来源，只有确实穷尽有用检索后才能明确失败。个人数据正常字段由适配器机械处理；personal_review 只解决契约列出的异常项，其中活动已经先行建表并由本任务后台修正，结构不完整的地图等异常仍保持暂存；personal_metadata 只补既有个人项的标签和时间。两者都不得读取或融合公开清单。
-处理活动标签时准确性优先于数量：根据活动实际玩法自主选择最贴切的稳定标签，不要求覆盖固定维度，也不要为了凑数添加近义或无关标签。逐标签审计说明可选，但整体结论必须有可靠来源。
-本 Worker 的失败只允许结束自己领取的任务，不得领取、失败或结束其他 Worker 的任务。
-完成该任务后退出；不要领取第二项任务。`
+  return `必须使用 $sync-gacha-schedules 技能处理 Gtask 后台基准表维护任务。你是桌面应用启动的本地后台 Agent，不要修改项目源码，也不要要求用户回复。使用固定 Agent ID“${agentId}”登记，只领取任务“${route.jobId}”；领取时传入 jobId="${route.jobId}"、model="${route.model}"、reasoningEffort="${route.reasoningEffort}"。先阅读 job.contract，按其中的语言、时区、字段和来源要求联网核验活动、周期、地图或版本时间。只能通过 MCP 的结构化基准表工具写入，不得读取凭据、个人账号数据或更改用户完成状态。任务不存在或已被领取时立即退出；已领取任务必须提交完整结果或明确失败，完成后退出，不领取第二项任务。`
 }
-
 export function findCodexCli(options: CodexCliDiscoveryOptions = {}): string | null {
   const env = options.env ?? process.env
   const exists = options.exists ?? existsSync

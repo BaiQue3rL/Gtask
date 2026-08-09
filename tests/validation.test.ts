@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   parseChecklistSection,
-  parseCodexWorkerPreferences,
   parseCreateChecklistItem,
   parseExternalUrl,
   parseGameId,
-  parseSyncRunMode,
-  parseSyncScope,
   parseUpdateChecklistItem
 } from '../src/main/validation'
 
@@ -44,41 +41,6 @@ describe('清单 IPC 参数校验', () => {
   it('只接受已定义的清单版块', () => {
     expect(parseChecklistSection('cycles')).toBe('cycles')
     expect(() => parseChecklistSection('all')).toThrow('不支持的清单版块')
-  })
-
-  it('校验同步模式和同步范围', () => {
-    expect(parseSyncRunMode('automatic')).toBe('automatic')
-    expect(parseSyncScope('public_and_personal')).toBe('public_and_personal')
-    expect(() => parseSyncRunMode('startup')).toThrow('不支持的同步运行模式')
-    expect(() => parseSyncScope('personal_only')).toThrow('不支持的同步范围')
-  })
-
-  it('只接受 Gtask 支持的 Codex 模型与推理强度', () => {
-    expect(parseCodexWorkerPreferences({
-      strategy: 'fixed',
-      model: 'gpt-5.6-sol',
-      reasoningEffort: 'high'
-    })).toEqual({ strategy: 'fixed', model: 'gpt-5.6-sol', reasoningEffort: 'high' })
-    expect(() => parseCodexWorkerPreferences({
-      strategy: 'smart',
-      model: 'inherit',
-      reasoningEffort: 'inherit'
-    })).toThrow('不支持的 Codex 后台调度策略')
-    expect(() => parseCodexWorkerPreferences({
-      strategy: 'fixed',
-      model: 'unknown-model',
-      reasoningEffort: 'high'
-    })).toThrow('不支持的 Codex 后台模型')
-    expect(() => parseCodexWorkerPreferences({
-      strategy: 'fixed',
-      model: 'gpt-5.6-terra',
-      reasoningEffort: 'extreme'
-    })).toThrow('不支持的 Codex 推理强度')
-    expect(() => parseCodexWorkerPreferences({
-      strategy: 'dynamic',
-      model: 'gpt-5.6-terra',
-      reasoningEffort: 'medium'
-    })).toThrow('不支持的 Codex 后台调度策略')
   })
 
   it('拒绝非法时间和结束早于开始的事项', () => {

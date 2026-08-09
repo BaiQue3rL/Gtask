@@ -1,7 +1,7 @@
 import type { GameId, SyncTarget } from '../../shared/contracts'
 import {
-  extractZenlessExplorationReviewCandidates,
-  extractZenlessEventReviewCandidates,
+  extractZenlessExplorationProgressCandidates,
+  extractZenlessEventProgressCandidates,
   parseZenlessPersonalData
 } from './zenless-personal-parser'
 import {
@@ -12,8 +12,8 @@ import {
 } from './personal-sync-settler'
 import type { SyncAdapter, SyncAdapterOutput, SyncProgressReporter } from './types'
 import {
-  assemblePersonalEventsFromCandidates,
-  assemblePersonalMapsFromCandidates,
+  personalEventsFromCandidates,
+  personalMapsFromCandidates,
   withPersonalIdentity
 } from './personal-snapshot'
 
@@ -75,28 +75,24 @@ export class ZenlessPersonalAdapter implements SyncAdapter {
       : []
     const eventCandidates = eventCalendar === undefined
       ? []
-      : extractZenlessEventReviewCandidates(eventCalendar)
+      : extractZenlessEventProgressCandidates(eventCalendar)
     const explorationCandidates = exploration === undefined
       ? []
-      : extractZenlessExplorationReviewCandidates(exploration)
-    const eventSnapshot = assemblePersonalEventsFromCandidates(
+      : extractZenlessExplorationProgressCandidates(exploration)
+    const eventItems = personalEventsFromCandidates(
       'zenless',
       'miyoushe',
       eventCandidates
     )
-    const explorationSnapshot = assemblePersonalMapsFromCandidates(
+    const explorationItems = personalMapsFromCandidates(
       'miyoushe',
       explorationCandidates
     )
     return {
       items: [
-        ...eventSnapshot.items,
+        ...eventItems,
         ...withPersonalIdentity(cycleItems, 'miyoushe', 'personal-challenge-record'),
-        ...explorationSnapshot.items
-      ],
-      reviewCandidates: [
-        ...eventSnapshot.reviewCandidates,
-        ...explorationSnapshot.reviewCandidates
+        ...explorationItems
       ],
       snapshotCompleteness: outcomes.every((outcome) => outcome.succeeded) ? 'complete' : 'partial',
       adapterVersion: 'zenless-personal-v1',

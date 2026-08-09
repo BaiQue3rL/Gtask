@@ -49,21 +49,7 @@ describe('Codex schedule worker', () => {
       model: 'gpt-5.6-sol',
       reasoningEffort: 'medium'
     }
-    const personal = { id: 'personal', jobKind: 'personal_review', routingTier: 0 } as AiScheduleJob
-    const eventReview = {
-      id: 'event-review', jobKind: 'personal_review', target: 'events', routingTier: 0
-    } as AiScheduleJob
-    const metadata = { id: 'metadata', jobKind: 'personal_metadata', routingTier: 0 } as AiScheduleJob
     const publicJob = { id: 'public', jobKind: 'public_catalog', routingTier: 2 } as AiScheduleJob
-    expect(resolveCodexWorkerRoute(personal, preferences)).toMatchObject({
-      model: 'gpt-5.6-sol', reasoningEffort: 'medium', requiresWeb: false
-    })
-    expect(resolveCodexWorkerRoute(eventReview, preferences)).toMatchObject({
-      model: 'gpt-5.6-sol', reasoningEffort: 'medium', requiresWeb: true
-    })
-    expect(resolveCodexWorkerRoute(metadata, preferences)).toMatchObject({
-      model: 'gpt-5.6-sol', reasoningEffort: 'medium', requiresWeb: true
-    })
     expect(resolveCodexWorkerRoute(publicJob, preferences)).toMatchObject({
       model: 'gpt-5.6-sol', reasoningEffort: 'medium', requiresWeb: true
     })
@@ -78,12 +64,11 @@ describe('Codex schedule worker', () => {
     const job = (
       id: string,
       gameId: AiScheduleJob['gameId'],
-      jobKind: AiScheduleJob['jobKind'] = 'personal_review',
       routingTier = 0
     ): AiScheduleJob => ({
       id,
       gameId,
-      jobKind,
+      jobKind: 'public_catalog',
       routingTier,
       status: 'pending',
       requestedAt: `2026-08-01T12:00:${id.padStart(2, '0')}.000Z`
@@ -112,10 +97,10 @@ describe('Codex schedule worker', () => {
       .toHaveLength(1)
 
     const expensiveJobs = [
-      job('11', 'genshin', 'public_catalog', 2),
-      job('12', 'star-rail', 'public_catalog', 2),
-      job('13', 'zenless', 'public_catalog', 2),
-      job('14', 'wuthering-waves', 'public_catalog', 2)
+      job('11', 'genshin', 2),
+      job('12', 'star-rail', 2),
+      job('13', 'zenless', 2),
+      job('14', 'wuthering-waves', 2)
     ]
     expect(selectCodexWorkerRoutes({
       jobs: expensiveJobs,
@@ -125,11 +110,11 @@ describe('Codex schedule worker', () => {
     })).toHaveLength(4)
 
     const webJobs = [
-      job('21', 'genshin', 'personal_metadata'),
-      job('22', 'genshin', 'personal_metadata'),
-      job('23', 'star-rail', 'personal_metadata'),
-      job('24', 'star-rail', 'personal_metadata'),
-      job('25', 'zenless', 'personal_metadata')
+      job('21', 'genshin'),
+      job('22', 'genshin'),
+      job('23', 'star-rail'),
+      job('24', 'star-rail'),
+      job('25', 'zenless')
     ]
     expect(selectCodexWorkerRoutes({
       jobs: webJobs,

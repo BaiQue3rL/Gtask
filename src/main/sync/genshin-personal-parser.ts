@@ -1,7 +1,6 @@
 import {
-  officialPersonalFactAuthority,
   type NormalizedSyncItem,
-  type SemanticReviewDraft
+  type PersonalProgressCandidate
 } from './types'
 import { hasChallengeRecordEvidence } from './challenge-record-evidence'
 import { finiteNumber } from './numbers'
@@ -29,7 +28,7 @@ export function parseGenshinPersonalData(input: GenshinPersonalPayload): Normali
   return items
 }
 
-export function extractGenshinEventReviewCandidates(value: unknown): SemanticReviewDraft[] {
+export function extractGenshinEventProgressCandidates(value: unknown): PersonalProgressCandidate[] {
   const root = requiredRecord(value, '活动日历')
   const events = Array.isArray(root.act_list) ? root.act_list.filter(isRecord) : []
   return events.map((event) => {
@@ -40,11 +39,6 @@ export function extractGenshinEventReviewCandidates(value: unknown): SemanticRev
       target: 'events',
       kind: 'personal-item-semantics',
       payload: {
-        factAuthority: officialPersonalFactAuthority(
-          'identity',
-          'localized_title',
-          'time_window'
-        ),
         sourceContext: 'miyoushe-genshin-event-calendar',
         officialEventId: id,
         title,
@@ -154,9 +148,9 @@ export function parseExplorations(value: unknown): NormalizedSyncItem[] {
   return items
 }
 
-export function extractGenshinExplorationReviewCandidates(
+export function extractGenshinExplorationProgressCandidates(
   value: unknown
-): SemanticReviewDraft[] {
+): PersonalProgressCandidate[] {
   const root = requiredRecord(value, '个人概览')
   const explorations = Array.isArray(root.world_explorations)
     ? root.world_explorations.filter(isRecord)
@@ -173,7 +167,7 @@ export function extractGenshinExplorationReviewCandidates(
       : []
   }))
   const titleById = new Map(parsed.map((entry) => [entry.id, entry.title]))
-  const drafts: SemanticReviewDraft[] = []
+  const drafts: PersonalProgressCandidate[] = []
   const knownChildren = new Set(parsed
     .filter((entry) => entry.parentId)
     .map((entry) => `${entry.parentId}:${normalizeExplorationTitle(entry.title)}`))
@@ -183,12 +177,6 @@ export function extractGenshinExplorationReviewCandidates(
       target: 'exploration',
       kind: 'personal-map-progress',
       payload: {
-        factAuthority: officialPersonalFactAuthority(
-          'identity',
-          'localized_title',
-          'progress',
-          'hierarchy'
-        ),
         provider: 'miyoushe',
         officialId: exploration.id,
         officialTitle: exploration.title,
@@ -214,12 +202,6 @@ export function extractGenshinExplorationReviewCandidates(
         target: 'exploration',
         kind: 'personal-map-progress',
         payload: {
-          factAuthority: officialPersonalFactAuthority(
-            'identity',
-            'localized_title',
-            'progress',
-            'hierarchy'
-          ),
           provider: 'miyoushe',
           officialId: `area:${exploration.id}:${areaId}`,
           officialTitle: title,

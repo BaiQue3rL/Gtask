@@ -6,7 +6,8 @@ This file is an AI entry point. It is intentionally concise; users are not expec
 
 - Product: **Gtask**, a Windows Electron + Vue 3 + TypeScript + SQLite desktop application for game task, event, recurring-challenge, and map-exploration checklists.
 - Current built-in games: Genshin Impact (`genshin`), Honkai: Star Rail (`star-rail`), Zenless Zone Zero (`zenless`), and Wuthering Waves (`wuthering-waves`). The architecture must remain extensible and user-facing copy must not imply the product can never support more games.
-- Codex is the business-semantic authority for public-data research. Authenticated personal data uses complete adapter-owned snapshots; application code performs deterministic collection, official-ID binding, validation, atomic source switching, and protected-data enforcement. Never reintroduce automatic public/personal fusion.
+- Built-in activities, recurring challenges, maps, and version windows come from persistent verified baselines. Authenticated personal adapters may update only completion/progress on uniquely matched baseline rows; they never own or replace catalog structure. Never reintroduce source switching or personal-owned catalogs.
+- Public baseline research is a background MCP maintenance concern, not a product dependency or user-facing workflow. Do not expose Codex/plugin/Agent controls, public-data sync, or onboarding in the renderer.
 - Read `docs/sync-architecture-redesign.md` before changing synchronization architecture. Read `docs/next-session.md` for the latest handoff state.
 - Preserve unrelated user changes and untracked research directories. Never reset or delete the database, credentials, backups, release artifacts, or test references unless the user explicitly requests it.
 
@@ -29,4 +30,4 @@ Do not rebuild the map catalog from personal progress and do not invent a third 
 - Types: `pnpm typecheck`
 - Production build: `pnpm build`
 
-If `node` is unavailable in the shell, use the Codex workspace dependency runtime rather than installing dependencies into a new drive-root directory.
+If `node` is unavailable in the shell, use the configured workspace dependency runtime rather than installing dependencies into a new drive-root directory.

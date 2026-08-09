@@ -1,7 +1,7 @@
 import type { GameId, SyncTarget } from '../../shared/contracts'
 import {
-  extractGenshinExplorationReviewCandidates,
-  extractGenshinEventReviewCandidates,
+  extractGenshinExplorationProgressCandidates,
+  extractGenshinEventProgressCandidates,
   parseGenshinPersonalData
 } from './genshin-personal-parser'
 import {
@@ -12,8 +12,8 @@ import {
 } from './personal-sync-settler'
 import type { SyncAdapter, SyncAdapterOutput, SyncProgressReporter } from './types'
 import {
-  assemblePersonalEventsFromCandidates,
-  assemblePersonalMapsFromCandidates,
+  personalEventsFromCandidates,
+  personalMapsFromCandidates,
   withPersonalIdentity
 } from './personal-snapshot'
 
@@ -73,10 +73,10 @@ export class GenshinPersonalAdapter implements SyncAdapter {
       .some((value) => value !== undefined)
     const eventCandidates = eventCalendar === undefined
       ? []
-      : extractGenshinEventReviewCandidates(eventCalendar)
+      : extractGenshinEventProgressCandidates(eventCalendar)
     const explorationCandidates = profile === undefined
       ? []
-      : extractGenshinExplorationReviewCandidates(profile)
+      : extractGenshinExplorationProgressCandidates(profile)
     const cycleItems = hasChecklistData
       ? parseGenshinPersonalData({
             spiralAbyss,
@@ -84,24 +84,20 @@ export class GenshinPersonalAdapter implements SyncAdapter {
             stygianOnslaught
           })
       : []
-    const eventSnapshot = assemblePersonalEventsFromCandidates(
+    const eventItems = personalEventsFromCandidates(
       'genshin',
       'miyoushe',
       eventCandidates
     )
-    const explorationSnapshot = assemblePersonalMapsFromCandidates(
+    const explorationItems = personalMapsFromCandidates(
       'miyoushe',
       explorationCandidates
     )
     return {
       items: [
-        ...eventSnapshot.items,
-        ...explorationSnapshot.items,
+        ...eventItems,
+        ...explorationItems,
         ...withPersonalIdentity(cycleItems, 'miyoushe', 'personal-challenge-record')
-      ],
-      reviewCandidates: [
-        ...eventSnapshot.reviewCandidates,
-        ...explorationSnapshot.reviewCandidates
       ],
       snapshotCompleteness: outcomes.every((outcome) => outcome.succeeded) ? 'complete' : 'partial',
       adapterVersion: 'genshin-personal-v1',
