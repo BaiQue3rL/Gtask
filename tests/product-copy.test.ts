@@ -26,6 +26,11 @@ describe('product copy and built-in section boundaries', () => {
     expect(app).toContain('beginPendingPersonalLogin')
   })
 
+  it('only renders personal-sync state for sections with a supported personal adapter', () => {
+    expect(app.match(/v-if="panel\.syncTarget && personalSyncTargets\.includes\(panel\.syncTarget\)"/g))
+      .toHaveLength(2)
+  })
+
   it('only exposes creation and editing for the custom section', () => {
     expect(app).toContain('v-if="panel.allowCreate === true"')
     expect(app).toContain("v-if=\"panel.section === 'custom'\"")
@@ -39,5 +44,49 @@ describe('product copy and built-in section boundaries', () => {
     expect(app).not.toContain('class="source-detail"')
     expect(styles).toContain('min-height: 50px')
     expect(styles).toContain('.item-identity .activity-tag')
+  })
+
+  it('renders the incomplete filter as an accessible stateful switch', () => {
+    expect(app).toContain('v-model="showIncompleteOnly"')
+    expect(app).toContain('class="incomplete-filter-control"')
+    expect(app).toContain('class="incomplete-filter-label"')
+    expect(app).not.toContain(':class="{ active: showIncompleteOnly }"')
+    expect(styles).not.toContain('.incomplete-filter-button.active')
+    expect(styles).toContain('transform: translateX(16px)')
+    expect(styles).toMatch(/\.incomplete-filter-label \{[^}]*color: #f5f9ff[^}]*font-size: 15px[^}]*font-weight: 650/)
+    expect(styles).toMatch(/\.incomplete-filter-control \{[^}]*justify-content: space-between/)
+  })
+
+  it('aligns the incomplete filter with the game title row', () => {
+    expect(styles).toMatch(/\.topbar \{[^}]*align-items: end/)
+    expect(styles).toMatch(/\.topbar \{[^}]*grid-template-columns: calc\(66\.6667% - 3px\)/)
+    expect(styles).toMatch(/\.topbar-actions \{[^}]*align-self: end[^}]*\}/)
+    expect(styles).not.toMatch(/\.topbar-actions \{[^}]*margin-right/)
+    expect(styles).toMatch(/\.incomplete-filter-control \{[^}]*height: 36px/)
+    expect(styles).toMatch(/h1 \{[^}]*line-height: 36px/)
+  })
+
+  it('uses the shared compact switch treatment for every settings toggle', () => {
+    expect(app.match(/class="toggle-switch-input"/g)).toHaveLength(4)
+    expect(styles).toContain('.toggle-switch-input:checked + .toggle-switch')
+    expect(styles).toMatch(/\.editor-modal \.game-visibility-row \{[^}]*display: flex[^}]*min-height: 42px[^}]*margin-top: 0/)
+  })
+
+  it('does not retain the removed activity tag filter implementation', () => {
+    for (const obsoleteCode of [
+      'activityTagFilter',
+      'activityTagMenuOpen',
+      'activityTagOptions',
+      '玩法筛选',
+      '全部玩法',
+      'activity-tag-filter',
+      'dropdown-menu'
+    ]) {
+      expect(app).not.toContain(obsoleteCode)
+    }
+    expect(styles).not.toContain('.activity-tag-filter')
+    expect(styles).not.toContain('.activity-filter-')
+    expect(styles).not.toContain('.dropdown-menu')
+    expect(styles).not.toContain('.dropdown-chevron')
   })
 })

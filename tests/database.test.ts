@@ -1372,6 +1372,48 @@ describe('AppDatabase', () => {
     }
   })
 
+  it('把唯一匹配的个人活动明确完成状态写回公开基准行', () => {
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
+    const reference = new Date('2026-08-09T00:00:00.000Z')
+    database.mergeSyncedItems('genshin', 'public_schedule', [{
+      remoteKey: 'event:baseline:completed-overlay',
+      category: 'limited_event',
+      title: '个人完成状态覆盖测试',
+      startsAt: '2026-07-20T00:00:00.000Z',
+      endsAt: '2026-09-10T00:00:00.000Z',
+      completed: false
+    }], reference.toISOString())
+
+    database.replacePersonalSnapshot(
+      'genshin',
+      'events',
+      `miyoushe:${'a'.repeat(64)}`,
+      [{
+        remoteKey: 'personal-event:miyoushe:test:completed-overlay',
+        category: 'limited_event',
+        title: '个人完成状态覆盖测试',
+        startsAt: '2026-07-20T00:00:00.000Z',
+        endsAt: '2026-09-10T00:00:00.000Z',
+        completed: true,
+        sourceIdentity: {
+          provider: 'miyoushe',
+          endpoint: 'miyoushe-genshin-event-calendar',
+          externalId: 'completed-overlay'
+        }
+      }],
+      'genshin-personal-v1',
+      reference
+    )
+
+    expect(database.listChecklistItems('genshin')).toContainEqual(
+      expect.objectContaining({
+        remoteKey: 'event:baseline:completed-overlay',
+        source: 'public_schedule',
+        completed: true
+      })
+    )
+  })
+
   it.skip('旧融合流程：启动时保留 Codex 写入的个人活动状态', () => {
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-task-manager-star-rail-completion-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')

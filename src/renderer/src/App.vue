@@ -119,8 +119,6 @@ let panelDragPointerId: number | null = null
 let panelDragHandle: HTMLElement | null = null
 const panelDragPoint = ref<{ x: number; y: number } | null>(null)
 const showIncompleteOnly = ref(false)
-const activityTagFilter = ref('')
-const activityTagMenuOpen = ref(false)
 const globalPersonalSyncBusy = ref(false)
 const collapsedMapKeys = ref(new Set<string>())
 const collapsedMapKeysByGame = new Map<GameId, Set<string>>()
@@ -218,11 +216,6 @@ const completedCount = computed(() => {
   const weekStart = startOfCurrentWeek()
   return items.value.filter((item) => item.completedAt && new Date(item.completedAt) >= weekStart).length
 })
-const activityTagOptions = computed(() => [...new Set(
-  items.value
-    .filter((item) => item.category === 'limited_event')
-    .flatMap((item) => item.activityTags)
-)].sort((left, right) => left.localeCompare(right, 'zh-CN')))
 const expiringCount = computed(() => {
   const now = Date.now()
   const threshold = now + 3 * 24 * 60 * 60 * 1000
@@ -333,7 +326,6 @@ function handleGlobalKeydown(event: KeyboardEvent): void {
     pendingPersonalSyncIntent.value = null
     return
   }
-  activityTagMenuOpen.value = false
   editorOpen.value = false
   recycleBinOpen.value = false
   settingsOpen.value = false
@@ -345,11 +337,9 @@ watch(selectedGameId, async (gameId, previousGameId) => {
   }
   restoringGameView.value = true
   items.value = []
-  activityTagMenuOpen.value = false
   draggingPanelSection.value = null
   panelDropTarget.value = null
   recycleBinOpen.value = false
-  activityTagFilter.value = ''
   let savedScroll: ChecklistScrollSnapshot | undefined
   try {
     await Promise.all([
@@ -1179,12 +1169,7 @@ function itemsFor(categories: ChecklistCategory[]): ChecklistItem[] {
   return items.value.filter(
     (item) =>
       categories.includes(item.category) &&
-      (!showIncompleteOnly.value || !isChecklistItemComplete(item)) &&
-      (
-        !activityTagFilter.value ||
-        item.category !== 'limited_event' ||
-        item.activityTags.includes(activityTagFilter.value)
-      )
+      (!showIncompleteOnly.value || !isChecklistItemComplete(item))
   ).sort((left, right) => compareChecklistItems(left, right, clockNow.value))
 }
 
@@ -1426,7 +1411,7 @@ function showError(error: unknown): void {
 </script>
 
 <template>
-  <main class="app-shell" @click="activityTagMenuOpen = false">
+  <main class="app-shell">
     <aside class="sidebar">
       <div class="brand">
         <img class="brand-mark" :src="appIcon" alt="" aria-hidden="true">
@@ -1483,18 +1468,18 @@ function showError(error: unknown): void {
           <h1>{{ selectedGame?.name ?? 'Gtask' }}</h1>
         </div>
         <div v-if="!loading && !restoringGameView" class="topbar-actions">
-          <button
-            class="toolbar-button incomplete-filter-button"
-            :class="{ active: showIncompleteOnly }"
-            type="button"
-            :aria-pressed="showIncompleteOnly"
-            @click="showIncompleteOnly = !showIncompleteOnly"
-          >
-            <span>只看未完成</span>
-            <svg class="incomplete-filter-icon" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M2.5 3.25h11L8.75 7.5v5.25h-1.5V7.5L2.5 3.25Z" />
-            </svg>
-          </button>
+          <label class="incomplete-filter-control">
+            <span class="incomplete-filter-label">只看未完成</span>
+            <input
+              v-model="showIncompleteOnly"
+              class="toggle-switch-input"
+              type="checkbox"
+              aria-label="只看未完成"
+            >
+            <span class="toggle-switch" aria-hidden="true">
+              <span class="toggle-switch-thumb"></span>
+            </span>
+          </label>
         </div>
       </header>
 
@@ -1580,7 +1565,7 @@ function showError(error: unknown): void {
                     <span class="section-title-text">{{ panel.title }}</span>
                   </h2>
                   <span
-                    v-if="panel.syncTarget"
+                    v-if="panel.syncTarget && personalSyncTargets.includes(panel.syncTarget)"
                     class="section-sync-indicator"
                     :class="syncStateClass(syncTargetState(panel.syncTarget))"
                     :title="syncStateTimestamp(syncTargetState(panel.syncTarget))
@@ -1614,47 +1599,6 @@ function showError(error: unknown): void {
                     :disabled="!items.some((item) => panel.categories.includes(item.category) && item.completed && item.source === 'manual')"
                     @click="archiveCompletedSection(panel.section, panel.categories, panel.title)"
                   >删除已完成</button>
-                </div>
-              </div>
-              <div
-                v-if="panel.section === 'events'"
-                class="activity-tag-filter"
-                @click.stop
-              >
-                <div v-if="activityTagOptions.length > 0" class="activity-filter-control">
-                  <span>玩法筛选</span>
-                  <div class="dropdown activity-filter-dropdown">
-                    <button
-                      class="activity-filter-button"
-                      type="button"
-                      aria-haspopup="menu"
-                      :aria-expanded="activityTagMenuOpen"
-                      @click="activityTagMenuOpen = !activityTagMenuOpen"
-                    >
-                      <span>{{ activityTagFilter || '全部玩法' }}</span>
-                      <svg class="dropdown-chevron" viewBox="0 0 16 16" aria-hidden="true">
-                        <path d="m4 6 4 4 4-4" />
-                      </svg>
-                    </button>
-                    <div v-if="activityTagMenuOpen" class="dropdown-menu activity-filter-menu" role="menu">
-                      <button
-                        role="menuitemradio"
-                        type="button"
-                        :aria-checked="activityTagFilter === ''"
-                        :class="{ selected: activityTagFilter === '' }"
-                        @click="activityTagFilter = ''; activityTagMenuOpen = false"
-                      >全部玩法</button>
-                      <button
-                        v-for="tag in activityTagOptions"
-                        :key="tag"
-                        role="menuitemradio"
-                        type="button"
-                        :aria-checked="activityTagFilter === tag"
-                        :class="{ selected: activityTagFilter === tag }"
-                        @click="activityTagFilter = tag; activityTagMenuOpen = false"
-                      >{{ tag }}</button>
-                    </div>
-                  </div>
                 </div>
               </div>
               <div class="item-list panel-item-columns">
@@ -1794,27 +1738,35 @@ function showError(error: unknown): void {
         <p class="recycle-hint">隐藏只影响侧栏，数据仍会保留。</p>
         <div class="game-visibility-list">
           <label v-for="game in games" :key="game.id" class="game-visibility-row">
-            <span><img class="game-icon" :src="gameIcons[game.id]" alt="" aria-hidden="true">{{ game.name }}</span>
+            <span class="settings-game-label"><img class="game-icon" :src="gameIcons[game.id]" alt="" aria-hidden="true">{{ game.name }}</span>
             <input
+              class="toggle-switch-input"
               type="checkbox"
               :checked="isGameVisible(game.id)"
               :disabled="isGameVisible(game.id) && visibleGames.length === 1"
               :aria-label="`显示 ${game.name}`"
               @change="toggleGameVisibility(game.id)"
             >
+            <span class="toggle-switch" aria-hidden="true">
+              <span class="toggle-switch-thumb"></span>
+            </span>
           </label>
         </div>
         <h3 class="settings-heading">启动后自动同步</h3>
         <p class="recycle-hint">启动时自动读取所选游戏的官方个人进度；10 分钟内重复启动会安静跳过。</p>
         <div class="game-visibility-list">
           <label v-for="game in games" :key="`auto-sync:${game.id}`" class="game-visibility-row">
-            <span><img class="game-icon" :src="gameIcons[game.id]" alt="" aria-hidden="true">{{ game.name }}</span>
+            <span class="settings-game-label"><img class="game-icon" :src="gameIcons[game.id]" alt="" aria-hidden="true">{{ game.name }}</span>
             <input
+              class="toggle-switch-input"
               type="checkbox"
               :checked="syncSettingsByGame[game.id]?.autoSyncEnabled ?? false"
               :aria-label="`启动后自动同步 ${game.name}`"
               @change="saveAutoSyncPreference(game.id, ($event.target as HTMLInputElement).checked)"
             >
+            <span class="toggle-switch" aria-hidden="true">
+              <span class="toggle-switch-thumb"></span>
+            </span>
           </label>
         </div>
         <h3 class="settings-heading">版块布局</h3>
@@ -1860,11 +1812,15 @@ function showError(error: unknown): void {
             </span>
             <input
               v-model="softwareUpdateSettings.autoCheckEnabled"
+              class="toggle-switch-input"
               type="checkbox"
               :disabled="softwareUpdateBusy"
               aria-label="启动后自动检查更新"
               @change="saveSoftwareUpdatePreference"
             >
+            <span class="toggle-switch" aria-hidden="true">
+              <span class="toggle-switch-thumb"></span>
+            </span>
           </label>
           <div class="software-update-footer">
             <span>

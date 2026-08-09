@@ -50,6 +50,7 @@ export function personalEventsFromCandidates(
     const startsAt = readIso(candidate.payload.normalizedStartAt)
     const endsAt = readIso(candidate.payload.normalizedEndAt)
     if (endsAt && Date.parse(endsAt) <= now) continue
+    const completed = readExplicitEventCompletion(endpoint, candidate.payload.observedStatus)
     const externalId = String(id).trim()
     const remoteKey = `personal-event:${provider}:${endpoint}:${externalId}`
     if (seen.has(remoteKey)) continue
@@ -62,11 +63,30 @@ export function personalEventsFromCandidates(
       endsAt,
       scheduleKind: 'fixed_window',
       modeKey: `official-event-${externalId}`,
-      sourceIdentity: { provider, endpoint, externalId }
-      // 活动日历的状态字段不等于“玩家完成”，没有确定证据时不写 completed。
+      sourceIdentity: { provider, endpoint, externalId },
+      // 只采信接口明确提供的“全部完成”布尔值；生命周期状态和进度数字不用于猜测。
+      ...(completed === undefined ? {} : { completed })
     })
   }
   return items
+}
+
+function readExplicitEventCompletion(endpoint: string, value: unknown): boolean | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const status = value as Record<string, unknown>
+  if (
+    endpoint === 'miyoushe-genshin-event-calendar' &&
+    typeof status.isFinished === 'boolean'
+  ) {
+    return status.isFinished
+  }
+  if (
+    endpoint === 'miyoushe-star-rail-event-calendar' &&
+    typeof status.allFinished === 'boolean'
+  ) {
+    return status.allFinished
+  }
+  return undefined
 }
 
 export function personalMapsFromCandidates(
