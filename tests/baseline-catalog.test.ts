@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AppDatabase } from '../src/main/database'
+import { activityTagsMeetQualityContract } from '../src/main/activity-tags'
 import { SUPPORTED_GAME_IDS } from '../src/shared/contracts'
 import {
   BUNDLED_BASELINE_VERIFIED_AT,
@@ -39,8 +40,31 @@ describe('bundled baseline catalog', () => {
     for (const gameId of SUPPORTED_GAME_IDS) {
       const window = getBundledVersionWindow(gameId)
       expect(Date.parse(window.startsAt)).toBeLessThan(Date.parse(window.endsAt))
-      expect(new Set(getBundledActivityCatalog(gameId).map((item) => item.remoteKey)).size)
-        .toBe(getBundledActivityCatalog(gameId).length)
+      const activities = getBundledActivityCatalog(gameId)
+      expect(new Set(activities.map((item) => item.remoteKey)).size).toBe(activities.length)
+      expect(activities.every((item) =>
+        Boolean(item.startsAt) &&
+        Boolean(item.endsAt) &&
+        Date.parse(item.startsAt!) < Date.parse(item.endsAt!)
+      )).toBe(true)
+      expect(activities.every((item) =>
+        activityTagsMeetQualityContract(item.activityTags ?? [])
+      )).toBe(true)
+    }
+  })
+
+  it('seeds a concrete current time window for every recurring challenge', () => {
+    database = new AppDatabase(':memory:')
+    for (const gameId of SUPPORTED_GAME_IDS) {
+      const cycles = database.listChecklistItems(gameId).filter(
+        (item) => item.category === 'endgame'
+      )
+      expect(cycles.length).toBeGreaterThan(0)
+      expect(cycles.every((item) =>
+        Boolean(item.startsAt) &&
+        Boolean(item.endsAt) &&
+        Date.parse(item.startsAt!) < Date.parse(item.endsAt!)
+      )).toBe(true)
     }
   })
 
@@ -107,5 +131,87 @@ describe('bundled baseline catalog', () => {
     expect(syncStateColumns.map((column) => column.name)).not.toEqual(expect.arrayContaining([
       'mode', 'run_mode', 'auto_scope', 'last_scope', 'initial_guide_dismissed'
     ]))
+  })
+
+  it('binds a uniquely named official map region to the baseline hierarchy and persists after restart', () => {
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-map-progress-persistence-'))
+    const databasePath = join(temporaryDirectory, 'test.sqlite')
+    database = new AppDatabase(databasePath)
+    database.replacePersonalSnapshot(
+      'genshin',
+      'exploration',
+      `miyoushe:${'a'.repeat(64)}`,
+      [{
+        remoteKey: 'personal-map:miyoushe:region:chasm',
+        category: 'exploration',
+        title: '层岩巨渊',
+        completed: true,
+        progressPercent: 100,
+        mapNodeKind: 'region',
+        parentTitle: null,
+        parentRemoteKey: null,
+        sourceIdentity: {
+          provider: 'miyoushe',
+          endpoint: 'exploration',
+          externalId: 'region:chasm'
+        }
+      }],
+      'test-adapter',
+      new Date('2026-08-09T10:00:00.000Z')
+    )
+
+    expect(database.listChecklistItems('genshin').find((item) => item.title === '层岩巨渊'))
+      .toMatchObject({
+        completed: true,
+        progressPercent: 100,
+        source: 'public_schedule',
+        mapNodeKind: 'subregion',
+        parentTitle: '璃月'
+      })
+    database.close()
+    database = new AppDatabase(databasePath)
+
+    expect(database.listChecklistItems('genshin').find((item) => item.title === '层岩巨渊'))
+      .toMatchObject({
+        completed: true,
+        progressPercent: 100,
+        source: 'public_schedule',
+        parentTitle: '璃月'
+      })
+  })
+
+  it('upgrades an awaiting cycle window in place without colliding with its stable remote key', () => {
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-cycle-window-upgrade-'))
+    const databasePath = join(temporaryDirectory, 'test.sqlite')
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
+    database.mergeSyncedItems('genshin', 'public_schedule', [{
+      remoteKey: 'endgame:stygian-onslaught',
+      category: 'endgame',
+      title: '幽境危战',
+      completed: false,
+      startsAt: null,
+      endsAt: null,
+      modeKey: 'stygian-onslaught',
+      periodKey: 'predicted:genshin:stygian-onslaught:awaiting-official-window'
+    }])
+    const oldItem = database.listChecklistItems('genshin').find(
+      (item) => item.modeKey === 'stygian-onslaught'
+    )!
+    database.setChecklistCompletion(oldItem.id, true)
+    database.close()
+    database = null
+
+    expect(() => {
+      database = new AppDatabase(databasePath)
+    }).not.toThrow()
+    expect(database!.listChecklistItems('genshin').find(
+      (item) => item.modeKey === 'stygian-onslaught'
+    )).toMatchObject({
+      id: oldItem.id,
+      remoteKey: 'endgame:stygian-onslaught',
+      completed: true,
+      startsAt: expect.any(String),
+      endsAt: expect.any(String)
+    })
   })
 })

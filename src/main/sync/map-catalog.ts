@@ -8,10 +8,10 @@ interface MapRegionDefinition {
 }
 
 const MAP_CATALOG_VERIFIED_AT: Record<GameId, string> = {
-  genshin: '2026-07-30T00:00:00+08:00',
-  'star-rail': '2026-07-30T00:00:00+08:00',
-  zenless: '2026-07-30T00:00:00+08:00',
-  'wuthering-waves': '2026-07-30T00:00:00+08:00'
+  genshin: '2026-08-09T12:30:00+08:00',
+  'star-rail': '2026-08-09T12:30:00+08:00',
+  zenless: '2026-08-09T12:30:00+08:00',
+  'wuthering-waves': '2026-08-09T12:30:00+08:00'
 }
 
 /**
@@ -30,7 +30,7 @@ const MAP_CATALOGS: Record<GameId, readonly MapRegionDefinition[]> = {
         '帕哈岛',
         '伦波岛',
         '希汐岛',
-        '虚海垒',
+        '虚海望',
         '逐浪野',
         '烟硌山峰',
         '杜南纳深坑',
@@ -225,11 +225,25 @@ const MAP_CATALOGS: Record<GameId, readonly MapRegionDefinition[]> = {
     { title: '卫非地', subregions: ['澄辉坪'] },
     {
       title: '莱姆尼安空洞',
-      subregions: ['[空洞]中央制造区', '[空洞]科研院旧址', '[空洞]旧建筑群']
+      subregions: [
+        '[空洞]中央制造区',
+        '[空洞]职工社区旧址',
+        '[空洞]科研院旧址',
+        '[空洞]粗加工中心',
+        '[空洞]轻松公寓',
+        '[空洞]航天科学站',
+        '[空洞]旧建筑群',
+        '[空洞]社区储运站',
+        '[空洞]昔丘',
+        '[空洞]港口工厂旧址',
+        '[空洞]辉瓷加工基地',
+        '[空洞]辉岭石矿场',
+        '[空洞]青溟秘境'
+      ]
     },
     {
       title: '雅努斯区',
-      subregions: ['六分街', '光映广场', '黑雁工地旧址', '芭莱大厦前']
+      subregions: ['六分街', '光映广场', '黑雁工地旧址', '芭莱大厦前', '厄匹斯港']
     },
     { title: '外环地带', subregions: ['野火镇'] }
   ],
@@ -302,8 +316,14 @@ const MAP_CATALOGS: Record<GameId, readonly MapRegionDefinition[]> = {
 }
 
 function stableKey(gameId: GameId, kind: 'region' | 'subregion', identity: string): string {
+  // 1.0.0 shipped the typo “虚海垒”. Keep that released machine identity
+  // while correcting the user-facing official name to “虚海望”.
+  const stableIdentity = gameId === 'genshin' && kind === 'subregion' &&
+    identity.normalize('NFKC').trim() === '挪德卡莱\0虚海望'
+    ? '挪德卡莱\0虚海垒'
+    : identity
   const digest = createHash('sha256')
-    .update(`${gameId}\0${kind}\0${identity.normalize('NFKC').trim()}`, 'utf8')
+    .update(`${gameId}\0${kind}\0${stableIdentity.normalize('NFKC').trim()}`, 'utf8')
     .digest('hex')
     .slice(0, 20)
   return `map-catalog:${gameId}:${kind}:${digest}`

@@ -202,6 +202,10 @@ export class AppDatabase {
       this.seedGames()
       this.ensureVersionWindowStorage()
       if (options.seedBundledBaselines !== false) {
+        // Advance expired rows before a bundled catalog with the same stable
+        // mode key is merged. Otherwise the new period can collide with the
+        // unique (game, source, remote_key) identity before normal rollover.
+        this.rolloverDueCycleItems()
         this.seedBundledBaselines()
         this.absorbLegacyPersonalProgressIntoBaselines()
       }
@@ -1155,15 +1159,14 @@ export class AppDatabase {
     }
     const invalidEventTags = items.find((item) =>
       item.category === 'limited_event' &&
-      item.activityTags !== undefined &&
       (
         !Array.isArray(item.activityTags) ||
-        (item.activityTags.length > 0 && !activityTagsMeetQualityContract(item.activityTags))
+        !activityTagsMeetQualityContract(item.activityTags)
       )
     )
     if (invalidEventTags) {
       throw new Error(
-        `活动“${invalidEventTags.title}”提交的玩法标签无效；没有可靠依据时应留空`
+        `活动“${invalidEventTags.title}”必须提交 1 到 5 个有可靠依据的有效玩法标签`
       )
     }
     const invalidEndgame = items.find((item) =>
@@ -2199,10 +2202,17 @@ export class AppDatabase {
 
     const title = normalizeSourceTitle(item.title)
     if (item.category === 'exploration') {
+      const titleMatches = candidates.filter((candidate) =>
+        normalizeSourceTitle(candidate.title) === title
+      )
+      // Official account APIs sometimes expose a standalone region where the
+      // canonical two-level catalog deliberately keeps the same unique title
+      // under its main region. Progress identity may follow the unique title;
+      // the baseline continues to own the rendered hierarchy below.
+      if (titleMatches.length === 1) return titleMatches[0]
       const nodeKind = item.mapNodeKind ?? null
       const parent = item.parentTitle ? normalizeSourceTitle(item.parentTitle) : null
-      const matches = candidates.filter((candidate) =>
-        normalizeSourceTitle(candidate.title) === title &&
+      const matches = titleMatches.filter((candidate) =>
         (!nodeKind || candidate.mapNodeKind === nodeKind) &&
         (!parent || normalizeSourceTitle(candidate.parentTitle ?? '') === parent)
       )
@@ -2997,7 +3007,7 @@ export class AppDatabase {
           AND category = 'endgame'
           AND source = ?
           AND (
-            (remote_key = ? AND period_key IS ?)
+            remote_key = ?
             OR (? IS NOT NULL AND mode_key = ? AND period_key IS ?)
             OR (? IS NOT NULL AND mode_key = ?
               AND starts_at IS NOT NULL AND ends_at IS NOT NULL
@@ -3018,7 +3028,6 @@ export class AppDatabase {
         gameId,
         source,
         remoteKey,
-        item.periodKey ?? null,
         item.modeKey ?? null,
         item.modeKey ?? null,
         item.periodKey ?? null,

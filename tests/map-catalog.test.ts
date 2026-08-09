@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { createHash } from 'node:crypto'
 import {
   getBundledMapCatalog,
   getBundledMapCatalogCounts,
@@ -102,5 +103,27 @@ describe('bundled map catalog', () => {
         mapNodeKind: 'subregion'
       })
     ]))
+
+    const zenless = getBundledMapCatalog('zenless')
+    expect(zenless).toEqual(expect.arrayContaining([
+      expect.objectContaining({ title: '[空洞]港口工厂旧址', parentTitle: '莱姆尼安空洞' }),
+      expect.objectContaining({ title: '[空洞]辉岭石矿场', parentTitle: '莱姆尼安空洞' }),
+      expect.objectContaining({ title: '厄匹斯港', parentTitle: '雅努斯区' })
+    ]))
+  })
+
+  it('corrects 虚海望 without changing its released stable key', () => {
+    const item = getBundledMapCatalog('genshin').find((candidate) => candidate.title === '虚海望')
+    const releasedDigest = createHash('sha256')
+      .update('genshin\0subregion\0挪德卡莱\0虚海垒', 'utf8')
+      .digest('hex')
+      .slice(0, 20)
+
+    expect(item).toMatchObject({
+      remoteKey: `map-catalog:genshin:subregion:${releasedDigest}`,
+      parentTitle: '挪德卡莱'
+    })
+    expect(getBundledMapCatalog('genshin').some((candidate) => candidate.title === '虚海垒'))
+      .toBe(false)
   })
 })

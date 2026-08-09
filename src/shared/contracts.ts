@@ -241,7 +241,7 @@ export interface ActivityTagContractEntry {
 }
 
 export interface PublicSyncContract {
-  schemaVersion: 12
+  schemaVersion: 13
   jobKind: 'public_catalog'
   authority: 'interface_contract'
   decisionAuthority: 'codex'
@@ -419,14 +419,6 @@ export interface SyncResult {
   message: string
 }
 
-export interface SyncCancellationResult {
-  gameId: GameId
-  target: SyncTarget
-  source: 'personal_data'
-  cancelled: boolean
-  message: string
-}
-
 export interface GachaApi {
   getAppInfo: () => Promise<AppInfo>
   getRenderingModeState: () => Promise<RenderingModeState>
@@ -465,10 +457,6 @@ export interface GachaApi {
     target?: SyncTarget,
     requestContext?: SyncRequestContext
   ) => Promise<SyncResult>
-  cancelSync: (
-    gameId: GameId,
-    target: SyncTarget
-  ) => Promise<SyncCancellationResult>
   listCredentialStatuses: () => Promise<CredentialStatus[]>
   startMiyousheQrLogin: () => Promise<MiyousheQrLoginState>
   pollMiyousheQrLogin: (sessionId: string) => Promise<MiyousheQrLoginState>

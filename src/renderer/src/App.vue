@@ -19,7 +19,6 @@ import type {
   RenderingModeState,
   SoftwareUpdateCheckResult,
   SoftwareUpdateSettings,
-  SyncResult,
   SyncProgressUpdate,
   SyncTarget,
   SyncTargetState,
@@ -50,6 +49,7 @@ import {
 import {
   buildMapTreeRows,
   collectMapBranchKeys,
+  filterIncompleteMapTreeRows,
   type ChecklistTreeRow
 } from './map-tree'
 import { filterChecklistPanels } from './panel-visibility'
@@ -59,10 +59,8 @@ import {
   personalProgressKey
 } from './personal-sync-progress'
 import { credentialProviderForSyncResult } from './sync-credential-notice'
-import {
-  userFacingProgressMessage,
-  userFacingSyncNotice
-} from './sync-display-copy'
+import { isChecklistItemComplete } from './checklist-completion'
+import { claimStartupAutoSync } from './startup-auto-sync'
 import genshinIcon from './assets/games/genshin.jpg'
 import starRailIcon from './assets/games/star-rail.jpg'
 import zenlessIcon from './assets/games/zenless.jpg'
@@ -133,11 +131,6 @@ const syncSettings = ref<SyncSettings | null>(null)
 const syncSettingsByGame = ref<Partial<Record<GameId, SyncSettings>>>({})
 const syncTargetStates = ref<SyncTargetState[]>([])
 const personalSyncTargets = ref<PersonalSyncTarget[]>([])
-const syncNotice = ref<{
-  status: SyncResult['status']
-  message: string
-  credentialProvider?: CredentialProvider | null
-} | null>(null)
 const clockNow = ref(Date.now())
 const editorOpen = ref(false)
 const recycleBinOpen = ref(false)
@@ -160,7 +153,6 @@ const backups = ref<BackupSummary[]>([])
 const backingUp = ref(false)
 const restoringBackup = ref<string | null>(null)
 const personalSyncProgressByKey = ref<Record<string, SyncProgressUpdate>>({})
-const cancellingSyncKeys = ref(new Set<string>())
 const editingItem = ref<ChecklistItem | null>(null)
 const renderingModeState = ref<RenderingModeState | null>(null)
 const renderingModeSelection = ref<RenderingMode>('compatibility')
@@ -221,29 +213,7 @@ const visibleGames = computed(() => orderedGames.value.filter(
   (game) => !hiddenGameIds.value.includes(game.id)
 ))
 const gameCredentialStatuses = computed(() => credentialStatuses.value)
-const liveSyncProgress = computed(() =>
-  Object.values(personalSyncProgressByKey.value).filter(
-    (progress): progress is SyncProgressUpdate =>
-      Boolean(
-        progress &&
-        progress.gameId === selectedGameId.value &&
-        ['waiting', 'running', 'verification_required'].includes(progress.status)
-      )
-  )
-)
-
-function syncResultNotice(result: SyncResult): ReturnType<typeof userFacingSyncNotice> {
-  return userFacingSyncNotice({
-    status: result.status,
-    credentialProvider: credentialProviderForSyncResult(result),
-    needsRetry: result.sources.some((source) => source.status === 'error')
-  })
-}
-
-const syncNoticeCredentialProvider = computed<CredentialProvider | null>(() => {
-  return syncNotice.value?.credentialProvider ?? null
-})
-const incompleteCount = computed(() => items.value.filter((item) => !item.completed).length)
+const incompleteCount = computed(() => items.value.filter((item) => !isChecklistItemComplete(item)).length)
 const completedCount = computed(() => {
   const weekStart = startOfCurrentWeek()
   return items.value.filter((item) => item.completedAt && new Date(item.completedAt) >= weekStart).length
@@ -298,7 +268,6 @@ onMounted(async () => {
 
 const removeSyncListener = window.gacha.onSyncCompleted((result) => {
   if (result.gameId !== selectedGameId.value) return
-  syncNotice.value = syncResultNotice(result)
   void Promise.all([
     loadItems(),
     loadGameVersionSummaries(),
@@ -314,18 +283,6 @@ const removeChecklistListener = window.gacha.onChecklistChanged(() => {
     loadSyncSettings(),
     loadSyncTargetStates()
   ])
-    .then(() => {
-      const settings = syncSettings.value
-      if (!settings?.message || settings.status === 'idle') return
-      syncNotice.value = userFacingSyncNotice({
-        status: settings.status === 'success'
-          ? 'success'
-          : settings.status === 'error'
-            ? 'error'
-            : 'partial',
-        needsRetry: settings.status === 'error'
-      })
-    })
 })
 const removeSyncProgressListener = window.gacha.onSyncProgress((progress) => {
   if (progress.source === 'personal_data') {
@@ -336,13 +293,6 @@ const removeSyncProgressListener = window.gacha.onSyncProgress((progress) => {
     )
     if (isTerminalPersonalProgress(progress)) {
       if (progress.gameId === selectedGameId.value) {
-        syncNotice.value = progress.status === 'completed'
-          ? null
-          : progress.status === 'cancelled'
-            ? { status: 'cancelled', message: '已取消' }
-            : userFacingSyncNotice({
-                status: 'error'
-              })
         void Promise.all([
           loadItems(),
           loadSyncSettings(),
@@ -352,11 +302,6 @@ const removeSyncProgressListener = window.gacha.onSyncProgress((progress) => {
       return
     }
     return
-  }
-  if (progress.gameId === selectedGameId.value) {
-    if (progress.status === 'cancelled') {
-      syncNotice.value = { status: 'cancelled', message: '已取消' }
-    }
   }
 })
 const clockTimer = window.setInterval(() => {
@@ -400,7 +345,6 @@ watch(selectedGameId, async (gameId, previousGameId) => {
   }
   restoringGameView.value = true
   items.value = []
-  syncNotice.value = null
   activityTagMenuOpen.value = false
   draggingPanelSection.value = null
   panelDropTarget.value = null
@@ -691,7 +635,9 @@ async function runPersonalSyncBatch(
       await window.gacha.getPersonalSyncTargets(gameId)
     )
     if (supportedTargets.length === 0) {
-      if (selectedGameId.value === gameId) errorMessage.value = '当前游戏暂不支持同步个人数据'
+      if (interactive && selectedGameId.value === gameId) {
+        errorMessage.value = '当前游戏暂不支持同步个人数据'
+      }
       return false
     }
     for (let index = 0; index < supportedTargets.length; index += 1) {
@@ -700,7 +646,7 @@ async function runPersonalSyncBatch(
     }
     return true
   } catch (error) {
-    if (selectedGameId.value === gameId) showError(error)
+    if (interactive && selectedGameId.value === gameId) showError(error)
     return false
   } finally {
     globalPersonalSyncBusy.value = false
@@ -710,8 +656,11 @@ async function runPersonalSyncBatch(
 async function runStartupAutoSync(): Promise<void> {
   if (startupAutoSyncStarted) return
   startupAutoSyncStarted = true
-  for (const game of games.value) {
-    if (!syncSettingsByGame.value[game.id]?.autoSyncEnabled) continue
+  const enabledGames = games.value.filter(
+    (game) => syncSettingsByGame.value[game.id]?.autoSyncEnabled
+  )
+  if (enabledGames.length === 0 || !claimStartupAutoSync(window.localStorage)) return
+  for (const game of enabledGames) {
     await runPersonalSyncBatch(game.id, false)
   }
 }
@@ -765,67 +714,6 @@ function syncStateLabel(state: SyncTargetState | undefined): string {
 
 function syncStateClass(state: SyncTargetState | undefined): string {
   return state?.status ?? 'idle'
-}
-
-const syncProgressPhaseLabels: Record<SyncProgressUpdate['phase'], string> = {
-  queued: '排队中',
-  fetching: '读取数据',
-  searching: '联网检索',
-  verifying: '核对信息',
-  structuring: '整理清单',
-  writing: '写入清单',
-  retrying: '正在重试',
-  verification: '等待验证',
-  merging: '更新清单',
-  completed: '同步完成',
-  failed: '同步失败',
-  cancelled: '已取消'
-}
-
-const syncProgressTargetLabels: Record<SyncTarget, string> = {
-  all: '全局',
-  tasks: '版本',
-  events: '活动',
-  cycles: '周期',
-  exploration: '地图'
-}
-
-function syncProgressTitle(progress: SyncProgressUpdate): string {
-  const platform = credentialProviderForGame(progress.gameId) === 'kuro-community'
-    ? '库街区'
-    : '米游社'
-  return `${platform}${syncProgressTargetLabels[progress.target]}进度同步`
-}
-
-function syncProgressCount(progress: SyncProgressUpdate): string | null {
-  if (progress.current === null || progress.total === null) return null
-  return `${progress.current}/${progress.total}`
-}
-
-function syncProgressPercent(progress: SyncProgressUpdate): number | null {
-  if (progress.current === null || progress.total === null || progress.total <= 0) return null
-  return Math.min(100, Math.round(progress.current / progress.total * 100))
-}
-
-function syncProgressStalled(progress: SyncProgressUpdate): boolean {
-  const elapsed = clockNow.value - new Date(progress.updatedAt).getTime()
-  return (progress.status === 'waiting' && elapsed > 60_000) ||
-    (progress.status === 'running' && elapsed > 30_000)
-}
-
-function syncProgressAge(progress: SyncProgressUpdate): string {
-  if (progress.status === 'waiting') return '排队中'
-  const seconds = Math.max(0, Math.floor((clockNow.value - new Date(progress.updatedAt).getTime()) / 1_000))
-  const elapsed = seconds < 60 ? `${seconds} 秒` : `${Math.floor(seconds / 60)} 分钟`
-  return `${elapsed}前更新`
-}
-
-function syncProgressMessage(progress: SyncProgressUpdate): string {
-  return userFacingProgressMessage(progress)
-}
-
-function progressForTarget(target: SyncTarget): SyncProgressUpdate | null {
-  return liveSyncProgress.value.find((progress) => progress.target === target) ?? null
 }
 
 async function loadArchivedItems(): Promise<void> {
@@ -1107,11 +995,6 @@ async function resumePendingPersonalSync(): Promise<void> {
   }
 }
 
-async function requestCredentialLogin(provider: CredentialProvider): Promise<void> {
-  if (provider === 'miyoushe') await startMiyousheLogin()
-  else openKuroCommunityLogin()
-}
-
 async function openDataDirectory(): Promise<void> {
   try {
     await window.gacha.openDataDirectory()
@@ -1241,7 +1124,10 @@ function panelHasActiveSync(panel: ChecklistPanel): boolean {
 
 const visiblePanels = computed(() => filterChecklistPanels(
   orderedPanels.value,
-  items.value,
+  items.value.map((item) => ({
+    category: item.category,
+    completed: isChecklistItemComplete(item)
+  })),
   showIncompleteOnly.value,
   new Set(
     orderedPanels.value
@@ -1249,46 +1135,6 @@ const visiblePanels = computed(() => filterChecklistPanels(
       .map((panel) => panel.section)
   )
 ))
-
-function isCancellingSync(progress: SyncProgressUpdate): boolean {
-  return cancellingSyncKeys.value.has(
-    syncRequestKey(progress.gameId, progress.source, progress.target)
-  )
-}
-
-async function cancelSync(progress: SyncProgressUpdate): Promise<void> {
-  const key = syncRequestKey(progress.gameId, progress.source, progress.target)
-  if (cancellingSyncKeys.value.has(key)) return
-  const nextCancelling = new Set(cancellingSyncKeys.value)
-  nextCancelling.add(key)
-  cancellingSyncKeys.value = nextCancelling
-  setSyncRequestActive(progress.gameId, progress.source, progress.target, false)
-
-  if (progress.target !== 'all' && progress.target !== 'tasks') {
-    const nextProgress = { ...personalSyncProgressByKey.value }
-    delete nextProgress[personalProgressKey(progress.gameId, progress.target)]
-    personalSyncProgressByKey.value = nextProgress
-  }
-  syncNotice.value = { status: 'cancelled', message: '正在取消…' }
-
-  try {
-    const result = await window.gacha.cancelSync(
-      progress.gameId,
-      progress.target
-    )
-    syncNotice.value = {
-      status: result.cancelled ? 'cancelled' : 'partial',
-      message: result.cancelled ? '同步已取消' : '当前没有进行中的同步'
-    }
-    await Promise.all([loadSyncSettings(), loadSyncTargetStates()])
-  } catch (error) {
-    showError(error)
-  } finally {
-    const remaining = new Set(cancellingSyncKeys.value)
-    remaining.delete(key)
-    cancellingSyncKeys.value = remaining
-  }
-}
 
 async function runPersonalSync(
   target: PersonalSyncTarget,
@@ -1298,7 +1144,6 @@ async function runPersonalSync(
   if (hasActivePersonalSyncForTarget(target, gameId)) return false
   if (!credentialChecked && !await ensurePersonalSyncCredential(gameId, target)) return false
   setSyncRequestActive(gameId, 'personal_data', target, true)
-  syncNotice.value = null
   const progressKey = personalProgressKey(gameId, target)
   const nextProgress = { ...personalSyncProgressByKey.value }
   delete nextProgress[progressKey]
@@ -1310,11 +1155,6 @@ async function runPersonalSync(
     })
     if (selectedGameId.value === gameId) {
       const credentialProvider = credentialProviderForSyncResult(result)
-      syncNotice.value = userFacingSyncNotice({
-        status: result.status,
-        credentialProvider,
-        needsRetry: result.sources.some((source) => source.status === 'error')
-      })
       await Promise.all([loadItems(), loadSyncSettings(), loadSyncTargetStates()])
       if (credentialProvider) {
         pendingPersonalSyncIntent.value = { gameId, target }
@@ -1323,8 +1163,7 @@ async function runPersonalSync(
     }
     return result.status !== 'error' && result.status !== 'cancelled' &&
       !credentialProviderForSyncResult(result)
-  } catch (error) {
-    if (selectedGameId.value === gameId) showError(error)
+  } catch {
     return false
   } finally {
     setSyncRequestActive(gameId, 'personal_data', target, false)
@@ -1340,7 +1179,7 @@ function itemsFor(categories: ChecklistCategory[]): ChecklistItem[] {
   return items.value.filter(
     (item) =>
       categories.includes(item.category) &&
-      (!showIncompleteOnly.value || !item.completed) &&
+      (!showIncompleteOnly.value || !isChecklistItemComplete(item)) &&
       (
         !activityTagFilter.value ||
         item.category !== 'limited_event' ||
@@ -1359,11 +1198,13 @@ function panelItems(panel: ChecklistPanel): ChecklistTreeRow[] {
       displayProgressPercent: item.progressPercent
     }))
   }
-  return buildMapTreeRows(
+  const rows = buildMapTreeRows(
     visible,
     collapsedMapKeys.value,
-    items.value.filter((item) => item.category === 'exploration')
+    items.value.filter((item) => item.category === 'exploration'),
+    !showIncompleteOnly.value
   )
+  return showIncompleteOnly.value ? filterIncompleteMapTreeRows(rows) : rows
 }
 
 function panelItemColumns(panel: ChecklistPanel): ChecklistTreeRow[][] {
@@ -1658,47 +1499,6 @@ function showError(error: unknown): void {
       </header>
 
       <p v-if="!loading && !restoringGameView && errorMessage" class="error-banner" role="alert">{{ errorMessage }}</p>
-      <div v-if="!loading && !restoringGameView && liveSyncProgress.length" class="sync-progress-stack" aria-live="polite">
-        <article
-          v-for="progress in liveSyncProgress"
-          :key="`${progress.source}:${progress.target}`"
-          class="sync-progress-card"
-          :class="{ stalled: syncProgressStalled(progress), verification: progress.status === 'verification_required' }"
-        >
-          <div class="sync-progress-main">
-            <div class="sync-progress-heading">
-              <strong>{{ syncProgressTitle(progress) }}</strong>
-              <span>{{ syncProgressPhaseLabels[progress.phase] }}</span>
-              <b v-if="syncProgressCount(progress)">{{ syncProgressCount(progress) }}</b>
-            </div>
-            <p>{{ syncProgressMessage(progress) }}</p>
-            <div v-if="syncProgressPercent(progress) !== null" class="sync-progress-track" aria-hidden="true">
-              <i :style="{ width: `${syncProgressPercent(progress)}%` }"></i>
-            </div>
-            <small :class="{ warning: syncProgressStalled(progress) }">
-              {{ syncProgressStalled(progress) && progress.status === 'running'
-                ? `进度暂未变化 · ${syncProgressAge(progress)}`
-                : syncProgressAge(progress) }}
-            </small>
-          </div>
-          <button
-            class="sync-cancel-button"
-            type="button"
-            :disabled="isCancellingSync(progress)"
-            @click="cancelSync(progress)"
-          >
-            {{ isCancellingSync(progress) ? '取消中…' : '取消同步' }}
-          </button>
-        </article>
-      </div>
-      <div v-if="!loading && !restoringGameView && syncNotice" class="sync-banner" :class="syncNotice.status" aria-live="polite">
-        <span>{{ syncNotice.message }}</span>
-        <button
-          v-if="syncNoticeCredentialProvider"
-          type="button"
-          @click="requestCredentialLogin(syncNoticeCredentialProvider)"
-        >前往登录</button>
-      </div>
       <section v-if="!loading && !restoringGameView" class="summary-grid">
         <article class="summary-card">
           <span class="summary-icon coral" aria-hidden="true">
@@ -1737,7 +1537,7 @@ function showError(error: unknown): void {
           tag="section"
           class="content-grid"
           :class="{
-            'motion-suppressed': draggingPanelSection !== null || globalSyncBusy || liveSyncProgress.length > 0
+            'motion-suppressed': draggingPanelSection !== null || globalSyncBusy
           }"
           :key="selectedGameId"
         >
@@ -1817,26 +1617,6 @@ function showError(error: unknown): void {
                 </div>
               </div>
               <div
-                v-if="panel.syncTarget && progressForTarget(panel.syncTarget)"
-                class="section-live-progress"
-                :class="{ stalled: syncProgressStalled(progressForTarget(panel.syncTarget)!) }"
-              >
-                <span class="section-live-dot"></span>
-                <strong>{{ syncProgressPhaseLabels[progressForTarget(panel.syncTarget)!.phase] }}</strong>
-                <span>{{ syncProgressMessage(progressForTarget(panel.syncTarget)!) }}</span>
-                <b v-if="syncProgressCount(progressForTarget(panel.syncTarget)!)">
-                  {{ syncProgressCount(progressForTarget(panel.syncTarget)!) }}
-                </b>
-                <button
-                  class="section-sync-cancel"
-                  type="button"
-                  :disabled="isCancellingSync(progressForTarget(panel.syncTarget)!)"
-                  @click="cancelSync(progressForTarget(panel.syncTarget)!)"
-                >
-                  {{ isCancellingSync(progressForTarget(panel.syncTarget)!) ? '取消中…' : '取消' }}
-                </button>
-              </div>
-              <div
                 v-if="panel.section === 'events'"
                 class="activity-tag-filter"
                 @click.stop
@@ -1884,7 +1664,7 @@ function showError(error: unknown): void {
                   name="checklist-flow"
                   tag="div"
                   class="item-list-column"
-                  :class="{ 'motion-suppressed': globalSyncBusy || liveSyncProgress.length > 0 }"
+                  :class="{ 'motion-suppressed': globalSyncBusy }"
                 >
                   <div
                     v-for="row in itemColumn"
@@ -2025,7 +1805,7 @@ function showError(error: unknown): void {
           </label>
         </div>
         <h3 class="settings-heading">启动后自动同步</h3>
-        <p class="recycle-hint">每次启动软件时，为选中的游戏自动读取一次官方个人进度；未登录时会安静跳过。</p>
+        <p class="recycle-hint">启动时自动读取所选游戏的官方个人进度；10 分钟内重复启动会安静跳过。</p>
         <div class="game-visibility-list">
           <label v-for="game in games" :key="`auto-sync:${game.id}`" class="game-visibility-row">
             <span><img class="game-icon" :src="gameIcons[game.id]" alt="" aria-hidden="true">{{ game.name }}</span>

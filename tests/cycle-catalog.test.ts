@@ -21,8 +21,12 @@ describe('cycle catalog', () => {
     expect(items.map((item) => item.title).sort()).toEqual([...expectedTitles].sort())
     expect(items.every((item) => item.completed === false)).toBe(true)
     expect(items.every((item) => item.sourceIdentity?.provider === 'gtask-cycle-catalog')).toBe(true)
-    expect(items.every((item) => !item.startsAt || Date.parse(item.startsAt) <= reference.getTime()))
-      .toBe(true)
+    expect(items.every((item) =>
+      Boolean(item.startsAt) &&
+      Boolean(item.endsAt) &&
+      Date.parse(item.startsAt!) <= reference.getTime() &&
+      Date.parse(item.endsAt!) > reference.getTime()
+    )).toBe(true)
   })
 
   it('为缺少战绩的固定模式补齐稳定名称和预测周期', () => {

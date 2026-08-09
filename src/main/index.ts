@@ -876,42 +876,6 @@ function registerIpcHandlers(): void {
     )
     return result
   })
-  ipcMain.handle('sync:cancel', (
-    _event,
-    gameId: unknown,
-    target: unknown
-  ) => {
-    if (!appDatabase || !syncOrchestrator) throw new Error('同步服务尚未初始化')
-    const parsedGameId = parseGameId(gameId)
-    const parsedTarget = parseSyncTarget(target)
-    if (parsedTarget === 'all' || parsedTarget === 'tasks') {
-      throw new Error('个人进度取消只支持活动、周期和地图版块')
-    }
-    const cancelled = syncOrchestrator.cancelPersonalSync(parsedGameId, parsedTarget)
-
-    const message = cancelled ? '已取消' : '当前没有可取消的同步'
-    if (cancelled) {
-      mainWindow?.webContents.send('sync:progress', {
-        gameId: parsedGameId,
-        target: parsedTarget,
-        source: 'personal_data',
-        phase: 'cancelled',
-        status: 'cancelled',
-        message,
-        current: null,
-        total: null,
-        updatedAt: new Date().toISOString()
-      } satisfies SyncProgressUpdate)
-      mainWindow?.webContents.send('checklist:changed')
-    }
-    return {
-      gameId: parsedGameId,
-      target: parsedTarget,
-      source: 'personal_data',
-      cancelled,
-      message
-    }
-  })
   ipcMain.handle('credentials:list-status', () => {
     if (!credentialVault) throw new Error('安全凭据存储尚未初始化')
     return [

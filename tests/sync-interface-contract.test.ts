@@ -31,8 +31,9 @@ describe('同步接口契约', () => {
     )!
 
     expect(events.itemShapes).toHaveLength(1)
-    expect(limited.requiredFields).toEqual(expect.arrayContaining(['startsAt', 'endsAt']))
-    expect(limited.requiredFields).not.toContain('activityTags')
+    expect(limited.requiredFields).toEqual(expect.arrayContaining([
+      'startsAt', 'endsAt', 'activityTags'
+    ]))
     const criteria = events.completionCriteria.join('；')
     expect(criteria).toContain('限时签到')
     expect(criteria).toContain('活动商店')
@@ -44,7 +45,7 @@ describe('同步接口契约', () => {
     expect(getPublicSyncContract('events').fieldSemantics.activityTags)
       .toContain('词汇表，不是待分配清单')
     expect(getPublicSyncContract('events').fieldSemantics.activityTags)
-      .toContain('留空优于猜测')
+      .toContain('每个活动必须')
     expect(getPublicSyncContract('events').activityTagCatalog)
       .toEqual(expect.arrayContaining([
         expect.objectContaining({ id: 'combat', qualityRole: 'primary' }),

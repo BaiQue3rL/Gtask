@@ -282,7 +282,7 @@ describe('AppDatabase', () => {
     }
   })
 
-  it('活动标签无法确认时允许留空，不阻塞其他可靠清单结果', () => {
+  it('公开活动缺少玩法标签时拒绝写入', () => {
     database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const reference = new Date('2026-07-26T00:00:00.000Z')
     database.mergeSyncedItems('star-rail', 'public_schedule', [{
@@ -302,7 +302,7 @@ describe('AppDatabase', () => {
     )
     database.claimAiScheduleJob('tag-coverage-agent', reference)
 
-    const result = database.applyAiScheduleJob(
+    expect(() => database!.applyAiScheduleJob(
       queued.id,
       'tag-coverage-agent',
       [{
@@ -314,24 +314,12 @@ describe('AppDatabase', () => {
       }],
       [],
       reference
-    )
+    )).toThrow('必须提交 1 到 5 个')
     expect(database.listChecklistItems('star-rail').some((item) => item.title === '本轮新增活动'))
-      .toBe(true)
+      .toBe(false)
     expect(database.listChecklistItems('star-rail').find(
       (item) => item.title === '必须补全的旧活动'
     )?.activityTags).toEqual([])
-    expect(result.job.status).toBe('completed')
-    expect(result.merge).toMatchObject({ added: 1, updated: 0 })
-    expect(database.getSyncSettings('star-rail')).toMatchObject({
-      status: 'success',
-      lastSuccessAt: expect.any(String)
-    })
-    expect(database.getSyncTargetStates('star-rail')).toContainEqual(expect.objectContaining({
-      target: 'events',
-      status: 'success',
-      catalogCoverage: 'complete',
-      lastSuccessAt: reference.toISOString()
-    }))
   })
 
   it('公开活动重复同步全部命中稳定身份时仍视为目录成功', () => {
@@ -342,6 +330,7 @@ describe('AppDatabase', () => {
         remoteKey: 'event:existing:a',
         category: 'limited_event' as const,
         title: '既有活动 A',
+        activityTags: ['combat'],
         startsAt: '2026-08-01T10:00:00+08:00',
         endsAt: '2026-08-20T03:59:00+08:00'
       },
@@ -349,6 +338,7 @@ describe('AppDatabase', () => {
         remoteKey: 'event:existing:b',
         category: 'limited_event' as const,
         title: '既有活动 B',
+        activityTags: ['combat'],
         startsAt: '2026-08-02T10:00:00+08:00',
         endsAt: '2026-08-21T03:59:00+08:00'
       }
@@ -2167,7 +2157,7 @@ describe('AppDatabase', () => {
         userTimeZone: 'America/Los_Angeles'
       },
       contract: {
-        schemaVersion: 12,
+        schemaVersion: 13,
         decisionAuthority: 'codex',
         executorPolicy: 'mechanical_validation_only'
       }

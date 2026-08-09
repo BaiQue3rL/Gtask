@@ -167,7 +167,7 @@ describe('本地 MCP server', () => {
         status: 'claimed',
         progressPhase: 'searching',
         contract: {
-          schemaVersion: 12,
+          schemaVersion: 13,
           authority: 'interface_contract',
           target: 'events',
           requestContext: {

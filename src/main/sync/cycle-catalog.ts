@@ -6,7 +6,6 @@ const DAY_MS = 24 * 60 * 60 * 1000
 type CyclePredictionPolicy =
   | { kind: 'monthly'; startDay: number; hour: number; timeZoneOffsetHours: number }
   | { kind: 'interval'; anchorStartsAt: string; cadenceDays: number; durationDays: number }
-  | { kind: 'learned' }
 
 export interface CycleModeDefinition {
   gameId: GameId
@@ -45,7 +44,12 @@ export const CYCLE_MODE_CATALOG: readonly CycleModeDefinition[] = [
     remoteKey: 'endgame:stygian-onslaught',
     title: '幽境危战',
     aliases: ['幽境危战'],
-    prediction: { kind: 'learned' }
+    prediction: {
+      kind: 'interval',
+      anchorStartsAt: '2026-07-08T10:00:00+08:00',
+      cadenceDays: 42,
+      durationDays: 33.75
+    }
   },
   {
     gameId: 'star-rail',
@@ -92,7 +96,12 @@ export const CYCLE_MODE_CATALOG: readonly CycleModeDefinition[] = [
     remoteKey: 'endgame:anomaly-arbitration',
     title: '异相仲裁',
     aliases: ['异相仲裁'],
-    prediction: { kind: 'learned' }
+    prediction: {
+      kind: 'interval',
+      anchorStartsAt: '2026-07-15T06:00:00+08:00',
+      cadenceDays: 42,
+      durationDays: 42
+    }
   },
   {
     gameId: 'zenless',
@@ -126,7 +135,12 @@ export const CYCLE_MODE_CATALOG: readonly CycleModeDefinition[] = [
     remoteKey: 'endgame:tower-of-adversity',
     title: '逆境深塔',
     aliases: ['逆境深塔'],
-    prediction: { kind: 'learned' }
+    prediction: {
+      kind: 'interval',
+      anchorStartsAt: '2026-07-20T04:00:00+08:00',
+      cadenceDays: 28,
+      durationDays: 28
+    }
   },
   {
     gameId: 'wuthering-waves',
@@ -134,7 +148,12 @@ export const CYCLE_MODE_CATALOG: readonly CycleModeDefinition[] = [
     remoteKey: 'endgame:whimpering-wastes',
     title: '冥歌海墟',
     aliases: ['冥歌海墟'],
-    prediction: { kind: 'learned' }
+    prediction: {
+      kind: 'interval',
+      anchorStartsAt: '2026-07-06T04:00:00+08:00',
+      cadenceDays: 28,
+      durationDays: 28
+    }
   },
   {
     gameId: 'wuthering-waves',
@@ -142,7 +161,12 @@ export const CYCLE_MODE_CATALOG: readonly CycleModeDefinition[] = [
     remoteKey: 'endgame:endstate-matrix',
     title: '终焉矩阵',
     aliases: ['终焉矩阵'],
-    prediction: { kind: 'learned' }
+    prediction: {
+      kind: 'interval',
+      anchorStartsAt: '2026-07-17T04:00:00+08:00',
+      cadenceDays: 42,
+      durationDays: 34
+    }
   }
 ] as const
 

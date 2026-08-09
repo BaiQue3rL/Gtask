@@ -138,17 +138,6 @@ export class SyncOrchestrator {
     return [...this.personalInFlight.keys()].some((key) => key.startsWith(prefix))
   }
 
-  cancelPersonalSync(gameId: GameId, target: PersonalSyncTarget): boolean {
-    let cancelled = false
-    const prefix = `${gameId}:${target}:`
-    for (const [key, active] of this.personalInFlight) {
-      if (!key.startsWith(prefix)) continue
-      active.controller.abort(new SyncCancelledError())
-      cancelled = true
-    }
-    return cancelled
-  }
-
   cancelAllPersonalSync(): number {
     let cancelled = 0
     for (const active of this.personalInFlight.values()) {

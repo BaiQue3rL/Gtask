@@ -482,7 +482,7 @@ export function createLocalMcpServer(
           titleSourceUrl: httpUrlSchema,
           activityTags: z.array(activityTagIdSchema)
             .min(MIN_AI_ACTIVITY_TAGS).max(MAX_AI_ACTIVITY_TAGS).optional()
-            .describe('可选；只有资料明确支持时才提交稳定 ID，没有可靠依据时留空'),
+            .describe('限时活动必填；依据玩法规则提交稳定 ID'),
           parentTitle: z.string().max(200).nullable().optional(),
           mapNodeKind: mapNodeKindSchema.nullable().optional(),
           parentRemoteKey: z.string().max(200).nullable().optional(),

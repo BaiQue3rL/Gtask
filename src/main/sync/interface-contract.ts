@@ -16,7 +16,7 @@ const DEFAULT_REQUEST_CONTEXT: SyncRequestContext = {
 }
 
 function activityTagSemantics(outputLocale: string): string {
-  return `activityTagCatalog 只是可用词汇表，不是待分配清单，也不要求使用其中任何标签。只有资料能够直接支持时，才提交 ${MIN_AI_ACTIVITY_TAGS} 至 ${MAX_AI_ACTIVITY_TAGS} 个稳定标签 ID，并按 ${outputLocale} 的标签定义自主判断最贴切的玩法语义；把标签暂时留空优于猜测、凑数或从词表中硬挑。现有目录无法准确表达资料明确描述的新玩法时，可调用标签注册工具创建 custom.* ID 后再引用。不得写入“活动”“限时活动”“常驻活动”等版块分类，也不得提交数据来源标签。`
+  return `activityTagCatalog 只是可用词汇表，不是待分配清单。每个活动必须依据玩法规则提交 ${MIN_AI_ACTIVITY_TAGS} 至 ${MAX_AI_ACTIVITY_TAGS} 个稳定标签 ID，并按 ${outputLocale} 的标签定义自主判断最贴切的玩法语义；不得猜测、凑数或从词表中硬挑。现有目录无法准确表达资料明确描述的新玩法时，可调用标签注册工具创建 custom.* ID 后再引用。不得写入“活动”“限时活动”“常驻活动”等版块分类，也不得提交数据来源标签。`
 }
 
 const tasksContract: SyncSectionContract = {
@@ -51,6 +51,7 @@ const eventsContract: SyncSectionContract = {
       'title',
       'startsAt',
       'endsAt',
+      'activityTags',
       'titleSourceUrl',
       'sourceUrl',
       'confidence'
@@ -68,8 +69,8 @@ const eventsContract: SyncSectionContract = {
     '限时活动反例：活动内部的每日阶段、单个关卡、剧情任务、活动商店、奖励档位、版本前瞻、维护公告、兑换码和角色或武器卡池；这些不能作为新的活动清单项。',
     '同一活动的预告页、规则页、玩法页和奖励页只是同一活动的不同资料，不得分别建项；标题应使用活动容器的官方本地化总名称。',
     '限时活动必须同时具有准确 startsAt 和 endsAt；开始后界面自动由“距离开始”切换为“剩余”。',
-    `玩法标签是可选的增强信息。能够确认时提交 ${MIN_AI_ACTIVITY_TAGS} 至 ${MAX_AI_ACTIVITY_TAGS} 个符合 requestContext.outputLocale 的准确标签；暂时无法确认时允许留空，不能同义重复、用泛化词凑数或为了覆盖词表而硬贴。`,
-    '提交标签前应阅读能够直接说明玩法规则的资料；只有排期图、活动标题或奖励列表不足以证明玩法。现有标签目录无法准确表达明确的新玩法时可以注册 custom.* 标签，也可以先留空等待后续补全。',
+    `玩法标签是活动必填字段。提交 ${MIN_AI_ACTIVITY_TAGS} 至 ${MAX_AI_ACTIVITY_TAGS} 个符合 requestContext.outputLocale 的准确标签；不能同义重复、用泛化词凑数或为了覆盖词表而硬贴。`,
+    '提交标签前应阅读能够直接说明玩法规则的资料；只有排期图、活动标题或奖励列表不足以证明玩法。现有标签目录无法准确表达明确的新玩法时应注册 custom.* 标签后再提交。',
     '同一活动只能保留一个语义记录；名称或标点不同但实际相同时使用 matchItemId。',
     '如果无法确认某个名称是整体活动还是内部阶段，或不同页面是否属于同一活动，必须结合官方活动规则、时间窗口和至少一个独立可靠来源交叉核验；仍无法确认则不得猜测或提交。'
   ]
@@ -178,7 +179,7 @@ export function getPublicSyncContract(
   requestContext: SyncRequestContext = DEFAULT_REQUEST_CONTEXT
 ): PublicSyncContract {
   return {
-    schemaVersion: 12,
+    schemaVersion: 13,
     jobKind: 'public_catalog',
     authority: 'interface_contract',
     decisionAuthority: 'codex',

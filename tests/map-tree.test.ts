@@ -3,7 +3,8 @@ import type { ChecklistItem } from '../src/shared/contracts'
 import {
   buildMapTreeRows,
   collectMapBranchKeys,
-  distributeMapTreeRows
+  distributeMapTreeRows,
+  filterIncompleteMapTreeRows
 } from '../src/renderer/src/map-tree'
 
 function mapItem(
@@ -158,6 +159,35 @@ describe('buildMapTreeRows', () => {
     expect(rows.map((row) => [row.item.id, row.depth])).toEqual([
       ['region:liyue', 0],
       ['map:active', 1]
+    ])
+  })
+
+  it('只看未完成时可以隐藏已完成父目录并把未完成子地区提升显示', () => {
+    const allItems = [
+      mapItem('region:liyue', '璃月', { completed: true, progressPercent: 100 }),
+      mapItem('map:active', '沉玉谷', {
+        mapNodeKind: 'subregion',
+        completed: false,
+        progressPercent: 80,
+        parentRemoteKey: 'region:liyue'
+      }),
+      mapItem('map:stale', '层岩巨渊', {
+        mapNodeKind: 'subregion',
+        completed: false,
+        progressPercent: 100,
+        parentRemoteKey: 'region:liyue'
+      })
+    ]
+    const visibleItems = allItems.filter((item) => !item.completed && item.progressPercent !== 100)
+    const rows = filterIncompleteMapTreeRows(buildMapTreeRows(
+      visibleItems,
+      new Set(),
+      allItems,
+      false
+    ))
+
+    expect(rows.map((row) => [row.item.id, row.depth])).toEqual([
+      ['map:active', 0]
     ])
   })
 

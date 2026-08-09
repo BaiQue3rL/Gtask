@@ -1,5 +1,6 @@
 import type { ChecklistItem } from '../../shared/contracts'
 import { compareMapTreeItems } from './checklist-sort'
+import { isChecklistItemComplete } from './checklist-completion'
 
 export interface ChecklistTreeRow {
   item: ChecklistItem
@@ -19,7 +20,8 @@ export function collectMapBranchKeys(items: ChecklistItem[]): Set<string> {
 export function buildMapTreeRows(
   sourceItems: ChecklistItem[],
   collapsedKeys: ReadonlySet<string>,
-  progressSourceItems: ChecklistItem[] = sourceItems
+  progressSourceItems: ChecklistItem[] = sourceItems,
+  includeAncestorStructure = true
 ): ChecklistTreeRow[] {
   const items = [...sourceItems].sort(compareMapTreeItems)
   const progressItems = [...progressSourceItems].sort(compareMapTreeItems)
@@ -50,17 +52,19 @@ export function buildMapTreeRows(
   // visible. Preserve the necessary ancestor path as structure instead of
   // promoting those children into fake root regions.
   const renderKeys = new Set(visibleKeys)
-  for (const visible of items) {
-    let current: ChecklistItem | undefined = visible
-    const visitedAncestors = new Set<string>()
-    while (current) {
-      const key = keyOf(current)
-      if (visitedAncestors.has(key)) break
-      visitedAncestors.add(key)
-      renderKeys.add(key)
-      const parentKey = parentKeyOf(current)
-      if (!parentKey || parentKey === key) break
-      current = byKey.get(parentKey)
+  if (includeAncestorStructure) {
+    for (const visible of items) {
+      let current: ChecklistItem | undefined = visible
+      const visitedAncestors = new Set<string>()
+      while (current) {
+        const key = keyOf(current)
+        if (visitedAncestors.has(key)) break
+        visitedAncestors.add(key)
+        renderKeys.add(key)
+        const parentKey = parentKeyOf(current)
+        if (!parentKey || parentKey === key) break
+        current = byKey.get(parentKey)
+      }
     }
   }
   const roots = progressItems.filter((item) => {
@@ -121,6 +125,10 @@ export function buildMapTreeRows(
     if (renderKeys.has(keyOf(item)) && !reachable.has(keyOf(item))) visit(item, 0)
   }
   return rows
+}
+
+export function filterIncompleteMapTreeRows(rows: ChecklistTreeRow[]): ChecklistTreeRow[] {
+  return rows.filter((row) => !isChecklistItemComplete(row.item))
 }
 
 export function distributeMapTreeRows(
