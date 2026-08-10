@@ -43,6 +43,8 @@ describe('Windows installer directory', () => {
       'utf8'
     )
     expect(packageJson.scripts?.['package:installer']).toContain('build-installer-with-details.mjs')
+    expect(packageJson.scripts?.['package:portable']).toContain('--publish never')
+    expect(packageScript).toContain("'--publish', 'never'")
     expect(packageScript).toContain('SetDetailsPrint both')
     expect(packageScript).toContain('正在检查并移除现有版本…')
     expect(packageScript).toContain('正在解压程序文件…')

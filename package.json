@@ -31,7 +31,7 @@
     "local:mcp": "node out/main/local-mcp-server-cli.js",
     "preview": "electron-vite preview",
     "package:dir": "pnpm build && pnpm licenses:generate && electron-builder --dir",
-    "package:portable": "pnpm build && pnpm licenses:generate && electron-builder --win portable",
+    "package:portable": "pnpm build && pnpm licenses:generate && electron-builder --win portable --publish never",
     "package:installer": "pnpm build && pnpm licenses:generate && node scripts/build-installer-with-details.mjs",
     "release:verify": "node scripts/verify-portable-release.mjs",
     "release:verify-installer": "node scripts/verify-installer-release.mjs"

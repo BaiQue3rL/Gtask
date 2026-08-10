@@ -55,11 +55,15 @@ patched = replaceOnce(
 try {
   writeFileSync(installSectionPath, patched, 'utf8')
   const cliPath = require.resolve('electron-builder/cli.js')
-  const result = spawnSync(process.execPath, [cliPath, '--win', 'nsis'], {
-    cwd: process.cwd(),
-    env: process.env,
-    stdio: 'inherit'
-  })
+  const result = spawnSync(
+    process.execPath,
+    [cliPath, '--win', 'nsis', '--publish', 'never'],
+    {
+      cwd: process.cwd(),
+      env: process.env,
+      stdio: 'inherit'
+    }
+  )
   if (result.error) throw result.error
   if (result.status !== 0) process.exitCode = result.status ?? 1
 } finally {
