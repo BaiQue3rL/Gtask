@@ -36,7 +36,10 @@ jobs:
           }
 
       - name: Test
-        run: pnpm test
+        # SQLite migrations and consistent backups are I/O-heavy on shared
+        # Windows runners. Keep a finite limit without inheriting Vitest's
+        # workstation-oriented five-second default.
+        run: pnpm exec vitest run --testTimeout=15000
 
       - name: Build portable edition
         run: pnpm package:portable
