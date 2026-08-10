@@ -27,6 +27,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install Electron binary
+        # Electron 42+ downloads its binary on first use instead of during
+        # dependency installation. electron-builder consumes this directory.
+        run: pnpm exec install-electron --no
+
       - name: Verify tag and package version
         shell: pwsh
         run: |
