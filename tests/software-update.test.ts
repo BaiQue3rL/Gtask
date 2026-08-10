@@ -73,6 +73,30 @@ describe('software update service', () => {
     })
   })
 
+  it('falls back to the next repository when the primary source fails', async () => {
+    const service = new SoftwareUpdateService('1.0.0', [
+      {
+        id: 'primary',
+        configured: true,
+        check: async () => { throw new Error('network unavailable') }
+      },
+      {
+        id: 'mirror',
+        configured: true,
+        check: async () => ({
+          version: '1.0.1',
+          releaseUrl: 'https://example.com/gtask/releases'
+        })
+      }
+    ])
+
+    await expect(service.check(new Date('2026-08-10T12:00:00.000Z'))).resolves.toMatchObject({
+      outcome: 'update_available',
+      latestVersion: '1.0.1',
+      releaseUrl: 'https://example.com/gtask/releases'
+    })
+  })
+
   it('persists only Gtask update preferences and the last successful check', () => {
     const directory = mkdtempSync(join(tmpdir(), 'gtask-update-settings-'))
     temporaryDirectories.push(directory)

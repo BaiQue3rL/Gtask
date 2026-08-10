@@ -1106,24 +1106,13 @@ const globalSyncBusy = computed(() =>
   hasActivePersonalSync.value
 )
 
-function panelHasActiveSync(panel: ChecklistPanel): boolean {
-  const target = panel.syncTarget
-  if (!target) return false
-  return hasActivePersonalSyncForTarget(target)
-}
-
 const visiblePanels = computed(() => filterChecklistPanels(
   orderedPanels.value,
   items.value.map((item) => ({
     category: item.category,
     completed: isChecklistItemComplete(item)
   })),
-  showIncompleteOnly.value,
-  new Set(
-    orderedPanels.value
-      .filter(panelHasActiveSync)
-      .map((panel) => panel.section)
-  )
+  showIncompleteOnly.value
 ))
 
 async function runPersonalSync(

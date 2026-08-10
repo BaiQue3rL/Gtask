@@ -24,13 +24,7 @@ describe('filterChecklistPanels', () => {
     expect(visible.map((panel) => panel.section)).toEqual(['events'])
   })
 
-  it('keeps an empty section visible while its sync is active', () => {
-    const visible = filterChecklistPanels(
-      panels,
-      [],
-      true,
-      new Set(['cycles' as const])
-    )
-    expect(visible.map((panel) => panel.section)).toEqual(['cycles'])
+  it('does not let transient background state bypass the incomplete filter', () => {
+    expect(filterChecklistPanels(panels, [], true)).toEqual([])
   })
 })

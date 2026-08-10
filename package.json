@@ -1,10 +1,26 @@
 {
   "name": "gtask",
   "version": "1.0.0",
-  "description": "可扩展的本地游戏任务与进度清单",
+  "description": "Windows desktop checklist for game schedules, tasks, and progress",
   "main": "./out/main/index.js",
   "author": "Gtask contributors",
   "license": "MIT",
+  "keywords": [
+    "desktop-app",
+    "windows",
+    "game-dashboard",
+    "game-task-manager",
+    "game-progress-tracker",
+    "game-checklist",
+    "genshin-impact",
+    "honkai-star-rail",
+    "zenless-zone-zero",
+    "wuthering-waves",
+    "electron",
+    "vue3",
+    "typescript",
+    "sqlite"
+  ],
   "scripts": {
     "dev": "electron-vite dev",
     "build": "pnpm typecheck && electron-vite build",

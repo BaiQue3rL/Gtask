@@ -90,11 +90,27 @@ import {
   parseUpdateChecklistItem
 } from './validation'
 
+// Release screenshots and automated UI checks must never touch the maintainer's
+// real Documents data. Packaged builds intentionally ignore this override.
+const developmentDocumentsArgument = process.argv.find((argument) =>
+  argument.startsWith('--gtask-development-documents-path=')
+)
+const developmentDocumentsPath = !app.isPackaged
+  ? process.env.GTASK_DEVELOPMENT_DOCUMENTS_PATH?.trim() ||
+    developmentDocumentsArgument?.slice('--gtask-development-documents-path='.length).trim()
+  : undefined
+if (developmentDocumentsPath) {
+  mkdirSync(developmentDocumentsPath, { recursive: true })
+  app.setPath('documents', developmentDocumentsPath)
+}
+
 const renderingModeConfigPath = join(app.getPath('userData'), 'rendering-mode.json')
 const activeRenderingMode = readRenderingMode(renderingModeConfigPath)
 let configuredRenderingMode = activeRenderingMode
 const softwareUpdateConfigPath = join(app.getPath('userData'), 'software-update.json')
 let softwareUpdateSettings = readSoftwareUpdateSettings(softwareUpdateConfigPath)
+const DEFAULT_GITHUB_UPDATE_FEED_URL =
+  'https://raw.githubusercontent.com/BaiQue3rL/Gtask/main/updates/latest.json'
 const BASELINE_WORKER_PREFERENCES = {
   strategy: 'fixed' as const,
   model: 'gpt-5.6-sol' as const,
@@ -1052,8 +1068,14 @@ if (!app.requestSingleInstanceLock()) {
     const fetcher = createElectronNetFetcher(net.fetch)
     softwareUpdateService = new SoftwareUpdateService(app.getVersion(), [
       new JsonFeedUpdateProvider(
-        'primary',
+        'override',
         process.env.GTASK_UPDATE_FEED_URL?.trim() ?? '',
+        net.fetch
+      ),
+      new JsonFeedUpdateProvider('github', DEFAULT_GITHUB_UPDATE_FEED_URL, net.fetch),
+      new JsonFeedUpdateProvider(
+        'mirror',
+        process.env.GTASK_UPDATE_MIRROR_FEED_URL?.trim() ?? '',
         net.fetch
       )
     ])

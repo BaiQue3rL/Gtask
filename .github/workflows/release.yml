@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows-release:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify tag and package version
+        shell: pwsh
+        run: |
+          $version = (Get-Content -Raw package.json | ConvertFrom-Json).version
+          if ("v$version" -ne "${{ github.ref_name }}") {
+            throw "Tag ${{ github.ref_name }} does not match package version $version"
+          }
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build portable edition
+        run: pnpm package:portable
+
+      - name: Verify portable edition
+        run: pnpm release:verify
+
+      - name: Build installer edition
+        run: pnpm package:installer
+
+      - name: Verify installer edition
+        run: pnpm release:verify-installer
+
+      - name: Create checksums
+        shell: pwsh
+        run: |
+          $version = (Get-Content -Raw package.json | ConvertFrom-Json).version
+          $files = @(
+            "release/Gtask-$version-setup.exe",
+            "release/Gtask-$version-portable.exe"
+          )
+          $lines = foreach ($file in $files) {
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $file).Hash.ToLowerInvariant()
+            "$hash  $([IO.Path]::GetFileName($file))"
+          }
+          $lines | Set-Content -Encoding ascii release/SHA256SUMS.txt
+
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = (Get-Content -Raw package.json | ConvertFrom-Json).version
+          gh release create "v$version" `
+            "release/Gtask-$version-setup.exe" `
+            "release/Gtask-$version-portable.exe" `
+            "release/SHA256SUMS.txt" `
+            --title "Gtask $version" `
+            --notes-file "docs/release-notes-$version.md" `
+            --verify-tag

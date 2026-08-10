@@ -134,8 +134,8 @@ export class SoftwareUpdateService {
   ) {}
 
   async check(reference = new Date()): Promise<SoftwareUpdateCheckResult> {
-    const provider = this.providers.find((candidate) => candidate.configured)
-    if (!provider) {
+    const providers = this.providers.filter((candidate) => candidate.configured)
+    if (providers.length === 0) {
       return {
         outcome: 'unavailable',
         currentVersion: this.currentVersion,
@@ -146,48 +146,52 @@ export class SoftwareUpdateService {
       }
     }
 
-    const controller = new AbortController()
-    let timeout: ReturnType<typeof setTimeout> | null = null
-    try {
-      const update = await Promise.race([
-        provider.check(controller.signal),
-        new Promise<never>((_resolve, reject) => {
-          timeout = setTimeout(() => {
-            controller.abort()
-            reject(new Error('更新检查超时'))
-          }, this.timeoutMs)
-        })
-      ])
-      const checkedAt = reference.toISOString()
-      if (!update || compareSoftwareVersions(update.version, this.currentVersion) <= 0) {
-        return {
-          outcome: 'up_to_date',
-          currentVersion: this.currentVersion,
-          latestVersion: update?.version ?? this.currentVersion,
-          releaseUrl: update?.releaseUrl ?? null,
-          checkedAt,
-          message: '当前已是最新版本'
+    for (const provider of providers) {
+      const controller = new AbortController()
+      let timeout: ReturnType<typeof setTimeout> | null = null
+      try {
+        const update = await Promise.race([
+          provider.check(controller.signal),
+          new Promise<never>((_resolve, reject) => {
+            timeout = setTimeout(() => {
+              controller.abort()
+              reject(new Error('更新检查超时'))
+            }, this.timeoutMs)
+          })
+        ])
+        const checkedAt = reference.toISOString()
+        if (!update || compareSoftwareVersions(update.version, this.currentVersion) <= 0) {
+          return {
+            outcome: 'up_to_date',
+            currentVersion: this.currentVersion,
+            latestVersion: update?.version ?? this.currentVersion,
+            releaseUrl: update?.releaseUrl ?? null,
+            checkedAt,
+            message: '当前已是最新版本'
+          }
         }
+        return {
+          outcome: 'update_available',
+          currentVersion: this.currentVersion,
+          latestVersion: update.version,
+          releaseUrl: update.releaseUrl,
+          checkedAt,
+          message: `发现新版本 ${update.version}`
+        }
+      } catch {
+        // A repository mirror is best-effort. Try the next configured source.
+      } finally {
+        if (timeout) clearTimeout(timeout)
       }
-      return {
-        outcome: 'update_available',
-        currentVersion: this.currentVersion,
-        latestVersion: update.version,
-        releaseUrl: update.releaseUrl,
-        checkedAt,
-        message: `发现新版本 ${update.version}`
-      }
-    } catch {
-      return {
-        outcome: 'error',
-        currentVersion: this.currentVersion,
-        latestVersion: null,
-        releaseUrl: null,
-        checkedAt: null,
-        message: '暂时无法检查更新，请稍后重试'
-      }
-    } finally {
-      if (timeout) clearTimeout(timeout)
+    }
+
+    return {
+      outcome: 'error',
+      currentVersion: this.currentVersion,
+      latestVersion: null,
+      releaseUrl: null,
+      checkedAt: null,
+      message: '暂时无法检查更新，请稍后重试'
     }
   }
 }
