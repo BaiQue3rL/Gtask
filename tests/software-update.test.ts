@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -6,6 +6,7 @@ import {
   JsonFeedUpdateProvider,
   SoftwareUpdateService,
   compareSoftwareVersions,
+  createDefaultSoftwareUpdateProviders,
   readSoftwareUpdateSettings,
   writeSoftwareUpdateSettings
 } from '../src/main/software-update'
@@ -59,6 +60,66 @@ describe('software update service', () => {
     })
   })
 
+  it('uses the release page matching the successful mirror', async () => {
+    const fetcher = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        version: '1.1.0',
+        releaseUrl: 'https://github.com/BaiQue3rL/Gtask/releases/latest',
+        releaseUrls: {
+          gitee: 'https://gitee.com/l3rui/Gtask/releases/tag/v1.1.0',
+          github: 'https://github.com/BaiQue3rL/Gtask/releases/tag/v1.1.0'
+        }
+      })
+    }))
+
+    await expect(new JsonFeedUpdateProvider(
+      'gitee',
+      'https://gitee.example/latest.json',
+      fetcher
+    ).check(new AbortController().signal)).resolves.toEqual({
+      version: '1.1.0',
+      releaseUrl: 'https://gitee.com/l3rui/Gtask/releases/tag/v1.1.0'
+    })
+  })
+
+  it('checks Gitee before GitHub and falls back when the mirror fails', async () => {
+    const requestedUrls: string[] = []
+    const fetcher = vi.fn(async (input: string | Request) => {
+      const url = input.toString()
+      requestedUrls.push(url)
+      if (url.includes('gitee.com')) return { ok: false, status: 503, json: async () => ({}) }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ version: '1.0.1', releaseUrl: 'https://github.com/BaiQue3rL/Gtask/releases/latest' })
+      }
+    })
+    const service = new SoftwareUpdateService('1.0.0', createDefaultSoftwareUpdateProviders({
+      fetcher
+    }))
+
+    await expect(service.check()).resolves.toMatchObject({
+      outcome: 'update_available',
+      latestVersion: '1.0.1',
+      releaseUrl: 'https://github.com/BaiQue3rL/Gtask/releases/latest'
+    })
+    expect(requestedUrls).toEqual([
+      'https://gitee.com/l3rui/Gtask/raw/main/updates/latest.json',
+      'https://raw.githubusercontent.com/BaiQue3rL/Gtask/main/updates/latest.json'
+    ])
+  })
+
+  it('respects an explicitly selected repository without adding another fallback', () => {
+    expect(createDefaultSoftwareUpdateProviders({ source: 'gitee' }).map(({ id }) => id))
+      .toEqual(['override', 'gitee'])
+    expect(createDefaultSoftwareUpdateProviders({ source: 'github' }).map(({ id }) => id))
+      .toEqual(['override', 'github'])
+    expect(createDefaultSoftwareUpdateProviders({ source: 'auto' }).map(({ id }) => id))
+      .toEqual(['override', 'gitee', 'github'])
+  })
+
   it('bounds a stalled update source without throwing into startup', async () => {
     const service = new SoftwareUpdateService('1.0.0', [{
       id: 'stalled',
@@ -103,14 +164,32 @@ describe('software update service', () => {
     const filePath = join(directory, 'nested', 'software-update.json')
     const written = writeSoftwareUpdateSettings(filePath, {
       autoCheckEnabled: false,
+      updateSource: 'github',
       lastSuccessfulCheckAt: '2026-08-02T12:00:00+08:00'
     })
 
     expect(written).toEqual({
       autoCheckEnabled: false,
+      updateSource: 'github',
       lastSuccessfulCheckAt: '2026-08-02T04:00:00.000Z'
     })
     expect(readSoftwareUpdateSettings(filePath)).toEqual(written)
     expect(JSON.parse(readFileSync(filePath, 'utf8'))).toEqual(written)
+  })
+
+  it('migrates older settings files to automatic mirror fallback', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'gtask-old-update-settings-'))
+    temporaryDirectories.push(directory)
+    const filePath = join(directory, 'software-update.json')
+    writeFileSync(filePath, JSON.stringify({
+      autoCheckEnabled: false,
+      lastSuccessfulCheckAt: '2026-08-02T04:00:00.000Z'
+    }))
+
+    expect(readSoftwareUpdateSettings(filePath)).toEqual({
+      autoCheckEnabled: false,
+      updateSource: 'auto',
+      lastSuccessfulCheckAt: '2026-08-02T04:00:00.000Z'
+    })
   })
 })

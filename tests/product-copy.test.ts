@@ -72,6 +72,14 @@ describe('product copy and built-in section boundaries', () => {
     expect(styles).toMatch(/\.editor-modal \.game-visibility-row \{[^}]*display: flex[^}]*min-height: 42px[^}]*margin-top: 0/)
   })
 
+  it('keeps repository selection inside the existing software update setting', () => {
+    expect(app).toContain('更新来源')
+    expect(app).toContain('自动（Gitee 优先）')
+    expect(app).toContain('Gitee 镜像')
+    expect(app).toContain('GitHub')
+    expect(app).toContain('v-model="softwareUpdateSettings.updateSource"')
+  })
+
   it('does not retain the removed activity tag filter implementation', () => {
     for (const obsoleteCode of [
       'activityTagFilter',

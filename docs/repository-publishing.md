@@ -4,11 +4,19 @@
 
 ## 发布原则
 
-- GitHub 是唯一权威仓库和正式版本发布源。
-- Gitee 仅作为免费的只读镜像和备用下载入口；镜像不可用时不影响项目的权威版本。
+- GitHub 是唯一权威仓库；标签、提交和发布说明以 GitHub 为准。
+- Gitee 是免费的只读镜像和中国区默认更新入口；镜像不可用时自动回退 GitHub。
 - 不购买对象存储、CDN、云服务器或付费域名，不由个人发布者承担持续流量成本。
-- 软件更新检查读取仓库中的小型 JSON 文件；网络失败时静默降级，不影响本地清单使用。
+- 软件更新默认先读取 Gitee 镜像中的小型 JSON 文件，再回退 GitHub；用户也可在设置中固定使用 Gitee 或 GitHub。网络失败时静默降级，不影响本地清单使用。
 - 公共基准维护仍遵守持久基准架构，不把个人接口或远程文件变成目录结构所有者。
+
+## 镜像与发布自动化
+
+- Gitee 仓库使用 Pull 镜像从 `BaiQue3rL/Gtask` 自动同步提交、分支和标签。
+- GitHub Actions 的 `Release` 工作流仍只构建一次；GitHub Release 成功后，使用仓库 Secret `GITEE_TOKEN` 调用 Gitee OpenAPI 创建同版本 Release，并上传安装版、便携版和 `SHA256SUMS.txt`。
+- `updates/latest.json` 同时保存 Gitee 与 GitHub Release 地址。应用默认按 `Gitee → GitHub` 顺序检查，成功读取哪个源就打开对应的下载页。
+- `GITEE_TOKEN` 只保存在 GitHub Actions 加密 Secret 中，不写入仓库、安装包、日志或用户配置。
+- 后台 MCP 的公共基准热维护仍然直接核验官方资料并写入本地持久基准；仓库镜像只分发维护代码和正式版本，不远程覆盖用户清单或个人进度。
 
 ## GitHub About
 

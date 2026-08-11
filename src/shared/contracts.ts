@@ -67,8 +67,12 @@ export interface RenderingModeState {
 
 export interface SoftwareUpdateSettings {
   autoCheckEnabled: boolean
+  updateSource: SoftwareUpdateSource
   lastSuccessfulCheckAt: string | null
 }
+
+export const SOFTWARE_UPDATE_SOURCES = ['auto', 'gitee', 'github'] as const
+export type SoftwareUpdateSource = (typeof SOFTWARE_UPDATE_SOURCES)[number]
 
 export type SoftwareUpdateCheckOutcome =
   | 'update_available'
@@ -425,7 +429,7 @@ export interface GachaApi {
   updateRenderingMode: (mode: RenderingMode) => Promise<RenderingModeState>
   getSoftwareUpdateSettings: () => Promise<SoftwareUpdateSettings>
   updateSoftwareUpdateSettings: (
-    settings: Pick<SoftwareUpdateSettings, 'autoCheckEnabled'>
+    settings: Pick<SoftwareUpdateSettings, 'autoCheckEnabled' | 'updateSource'>
   ) => Promise<SoftwareUpdateSettings>
   checkSoftwareUpdate: () => Promise<SoftwareUpdateCheckResult>
   restartApp: () => Promise<boolean>

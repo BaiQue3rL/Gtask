@@ -54,8 +54,8 @@ import { SyncOrchestrator } from './sync/orchestrator'
 import { restoreRelaunchOptions } from './relaunch'
 import { readRenderingMode, writeRenderingMode } from './rendering-mode'
 import {
-  JsonFeedUpdateProvider,
   SoftwareUpdateService,
+  createDefaultSoftwareUpdateProviders,
   readSoftwareUpdateSettings,
   writeSoftwareUpdateSettings
 } from './software-update'
@@ -75,6 +75,7 @@ import {
   type RenderingModeState,
   type SoftwareUpdateCheckResult,
   type SoftwareUpdateSettings,
+  type SoftwareUpdateSource,
   type SyncProgressUpdate
 } from '../shared/contracts'
 import { projectAiJobProgressPhase } from '../shared/sync-progress'
@@ -109,8 +110,6 @@ const activeRenderingMode = readRenderingMode(renderingModeConfigPath)
 let configuredRenderingMode = activeRenderingMode
 const softwareUpdateConfigPath = join(app.getPath('userData'), 'software-update.json')
 let softwareUpdateSettings = readSoftwareUpdateSettings(softwareUpdateConfigPath)
-const DEFAULT_GITHUB_UPDATE_FEED_URL =
-  'https://raw.githubusercontent.com/BaiQue3rL/Gtask/main/updates/latest.json'
 const BASELINE_WORKER_PREFERENCES = {
   strategy: 'fixed' as const,
   model: 'gpt-5.6-sol' as const,
@@ -243,11 +242,30 @@ function shutdownApplicationRuntime(): void {
   appDataRoot = null
 }
 
-function parseAutomaticUpdateSetting(value: unknown): boolean {
+function parseSoftwareUpdatePreferences(
+  value: unknown
+): Pick<SoftwareUpdateSettings, 'autoCheckEnabled' | 'updateSource'> {
   if (!value || typeof value !== 'object') throw new Error('更新设置格式不正确')
-  const enabled = (value as Record<string, unknown>).autoCheckEnabled
+  const record = value as Record<string, unknown>
+  const enabled = record.autoCheckEnabled
   if (typeof enabled !== 'boolean') throw new Error('更新设置格式不正确')
-  return enabled
+  const source = record.updateSource
+  if (source !== 'auto' && source !== 'gitee' && source !== 'github') {
+    throw new Error('更新来源格式不正确')
+  }
+  return { autoCheckEnabled: enabled, updateSource: source as SoftwareUpdateSource }
+}
+
+function configureSoftwareUpdateService(): void {
+  softwareUpdateService = new SoftwareUpdateService(
+    app.getVersion(),
+    createDefaultSoftwareUpdateProviders({
+      feedOverride: process.env.GTASK_UPDATE_FEED_URL,
+      mirrorFeedOverride: process.env.GTASK_UPDATE_MIRROR_FEED_URL,
+      source: softwareUpdateSettings.updateSource,
+      fetcher: net.fetch
+    })
+  )
 }
 
 async function checkForSoftwareUpdate(automatic: boolean): Promise<SoftwareUpdateCheckResult> {
@@ -688,10 +706,12 @@ function registerIpcHandlers(): void {
   })
   ipcMain.handle('software-update:get-settings', () => softwareUpdateSettings)
   ipcMain.handle('software-update:update-settings', (_event, value: unknown) => {
+    const preferences = parseSoftwareUpdatePreferences(value)
     softwareUpdateSettings = writeSoftwareUpdateSettings(softwareUpdateConfigPath, {
       ...softwareUpdateSettings,
-      autoCheckEnabled: parseAutomaticUpdateSetting(value)
+      ...preferences
     })
+    configureSoftwareUpdateService()
     return softwareUpdateSettings
   })
   ipcMain.handle('software-update:check', () => checkForSoftwareUpdate(false))
@@ -1066,19 +1086,7 @@ if (!app.requestSingleInstanceLock()) {
       unprotect: (encrypted) => safeStorage.decryptString(encrypted)
     })
     const fetcher = createElectronNetFetcher(net.fetch)
-    softwareUpdateService = new SoftwareUpdateService(app.getVersion(), [
-      new JsonFeedUpdateProvider(
-        'override',
-        process.env.GTASK_UPDATE_FEED_URL?.trim() ?? '',
-        net.fetch
-      ),
-      new JsonFeedUpdateProvider('github', DEFAULT_GITHUB_UPDATE_FEED_URL, net.fetch),
-      new JsonFeedUpdateProvider(
-        'mirror',
-        process.env.GTASK_UPDATE_MIRROR_FEED_URL?.trim() ?? '',
-        net.fetch
-      )
-    ])
+    configureSoftwareUpdateService()
     miyousheQrLogin = new MiyousheQrLoginService(fetcher)
     kuroCommunityCredential = new KuroCommunityCredentialService(fetcher)
     kuroCommunityLogin = new KuroCommunityLoginService(
