@@ -9,6 +9,7 @@ This file is an AI entry point. It is intentionally concise; users are not expec
 - Built-in activities, recurring challenges, maps, and version windows come from persistent verified baselines. Authenticated personal adapters may update only completion/progress on uniquely matched baseline rows; they never own or replace catalog structure. Never reintroduce source switching or personal-owned catalogs.
 - Public baseline research is a background MCP maintenance concern, not a product dependency or user-facing workflow. Do not expose Codex/plugin/Agent controls, public-data sync, or onboarding in the renderer.
 - Read `docs/sync-architecture-redesign.md` before changing synchronization architecture. Read `docs/next-session.md` for the latest handoff state.
+- Never change the product version, create a version tag, or publish a release unless the user explicitly approves that specific version release. Ordinary fixes and release-pipeline tests do not justify a version bump.
 - Preserve unrelated user changes and untracked research directories. Never reset or delete the database, credentials, backups, release artifacts, or test references unless the user explicitly requests it.
 
 ## Canonical map catalog maintenance
