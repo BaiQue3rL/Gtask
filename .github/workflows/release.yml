@@ -78,13 +78,23 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $version = (Get-Content -Raw package.json | ConvertFrom-Json).version
-          gh release create "v$version" `
-            "release/Gtask-$version-setup.exe" `
-            "release/Gtask-$version-portable.exe" `
-            "release/SHA256SUMS.txt" `
-            --title "Gtask $version" `
-            --notes-file "docs/release-notes-$version.md" `
-            --verify-tag
+          $files = @(
+            "release/Gtask-$version-setup.exe"
+            "release/Gtask-$version-portable.exe"
+            "release/SHA256SUMS.txt"
+          )
+          gh release view "v$version" --json tagName *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload "v$version" $files --clobber
+            gh release edit "v$version" `
+              --title "Gtask $version" `
+              --notes-file "docs/release-notes-$version.md"
+          } else {
+            gh release create "v$version" $files `
+              --title "Gtask $version" `
+              --notes-file "docs/release-notes-$version.md" `
+              --verify-tag
+          }
 
       - name: Publish Gitee mirror release
         shell: pwsh
