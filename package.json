@@ -1,6 +1,6 @@
 {
   "name": "gtask",
-  "version": "1.0.2",
+  "version": "1.0.0",
   "description": "Windows desktop checklist for game schedules, tasks, and progress",
   "main": "./out/main/index.js",
   "author": "Gtask contributors",
