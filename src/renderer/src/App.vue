@@ -158,6 +158,7 @@ const renderingModeBusy = ref(false)
 const renderingModeMessage = ref('')
 const softwareUpdateSettings = ref<SoftwareUpdateSettings>({
   autoCheckEnabled: true,
+  updateSource: 'auto',
   lastSuccessfulCheckAt: null
 })
 const softwareUpdateBusy = ref(false)
@@ -1020,11 +1021,12 @@ async function saveSoftwareUpdatePreference(): Promise<void> {
   softwareUpdateMessage.value = '正在保存…'
   try {
     softwareUpdateSettings.value = await window.gacha.updateSoftwareUpdateSettings({
-      autoCheckEnabled: softwareUpdateSettings.value.autoCheckEnabled
+      autoCheckEnabled: softwareUpdateSettings.value.autoCheckEnabled,
+      updateSource: softwareUpdateSettings.value.updateSource
     })
     softwareUpdateMessage.value = '设置已保存'
   } catch (error) {
-    softwareUpdateSettings.value.autoCheckEnabled = !softwareUpdateSettings.value.autoCheckEnabled
+    softwareUpdateSettings.value = await window.gacha.getSoftwareUpdateSettings()
     softwareUpdateMessage.value = ''
     showError(error)
   } finally {
@@ -1810,6 +1812,19 @@ function showError(error: unknown): void {
             <span class="toggle-switch" aria-hidden="true">
               <span class="toggle-switch-thumb"></span>
             </span>
+          </label>
+          <label class="software-update-source-field">
+            <span>更新来源</span>
+            <select
+              v-model="softwareUpdateSettings.updateSource"
+              :disabled="softwareUpdateBusy"
+              aria-label="更新来源"
+              @change="saveSoftwareUpdatePreference"
+            >
+              <option value="auto">自动（Gitee 优先）</option>
+              <option value="gitee">Gitee 镜像</option>
+              <option value="github">GitHub</option>
+            </select>
           </label>
           <div class="software-update-footer">
             <span>

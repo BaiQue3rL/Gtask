@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppDatabase } from '../src/main/database'
 import { activityTagsMeetQualityContract } from '../src/main/activity-tags'
 import { SUPPORTED_GAME_IDS } from '../src/shared/contracts'
@@ -16,6 +16,7 @@ let database: AppDatabase | null = null
 let temporaryDirectory: string | null = null
 
 afterEach(() => {
+  vi.useRealTimers()
   database?.close()
   database = null
   if (temporaryDirectory) rmSync(temporaryDirectory, { recursive: true, force: true })
@@ -181,6 +182,8 @@ describe('bundled baseline catalog', () => {
   })
 
   it('upgrades an awaiting cycle window in place without colliding with its stable remote key', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-10T15:00:00.000Z'))
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-cycle-window-upgrade-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
     database = new AppDatabase(databasePath, { seedBundledBaselines: false })

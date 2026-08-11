@@ -2,15 +2,21 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import type {
   SoftwareUpdateCheckResult,
-  SoftwareUpdateSettings
+  SoftwareUpdateSettings,
+  SoftwareUpdateSource
 } from '../shared/contracts'
 
 export const DEFAULT_SOFTWARE_UPDATE_SETTINGS: SoftwareUpdateSettings = {
   autoCheckEnabled: true,
+  updateSource: 'auto',
   lastSuccessfulCheckAt: null
 }
 
 export const DEFAULT_UPDATE_CHECK_TIMEOUT_MS = 5_000
+export const DEFAULT_GITEE_UPDATE_FEED_URL =
+  'https://gitee.com/l3rui/Gtask/raw/main/updates/latest.json'
+export const DEFAULT_GITHUB_UPDATE_FEED_URL =
+  'https://raw.githubusercontent.com/BaiQue3rL/Gtask/main/updates/latest.json'
 
 export interface AvailableSoftwareUpdate {
   version: string
@@ -28,6 +34,13 @@ type FetchLike = (
   init?: RequestInit
 ) => Promise<Pick<Response, 'ok' | 'status' | 'json'>>
 
+export interface DefaultSoftwareUpdateProviderOptions {
+  feedOverride?: string
+  mirrorFeedOverride?: string
+  source?: SoftwareUpdateSource
+  fetcher?: FetchLike
+}
+
 function parseTimestamp(value: unknown): string | null {
   if (typeof value !== 'string' || !Number.isFinite(Date.parse(value))) return null
   return new Date(value).toISOString()
@@ -40,6 +53,9 @@ export function parseSoftwareUpdateSettings(value: unknown): SoftwareUpdateSetti
     autoCheckEnabled: typeof record.autoCheckEnabled === 'boolean'
       ? record.autoCheckEnabled
       : DEFAULT_SOFTWARE_UPDATE_SETTINGS.autoCheckEnabled,
+    updateSource: record.updateSource === 'gitee' || record.updateSource === 'github'
+      ? record.updateSource
+      : DEFAULT_SOFTWARE_UPDATE_SETTINGS.updateSource,
     lastSuccessfulCheckAt: parseTimestamp(record.lastSuccessfulCheckAt)
   }
 }
@@ -88,9 +104,23 @@ function parseReleaseUrl(value: unknown): string | null {
   return url.toString()
 }
 
+function parseProviderReleaseUrl(
+  payload: Record<string, unknown>,
+  providerId: string
+): string | null {
+  const releaseUrls = payload.releaseUrls
+  if (releaseUrls && typeof releaseUrls === 'object' && !Array.isArray(releaseUrls)) {
+    const providerUrl = (releaseUrls as Record<string, unknown>)[providerId]
+    if (providerUrl !== undefined) return parseReleaseUrl(providerUrl)
+  }
+  return parseReleaseUrl(payload.releaseUrl)
+}
+
 /**
  * Generic JSON feed provider. A future release source only needs to expose
- * `{ "version": "1.2.3", "releaseUrl": "https://..." }`.
+ * `{ "version": "1.2.3", "releaseUrl": "https://..." }`. A mirrored
+ * feed may additionally expose `releaseUrls` keyed by provider id so the
+ * same JSON file can open the matching repository's release page.
  */
 export class JsonFeedUpdateProvider implements UpdateProvider {
   readonly id: string
@@ -121,9 +151,34 @@ export class JsonFeedUpdateProvider implements UpdateProvider {
     }
     return {
       version: payload.version.trim().replace(/^v/i, ''),
-      releaseUrl: parseReleaseUrl(payload.releaseUrl)
+      releaseUrl: parseProviderReleaseUrl(payload, this.id)
     }
   }
+}
+
+export function createDefaultSoftwareUpdateProviders(
+  options: DefaultSoftwareUpdateProviderOptions = {}
+): UpdateProvider[] {
+  const fetcher = options.fetcher ?? globalThis.fetch
+  const override = new JsonFeedUpdateProvider(
+    'override',
+    options.feedOverride?.trim() ?? '',
+    fetcher
+  )
+  const gitee = new JsonFeedUpdateProvider(
+    'gitee',
+    options.mirrorFeedOverride?.trim() || DEFAULT_GITEE_UPDATE_FEED_URL,
+    fetcher
+  )
+  const github = new JsonFeedUpdateProvider(
+    'github',
+    DEFAULT_GITHUB_UPDATE_FEED_URL,
+    fetcher
+  )
+
+  if (options.source === 'gitee') return [override, gitee]
+  if (options.source === 'github') return [override, github]
+  return [override, gitee, github]
 }
 
 export class SoftwareUpdateService {

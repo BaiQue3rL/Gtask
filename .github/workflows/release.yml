@@ -85,3 +85,15 @@ jobs:
             --title "Gtask $version" `
             --notes-file "docs/release-notes-$version.md" `
             --verify-tag
+
+      - name: Publish Gitee mirror release
+        shell: pwsh
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          GITEE_OWNER: l3rui
+          GITEE_REPO: Gtask
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:GITEE_TOKEN)) {
+            throw "Repository secret GITEE_TOKEN is required for mirrored releases"
+          }
+          node scripts/publish-gitee-release.mjs

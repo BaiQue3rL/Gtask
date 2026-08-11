@@ -60,12 +60,12 @@ Gtask 是一款 Windows 桌面游戏任务清单。它集中显示版本倒计�
 
 ## 下载与安装
 
-前往 [Releases](../../releases/latest) 下载 Windows 版本：
+中国区网络优先前往 [Gitee Releases](https://gitee.com/l3rui/Gtask/releases)，也可以从权威源 [GitHub Releases](https://github.com/BaiQue3rL/Gtask/releases/latest) 下载 Windows 版本：
 
 - `Gtask-x.y.z-setup.exe`：安装版。
 - `Gtask-x.y.z-portable.exe`：便携版。
 
-覆盖升级不会删除数据库、凭据或备份。GitHub 是唯一正式发布源；Gitee 镜像仅作为免费的备用入口。项目不自建下载服务器，也不使用付费对象存储或 CDN，因此无法承诺不同网络环境下的下载速度和可用性。
+覆盖升级不会删除数据库、凭据或备份。GitHub 保存权威提交、标签和发布说明；Gitee 自动镜像源码，并作为中国区默认更新检查与下载入口。任一镜像不可用时均可切换到另一个仓库。项目不自建下载服务器，也不使用付费对象存储或 CDN，因此无法承诺不同网络环境下的下载速度和可用性。
 
 ## 本地数据与隐私
 
