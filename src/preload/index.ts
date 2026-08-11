@@ -9,6 +9,7 @@ const gachaApi: GachaApi = {
   updateSoftwareUpdateSettings: (settings) =>
     ipcRenderer.invoke('software-update:update-settings', settings),
   checkSoftwareUpdate: () => ipcRenderer.invoke('software-update:check'),
+  checkRemoteCatalogUpdate: () => ipcRenderer.invoke('remote-catalog:check'),
   restartApp: () => ipcRenderer.invoke('app:restart'),
   openDataDirectory: () => ipcRenderer.invoke('app:open-data-directory'),
   openExternalUrl: (url) => ipcRenderer.invoke('app:open-external-url', url),

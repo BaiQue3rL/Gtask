@@ -165,13 +165,15 @@ describe('software update service', () => {
     const written = writeSoftwareUpdateSettings(filePath, {
       autoCheckEnabled: false,
       updateSource: 'github',
-      lastSuccessfulCheckAt: '2026-08-02T12:00:00+08:00'
+      lastSuccessfulCheckAt: '2026-08-02T12:00:00+08:00',
+      lastAutomaticCheckAt: '2026-08-02T11:00:00+08:00'
     })
 
     expect(written).toEqual({
       autoCheckEnabled: false,
       updateSource: 'github',
-      lastSuccessfulCheckAt: '2026-08-02T04:00:00.000Z'
+      lastSuccessfulCheckAt: '2026-08-02T04:00:00.000Z',
+      lastAutomaticCheckAt: '2026-08-02T03:00:00.000Z'
     })
     expect(readSoftwareUpdateSettings(filePath)).toEqual(written)
     expect(JSON.parse(readFileSync(filePath, 'utf8'))).toEqual(written)
@@ -189,7 +191,8 @@ describe('software update service', () => {
     expect(readSoftwareUpdateSettings(filePath)).toEqual({
       autoCheckEnabled: false,
       updateSource: 'auto',
-      lastSuccessfulCheckAt: '2026-08-02T04:00:00.000Z'
+      lastSuccessfulCheckAt: '2026-08-02T04:00:00.000Z',
+      lastAutomaticCheckAt: null
     })
   })
 })
