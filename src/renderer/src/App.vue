@@ -167,6 +167,13 @@ const softwareUpdateBusy = ref(false)
 const softwareUpdateMessage = ref('')
 const remoteCatalogUpdateBusy = ref(false)
 const remoteCatalogUpdateMessage = ref('')
+const remoteCatalogManualRetryAt = ref<string | null>(null)
+const remoteCatalogManualRetryMinutes = computed(() => {
+  if (!remoteCatalogManualRetryAt.value) return 0
+  return Math.max(0, Math.ceil(
+    (Date.parse(remoteCatalogManualRetryAt.value) - clockNow.value) / 60_000
+  ))
+})
 const loginRequiredOpen = ref(false)
 const pendingPersonalSyncIntent = ref<{
   gameId: GameId
@@ -724,11 +731,18 @@ async function loadArchivedItems(): Promise<void> {
 async function openSettings(): Promise<void> {
   settingsOpen.value = true
   try {
-    const [statuses, listedBackups, loadedRenderingMode, loadedUpdateSettings] = await Promise.all([
+    const [
+      statuses,
+      listedBackups,
+      loadedRenderingMode,
+      loadedUpdateSettings,
+      loadedCatalogStatus
+    ] = await Promise.all([
       window.gacha.listCredentialStatuses(),
       window.gacha.listBackups(),
       window.gacha.getRenderingModeState(),
-      window.gacha.getSoftwareUpdateSettings()
+      window.gacha.getSoftwareUpdateSettings(),
+      window.gacha.getRemoteCatalogUpdateStatus()
     ])
     credentialStatuses.value = statuses
     backups.value = listedBackups
@@ -738,6 +752,8 @@ async function openSettings(): Promise<void> {
     renderingModeMessage.value = ''
     softwareUpdateSettings.value = loadedUpdateSettings
     softwareUpdateMessage.value = ''
+    remoteCatalogManualRetryAt.value = loadedCatalogStatus.manualRetryAt
+    remoteCatalogUpdateMessage.value = ''
   } catch (error) {
     showError(error)
   }
@@ -1060,13 +1076,14 @@ async function checkSoftwareUpdate(): Promise<void> {
 }
 
 async function checkRemoteCatalogUpdate(): Promise<void> {
-  if (remoteCatalogUpdateBusy.value) return
+  if (remoteCatalogUpdateBusy.value || remoteCatalogManualRetryMinutes.value > 0) return
   softwareUpdateMessage.value = ''
   remoteCatalogUpdateBusy.value = true
   remoteCatalogUpdateMessage.value = '正在同步公共清单…'
   try {
     const result: RemoteCatalogCheckResult = await window.gacha.checkRemoteCatalogUpdate()
     remoteCatalogUpdateMessage.value = result.message
+    remoteCatalogManualRetryAt.value = result.manualRetryAt
   } catch (error) {
     remoteCatalogUpdateMessage.value = '暂时无法同步公共清单，请稍后重试'
     showError(error)
@@ -1856,9 +1873,9 @@ function showError(error: unknown): void {
               <button
                 class="secondary-button settings-action-button"
                 type="button"
-                :disabled="softwareUpdateBusy || remoteCatalogUpdateBusy"
+                :disabled="softwareUpdateBusy || remoteCatalogUpdateBusy || remoteCatalogManualRetryMinutes > 0"
                 @click="checkRemoteCatalogUpdate"
-              >{{ remoteCatalogUpdateBusy ? '更新中…' : '更新清单' }}</button>
+              >{{ remoteCatalogUpdateBusy ? '更新中…' : remoteCatalogManualRetryMinutes > 0 ? `${remoteCatalogManualRetryMinutes}分重试` : '更新清单' }}</button>
               <button
                 class="secondary-button settings-action-button"
                 type="button"

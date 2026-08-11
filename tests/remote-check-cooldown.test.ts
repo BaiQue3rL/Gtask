@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   AUTOMATIC_REMOTE_CHECK_COOLDOWN_MS,
-  automaticRemoteCheckDelay
+  MANUAL_REMOTE_CATALOG_COOLDOWN_MS,
+  automaticRemoteCheckDelay,
+  remoteCheckCooldownRemaining
 } from '../src/main/remote-check-cooldown'
 
 describe('automatic remote check cooldown', () => {
@@ -24,5 +26,18 @@ describe('automatic remote check cooldown', () => {
       750
     )).toBe(750)
     expect(automaticRemoteCheckDelay('2026-08-12T12:00:00.000Z', reference, 750)).toBe(750)
+  })
+
+  it('keeps a successful manual catalog check quiet for one hour', () => {
+    expect(remoteCheckCooldownRemaining(
+      '2026-08-11T11:30:00.000Z',
+      reference,
+      MANUAL_REMOTE_CATALOG_COOLDOWN_MS
+    )).toBe(30 * 60 * 1_000)
+    expect(remoteCheckCooldownRemaining(
+      '2026-08-11T11:00:00.000Z',
+      reference,
+      MANUAL_REMOTE_CATALOG_COOLDOWN_MS
+    )).toBe(0)
   })
 })
