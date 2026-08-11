@@ -144,13 +144,15 @@ export interface RemoteCatalogUpdateState {
   publishedAt: string | null
   providerId: string | null
   lastAutomaticCheckAt: string | null
+  lastSuccessfulManualCheckAt: string | null
 }
 
 export const EMPTY_REMOTE_CATALOG_UPDATE_STATE: RemoteCatalogUpdateState = {
   revision: null,
   publishedAt: null,
   providerId: null,
-  lastAutomaticCheckAt: null
+  lastAutomaticCheckAt: null,
+  lastSuccessfulManualCheckAt: null
 }
 
 export function parseRemoteCatalogFeed(value: unknown): RemoteCatalogFeed {
@@ -169,6 +171,10 @@ export function readRemoteCatalogUpdateState(filePath: string): RemoteCatalogUpd
       lastAutomaticCheckAt: typeof value.lastAutomaticCheckAt === 'string'
         && Number.isFinite(Date.parse(value.lastAutomaticCheckAt))
         ? new Date(value.lastAutomaticCheckAt).toISOString()
+        : null,
+      lastSuccessfulManualCheckAt: typeof value.lastSuccessfulManualCheckAt === 'string'
+        && Number.isFinite(Date.parse(value.lastSuccessfulManualCheckAt))
+        ? new Date(value.lastSuccessfulManualCheckAt).toISOString()
         : null
     }
   } catch {
@@ -189,6 +195,10 @@ export function writeRemoteCatalogUpdateState(
     lastAutomaticCheckAt: state.lastAutomaticCheckAt
       && Number.isFinite(Date.parse(state.lastAutomaticCheckAt))
       ? new Date(state.lastAutomaticCheckAt).toISOString()
+      : null,
+    lastSuccessfulManualCheckAt: state.lastSuccessfulManualCheckAt
+      && Number.isFinite(Date.parse(state.lastSuccessfulManualCheckAt))
+      ? new Date(state.lastSuccessfulManualCheckAt).toISOString()
       : null
   }
   mkdirSync(dirname(filePath), { recursive: true })
@@ -311,7 +321,7 @@ export class RemoteCatalogUpdateService {
     const valid = candidates.filter((candidate): candidate is NonNullable<typeof candidate> =>
       candidate !== null
     )
-    if (valid.length === 0) return null
+    if (valid.length === 0) throw new Error('暂时无法连接公共清单源')
     valid.sort((left, right) => Date.parse(right.feed.publishedAt) - Date.parse(left.feed.publishedAt))
     const github = valid.find((candidate) => candidate.providerId === 'github')
     const mirrorConflict = github && valid.some((candidate) =>
@@ -324,6 +334,12 @@ export class RemoteCatalogUpdateService {
     if (
       state.publishedAt &&
       Date.parse(selected.feed.publishedAt) < Date.parse(state.publishedAt)
+    ) {
+      return null
+    }
+    if (
+      state.revision === selected.feed.revision &&
+      state.publishedAt === new Date(selected.feed.publishedAt).toISOString()
     ) {
       return null
     }

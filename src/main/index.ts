@@ -66,7 +66,11 @@ import {
   writeRemoteCatalogUpdateState,
   type RemoteCatalogUpdateState
 } from './remote-catalog-update'
-import { automaticRemoteCheckDelay } from './remote-check-cooldown'
+import {
+  MANUAL_REMOTE_CATALOG_COOLDOWN_MS,
+  automaticRemoteCheckDelay,
+  remoteCheckCooldownRemaining
+} from './remote-check-cooldown'
 import { resolveAppDataPaths } from './data-paths'
 import {
   getBundledMapCatalog
@@ -82,6 +86,7 @@ import {
   type RenderingMode,
   type RenderingModeState,
   type RemoteCatalogCheckResult,
+  type RemoteCatalogUpdateStatus,
   type SoftwareUpdateCheckResult,
   type SoftwareUpdateSettings,
   type SoftwareUpdateSource,
@@ -293,9 +298,40 @@ function configureSoftwareUpdateService(): void {
   )
 }
 
+function getRemoteCatalogUpdateStatus(reference = new Date()): RemoteCatalogUpdateStatus {
+  const remaining = remoteCheckCooldownRemaining(
+    remoteCatalogUpdateState.lastSuccessfulManualCheckAt,
+    reference,
+    MANUAL_REMOTE_CATALOG_COOLDOWN_MS
+  )
+  return {
+    revision: remoteCatalogUpdateState.revision,
+    manualRetryAt: remaining > 0
+      ? new Date(reference.getTime() + remaining).toISOString()
+      : null
+  }
+}
+
 async function checkForRemoteCatalogUpdate(automatic: boolean): Promise<RemoteCatalogCheckResult> {
   if (!remoteCatalogUpdateService || !appDatabase) throw new Error('公共清单更新服务尚未初始化')
   const reference = new Date()
+  if (!automatic) {
+    const status = getRemoteCatalogUpdateStatus(reference)
+    if (status.manualRetryAt) {
+      return {
+        outcome: 'cooldown',
+        revision: status.revision,
+        checkedAt: reference.toISOString(),
+        added: 0,
+        updated: 0,
+        preserved: 0,
+        archived: 0,
+        expiredRemoved: 0,
+        message: '公共清单刚刚检查过',
+        manualRetryAt: status.manualRetryAt
+      }
+    }
+  }
   if (automatic) {
     remoteCatalogUpdateState = writeRemoteCatalogUpdateState(remoteCatalogStatePath, {
       ...remoteCatalogUpdateState,
@@ -304,6 +340,12 @@ async function checkForRemoteCatalogUpdate(automatic: boolean): Promise<RemoteCa
   }
   const update = await remoteCatalogUpdateService.check(remoteCatalogUpdateState, reference)
   if (!update) {
+    if (!automatic) {
+      remoteCatalogUpdateState = writeRemoteCatalogUpdateState(remoteCatalogStatePath, {
+        ...remoteCatalogUpdateState,
+        lastSuccessfulManualCheckAt: reference.toISOString()
+      })
+    }
     return {
       outcome: 'up_to_date',
       revision: remoteCatalogUpdateState.revision,
@@ -313,7 +355,8 @@ async function checkForRemoteCatalogUpdate(automatic: boolean): Promise<RemoteCa
       preserved: 0,
       archived: 0,
       expiredRemoved: 0,
-      message: '公共清单已是最新'
+      message: '公共清单已是最新',
+      manualRetryAt: getRemoteCatalogUpdateStatus(reference).manualRetryAt
     }
   }
   if (!appDatabase || isShuttingDown) throw new Error('应用正在退出')
@@ -322,7 +365,10 @@ async function checkForRemoteCatalogUpdate(automatic: boolean): Promise<RemoteCa
     revision: update.feed.revision,
     publishedAt: update.feed.publishedAt,
     providerId: update.providerId,
-    lastAutomaticCheckAt: remoteCatalogUpdateState.lastAutomaticCheckAt
+    lastAutomaticCheckAt: remoteCatalogUpdateState.lastAutomaticCheckAt,
+    lastSuccessfulManualCheckAt: automatic
+      ? remoteCatalogUpdateState.lastSuccessfulManualCheckAt
+      : reference.toISOString()
   })
   applicationLogger?.info('remote_catalog_updated', {
     revision: update.feed.revision,
@@ -338,7 +384,8 @@ async function checkForRemoteCatalogUpdate(automatic: boolean): Promise<RemoteCa
     revision: update.feed.revision,
     checkedAt: reference.toISOString(),
     ...merge,
-    message: `公共清单已更新：新增 ${merge.added}，修改 ${merge.updated}，撤回 ${merge.archived}`
+    message: `公共清单已更新：新增 ${merge.added}，修改 ${merge.updated}，撤回 ${merge.archived}`,
+    manualRetryAt: getRemoteCatalogUpdateStatus(reference).manualRetryAt
   }
 }
 
@@ -825,6 +872,7 @@ function registerIpcHandlers(): void {
     return softwareUpdateSettings
   })
   ipcMain.handle('software-update:check', () => checkForSoftwareUpdate(false))
+  ipcMain.handle('remote-catalog:get-status', () => getRemoteCatalogUpdateStatus())
   ipcMain.handle('remote-catalog:check', () => checkForRemoteCatalogUpdate(false))
   ipcMain.handle('app:restart', () => {
     setTimeout(() => {

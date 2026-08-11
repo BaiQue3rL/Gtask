@@ -91,7 +91,7 @@ export interface SoftwareUpdateCheckResult {
 }
 
 export interface RemoteCatalogCheckResult {
-  outcome: 'updated' | 'up_to_date'
+  outcome: 'updated' | 'up_to_date' | 'cooldown'
   revision: string | null
   checkedAt: string
   added: number
@@ -100,6 +100,12 @@ export interface RemoteCatalogCheckResult {
   archived: number
   expiredRemoved: number
   message: string
+  manualRetryAt: string | null
+}
+
+export interface RemoteCatalogUpdateStatus {
+  revision: string | null
+  manualRetryAt: string | null
 }
 
 export interface CredentialStatus {
@@ -445,6 +451,7 @@ export interface GachaApi {
     settings: Pick<SoftwareUpdateSettings, 'autoCheckEnabled' | 'updateSource'>
   ) => Promise<SoftwareUpdateSettings>
   checkSoftwareUpdate: () => Promise<SoftwareUpdateCheckResult>
+  getRemoteCatalogUpdateStatus: () => Promise<RemoteCatalogUpdateStatus>
   checkRemoteCatalogUpdate: () => Promise<RemoteCatalogCheckResult>
   restartApp: () => Promise<boolean>
   openDataDirectory: () => Promise<void>

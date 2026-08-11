@@ -195,8 +195,38 @@ describe('remote catalog update', () => {
       revision: 'future-local',
       publishedAt: '2026-08-11T12:15:00.000Z',
       providerId: 'github',
-      lastAutomaticCheckAt: null
+      lastAutomaticCheckAt: null,
+      lastSuccessfulManualCheckAt: null
     }, reference)).resolves.toBeNull()
+  })
+
+  it('does not reapply an already installed revision', async () => {
+    const current = feed('current', '2026-08-11T12:00:00.000Z')
+    const service = new RemoteCatalogUpdateService([{
+      id: 'current',
+      configured: true,
+      load: async () => current
+    }])
+
+    await expect(service.check({
+      revision: 'current',
+      publishedAt: '2026-08-11T12:00:00.000Z',
+      providerId: 'current',
+      lastAutomaticCheckAt: null,
+      lastSuccessfulManualCheckAt: null
+    }, reference)).resolves.toBeNull()
+  })
+
+  it('reports a failed check when every configured source is unavailable', async () => {
+    const service = new RemoteCatalogUpdateService([{
+      id: 'offline',
+      configured: true,
+      load: async () => { throw new Error('offline') }
+    }])
+
+    await expect(service.check(undefined, reference)).rejects.toThrow(
+      '暂时无法连接公共清单源'
+    )
   })
 
   it('persists only normalized non-secret update metadata', () => {
@@ -207,14 +237,16 @@ describe('remote catalog update', () => {
       revision: ' test-1 ',
       publishedAt: '2026-08-11T20:00:00+08:00',
       providerId: ' github ',
-      lastAutomaticCheckAt: '2026-08-11T19:30:00+08:00'
+      lastAutomaticCheckAt: '2026-08-11T19:30:00+08:00',
+      lastSuccessfulManualCheckAt: '2026-08-11T19:00:00+08:00'
     })
 
     expect(written).toEqual({
       revision: 'test-1',
       publishedAt: '2026-08-11T12:00:00.000Z',
       providerId: 'github',
-      lastAutomaticCheckAt: '2026-08-11T11:30:00.000Z'
+      lastAutomaticCheckAt: '2026-08-11T11:30:00.000Z',
+      lastSuccessfulManualCheckAt: '2026-08-11T11:00:00.000Z'
     })
     expect(readRemoteCatalogUpdateState(filePath)).toEqual(written)
   })
