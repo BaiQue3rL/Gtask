@@ -1,5 +1,6 @@
 import { readFile, stat } from 'node:fs/promises'
 import { basename, join } from 'node:path'
+import { giteeResourceId, isMissingGiteeRelease } from './gitee-release-api.mjs'
 
 const owner = process.env.GITEE_OWNER?.trim() || 'l3rui'
 const repo = process.env.GITEE_REPO?.trim() || 'Gtask'
@@ -104,15 +105,15 @@ async function upsertRelease() {
   const tagPath = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}` +
     `/releases/tags/${encodeURIComponent(tag)}`
   const existing = await requestJson(tagPath, { acceptedStatuses: [404] })
-  if (existing.status === 404) {
+  if (isMissingGiteeRelease(existing.status, existing.payload)) {
     const created = await requestJson(
       `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/releases`,
       { method: 'POST', form: releaseForm(true) }
     )
     return created.payload
   }
-  const releaseId = existing.payload?.id
-  if (!Number.isInteger(releaseId)) throw new Error('Gitee Release 缺少有效 ID')
+  const releaseId = giteeResourceId(existing.payload?.id)
+  if (!releaseId) throw new Error('Gitee Release 缺少有效 ID')
   const updated = await requestJson(
     `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/releases/${releaseId}`,
     { method: 'PATCH', form: releaseForm() }
@@ -121,8 +122,8 @@ async function upsertRelease() {
 }
 
 async function replaceAttachments(release) {
-  const releaseId = release?.id
-  if (!Number.isInteger(releaseId)) throw new Error('Gitee Release 缺少有效 ID')
+  const releaseId = giteeResourceId(release?.id)
+  if (!releaseId) throw new Error('Gitee Release 缺少有效 ID')
   const basePath = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}` +
     `/releases/${releaseId}/attach_files`
   const listed = await requestJson(`${basePath}?per_page=100`)
@@ -130,8 +131,9 @@ async function replaceAttachments(release) {
   const expectedNames = new Set(assetPaths.map((assetPath) => basename(assetPath)))
 
   for (const attachment of attachments) {
-    if (!expectedNames.has(attachment?.name) || !Number.isInteger(attachment?.id)) continue
-    await requestJson(`${basePath}/${attachment.id}`, { method: 'DELETE' })
+    const attachmentId = giteeResourceId(attachment?.id)
+    if (!expectedNames.has(attachment?.name) || !attachmentId) continue
+    await requestJson(`${basePath}/${attachmentId}`, { method: 'DELETE' })
   }
 
   for (const assetPath of assetPaths) {

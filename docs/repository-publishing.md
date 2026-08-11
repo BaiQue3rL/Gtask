@@ -14,6 +14,7 @@
 
 - Gitee 仓库使用 Pull 镜像从 `BaiQue3rL/Gtask` 自动同步提交、分支和标签。
 - GitHub Actions 的 `Release` 工作流仍只构建一次；GitHub Release 成功后，使用仓库 Secret `GITEE_TOKEN` 调用 Gitee OpenAPI 创建同版本 Release，并上传安装版、便携版和 `SHA256SUMS.txt`。
+- GitHub 与 Gitee Release 发布均可安全重跑：已有 GitHub 附件会原名覆盖，Gitee 会更新同标签 Release 并仅替换本版本的三个同名附件。
 - `updates/latest.json` 同时保存 Gitee 与 GitHub Release 地址。应用默认按 `Gitee → GitHub` 顺序检查，成功读取哪个源就打开对应的下载页。
 - `GITEE_TOKEN` 只保存在 GitHub Actions 加密 Secret 中，不写入仓库、安装包、日志或用户配置。
 - 后台 MCP 的公共基准热维护仍然直接核验官方资料并写入本地持久基准；仓库镜像只分发维护代码和正式版本，不远程覆盖用户清单或个人进度。
