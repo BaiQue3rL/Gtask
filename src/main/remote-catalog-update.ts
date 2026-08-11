@@ -143,12 +143,14 @@ export interface RemoteCatalogUpdateState {
   revision: string | null
   publishedAt: string | null
   providerId: string | null
+  lastAutomaticCheckAt: string | null
 }
 
 export const EMPTY_REMOTE_CATALOG_UPDATE_STATE: RemoteCatalogUpdateState = {
   revision: null,
   publishedAt: null,
-  providerId: null
+  providerId: null,
+  lastAutomaticCheckAt: null
 }
 
 export function parseRemoteCatalogFeed(value: unknown): RemoteCatalogFeed {
@@ -163,7 +165,11 @@ export function readRemoteCatalogUpdateState(filePath: string): RemoteCatalogUpd
       publishedAt: typeof value.publishedAt === 'string' && Number.isFinite(Date.parse(value.publishedAt))
         ? new Date(value.publishedAt).toISOString()
         : null,
-      providerId: typeof value.providerId === 'string' ? value.providerId : null
+      providerId: typeof value.providerId === 'string' ? value.providerId : null,
+      lastAutomaticCheckAt: typeof value.lastAutomaticCheckAt === 'string'
+        && Number.isFinite(Date.parse(value.lastAutomaticCheckAt))
+        ? new Date(value.lastAutomaticCheckAt).toISOString()
+        : null
     }
   } catch {
     return { ...EMPTY_REMOTE_CATALOG_UPDATE_STATE }
@@ -179,7 +185,11 @@ export function writeRemoteCatalogUpdateState(
     publishedAt: state.publishedAt && Number.isFinite(Date.parse(state.publishedAt))
       ? new Date(state.publishedAt).toISOString()
       : null,
-    providerId: state.providerId?.trim() || null
+    providerId: state.providerId?.trim() || null,
+    lastAutomaticCheckAt: state.lastAutomaticCheckAt
+      && Number.isFinite(Date.parse(state.lastAutomaticCheckAt))
+      ? new Date(state.lastAutomaticCheckAt).toISOString()
+      : null
   }
   mkdirSync(dirname(filePath), { recursive: true })
   writeFileSync(filePath, `${JSON.stringify(normalized, null, 2)}\n`, 'utf8')

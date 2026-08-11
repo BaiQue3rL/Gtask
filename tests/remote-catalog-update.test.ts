@@ -60,22 +60,88 @@ function feed(
 }
 
 describe('remote catalog update', () => {
-  it('ships one seven-day test card in every built-in section of every game', () => {
+  it('publishes an explicit retraction for every hot-update test card', () => {
     const checkedIn = parseRemoteCatalogFeed(JSON.parse(
       readFileSync(join(process.cwd(), 'updates', 'catalog.json'), 'utf8')
     ))
     expect(checkedIn.games).toHaveLength(4)
+    const archivedKeys = new Set<string>()
     for (const game of checkedIn.games) {
-      expect(game.upserts).toHaveLength(3)
-      expect(game.upserts.map((item) => item.category).sort()).toEqual([
-        'endgame',
-        'exploration',
-        'limited_event'
+      expect(game.upserts).toEqual([])
+      expect(game.archives).toEqual([
+        `hot-update-test:${game.gameId}:events:v1`,
+        `hot-update-test:${game.gameId}:cycles:v1`,
+        `hot-update-test:${game.gameId}:exploration:v1`
       ])
-      expect(game.upserts.every((item) => item.title === '测试')).toBe(true)
-      expect(game.upserts.every((item) => item.endsAt === '2026-08-18T21:00:00+08:00'))
-        .toBe(true)
+      for (const remoteKey of game.archives) archivedKeys.add(remoteKey)
     }
+    expect(archivedKeys.size).toBe(12)
+  })
+
+  it('removes only the explicitly retracted public cards', () => {
+    const retraction = parseRemoteCatalogFeed(JSON.parse(
+      readFileSync(join(process.cwd(), 'updates', 'catalog.json'), 'utf8')
+    ))
+    const initial = parseRemoteCatalogFeed({
+      schemaVersion: 1,
+      revision: '2026-08-11.hot-update-test.1',
+      publishedAt: '2026-08-11T20:35:00+08:00',
+      games: retraction.games.map((game) => ({
+        gameId: game.gameId,
+        upserts: game.archives.map((remoteKey) => {
+          const common = {
+            remoteKey,
+            title: '测试',
+            startsAt: '2026-08-11T00:00:00+08:00',
+            endsAt: '2026-08-18T21:00:00+08:00',
+            timeZone: 'Asia/Shanghai',
+            sourceUrl
+          }
+          if (remoteKey.includes(':events:')) {
+            return {
+              ...common,
+              category: 'limited_event',
+              activityTags: ['combat'],
+              scheduleKind: 'fixed_window'
+            }
+          }
+          if (remoteKey.includes(':cycles:')) {
+            return {
+              ...common,
+              category: 'endgame',
+              modeKey: 'hot-update-test',
+              periodKey: 'hot-update-test:2026-08-11',
+              scheduleKind: 'fixed_window'
+            }
+          }
+          return {
+            ...common,
+            category: 'exploration',
+            mapNodeKind: 'region'
+          }
+        }),
+        archives: []
+      }))
+    })
+
+    database = new AppDatabase(':memory:')
+    const custom = database.createChecklistItem({
+      gameId: 'genshin',
+      category: 'custom',
+      title: '保留的自定义项目'
+    })
+    database.applyRemoteCatalogFeed(initial, reference)
+    expect(retraction.games.flatMap((game) => database!.listChecklistItems(game.gameId)
+      .filter((item) => item.remoteKey?.startsWith('hot-update-test:')))).toHaveLength(12)
+
+    expect(database.applyRemoteCatalogFeed(retraction, new Date('2026-08-11T13:00:00.000Z')))
+      .toMatchObject({ added: 0, updated: 0, archived: 12 })
+    expect(retraction.games.flatMap((game) => database!.listChecklistItems(game.gameId)
+      .filter((item) => item.remoteKey?.startsWith('hot-update-test:')))).toEqual([])
+    expect(database.getChecklistItem(custom.id)).toMatchObject({
+      title: '保留的自定义项目',
+      source: 'manual'
+    })
   })
 
   it('rejects personal state and custom items at the transport boundary', () => {
@@ -128,7 +194,8 @@ describe('remote catalog update', () => {
     await expect(service.check({
       revision: 'future-local',
       publishedAt: '2026-08-11T12:15:00.000Z',
-      providerId: 'github'
+      providerId: 'github',
+      lastAutomaticCheckAt: null
     }, reference)).resolves.toBeNull()
   })
 
@@ -139,13 +206,15 @@ describe('remote catalog update', () => {
     const written = writeRemoteCatalogUpdateState(filePath, {
       revision: ' test-1 ',
       publishedAt: '2026-08-11T20:00:00+08:00',
-      providerId: ' github '
+      providerId: ' github ',
+      lastAutomaticCheckAt: '2026-08-11T19:30:00+08:00'
     })
 
     expect(written).toEqual({
       revision: 'test-1',
       publishedAt: '2026-08-11T12:00:00.000Z',
-      providerId: 'github'
+      providerId: 'github',
+      lastAutomaticCheckAt: '2026-08-11T11:30:00.000Z'
     })
     expect(readRemoteCatalogUpdateState(filePath)).toEqual(written)
   })

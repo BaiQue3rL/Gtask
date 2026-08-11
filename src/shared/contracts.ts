@@ -69,6 +69,7 @@ export interface SoftwareUpdateSettings {
   autoCheckEnabled: boolean
   updateSource: SoftwareUpdateSource
   lastSuccessfulCheckAt: string | null
+  lastAutomaticCheckAt: string | null
 }
 
 export const SOFTWARE_UPDATE_SOURCES = ['auto', 'gitee', 'github'] as const
@@ -86,6 +87,18 @@ export interface SoftwareUpdateCheckResult {
   latestVersion: string | null
   releaseUrl: string | null
   checkedAt: string | null
+  message: string
+}
+
+export interface RemoteCatalogCheckResult {
+  outcome: 'updated' | 'up_to_date'
+  revision: string | null
+  checkedAt: string
+  added: number
+  updated: number
+  preserved: number
+  archived: number
+  expiredRemoved: number
   message: string
 }
 
@@ -432,6 +445,7 @@ export interface GachaApi {
     settings: Pick<SoftwareUpdateSettings, 'autoCheckEnabled' | 'updateSource'>
   ) => Promise<SoftwareUpdateSettings>
   checkSoftwareUpdate: () => Promise<SoftwareUpdateCheckResult>
+  checkRemoteCatalogUpdate: () => Promise<RemoteCatalogCheckResult>
   restartApp: () => Promise<boolean>
   openDataDirectory: () => Promise<void>
   openExternalUrl: (url: string) => Promise<void>

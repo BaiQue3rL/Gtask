@@ -9,7 +9,8 @@ import type {
 export const DEFAULT_SOFTWARE_UPDATE_SETTINGS: SoftwareUpdateSettings = {
   autoCheckEnabled: true,
   updateSource: 'auto',
-  lastSuccessfulCheckAt: null
+  lastSuccessfulCheckAt: null,
+  lastAutomaticCheckAt: null
 }
 
 export const DEFAULT_UPDATE_CHECK_TIMEOUT_MS = 5_000
@@ -56,7 +57,8 @@ export function parseSoftwareUpdateSettings(value: unknown): SoftwareUpdateSetti
     updateSource: record.updateSource === 'gitee' || record.updateSource === 'github'
       ? record.updateSource
       : DEFAULT_SOFTWARE_UPDATE_SETTINGS.updateSource,
-    lastSuccessfulCheckAt: parseTimestamp(record.lastSuccessfulCheckAt)
+    lastSuccessfulCheckAt: parseTimestamp(record.lastSuccessfulCheckAt),
+    lastAutomaticCheckAt: parseTimestamp(record.lastAutomaticCheckAt)
   }
 }
 

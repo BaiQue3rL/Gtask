@@ -17,6 +17,7 @@ import type {
   PersonalSyncTarget,
   RenderingMode,
   RenderingModeState,
+  RemoteCatalogCheckResult,
   SoftwareUpdateCheckResult,
   SoftwareUpdateSettings,
   SyncProgressUpdate,
@@ -159,10 +160,13 @@ const renderingModeMessage = ref('')
 const softwareUpdateSettings = ref<SoftwareUpdateSettings>({
   autoCheckEnabled: true,
   updateSource: 'auto',
-  lastSuccessfulCheckAt: null
+  lastSuccessfulCheckAt: null,
+  lastAutomaticCheckAt: null
 })
 const softwareUpdateBusy = ref(false)
 const softwareUpdateMessage = ref('')
+const remoteCatalogUpdateBusy = ref(false)
+const remoteCatalogUpdateMessage = ref('')
 const loginRequiredOpen = ref(false)
 const pendingPersonalSyncIntent = ref<{
   gameId: GameId
@@ -1036,6 +1040,7 @@ async function saveSoftwareUpdatePreference(): Promise<void> {
 
 async function checkSoftwareUpdate(): Promise<void> {
   if (softwareUpdateBusy.value) return
+  remoteCatalogUpdateMessage.value = ''
   softwareUpdateBusy.value = true
   softwareUpdateMessage.value = '正在检查更新…'
   try {
@@ -1051,6 +1056,22 @@ async function checkSoftwareUpdate(): Promise<void> {
     showError(error)
   } finally {
     softwareUpdateBusy.value = false
+  }
+}
+
+async function checkRemoteCatalogUpdate(): Promise<void> {
+  if (remoteCatalogUpdateBusy.value) return
+  softwareUpdateMessage.value = ''
+  remoteCatalogUpdateBusy.value = true
+  remoteCatalogUpdateMessage.value = '正在同步公共清单…'
+  try {
+    const result: RemoteCatalogCheckResult = await window.gacha.checkRemoteCatalogUpdate()
+    remoteCatalogUpdateMessage.value = result.message
+  } catch (error) {
+    remoteCatalogUpdateMessage.value = '暂时无法同步公共清单，请稍后重试'
+    showError(error)
+  } finally {
+    remoteCatalogUpdateBusy.value = false
   }
 }
 
@@ -1799,13 +1820,13 @@ function showError(error: unknown): void {
           <label class="software-update-toggle">
             <span>
               <strong>启动后自动检查更新</strong>
-              <small>后台检查，不影响启动。</small>
+              <small>后台检查版本和公共清单；24 小时内不会重复请求。</small>
             </span>
             <input
               v-model="softwareUpdateSettings.autoCheckEnabled"
               class="toggle-switch-input"
               type="checkbox"
-              :disabled="softwareUpdateBusy"
+              :disabled="softwareUpdateBusy || remoteCatalogUpdateBusy"
               aria-label="启动后自动检查更新"
               @change="saveSoftwareUpdatePreference"
             >
@@ -1817,7 +1838,7 @@ function showError(error: unknown): void {
             <span>更新来源</span>
             <select
               v-model="softwareUpdateSettings.updateSource"
-              :disabled="softwareUpdateBusy"
+              :disabled="softwareUpdateBusy || remoteCatalogUpdateBusy"
               aria-label="更新来源"
               @change="saveSoftwareUpdatePreference"
             >
@@ -1829,14 +1850,22 @@ function showError(error: unknown): void {
           <div class="software-update-footer">
             <span>
               <strong>当前版本 v{{ appInfo?.version ?? '—' }}</strong>
-              <small>{{ softwareUpdateMessage || formatUpdateCheckTime(softwareUpdateSettings.lastSuccessfulCheckAt) }}</small>
+              <small>{{ remoteCatalogUpdateMessage || softwareUpdateMessage || formatUpdateCheckTime(softwareUpdateSettings.lastSuccessfulCheckAt) }}</small>
             </span>
-            <button
-              class="secondary-button settings-action-button"
-              type="button"
-              :disabled="softwareUpdateBusy"
-              @click="checkSoftwareUpdate"
-            >{{ softwareUpdateBusy ? '检查中…' : '检查更新' }}</button>
+            <div class="software-update-actions">
+              <button
+                class="secondary-button settings-action-button"
+                type="button"
+                :disabled="softwareUpdateBusy || remoteCatalogUpdateBusy"
+                @click="checkRemoteCatalogUpdate"
+              >{{ remoteCatalogUpdateBusy ? '更新中…' : '更新清单' }}</button>
+              <button
+                class="secondary-button settings-action-button"
+                type="button"
+                :disabled="softwareUpdateBusy || remoteCatalogUpdateBusy"
+                @click="checkSoftwareUpdate"
+              >{{ softwareUpdateBusy ? '检查中…' : '检查更新' }}</button>
+            </div>
           </div>
         </div>
         <h3 class="settings-heading data-heading">登录凭据</h3>

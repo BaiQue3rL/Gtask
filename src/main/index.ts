@@ -66,6 +66,7 @@ import {
   writeRemoteCatalogUpdateState,
   type RemoteCatalogUpdateState
 } from './remote-catalog-update'
+import { automaticRemoteCheckDelay } from './remote-check-cooldown'
 import { resolveAppDataPaths } from './data-paths'
 import {
   getBundledMapCatalog
@@ -80,6 +81,7 @@ import {
   type GameId,
   type RenderingMode,
   type RenderingModeState,
+  type RemoteCatalogCheckResult,
   type SoftwareUpdateCheckResult,
   type SoftwareUpdateSettings,
   type SoftwareUpdateSource,
@@ -291,15 +293,36 @@ function configureSoftwareUpdateService(): void {
   )
 }
 
-async function checkForRemoteCatalogUpdate(): Promise<void> {
-  if (!remoteCatalogUpdateService || !appDatabase) return
-  const update = await remoteCatalogUpdateService.check(remoteCatalogUpdateState)
-  if (!update || !appDatabase || isShuttingDown) return
+async function checkForRemoteCatalogUpdate(automatic: boolean): Promise<RemoteCatalogCheckResult> {
+  if (!remoteCatalogUpdateService || !appDatabase) throw new Error('公共清单更新服务尚未初始化')
+  const reference = new Date()
+  if (automatic) {
+    remoteCatalogUpdateState = writeRemoteCatalogUpdateState(remoteCatalogStatePath, {
+      ...remoteCatalogUpdateState,
+      lastAutomaticCheckAt: reference.toISOString()
+    })
+  }
+  const update = await remoteCatalogUpdateService.check(remoteCatalogUpdateState, reference)
+  if (!update) {
+    return {
+      outcome: 'up_to_date',
+      revision: remoteCatalogUpdateState.revision,
+      checkedAt: reference.toISOString(),
+      added: 0,
+      updated: 0,
+      preserved: 0,
+      archived: 0,
+      expiredRemoved: 0,
+      message: '公共清单已是最新'
+    }
+  }
+  if (!appDatabase || isShuttingDown) throw new Error('应用正在退出')
   const merge = appDatabase.applyRemoteCatalogFeed(update.feed)
   remoteCatalogUpdateState = writeRemoteCatalogUpdateState(remoteCatalogStatePath, {
     revision: update.feed.revision,
     publishedAt: update.feed.publishedAt,
-    providerId: update.providerId
+    providerId: update.providerId,
+    lastAutomaticCheckAt: remoteCatalogUpdateState.lastAutomaticCheckAt
   })
   applicationLogger?.info('remote_catalog_updated', {
     revision: update.feed.revision,
@@ -310,11 +333,25 @@ async function checkForRemoteCatalogUpdate(): Promise<void> {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('checklist:changed')
   }
+  return {
+    outcome: 'updated',
+    revision: update.feed.revision,
+    checkedAt: reference.toISOString(),
+    ...merge,
+    message: `公共清单已更新：新增 ${merge.added}，修改 ${merge.updated}，撤回 ${merge.archived}`
+  }
 }
 
 async function checkForSoftwareUpdate(automatic: boolean): Promise<SoftwareUpdateCheckResult> {
   if (!softwareUpdateService) throw new Error('更新服务尚未初始化')
-  const result = await softwareUpdateService.check()
+  const reference = new Date()
+  if (automatic) {
+    softwareUpdateSettings = writeSoftwareUpdateSettings(softwareUpdateConfigPath, {
+      ...softwareUpdateSettings,
+      lastAutomaticCheckAt: reference.toISOString()
+    })
+  }
+  const result = await softwareUpdateService.check(reference)
   if (result.checkedAt) {
     softwareUpdateSettings = writeSoftwareUpdateSettings(softwareUpdateConfigPath, {
       ...softwareUpdateSettings,
@@ -342,25 +379,35 @@ async function checkForSoftwareUpdate(automatic: boolean): Promise<SoftwareUpdat
 
 function scheduleStartupUpdateCheck(): void {
   if (!softwareUpdateSettings.autoCheckEnabled || softwareUpdateTimer) return
+  const delay = automaticRemoteCheckDelay(
+    softwareUpdateSettings.lastAutomaticCheckAt,
+    new Date(),
+    2_000
+  )
   softwareUpdateTimer = setTimeout(() => {
     softwareUpdateTimer = null
     void checkForSoftwareUpdate(true).catch((error) => {
       // Automatic checks never interrupt startup or surface transient network errors.
       reportBackgroundError('后台检查更新', error)
     })
-  }, 2_000)
+  }, delay)
 }
 
 function scheduleStartupRemoteCatalogUpdate(): void {
-  if (remoteCatalogUpdateTimer) return
+  if (!softwareUpdateSettings.autoCheckEnabled || remoteCatalogUpdateTimer) return
+  const delay = automaticRemoteCheckDelay(
+    remoteCatalogUpdateState.lastAutomaticCheckAt,
+    new Date(),
+    750
+  )
   remoteCatalogUpdateTimer = setTimeout(() => {
     remoteCatalogUpdateTimer = null
-    void checkForRemoteCatalogUpdate().catch((error) => {
+    void checkForRemoteCatalogUpdate(true).catch((error) => {
       // The last valid persistent baseline remains active when every remote
       // source fails or a payload cannot pass validation/transaction checks.
       reportBackgroundError('后台更新公共清单', error)
     })
-  }, 750)
+  }, delay)
 }
 
 function codexMcpLauncherOptions() {
@@ -769,9 +816,16 @@ function registerIpcHandlers(): void {
       ...preferences
     })
     configureSoftwareUpdateService()
+    if (softwareUpdateTimer) clearTimeout(softwareUpdateTimer)
+    softwareUpdateTimer = null
+    if (remoteCatalogUpdateTimer) clearTimeout(remoteCatalogUpdateTimer)
+    remoteCatalogUpdateTimer = null
+    scheduleStartupUpdateCheck()
+    scheduleStartupRemoteCatalogUpdate()
     return softwareUpdateSettings
   })
   ipcMain.handle('software-update:check', () => checkForSoftwareUpdate(false))
+  ipcMain.handle('remote-catalog:check', () => checkForRemoteCatalogUpdate(false))
   ipcMain.handle('app:restart', () => {
     setTimeout(() => {
       app.relaunch()
