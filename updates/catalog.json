@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "revision": "2026-08-11.hot-update-test.1",
+  "publishedAt": "2026-08-11T20:35:00+08:00",
+  "games": [
+    {
+      "gameId": "genshin",
+      "upserts": [
+        {
+          "remoteKey": "hot-update-test:genshin:events:v1",
+          "category": "limited_event",
+          "title": "测试",
+          "startsAt": "2026-08-11T00:00:00+08:00",
+          "endsAt": "2026-08-18T21:00:00+08:00",
+          "activityTags": ["combat"],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://github.com/BaiQue3rL/Gtask/blob/main/updates/catalog.json"
+        },
+        {
+          "remoteKey": "hot-update-test:genshin:cycles:v1",
+          "category": "endgame",
+          "title": "测试",
+          "startsAt": "2026-08-11T00:00:00+08:00",
+          "endsAt": "2026-08-18T21:00:00+08:00",
+          "modeKey": "hot-update-test",
+          "periodKey": "hot-update-test:2026-08-11",
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://github.com/BaiQue3rL/Gtask/blob/main/updates/catalog.json"
+        },
+        {
+          "remoteKey": "hot-update-test:genshin:exploration:v1",
+          "category": "exploration",
+          "title": "测试",
+          "mapNodeKind": "region",
+          "startsAt": "2026-08-11T00:00:00+08:00",
+          "endsAt": "2026-08-18T21:00:00+08:00",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://github.com/BaiQue3rL/Gtask/blob/main/updates/catalog.json"
+        }
+      ],
+      "archives": []
+    },
+    {
+      "gameId": "star-rail",
+      "upserts": [
+        {
+          "remoteKey": "hot-update-test:star-rail:events:v1",
+          "category": "limited_event",
+          "title": "测试",
+          "startsAt": "2026-08-11T00:00:00+08:00",
+          "endsAt": "2026-08-18T21:00:00+08:00",
+          "activityTags": ["combat"],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://github.com/BaiQue3rL/Gtask/blob/main/updates/catalog.json"
+        },
+        {
+          "remoteKey": "hot-update-test:star-rail:cycles:v1",
+          "category": "endgame",
+          "title": "测试",
+          "startsAt": "2026-08-11T00:00:00+08:00",
+          "endsAt": "2026-08-18T21:00:00+08:00",
+          "modeKey": "hot-update-test",
+          "periodKey": "hot-update-test:2026-08-11",
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://github.com/BaiQue3rL/Gtask/blob/main/updates/catalog.json"
+        },
+        {
+          "remoteKey": "hot-update-test:star-rail:exploration:v1",
+          "category": "exploration",
+          "title": "测试",
+          "mapNodeKind": "region",
+          "startsAt": "2026-08-11T00:00:00+08:00",
+          "endsAt": "2026-08-18T21:00:00+08:00",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://github.com/BaiQue3rL/Gtask/blob/main/updates/catalog.json"
+        }
+      ],
+      "archives": []
+    },
+    {
+      "gameId": "zenless",
+      "upserts": [
+        {
+          "remoteKey": "hot-update-test:zenless:events:v1",
+          "category": "limited_event",
+          "title": "测试",
+          "startsAt": "2026-08-11T00:00:00+08:00",
+          "endsAt": "2026-08-18T21:00:00+08:00",
+          "activityTags": ["combat"],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://github.com/BaiQue3rL/Gtask/blob/main/updates/catalog.json"
+        },
+        {
+          "remoteKey": "hot-update-test:zenless:cycles:v1",
+          "category": "endgame",
+          "title": "测试",
+          "startsAt": "2026-08-11T00:00:00+08:00",
+          "endsAt": "2026-08-18T21:00:00+08:00",
+          "modeKey": "hot-update-test",
+          "periodKey": "hot-update-test:2026-08-11",
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://github.com/BaiQue3rL/Gtask/blob/main/updates/catalog.json"
+        },
+        {
+          "remoteKey": "hot-update-test:zenless:exploration:v1",
+          "category": "exploration",
+          "title": "测试",
+          "mapNodeKind": "region",
+          "startsAt": "2026-08-11T00:00:00+08:00",
+          "endsAt": "2026-08-18T21:00:00+08:00",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://github.com/BaiQue3rL/Gtask/blob/main/updates/catalog.json"
+        }
+      ],
+      "archives": []
+    },
+    {
+      "gameId": "wuthering-waves",
+      "upserts": [
+        {
+          "remoteKey": "hot-update-test:wuthering-waves:events:v1",
+          "category": "limited_event",
+          "title": "测试",
+          "startsAt": "2026-08-11T00:00:00+08:00",
+          "endsAt": "2026-08-18T21:00:00+08:00",
+          "activityTags": ["combat"],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://github.com/BaiQue3rL/Gtask/blob/main/updates/catalog.json"
+        },
+        {
+          "remoteKey": "hot-update-test:wuthering-waves:cycles:v1",
+          "category": "endgame",
+          "title": "测试",
+          "startsAt": "2026-08-11T00:00:00+08:00",
+          "endsAt": "2026-08-18T21:00:00+08:00",
+          "modeKey": "hot-update-test",
+          "periodKey": "hot-update-test:2026-08-11",
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://github.com/BaiQue3rL/Gtask/blob/main/updates/catalog.json"
+        },
+        {
+          "remoteKey": "hot-update-test:wuthering-waves:exploration:v1",
+          "category": "exploration",
+          "title": "测试",
+          "mapNodeKind": "region",
+          "startsAt": "2026-08-11T00:00:00+08:00",
+          "endsAt": "2026-08-18T21:00:00+08:00",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://github.com/BaiQue3rL/Gtask/blob/main/updates/catalog.json"
+        }
+      ],
+      "archives": []
+    }
+  ]
+}

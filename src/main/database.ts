@@ -43,6 +43,7 @@ import { getBundledMapCatalog, getBundledMapCatalogVerifiedAt } from './sync/map
 import {
   BUNDLED_BASELINE_VERIFIED_AT,
   getBundledActivityCatalog,
+  getDefaultVersionCadenceDays,
   getBundledVersionWindow
 } from './sync/baseline-catalog'
 import {
@@ -53,6 +54,7 @@ import {
   type NormalizedSyncItem,
   type SyncMergeResult
 } from './sync/types'
+import type { RemoteCatalogFeed } from './remote-catalog-update'
 
 const DEFAULT_GAMES: GameSummary[] = [
   {
@@ -95,11 +97,17 @@ export const CURRENT_SCHEMA_VERSION = 3
 
 const AI_AGENT_MAX_AGE_MS = 5 * 60 * 1000
 const AI_JOB_CLAIM_MAX_AGE_MS = 15 * 60 * 1000
+const DAY_MS = 24 * 60 * 60 * 1000
 
 interface SyncMergeOptions {
   codexReviewed?: boolean
   identityPolicy?: 'heuristic' | 'remote-key-only'
   outputLocale?: string
+}
+
+export interface RemoteCatalogApplyResult extends SyncMergeResult {
+  archived: number
+  expiredRemoved: number
 }
 
 interface PublicCatalogReplacementOptions extends SyncMergeOptions {
@@ -214,6 +222,7 @@ export class AppDatabase {
       this.normalizeSyncedProgressSafety()
       this.normalizePublicMapProgressConsistency()
       this.rolloverDueCycleItems()
+      this.rolloverExpiredVersionWindows()
       this.pruneExpiredSystemItems()
       this.markStaleSyncStates()
     } catch (error) {
@@ -318,6 +327,7 @@ export class AppDatabase {
   }
 
   listGameVersionSummaries(reference = new Date()): GameVersionSummary[] {
+    this.rolloverExpiredVersionWindows(reference)
     const referenceTime = reference.getTime()
     const rows = this.database.prepare(`
       SELECT
@@ -349,6 +359,7 @@ export class AppDatabase {
     gameId: GameId,
     reference = new Date()
   ): { periodKey: string | null; startsAt: string; endsAt: string } | null {
+    this.rolloverExpiredVersionWindows(reference)
     const rows = this.database.prepare(`
       SELECT period_key AS periodKey, starts_at AS startsAt, ends_at AS endsAt
       FROM game_version_windows
@@ -363,6 +374,43 @@ export class AppDatabase {
     return valid.find((row) =>
       Date.parse(row.startsAt) <= referenceTime && referenceTime < Date.parse(row.endsAt)
     ) ?? valid.sort((left, right) => Date.parse(right.startsAt) - Date.parse(left.startsAt))[0] ?? null
+  }
+
+  rolloverExpiredVersionWindows(reference = new Date()): number {
+    const expired = this.database.prepare(`
+      SELECT game_id AS gameId, ends_at AS endsAt
+      FROM game_version_windows
+      WHERE julianday(ends_at) <= julianday(?)
+    `).all(reference.toISOString()) as Array<{ gameId: GameId; endsAt: string }>
+    if (expired.length === 0) return 0
+
+    const update = this.database.prepare(`
+      UPDATE game_version_windows
+      SET period_key = ?, starts_at = ?, ends_at = ?,
+          confidence = MIN(confidence, 0.25), updated_at = ?
+      WHERE game_id = ? AND ends_at = ?
+    `)
+    let changed = 0
+    for (const row of expired) {
+      const previousEndsAt = Date.parse(row.endsAt)
+      if (!Number.isFinite(previousEndsAt)) continue
+      const cadenceMs = getDefaultVersionCadenceDays(row.gameId) * DAY_MS
+      const elapsedPeriods = Math.floor(
+        Math.max(0, reference.getTime() - previousEndsAt) / cadenceMs
+      )
+      const startsAt = new Date(previousEndsAt + elapsedPeriods * cadenceMs).toISOString()
+      const endsAt = new Date(previousEndsAt + (elapsedPeriods + 1) * cadenceMs).toISOString()
+      const periodKey = `predicted:${row.gameId}:version:${startsAt}`
+      changed += Number(update.run(
+        periodKey,
+        startsAt,
+        endsAt,
+        reference.toISOString(),
+        row.gameId,
+        row.endsAt
+      ).changes)
+    }
+    return changed
   }
 
   getDataVersion(): number {
@@ -2278,34 +2326,54 @@ export class AppDatabase {
       if (identities.has(identity)) throw new Error(`个人快照包含重复官方标识：${item.title}`)
       identities.add(identity)
     }
-    const preparedItems = items.flatMap((item): NormalizedSyncItem[] => {
+    const preparedItems = items.flatMap((item) => {
       const baseline = this.findBaselineItemForPersonalProgress(gameId, item)
       if (!baseline?.remoteKey) return []
       return [{
-        ...item,
-        remoteKey: baseline.remoteKey,
-        title: baseline.title,
-        activityTags: baseline.activityTags,
-        parentTitle: baseline.parentTitle,
-        mapNodeKind: baseline.mapNodeKind,
-        parentRemoteKey: baseline.parentRemoteKey,
-        startsAt: baseline.startsAt,
-        endsAt: baseline.endsAt,
-        resetRule: baseline.resetRule,
-        periodKey: baseline.periodKey,
-        scheduleKind: baseline.scheduleKind,
-        resetWeekday: baseline.resetWeekday,
-        timeZone: baseline.timeZone,
-        modeKey: baseline.modeKey,
-        sourceUrl: baseline.sourceUrl
+        item: {
+          ...item,
+          remoteKey: baseline.remoteKey,
+          title: baseline.title,
+          activityTags: baseline.activityTags,
+          parentTitle: baseline.parentTitle,
+          mapNodeKind: baseline.mapNodeKind,
+          parentRemoteKey: baseline.parentRemoteKey,
+          startsAt: baseline.startsAt,
+          endsAt: baseline.endsAt,
+          resetRule: baseline.resetRule,
+          periodKey: baseline.periodKey,
+          scheduleKind: baseline.scheduleKind,
+          resetWeekday: baseline.resetWeekday,
+          timeZone: baseline.timeZone,
+          modeKey: baseline.modeKey,
+          sourceUrl: baseline.sourceUrl
+        } satisfies NormalizedSyncItem,
+        observedStartsAt: item.startsAt,
+        observedEndsAt: item.endsAt
       }]
     })
     const activeItems: NormalizedSyncItem[] = []
     const expiredItems: NormalizedSyncItem[] = []
     const suppressedItems: NormalizedSyncItem[] = []
     const correctedIdentities: NormalizedSyncItem['sourceIdentity'][] = []
-    for (const item of preparedItems) {
+    for (const prepared of preparedItems) {
+      const item = prepared.item
+      // The persistent baseline owns the rendered period window, but the
+      // provider's observed window still owns the lifecycle of its personal
+      // identity.  Classify recurring observations before projecting them
+      // onto the current baseline period; otherwise an expired observation
+      // and the new-period placeholder become two active rows with the same
+      // stable remote key.
+      const lifecycleStartsAt = item.category === 'endgame'
+        ? prepared.observedStartsAt
+        : item.startsAt
+      const lifecycleEndsAt = item.category === 'endgame'
+        ? prepared.observedEndsAt
+        : item.endsAt
       this.assertTimeWindow(item.startsAt ?? null, item.endsAt ?? null)
+      if (item.category === 'endgame') {
+        this.assertTimeWindow(lifecycleStartsAt ?? null, lifecycleEndsAt ?? null)
+      }
       if (
         item.category === 'limited_event' && item.completed === true &&
         item.startsAt && Date.parse(item.startsAt) > reference.getTime()
@@ -2331,9 +2399,13 @@ export class AppDatabase {
             identity.endpoint,
             identity.externalId
           ) as { expiredEndsAt: string } | undefined
-      const endsAtMs = item.endsAt ? Date.parse(item.endsAt) : Number.NaN
+      const endsAtMs = lifecycleEndsAt ? Date.parse(lifecycleEndsAt) : Number.NaN
       if (Number.isFinite(endsAtMs) && endsAtMs <= reference.getTime()) {
-        expiredItems.push(item)
+        expiredItems.push({
+          ...item,
+          startsAt: lifecycleStartsAt,
+          endsAt: lifecycleEndsAt
+        })
         continue
       }
       if (tombstone) {
@@ -2616,6 +2688,57 @@ export class AppDatabase {
       )
       this.pruneExpiredSystemItemsInTransaction(new Date(syncedAt))
       return merge
+    })
+  }
+
+  applyRemoteCatalogFeed(
+    feed: RemoteCatalogFeed,
+    reference = new Date()
+  ): RemoteCatalogApplyResult {
+    const syncedAt = new Date(feed.publishedAt).toISOString()
+    return this.runTransaction(() => {
+      const result: RemoteCatalogApplyResult = {
+        added: 0,
+        updated: 0,
+        preserved: 0,
+        archived: 0,
+        expiredRemoved: 0
+      }
+      const removePublicItem = this.database.prepare(`
+        DELETE FROM checklist_items
+        WHERE game_id = ? AND source = 'public_schedule' AND remote_key = ?
+      `)
+
+      for (const game of feed.games) {
+        if (game.versionWindow) {
+          this.validateVersionWindow(game.versionWindow, reference)
+          this.upsertVersionWindow(game.gameId, game.versionWindow, syncedAt)
+        }
+        if (game.upserts.length > 0) {
+          const merged = this.mergeSyncedItems(
+            game.gameId,
+            'public_schedule',
+            game.upserts,
+            syncedAt,
+            false,
+            {
+              codexReviewed: true,
+              identityPolicy: 'remote-key-only',
+              outputLocale: 'zh-CN'
+            }
+          )
+          result.added += merged.added
+          result.updated += merged.updated
+          result.preserved += merged.preserved
+        }
+        for (const remoteKey of game.archives) {
+          result.archived += Number(removePublicItem.run(game.gameId, remoteKey).changes)
+        }
+        this.recalculatePublicMapRegionProgress(game.gameId, reference)
+        this.assertActiveMapReferences(game.gameId)
+      }
+      result.expiredRemoved = this.pruneExpiredSystemItemsInTransaction(reference)
+      return result
     })
   }
 
