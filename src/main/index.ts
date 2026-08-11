@@ -59,6 +59,13 @@ import {
   readSoftwareUpdateSettings,
   writeSoftwareUpdateSettings
 } from './software-update'
+import {
+  RemoteCatalogUpdateService,
+  createDefaultRemoteCatalogProviders,
+  readRemoteCatalogUpdateState,
+  writeRemoteCatalogUpdateState,
+  type RemoteCatalogUpdateState
+} from './remote-catalog-update'
 import { resolveAppDataPaths } from './data-paths'
 import {
   getBundledMapCatalog
@@ -110,6 +117,10 @@ const activeRenderingMode = readRenderingMode(renderingModeConfigPath)
 let configuredRenderingMode = activeRenderingMode
 const softwareUpdateConfigPath = join(app.getPath('userData'), 'software-update.json')
 let softwareUpdateSettings = readSoftwareUpdateSettings(softwareUpdateConfigPath)
+const remoteCatalogStatePath = join(app.getPath('userData'), 'remote-catalog-update.json')
+let remoteCatalogUpdateState: RemoteCatalogUpdateState = readRemoteCatalogUpdateState(
+  remoteCatalogStatePath
+)
 const BASELINE_WORKER_PREFERENCES = {
   strategy: 'fixed' as const,
   model: 'gpt-5.6-sol' as const,
@@ -148,6 +159,7 @@ let periodTimer: ReturnType<typeof setInterval> | null = null
 let externalChangeTimer: ReturnType<typeof setInterval> | null = null
 let aiJobProgressTimer: ReturnType<typeof setInterval> | null = null
 let softwareUpdateTimer: ReturnType<typeof setTimeout> | null = null
+let remoteCatalogUpdateTimer: ReturnType<typeof setTimeout> | null = null
 const aiJobProgressSignatures = new Map<string, string>()
 let codexScheduleWorkerPool: CodexScheduleWorkerPool | null = null
 let credentialVault: CredentialVault | null = null
@@ -158,6 +170,7 @@ let appBackupDirectory: string | null = null
 let appDatabasePath: string | null = null
 let appDataRoot: string | null = null
 let softwareUpdateService: SoftwareUpdateService | null = null
+let remoteCatalogUpdateService: RemoteCatalogUpdateService | null = null
 let applicationLogger: ApplicationLogger | null = null
 let isShuttingDown = false
 
@@ -209,6 +222,8 @@ function shutdownApplicationRuntime(): void {
   aiJobProgressTimer = null
   if (softwareUpdateTimer) clearTimeout(softwareUpdateTimer)
   softwareUpdateTimer = null
+  if (remoteCatalogUpdateTimer) clearTimeout(remoteCatalogUpdateTimer)
+  remoteCatalogUpdateTimer = null
   if (app.isReady()) {
     powerMonitor.removeListener('resume', maintainChecklistTimeState)
     powerMonitor.removeListener('unlock-screen', maintainChecklistTimeState)
@@ -266,6 +281,35 @@ function configureSoftwareUpdateService(): void {
       fetcher: net.fetch
     })
   )
+  remoteCatalogUpdateService = new RemoteCatalogUpdateService(
+    createDefaultRemoteCatalogProviders({
+      feedOverride: process.env.GTASK_CATALOG_FEED_URL,
+      mirrorFeedOverride: process.env.GTASK_CATALOG_MIRROR_FEED_URL,
+      source: softwareUpdateSettings.updateSource,
+      fetcher: net.fetch
+    })
+  )
+}
+
+async function checkForRemoteCatalogUpdate(): Promise<void> {
+  if (!remoteCatalogUpdateService || !appDatabase) return
+  const update = await remoteCatalogUpdateService.check(remoteCatalogUpdateState)
+  if (!update || !appDatabase || isShuttingDown) return
+  const merge = appDatabase.applyRemoteCatalogFeed(update.feed)
+  remoteCatalogUpdateState = writeRemoteCatalogUpdateState(remoteCatalogStatePath, {
+    revision: update.feed.revision,
+    publishedAt: update.feed.publishedAt,
+    providerId: update.providerId
+  })
+  applicationLogger?.info('remote_catalog_updated', {
+    revision: update.feed.revision,
+    publishedAt: update.feed.publishedAt,
+    providerId: update.providerId,
+    merge
+  })
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('checklist:changed')
+  }
 }
 
 async function checkForSoftwareUpdate(automatic: boolean): Promise<SoftwareUpdateCheckResult> {
@@ -305,6 +349,18 @@ function scheduleStartupUpdateCheck(): void {
       reportBackgroundError('后台检查更新', error)
     })
   }, 2_000)
+}
+
+function scheduleStartupRemoteCatalogUpdate(): void {
+  if (remoteCatalogUpdateTimer) return
+  remoteCatalogUpdateTimer = setTimeout(() => {
+    remoteCatalogUpdateTimer = null
+    void checkForRemoteCatalogUpdate().catch((error) => {
+      // The last valid persistent baseline remains active when every remote
+      // source fails or a payload cannot pass validation/transaction checks.
+      reportBackgroundError('后台更新公共清单', error)
+    })
+  }, 750)
 }
 
 function codexMcpLauncherOptions() {
@@ -669,6 +725,7 @@ function createWindow(): void {
       }
     })
     scheduleStartupUpdateCheck()
+    scheduleStartupRemoteCatalogUpdate()
   })
   mainWindow.webContents.on('render-process-gone', (_event, details) => {
     applicationLogger?.error('renderer_process_gone', details)

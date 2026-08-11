@@ -3,6 +3,16 @@ import type { CodexVersionWindow, NormalizedSyncItem } from './types'
 
 export const BUNDLED_BASELINE_VERIFIED_AT = '2026-08-09T12:30:00+08:00'
 
+// These are per-game fallback cadences, not claims about a fixed official
+// schedule. Exact verified windows always take priority; the cadence is only
+// used after a stored window expires before the next calibration arrives.
+const DEFAULT_VERSION_CADENCE_DAYS: Record<GameId, number> = {
+  genshin: 42,
+  'star-rail': 42,
+  zenless: 42,
+  'wuthering-waves': 42
+}
+
 const VERSION_WINDOWS: Record<GameId, CodexVersionWindow> = {
   genshin: {
     periodKey: 'genshin-version-luna-viii-2026',
@@ -90,6 +100,10 @@ const ACTIVITIES: Record<GameId, readonly ActivitySeed[]> = {
 
 export function getBundledVersionWindow(gameId: GameId): CodexVersionWindow {
   return { ...VERSION_WINDOWS[gameId] }
+}
+
+export function getDefaultVersionCadenceDays(gameId: GameId): number {
+  return DEFAULT_VERSION_CADENCE_DAYS[gameId]
 }
 
 export function getBundledActivityCatalog(gameId: GameId): NormalizedSyncItem[] {

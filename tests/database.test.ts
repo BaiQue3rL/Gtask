@@ -5,7 +5,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AppDatabase, CURRENT_SCHEMA_VERSION } from '../src/main/database'
 import { getBundledMapCatalog } from '../src/main/sync/map-catalog'
-import type { GameId } from '../src/shared/contracts'
+import { SUPPORTED_GAME_IDS, type GameId } from '../src/shared/contracts'
 
 let database: AppDatabase | null = null
 let temporaryDirectory: string | null = null
@@ -112,7 +112,7 @@ describe('AppDatabase', () => {
     }
   })
 
-  it('只向侧栏提供当前进行中版本的结束时间', () => {
+  it('只向侧栏提供已有版本窗口的结束时间', () => {
     database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     applyVersionWindow(
       database,
@@ -122,15 +122,6 @@ describe('AppDatabase', () => {
       '2026-08-01T00:00:00.000Z',
       '2026-08-20T00:00:00.000Z'
     )
-    applyVersionWindow(
-      database,
-      'star-rail',
-      new Date('2026-07-15T00:00:00.000Z'),
-      'star-rail:version:expired',
-      '2026-07-01T00:00:00.000Z',
-      '2026-08-01T00:00:00.000Z'
-    )
-
     expect(database.listGameVersionSummaries(new Date('2026-08-03T00:00:00.000Z')))
       .toEqual([
         { gameId: 'genshin', endsAt: '2026-08-20T00:00:00.000Z' },
@@ -138,6 +129,61 @@ describe('AppDatabase', () => {
         { gameId: 'zenless', endsAt: null },
         { gameId: 'wuthering-waves', endsAt: null }
       ])
+  })
+
+  it.each(SUPPORTED_GAME_IDS)(
+    '官方窗口过期后按 %s 的独立常规周期续出 42 天低置信度窗口',
+    (gameId) => {
+      database = new AppDatabase(':memory:', { seedBundledBaselines: false })
+      applyVersionWindow(
+        database,
+        gameId,
+        new Date('2026-07-24T00:00:00.000Z'),
+        `${gameId}:version:verified`,
+        '2026-07-01T00:00:00.000Z',
+        '2026-08-01T00:00:00.000Z'
+      )
+
+      expect(database.getRelevantGameVersionWindow(
+        gameId,
+        new Date('2026-08-03T00:00:00.000Z')
+      )).toEqual({
+        periodKey: `predicted:${gameId}:version:2026-08-01T00:00:00.000Z`,
+        startsAt: '2026-08-01T00:00:00.000Z',
+        endsAt: '2026-09-12T00:00:00.000Z'
+      })
+    }
+  )
+
+  it('精确官方版本时间覆盖本地 42 天预测窗口', () => {
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
+    applyVersionWindow(
+      database,
+      'zenless',
+      new Date('2026-07-24T00:00:00.000Z'),
+      'zenless:version:verified-old',
+      '2026-07-01T00:00:00.000Z',
+      '2026-08-01T00:00:00.000Z'
+    )
+    expect(database.getRelevantGameVersionWindow(
+      'zenless', new Date('2026-08-03T00:00:00.000Z')
+    )?.periodKey).toMatch(/^predicted:/)
+
+    applyVersionWindow(
+      database,
+      'zenless',
+      new Date('2026-08-03T00:00:00.000Z'),
+      'zenless:version:special',
+      '2026-08-01T00:00:00.000Z',
+      '2026-09-20T00:00:00.000Z'
+    )
+    expect(database.getRelevantGameVersionWindow(
+      'zenless', new Date('2026-08-03T00:00:00.000Z')
+    )).toEqual({
+      periodKey: 'zenless:version:special',
+      startsAt: '2026-08-01T00:00:00.000Z',
+      endsAt: '2026-09-20T00:00:00.000Z'
+    })
   })
 
   it('新增、编辑、手动完成和软删除事项', () => {

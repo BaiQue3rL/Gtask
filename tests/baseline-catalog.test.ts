@@ -11,6 +11,11 @@ import {
   getBundledActivityCatalog,
   getBundledVersionWindow
 } from '../src/main/sync/baseline-catalog'
+import {
+  CYCLE_MODE_CATALOG,
+  completeCycleCatalog,
+  predictCycleWindow
+} from '../src/main/sync/cycle-catalog'
 
 let database: AppDatabase | null = null
 let temporaryDirectory: string | null = null
@@ -216,5 +221,63 @@ describe('bundled baseline catalog', () => {
       startsAt: expect.any(String),
       endsAt: expect.any(String)
     })
+  })
+
+  it('keeps every built-in recurring challenge syncable when the provider still returns the expired period', () => {
+    vi.useFakeTimers()
+    const reference = new Date('2026-08-11T12:00:00.000Z')
+    vi.setSystemTime(reference)
+    database = new AppDatabase(':memory:')
+
+    for (const gameId of SUPPORTED_GAME_IDS) {
+      const definitions = CYCLE_MODE_CATALOG.filter((definition) => definition.gameId === gameId)
+      const expiredObservations = definitions.map((definition) => {
+        const currentWindow = predictCycleWindow(definition, reference)
+        expect(currentWindow).not.toBeNull()
+        const expiredEndsAt = new Date(Date.parse(currentWindow!.startsAt) - 1).toISOString()
+        return {
+          remoteKey: definition.remoteKey,
+          category: 'endgame' as const,
+          title: definition.title,
+          completed: true,
+          startsAt: new Date(Date.parse(expiredEndsAt) - 14 * 24 * 60 * 60 * 1000).toISOString(),
+          endsAt: expiredEndsAt,
+          modeKey: definition.modeKey,
+          periodKey: `${gameId}:${definition.modeKey}:expired`,
+          sourceIdentity: {
+            provider: 'test-provider',
+            endpoint: 'recurring-challenges',
+            externalId: `${definition.modeKey}:expired`
+          }
+        }
+      })
+      const snapshot = completeCycleCatalog(
+        gameId,
+        expiredObservations,
+        database.listChecklistItems(gameId),
+        'personal_sync',
+        reference
+      )
+
+      expect(snapshot).toHaveLength(definitions.length * 2)
+      expect(new Set(snapshot.map((item) => item.remoteKey)).size).toBe(definitions.length)
+      expect(() => database!.replacePersonalSnapshot(
+        gameId,
+        'cycles',
+        `test:${'a'.repeat(64)}`,
+        snapshot,
+        'cycle-rollover-test',
+        reference
+      )).not.toThrow()
+
+      const currentCycles = database.listChecklistItems(gameId).filter(
+        (item) => item.category === 'endgame'
+      )
+      expect(currentCycles).toHaveLength(definitions.length)
+      expect(currentCycles.every((item) => item.completed === false)).toBe(true)
+      expect(currentCycles.every((item) => item.lastSyncedAt === reference.toISOString())).toBe(true)
+      expect(database.getSyncTargetStates(gameId).find((state) => state.target === 'cycles'))
+        .toMatchObject({ status: 'success', lastSuccessAt: reference.toISOString() })
+    }
   })
 })
