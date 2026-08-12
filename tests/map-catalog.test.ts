@@ -50,6 +50,7 @@ describe('bundled map catalog', () => {
         .map((item) => item.title)
 
     expect(rootTitles('genshin')).toEqual([
+      '至冬',
       '空之神殿',
       '挪德卡莱',
       '纳塔',
@@ -100,6 +101,14 @@ describe('bundled map catalog', () => {
       expect.objectContaining({
         title: '渊下宫',
         parentTitle: '稻妻',
+        mapNodeKind: 'subregion'
+      })
+    ]))
+
+    expect(getBundledMapCatalog('genshin')).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        title: '古兽冰原',
+        parentTitle: '至冬',
         mapNodeKind: 'subregion'
       })
     ]))

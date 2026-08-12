@@ -60,28 +60,58 @@ function feed(
 }
 
 describe('remote catalog update', () => {
-  it('publishes an explicit retraction for every hot-update test card', () => {
+  it('publishes the verified Genshin 7.0 baseline and preserves every test-card retraction', () => {
     const checkedIn = parseRemoteCatalogFeed(JSON.parse(
       readFileSync(join(process.cwd(), 'updates', 'catalog.json'), 'utf8')
     ))
     expect(checkedIn.games).toHaveLength(4)
     const archivedKeys = new Set<string>()
     for (const game of checkedIn.games) {
-      expect(game.upserts).toEqual([])
       expect(game.archives).toEqual([
         `hot-update-test:${game.gameId}:events:v1`,
         `hot-update-test:${game.gameId}:cycles:v1`,
         `hot-update-test:${game.gameId}:exploration:v1`
       ])
       for (const remoteKey of game.archives) archivedKeys.add(remoteKey)
+
+      if (game.gameId === 'genshin') {
+        expect(game.versionWindow).toMatchObject({
+          periodKey: 'genshin-version-7.0-2026',
+          startsAt: '2026-08-12T11:00:00+08:00'
+        })
+        expect(game.upserts).toEqual(expect.arrayContaining([
+          expect.objectContaining({ title: '砺行修远', category: 'limited_event' }),
+          expect.objectContaining({ title: '新芽相助·初探雪原', category: 'limited_event' }),
+          expect.objectContaining({ title: '险境征者争锋大赛', category: 'limited_event' }),
+          expect.objectContaining({ title: '幽境危战', category: 'endgame' }),
+          expect.objectContaining({ title: '至冬', mapNodeKind: 'region' }),
+          expect.objectContaining({
+            title: '古兽冰原',
+            mapNodeKind: 'subregion',
+            parentTitle: '至冬'
+          })
+        ]))
+      } else {
+        expect(game.upserts).toEqual([])
+      }
     }
     expect(archivedKeys.size).toBe(12)
   })
 
   it('removes only the explicitly retracted public cards', () => {
-    const retraction = parseRemoteCatalogFeed(JSON.parse(
+    const checkedIn = parseRemoteCatalogFeed(JSON.parse(
       readFileSync(join(process.cwd(), 'updates', 'catalog.json'), 'utf8')
     ))
+    const retraction = parseRemoteCatalogFeed({
+      schemaVersion: 1,
+      revision: 'hot-update-test-retraction-only',
+      publishedAt: checkedIn.publishedAt,
+      games: checkedIn.games.map((game) => ({
+        gameId: game.gameId,
+        upserts: [],
+        archives: game.archives
+      }))
+    })
     const initial = parseRemoteCatalogFeed({
       schemaVersion: 1,
       revision: '2026-08-11.hot-update-test.1',

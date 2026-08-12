@@ -1,11 +1,181 @@
 {
   "schemaVersion": 1,
-  "revision": "2026-08-11.hot-update-test.2",
-  "publishedAt": "2026-08-11T20:54:40+08:00",
+  "revision": "2026-08-12.genshin-7.0-baseline",
+  "publishedAt": "2026-08-12T18:20:00+08:00",
   "games": [
     {
       "gameId": "genshin",
-      "upserts": [],
+      "versionWindow": {
+        "periodKey": "genshin-version-7.0-2026",
+        "startsAt": "2026-08-12T11:00:00+08:00",
+        "endsAt": "2026-09-23T05:59:00+08:00",
+        "timeZone": "Asia/Shanghai",
+        "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165682",
+        "confidence": 0.82
+      },
+      "upserts": [
+        {
+          "remoteKey": "event:7.0:seasonal-training",
+          "category": "limited_event",
+          "title": "砺行修远",
+          "startsAt": "2026-08-10T04:00:00+08:00",
+          "endsAt": "2026-11-02T03:59:59+08:00",
+          "activityTags": [
+            "quest",
+            "material-reward"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165613"
+        },
+        {
+          "remoteKey": "event:7.0:sprout-mutual-aid-snowfield",
+          "category": "limited_event",
+          "title": "新芽相助·初探雪原",
+          "startsAt": "2026-08-12T11:00:00+08:00",
+          "endsAt": "2026-08-24T03:59:59+08:00",
+          "activityTags": [
+            "exploration",
+            "photography",
+            "collection"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165629"
+        },
+        {
+          "remoteKey": "event:7.0:forge-realm-strategic-battle",
+          "category": "limited_event",
+          "title": "铸境研炼·奕思巧战",
+          "startsAt": "2026-08-12T11:00:00+08:00",
+          "endsAt": "2026-09-23T05:59:00+08:00",
+          "activityTags": [
+            "card",
+            "challenge"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165634"
+        },
+        {
+          "remoteKey": "event:7.0:frontier-challenger-championship",
+          "category": "limited_event",
+          "title": "险境征者争锋大赛",
+          "startsAt": "2026-08-28T10:00:00+08:00",
+          "endsAt": "2026-09-14T03:59:59+08:00",
+          "activityTags": [
+            "racing",
+            "shooting",
+            "combat",
+            "challenge"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165630"
+        },
+        {
+          "remoteKey": "web-event:7.0:snezhnaya-travel-handbook",
+          "category": "limited_event",
+          "title": "至冬漫游手册",
+          "startsAt": "2026-08-12T14:00:00+08:00",
+          "endsAt": "2026-08-25T23:59:59+08:00",
+          "activityTags": [
+            "web-event",
+            "quest"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165696"
+        },
+        {
+          "remoteKey": "endgame:spiral-abyss",
+          "category": "endgame",
+          "title": "深境螺旋",
+          "startsAt": "2026-07-16T04:00:00+08:00",
+          "endsAt": "2026-08-16T04:00:00+08:00",
+          "modeKey": "spiral-abyss",
+          "periodKey": "genshin:spiral-abyss:2026-07-16",
+          "scheduleKind": "remote_schedule",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165682"
+        },
+        {
+          "remoteKey": "endgame:imaginarium-theater",
+          "category": "endgame",
+          "title": "幻想真境剧诗",
+          "startsAt": "2026-08-01T04:00:00+08:00",
+          "endsAt": "2026-09-01T04:00:00+08:00",
+          "modeKey": "imaginarium-theater",
+          "periodKey": "genshin:imaginarium-theater:2026-08-01",
+          "scheduleKind": "remote_schedule",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165682"
+        },
+        {
+          "remoteKey": "endgame:stygian-onslaught",
+          "category": "endgame",
+          "title": "幽境危战",
+          "startsAt": "2026-08-19T10:00:00+08:00",
+          "endsAt": "2026-09-22T04:00:00+08:00",
+          "modeKey": "stygian-onslaught",
+          "periodKey": "genshin:stygian-onslaught:2026-08-19",
+          "scheduleKind": "remote_schedule",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165630"
+        },
+        {
+          "remoteKey": "map-catalog:genshin:region:414719b0efe139ee12c9",
+          "category": "exploration",
+          "title": "至冬",
+          "mapNodeKind": "region",
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165682"
+        },
+        {
+          "remoteKey": "map-catalog:genshin:subregion:966d5a84a8df97be95fa",
+          "category": "exploration",
+          "title": "古兽冰原",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:genshin:region:414719b0efe139ee12c9",
+          "parentTitle": "至冬",
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165682"
+        },
+        {
+          "remoteKey": "map-catalog:genshin:subregion:f96b05e8ce3e7dcd302f",
+          "category": "exploration",
+          "title": "白桦雪葬地",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:genshin:region:414719b0efe139ee12c9",
+          "parentTitle": "至冬",
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165682"
+        },
+        {
+          "remoteKey": "map-catalog:genshin:subregion:a95bf7d90dd03042b6ab",
+          "category": "exploration",
+          "title": "永凝冻土",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:genshin:region:414719b0efe139ee12c9",
+          "parentTitle": "至冬",
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165682"
+        },
+        {
+          "remoteKey": "map-catalog:genshin:subregion:a34445f05d0911c8b815",
+          "category": "exploration",
+          "title": "焰羽谷",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:genshin:region:414719b0efe139ee12c9",
+          "parentTitle": "至冬",
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165682"
+        },
+        {
+          "remoteKey": "map-catalog:genshin:subregion:7ca6fa77db78fc351386",
+          "category": "exploration",
+          "title": "霜殛寒峰",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:genshin:region:414719b0efe139ee12c9",
+          "parentTitle": "至冬",
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165682"
+        }
+      ],
       "archives": [
         "hot-update-test:genshin:events:v1",
         "hot-update-test:genshin:cycles:v1",

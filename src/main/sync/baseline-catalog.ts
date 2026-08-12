@@ -1,7 +1,7 @@
 import type { GameId } from '../../shared/contracts'
 import type { CodexVersionWindow, NormalizedSyncItem } from './types'
 
-export const BUNDLED_BASELINE_VERIFIED_AT = '2026-08-09T12:30:00+08:00'
+export const BUNDLED_BASELINE_VERIFIED_AT = '2026-08-12T18:20:00+08:00'
 
 // These are per-game fallback cadences, not claims about a fixed official
 // schedule. Exact verified windows always take priority; the cadence is only
@@ -15,12 +15,12 @@ const DEFAULT_VERSION_CADENCE_DAYS: Record<GameId, number> = {
 
 const VERSION_WINDOWS: Record<GameId, CodexVersionWindow> = {
   genshin: {
-    periodKey: 'genshin-version-luna-viii-2026',
-    startsAt: '2026-07-01T11:00:00+08:00',
-    endsAt: '2026-08-12T05:59:00+08:00',
+    periodKey: 'genshin-version-7.0-2026',
+    startsAt: '2026-08-12T11:00:00+08:00',
+    endsAt: '2026-09-23T05:59:00+08:00',
     timeZone: 'Asia/Shanghai',
-    sourceUrl: 'https://ys.mihoyo.com/main/news',
-    confidence: 1
+    sourceUrl: 'https://ys.mihoyo.com/main/news/detail/165682',
+    confidence: 0.82
   },
   'star-rail': {
     periodKey: 'version-4.4',
@@ -50,18 +50,22 @@ const VERSION_WINDOWS: Record<GameId, CodexVersionWindow> = {
 
 type ActivitySeed = Omit<NormalizedSyncItem, 'category'>
 
-const GENSHIN_NEWS = 'https://ys.mihoyo.com/main/news'
+const GENSHIN_70_ACTIVITY_DIGEST = 'https://ys.mihoyo.com/main/news/detail/165630'
+const GENSHIN_70_SPROUT_EVENT = 'https://ys.mihoyo.com/main/news/detail/165629'
+const GENSHIN_70_FORGE_REALM = 'https://ys.mihoyo.com/main/news/detail/165634'
+const GENSHIN_SEASONAL_TRAINING = 'https://ys.mihoyo.com/main/news/detail/165613'
+const GENSHIN_70_WEB_EVENT = 'https://ys.mihoyo.com/main/news/detail/165696'
 const STAR_RAIL_NEWS = 'https://sr.mihoyo.com/news?nav=news&type=activity'
 const ZENLESS_NEWS = 'https://zenless.hoyoverse.com/zh-cn/news'
 const WUTHERING_WAVES_35 = 'https://wutheringwaves.kurogames.com/main/news/detail/5023'
 
 const ACTIVITIES: Record<GameId, readonly ActivitySeed[]> = {
   genshin: [
-    { remoteKey: 'event:luna-viii:summer-homecoming', title: '映夏！归乡？千灵节！', activityTags: ['management', 'exploration', 'collection'], startsAt: '2026-07-01T11:00:00+08:00', endsAt: '2026-08-11T03:59:59+08:00', sourceUrl: GENSHIN_NEWS },
-    { remoteKey: 'event:luna-viii:forge-realm', title: '铸境研炼·无量疾战', activityTags: ['card', 'challenge'], startsAt: '2026-07-01T11:00:00+08:00', endsAt: '2026-08-12T05:59:00+08:00', sourceUrl: GENSHIN_NEWS },
-    { remoteKey: 'event:luna-viii:final-longshot', title: '最终远射瞄准线', activityTags: ['shooting', 'puzzle', 'challenge'], startsAt: '2026-07-17T10:00:00+08:00', endsAt: '2026-07-27T03:59:59+08:00', sourceUrl: GENSHIN_NEWS },
-    { remoteKey: 'event:luna-viii:dance-party', title: '悠悠律动舞力聚会', activityTags: ['rhythm', 'co-op', 'challenge'], startsAt: '2026-07-24T10:00:00+08:00', endsAt: '2026-08-03T03:59:59+08:00', sourceUrl: GENSHIN_NEWS },
-    { remoteKey: 'event:luna-viii:ley-line-overflow', title: '地脉移涌', activityTags: ['ley-line', 'double-reward', 'material-reward'], startsAt: '2026-08-03T04:00:00+08:00', endsAt: '2026-08-10T03:59:59+08:00', sourceUrl: GENSHIN_NEWS }
+    { remoteKey: 'event:7.0:seasonal-training', title: '砺行修远', activityTags: ['quest', 'material-reward'], startsAt: '2026-08-10T04:00:00+08:00', endsAt: '2026-11-02T03:59:59+08:00', sourceUrl: GENSHIN_SEASONAL_TRAINING },
+    { remoteKey: 'event:7.0:sprout-mutual-aid-snowfield', title: '新芽相助·初探雪原', activityTags: ['exploration', 'photography', 'collection'], startsAt: '2026-08-12T11:00:00+08:00', endsAt: '2026-08-24T03:59:59+08:00', sourceUrl: GENSHIN_70_SPROUT_EVENT },
+    { remoteKey: 'event:7.0:forge-realm-strategic-battle', title: '铸境研炼·奕思巧战', activityTags: ['card', 'challenge'], startsAt: '2026-08-12T11:00:00+08:00', endsAt: '2026-09-23T05:59:00+08:00', sourceUrl: GENSHIN_70_FORGE_REALM },
+    { remoteKey: 'event:7.0:frontier-challenger-championship', title: '险境征者争锋大赛', activityTags: ['racing', 'shooting', 'combat', 'challenge'], startsAt: '2026-08-28T10:00:00+08:00', endsAt: '2026-09-14T03:59:59+08:00', sourceUrl: GENSHIN_70_ACTIVITY_DIGEST },
+    { remoteKey: 'web-event:7.0:snezhnaya-travel-handbook', title: '至冬漫游手册', activityTags: ['web-event', 'quest'], startsAt: '2026-08-12T14:00:00+08:00', endsAt: '2026-08-25T23:59:59+08:00', sourceUrl: GENSHIN_70_WEB_EVENT }
   ],
   'star-rail': [
     { remoteKey: 'event:4.4:anti-corruption', title: '反贪「砖」家', activityTags: ['puzzle', 'challenge', 'co-op'], startsAt: '2026-07-15T11:00:00+08:00', endsAt: '2026-08-26T03:59:59+08:00', sourceUrl: STAR_RAIL_NEWS },

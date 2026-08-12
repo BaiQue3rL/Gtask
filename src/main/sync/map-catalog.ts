@@ -8,7 +8,7 @@ interface MapRegionDefinition {
 }
 
 const MAP_CATALOG_VERIFIED_AT: Record<GameId, string> = {
-  genshin: '2026-08-09T12:30:00+08:00',
+  genshin: '2026-08-12T18:20:00+08:00',
   'star-rail': '2026-08-09T12:30:00+08:00',
   zenless: '2026-08-09T12:30:00+08:00',
   'wuthering-waves': '2026-08-09T12:30:00+08:00'
@@ -23,6 +23,10 @@ const MAP_CATALOG_VERIFIED_AT: Record<GameId, string> = {
  */
 const MAP_CATALOGS: Record<GameId, readonly MapRegionDefinition[]> = {
   genshin: [
+    {
+      title: '至冬',
+      subregions: ['古兽冰原', '白桦雪葬地', '永凝冻土', '焰羽谷', '霜殛寒峰']
+    },
     { title: '空之神殿', subregions: [] },
     {
       title: '挪德卡莱',

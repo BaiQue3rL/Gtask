@@ -46,7 +46,7 @@ export const CYCLE_MODE_CATALOG: readonly CycleModeDefinition[] = [
     aliases: ['幽境危战'],
     prediction: {
       kind: 'interval',
-      anchorStartsAt: '2026-07-08T10:00:00+08:00',
+      anchorStartsAt: '2026-08-19T10:00:00+08:00',
       cadenceDays: 42,
       durationDays: 33.75
     }
@@ -344,9 +344,9 @@ export function completeCycleCatalog(
   // A provider may keep returning the previous period until the player enters
   // the newly opened challenge.  Preserve that expired observation long
   // enough for the snapshot layer to tombstone its official identity, but do
-  // not let it count as the current catalog member.  Conversely, announced
-  // future periods are not checklist rows: the catalog always represents the
-  // one period that is actionable now.
+  // not let it count as the current catalog member. If a mode is between two
+  // periods, the built-in schedule may still supply its next upcoming window
+  // so a fresh install does not lose that mode while waiting for it to open.
   const normalized = items.map((item) => {
     if (item.category !== 'endgame') return item
     const definition = findCycleMode(gameId, item)

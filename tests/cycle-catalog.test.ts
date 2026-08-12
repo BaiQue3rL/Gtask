@@ -24,7 +24,7 @@ describe('cycle catalog', () => {
     expect(items.every((item) =>
       Boolean(item.startsAt) &&
       Boolean(item.endsAt) &&
-      Date.parse(item.startsAt!) <= reference.getTime() &&
+      Date.parse(item.startsAt!) < Date.parse(item.endsAt!) &&
       Date.parse(item.endsAt!) > reference.getTime()
     )).toBe(true)
   })

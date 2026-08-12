@@ -225,7 +225,7 @@ describe('bundled baseline catalog', () => {
 
   it('keeps every built-in recurring challenge syncable when the provider still returns the expired period', () => {
     vi.useFakeTimers()
-    const reference = new Date('2026-08-11T12:00:00.000Z')
+    const reference = new Date('2026-08-20T12:00:00.000Z')
     vi.setSystemTime(reference)
     database = new AppDatabase(':memory:')
 
