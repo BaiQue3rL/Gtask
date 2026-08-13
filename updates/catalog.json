@@ -1,18 +1,10 @@
 {
   "schemaVersion": 1,
-  "revision": "2026-08-12.genshin-7.0-baseline",
-  "publishedAt": "2026-08-12T18:20:00+08:00",
+  "revision": "2026-08-13.genshin-cycle-identity-correction",
+  "publishedAt": "2026-08-13T23:02:31+08:00",
   "games": [
     {
       "gameId": "genshin",
-      "versionWindow": {
-        "periodKey": "genshin-version-7.0-2026",
-        "startsAt": "2026-08-12T11:00:00+08:00",
-        "endsAt": "2026-09-23T05:59:00+08:00",
-        "timeZone": "Asia/Shanghai",
-        "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165682",
-        "confidence": 0.82
-      },
       "upserts": [
         {
           "remoteKey": "event:7.0:seasonal-training",
@@ -88,30 +80,6 @@
           "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165696"
         },
         {
-          "remoteKey": "endgame:spiral-abyss",
-          "category": "endgame",
-          "title": "深境螺旋",
-          "startsAt": "2026-07-16T04:00:00+08:00",
-          "endsAt": "2026-08-16T04:00:00+08:00",
-          "modeKey": "spiral-abyss",
-          "periodKey": "genshin:spiral-abyss:2026-07-16",
-          "scheduleKind": "remote_schedule",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165682"
-        },
-        {
-          "remoteKey": "endgame:imaginarium-theater",
-          "category": "endgame",
-          "title": "幻想真境剧诗",
-          "startsAt": "2026-08-01T04:00:00+08:00",
-          "endsAt": "2026-09-01T04:00:00+08:00",
-          "modeKey": "imaginarium-theater",
-          "periodKey": "genshin:imaginarium-theater:2026-08-01",
-          "scheduleKind": "remote_schedule",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165682"
-        },
-        {
           "remoteKey": "endgame:stygian-onslaught",
           "category": "endgame",
           "title": "幽境危战",
@@ -179,7 +147,9 @@
       "archives": [
         "hot-update-test:genshin:events:v1",
         "hot-update-test:genshin:cycles:v1",
-        "hot-update-test:genshin:exploration:v1"
+        "hot-update-test:genshin:exploration:v1",
+        "endgame:spiral-abyss:2026-08-16",
+        "endgame:imaginarium-theater:2026-09-01"
       ]
     },
     {

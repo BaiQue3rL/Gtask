@@ -264,7 +264,7 @@ export interface ActivityTagContractEntry {
 }
 
 export interface PublicSyncContract {
-  schemaVersion: 13
+  schemaVersion: 14
   jobKind: 'public_catalog'
   authority: 'interface_contract'
   decisionAuthority: 'codex'

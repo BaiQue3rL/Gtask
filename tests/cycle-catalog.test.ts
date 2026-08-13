@@ -24,7 +24,7 @@ describe('cycle catalog', () => {
     expect(items.every((item) =>
       Boolean(item.startsAt) &&
       Boolean(item.endsAt) &&
-      Date.parse(item.startsAt!) < Date.parse(item.endsAt!) &&
+      Date.parse(item.startsAt!) <= reference.getTime() &&
       Date.parse(item.endsAt!) > reference.getTime()
     )).toBe(true)
   })
@@ -185,7 +185,7 @@ describe('cycle catalog', () => {
     expect(Date.parse(theater[0].endsAt!)).toBeGreaterThan(reference.getTime())
   })
 
-  it('优先沿用官方观测到的上一期长度进行换期', () => {
+  it('过期观测只用于识别模式，换期仍按固定锚点与周期计算', () => {
     const previous = {
       modeKey: 'tower-of-adversity',
       remoteKey: 'endgame:tower-of-adversity',
@@ -199,8 +199,27 @@ describe('cycle catalog', () => {
       new Date('2026-08-01T00:00:00.000Z')
     )
     expect(next).toMatchObject({
-      startsAt: '2026-07-27T20:00:00.000Z',
-      endsAt: '2026-08-24T20:00:00.000Z'
+      startsAt: '2026-07-19T20:00:00.000Z',
+      endsAt: '2026-08-16T20:00:00.000Z'
+    })
+  })
+
+  it('带空档的周期不会拿上一期持续时间首尾相接', () => {
+    const previous = {
+      modeKey: 'stygian-onslaught',
+      remoteKey: 'endgame:stygian-onslaught',
+      title: '幽境危战',
+      startsAt: '2026-07-08T10:00:00+08:00',
+      endsAt: '2026-08-11T04:00:00+08:00'
+    } as ChecklistItem
+
+    expect(nextCyclePeriod(
+      'genshin',
+      previous,
+      new Date('2026-08-13T12:00:00+08:00')
+    )).toMatchObject({
+      startsAt: '2026-08-19T02:00:00.000Z',
+      endsAt: '2026-09-21T20:00:00.000Z'
     })
   })
 

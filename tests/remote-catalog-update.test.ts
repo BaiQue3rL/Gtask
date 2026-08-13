@@ -60,30 +60,33 @@ function feed(
 }
 
 describe('remote catalog update', () => {
-  it('publishes the verified Genshin 7.0 baseline and preserves every test-card retraction', () => {
+  it('publishes the verified Genshin 7.0 baseline and retracts invalid period-scoped cycle cards', () => {
     const checkedIn = parseRemoteCatalogFeed(JSON.parse(
       readFileSync(join(process.cwd(), 'updates', 'catalog.json'), 'utf8')
     ))
     expect(checkedIn.games).toHaveLength(4)
     const archivedKeys = new Set<string>()
     for (const game of checkedIn.games) {
-      expect(game.archives).toEqual([
+      const expectedArchives = [
         `hot-update-test:${game.gameId}:events:v1`,
         `hot-update-test:${game.gameId}:cycles:v1`,
         `hot-update-test:${game.gameId}:exploration:v1`
-      ])
+      ]
+      if (game.gameId === 'genshin') {
+        expectedArchives.push(
+          'endgame:spiral-abyss:2026-08-16',
+          'endgame:imaginarium-theater:2026-09-01'
+        )
+      }
+      expect(game.archives).toEqual(expectedArchives)
       for (const remoteKey of game.archives) archivedKeys.add(remoteKey)
 
       if (game.gameId === 'genshin') {
-        expect(game.versionWindow).toMatchObject({
-          periodKey: 'genshin-version-7.0-2026',
-          startsAt: '2026-08-12T11:00:00+08:00'
-        })
+        expect(game.versionWindow).toBeUndefined()
         expect(game.upserts).toEqual(expect.arrayContaining([
           expect.objectContaining({ title: '砺行修远', category: 'limited_event' }),
           expect.objectContaining({ title: '新芽相助·初探雪原', category: 'limited_event' }),
           expect.objectContaining({ title: '险境征者争锋大赛', category: 'limited_event' }),
-          expect.objectContaining({ title: '幽境危战', category: 'endgame' }),
           expect.objectContaining({ title: '至冬', mapNodeKind: 'region' }),
           expect.objectContaining({
             title: '古兽冰原',
@@ -91,11 +94,47 @@ describe('remote catalog update', () => {
             parentTitle: '至冬'
           })
         ]))
+        expect(game.upserts.filter((item) => item.category === 'endgame')).toEqual([
+          expect.objectContaining({
+            remoteKey: 'endgame:stygian-onslaught',
+            modeKey: 'stygian-onslaught'
+          })
+        ])
       } else {
         expect(game.upserts).toEqual([])
       }
     }
-    expect(archivedKeys.size).toBe(12)
+    expect(archivedKeys.size).toBe(14)
+  })
+
+  it('rejects period-scoped keys and duplicate rows for a known recurring mode', () => {
+    const cycle = {
+      remoteKey: 'endgame:spiral-abyss:2026-08-16',
+      category: 'endgame' as const,
+      title: '深境螺旋',
+      startsAt: '2026-08-16T04:00:00+08:00',
+      endsAt: '2026-09-16T04:00:00+08:00',
+      modeKey: 'spiral-abyss',
+      periodKey: 'genshin:spiral-abyss:2026-08-16',
+      scheduleKind: 'remote_schedule' as const,
+      timeZone: 'Asia/Shanghai',
+      sourceUrl
+    }
+
+    expect(() => parseRemoteCatalogFeed({
+      schemaVersion: 1,
+      revision: 'invalid-period-scoped-cycle-key',
+      publishedAt: '2026-08-13T23:02:31+08:00',
+      games: [{ gameId: 'genshin', upserts: [cycle], archives: [] }]
+    })).toThrow(/必须使用稳定键/)
+
+    expect(() => database = new AppDatabase(':memory:')).not.toThrow()
+    expect(() => database!.mergeSyncedItems(
+      'genshin',
+      'public_schedule',
+      [cycle],
+      '2026-08-13T15:02:31.000Z'
+    )).toThrow(/不能按期次新建卡片/)
   })
 
   it('removes only the explicitly retracted public cards', () => {
@@ -165,7 +204,7 @@ describe('remote catalog update', () => {
       .filter((item) => item.remoteKey?.startsWith('hot-update-test:')))).toHaveLength(12)
 
     expect(database.applyRemoteCatalogFeed(retraction, new Date('2026-08-11T13:00:00.000Z')))
-      .toMatchObject({ added: 0, updated: 0, archived: 12 })
+      .toMatchObject({ added: 0, updated: 0, archived: 14 })
     expect(retraction.games.flatMap((game) => database!.listChecklistItems(game.gameId)
       .filter((item) => item.remoteKey?.startsWith('hot-update-test:')))).toEqual([])
     expect(database.getChecklistItem(custom.id)).toMatchObject({
