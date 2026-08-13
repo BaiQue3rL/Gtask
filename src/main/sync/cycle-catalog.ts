@@ -46,7 +46,7 @@ export const CYCLE_MODE_CATALOG: readonly CycleModeDefinition[] = [
     aliases: ['幽境危战'],
     prediction: {
       kind: 'interval',
-      anchorStartsAt: '2026-08-19T10:00:00+08:00',
+      anchorStartsAt: '2026-07-08T10:00:00+08:00',
       cadenceDays: 42,
       durationDays: 33.75
     }
@@ -235,14 +235,16 @@ function intervalWindow(
   const anchor = Date.parse(policy.anchorStartsAt)
   const cadence = policy.cadenceDays * DAY_MS
   const offset = Math.floor((reference.getTime() - anchor) / cadence)
-  const startsAt = anchor + Math.max(0, offset) * cadence
+  let startsAt = anchor + Math.max(0, offset) * cadence
+  const duration = policy.durationDays * DAY_MS
+  if (startsAt + duration <= reference.getTime()) startsAt += cadence
   return {
     startsAt: new Date(startsAt).toISOString(),
-    endsAt: new Date(startsAt + policy.durationDays * DAY_MS).toISOString()
+    endsAt: new Date(startsAt + duration).toISOString()
   }
 }
 
-function learnedWindow(
+function activeObservedWindow(
   existing: Pick<ChecklistItem, 'startsAt' | 'endsAt'> | undefined,
   reference: Date
 ): CycleWindow | null {
@@ -251,15 +253,8 @@ function learnedWindow(
   const end = Date.parse(existing.endsAt)
   const duration = end - start
   if (!Number.isFinite(start) || !Number.isFinite(end) || duration <= 0) return null
-  if (end > reference.getTime()) {
-    return { startsAt: new Date(start).toISOString(), endsAt: new Date(end).toISOString() }
-  }
-  const periods = Math.floor((reference.getTime() - end) / duration) + 1
-  const nextStart = start + periods * duration
-  return {
-    startsAt: new Date(nextStart).toISOString(),
-    endsAt: new Date(nextStart + duration).toISOString()
-  }
+  if (end <= reference.getTime()) return null
+  return { startsAt: new Date(start).toISOString(), endsAt: new Date(end).toISOString() }
 }
 
 export function predictCycleWindow(
@@ -267,8 +262,8 @@ export function predictCycleWindow(
   reference = new Date(),
   existing?: Pick<ChecklistItem, 'startsAt' | 'endsAt'>
 ): CycleWindow | null {
-  const learned = learnedWindow(existing, reference)
-  if (learned) return learned
+  const observed = activeObservedWindow(existing, reference)
+  if (observed) return observed
   if (definition.prediction.kind === 'monthly') {
     return monthlyWindow(reference, definition.prediction)
   }
@@ -344,9 +339,9 @@ export function completeCycleCatalog(
   // A provider may keep returning the previous period until the player enters
   // the newly opened challenge.  Preserve that expired observation long
   // enough for the snapshot layer to tombstone its official identity, but do
-  // not let it count as the current catalog member. If a mode is between two
-  // periods, the built-in schedule may still supply its next upcoming window
-  // so a fresh install does not lose that mode while waiting for it to open.
+  // not let it count as the current catalog member. Future provider rows are
+  // discarded; during an intentional gap, the stable built-in rule may add
+  // exactly the next canonical window so the mode never duplicates.
   const normalized = items.map((item) => {
     if (item.category !== 'endgame') return item
     const definition = findCycleMode(gameId, item)

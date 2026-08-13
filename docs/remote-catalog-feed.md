@@ -16,10 +16,12 @@
 - `upserts` 只允许 `limited_event`、`endgame` 和严格两级的 `exploration`。
 - 活动必须有完整起止时间、HTTPS 来源和有效玩法标签。
 - 周期必须有稳定 `modeKey`、当期 `periodKey` 和完整窗口。
+- 周期模式由客户端按稳定规则自动换期，不随版本例行推送当期/下期卡片；只有官方重置规则或锚点变化，以及模式新增、移除、改名时，才允许发布周期结构更新。
 - 地图只允许无父级 `region` 或恰好归属一个现有 `region` 的 `subregion`。
 - `archives` 只能按稳定 `remoteKey` 删除 `public_schedule` 行。
 - 协议不包含 `completed`、`progressPercent`、账号标识、Cookie、Token 或任何 `custom` 写入字段。
 - 同稳定键更新标题、时间或层级时，用户完成状态、手动完成锁和探索度保持不变。
+- 版本倒计时按各游戏既定周期自动换期；常规版本不重复发布 `versionWindow`。仅在延期、缩短、延长或其他既定周期无法表达的官方例外中校准。
 
 ## 发布步骤
 

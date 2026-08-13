@@ -3,6 +3,7 @@ import { dirname } from 'node:path'
 import { z } from 'zod'
 import { activityTagsMeetQualityContract } from './activity-tags'
 import type { SoftwareUpdateSource } from '../shared/contracts'
+import { findCycleMode } from './sync/cycle-catalog'
 
 export const REMOTE_CATALOG_SCHEMA_VERSION = 1
 export const DEFAULT_REMOTE_CATALOG_TIMEOUT_MS = 5_000
@@ -106,11 +107,25 @@ const gameUpdateSchema = z.object({
   archives: z.array(stableKeySchema).max(2_000).default([])
 }).strict().superRefine((game, context) => {
   const seen = new Set<string>()
+  const seenCycleModes = new Set<string>()
   for (const item of game.upserts) {
     if (seen.has(item.remoteKey)) {
       context.addIssue({ code: 'custom', message: `重复稳定键：${item.remoteKey}` })
     }
     seen.add(item.remoteKey)
+    if (item.category === 'endgame') {
+      if (seenCycleModes.has(item.modeKey)) {
+        context.addIssue({ code: 'custom', message: `周期模式重复出现：${item.modeKey}` })
+      }
+      seenCycleModes.add(item.modeKey)
+      const definition = findCycleMode(game.gameId, item)
+      if (definition && item.remoteKey !== definition.remoteKey) {
+        context.addIssue({
+          code: 'custom',
+          message: `周期模式 ${item.modeKey} 必须使用稳定键 ${definition.remoteKey}`
+        })
+      }
+    }
   }
   for (const remoteKey of game.archives) {
     if (seen.has(remoteKey)) {

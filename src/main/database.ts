@@ -2795,6 +2795,9 @@ export class AppDatabase {
         )
       }
     }
+    if (source === 'public_schedule') {
+      this.assertPublicCycleStableIdentities(gameId, items)
+    }
     const seenRemoteKeys = new Set<string>()
     this.assertMapStructure(gameId, items)
 
@@ -3005,6 +3008,27 @@ export class AppDatabase {
     } catch (error) {
       if (manageTransaction) this.database.exec('ROLLBACK')
       throw error
+    }
+  }
+
+  private assertPublicCycleStableIdentities(
+    gameId: GameId,
+    items: NormalizedSyncItem[]
+  ): void {
+    const seenModes = new Set<string>()
+    for (const item of items) {
+      if (item.category !== 'endgame') continue
+      if (!item.modeKey) throw new Error(`周期挑战“${item.title}”缺少稳定模式标识`)
+      if (seenModes.has(item.modeKey)) {
+        throw new Error(`公开周期清单包含重复模式：${item.modeKey}`)
+      }
+      seenModes.add(item.modeKey)
+      const definition = findCycleMode(gameId, item)
+      if (definition && item.remoteKey !== definition.remoteKey) {
+        throw new Error(
+          `周期挑战“${definition.title}”必须使用稳定标识 ${definition.remoteKey}，不能按期次新建卡片`
+        )
+      }
     }
   }
 

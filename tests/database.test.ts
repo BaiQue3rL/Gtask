@@ -1838,15 +1838,18 @@ describe('AppDatabase', () => {
     ).every((item) => item.completed && item.progressPercent === 100)).toBe(true)
   })
 
-  it('挑战玩法进入新周期时新增清单并保留上一期完成记录', () => {
+  it('挑战玩法进入新周期时复用稳定清单并重置完成状态', () => {
     database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.mergeSyncedItems('zenless', 'public_schedule', [
       {
         remoteKey: 'endgame:shiyu-defense',
         category: 'endgame',
         title: '式舆防卫战',
+        startsAt: '2026-07-05T20:00:00.000Z',
+        endsAt: '2026-07-19T20:00:00.000Z',
         periodKey: '2026-07-a',
-        modeKey: 'shiyu-defense'
+        modeKey: 'shiyu-defense',
+        scheduleKind: 'remote_schedule'
       }
     ])
     const item = database
@@ -1854,26 +1857,14 @@ describe('AppDatabase', () => {
       .find((candidate) => candidate.remoteKey === 'endgame:shiyu-defense')!
     database.updateChecklistItem({ id: item.id, completed: true })
 
-    database.mergeSyncedItems('zenless', 'public_schedule', [
-      {
-        remoteKey: 'endgame:shiyu-defense:2026-07-b',
-        category: 'endgame',
-        title: '式舆防卫战',
-        periodKey: '2026-07-b',
-        modeKey: 'shiyu-defense'
-      }
-    ])
+    expect(database.rolloverDueCycleItems(new Date('2026-07-20T00:00:00.000Z'))).toBe(1)
 
     const periods = database.listChecklistItems('zenless')
       .filter((candidate) => candidate.modeKey === 'shiyu-defense')
-    expect(periods).toHaveLength(2)
-    expect(periods.find((candidate) => candidate.id === item.id)).toMatchObject({
-      periodKey: '2026-07-a',
-      completed: true,
-      manualCompletionLocked: true
-    })
-    expect(periods.find((candidate) => candidate.periodKey === '2026-07-b')).toMatchObject({
-      periodKey: '2026-07-b',
+    expect(periods).toHaveLength(1)
+    expect(periods[0]).toMatchObject({
+      id: item.id,
+      remoteKey: 'endgame:shiyu-defense',
       completed: false,
       completedAt: null,
       manualCompletionLocked: false
@@ -2245,7 +2236,7 @@ describe('AppDatabase', () => {
         userTimeZone: 'America/Los_Angeles'
       },
       contract: {
-        schemaVersion: 13,
+        schemaVersion: 14,
         decisionAuthority: 'codex',
         executorPolicy: 'mechanical_validation_only'
       }
@@ -2559,7 +2550,7 @@ describe('AppDatabase', () => {
       'agent-initial-all',
       [
         {
-          remoteKey: 'wuthering-waves:tower:2026-07',
+          remoteKey: 'endgame:tower-of-adversity',
           category: 'endgame',
           title: '逆境深塔',
           modeKey: 'tower-of-adversity',
@@ -2568,7 +2559,7 @@ describe('AppDatabase', () => {
           endsAt: '2026-08-03T03:59:59+08:00'
         },
         {
-          remoteKey: 'wuthering-waves:wastes:2026-07',
+          remoteKey: 'endgame:whimpering-wastes',
           category: 'endgame',
           title: '冥歌海墟',
           modeKey: 'whimpering-wastes',
@@ -2577,7 +2568,7 @@ describe('AppDatabase', () => {
           endsAt: '2026-08-03T03:59:59+08:00'
         },
         {
-          remoteKey: 'wuthering-waves:matrix:2026-07',
+          remoteKey: 'endgame:endstate-matrix',
           category: 'endgame',
           title: '终焉矩阵',
           modeKey: 'endstate-matrix',
@@ -2872,7 +2863,7 @@ describe('AppDatabase', () => {
       queued.id,
       'agent-genshin-cycles',
       [{
-        remoteKey: 'genshin:stygian-onslaught:2026-07',
+        remoteKey: 'endgame:stygian-onslaught',
         category: 'endgame',
         title: '幽境危战',
         modeKey: 'stygian-onslaught',

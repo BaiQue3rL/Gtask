@@ -78,9 +78,9 @@ const eventsContract: SyncSectionContract = {
 
 const cyclesContract: SyncSectionContract = {
   target: 'cycles',
-  purpose: '校准当前主要周期挑战的名称、周期窗口与模式身份。',
+  purpose: '仅核验主要周期挑战的模式定义、重置规则或锚点是否发生官方变化。',
   inventoryScope:
-    '当前正在进行或官方已经公布下一期的全部主要周期挑战模式及其当期实例。周期挑战是具有独立模式入口、重复结算周期和个人挑战进度的主要常驻终局玩法；单层、单节点、单阶段或当期增益不是独立模式。',
+    'matchCandidates 是应用当前稳定周期模式基准。只检查官方是否新增、移除、改名某个主要常驻终局模式，或是否改变其重置规则/时间锚点；普通换期由应用自动计算，不枚举、不提交本期或下期实例。',
   itemShapes: [
     {
       name: '周期挑战',
@@ -106,13 +106,13 @@ const cyclesContract: SyncSectionContract = {
     }
   ],
   completionCriteria: [
+    '没有新增模式、模式调整或官方排期规则变化时，提交空 items 即可完成核验；不得为了表示“已核查”而重写本期或下期窗口。',
     '模式正例：原神“深境螺旋”“幻想真境剧诗”、星铁“混沌回忆”“虚构叙事”“末日幻影”、绝区零“式舆防卫战”“危局强袭战”等具有独立入口和重复周期的主要挑战。',
     '模式反例：某一层、节点、关卡、难度、当期增益、敌人阵容、奖励档位、每周首领、体力副本或限时活动挑战；这些不能作为新的周期模式。',
-    '每种周期挑战使用稳定 modeKey；每一期使用独立 periodKey 和 remoteKey。',
-    '同一模式的本期标题、副标题或期数属于 periodKey 对应的周期实例，不得因为标题变化创建新的 modeKey；不同模式即使时间窗相同也不得合并。',
-    '周期 startsAt/endsAt 必须是该期挑战开放与结算窗口，不是奖励领取期限、单个阶段开放时间或版本结束时间。',
+    '每种周期挑战跨所有期次永久复用同一个 modeKey 和 remoteKey；periodKey、startsAt、endsAt 只描述该稳定行当前自动计算到的期次，绝不能把日期或期号拼入 remoteKey 新建第二张卡。',
+    '只有在官方改变排期规则或需要重新校准锚点时才提交 startsAt/endsAt；它们必须是完整挑战开放与结算窗口，不是奖励领取期限、单个阶段或版本结束时间。',
     '无法确认某内容是独立周期模式还是模式内部阶段时，必须交叉核验官方玩法入口、周期说明和可靠社区资料；仍无法确认则不得猜测或提交。',
-    '深渊类事项不设置自动 recurrenceRule；新一期是新记录。'
+    '深渊类事项由应用内置的模式规则自动换期；普通新一期不是新记录，也不通过热更新逐期下发。'
   ]
 }
 
@@ -179,7 +179,7 @@ export function getPublicSyncContract(
   requestContext: SyncRequestContext = DEFAULT_REQUEST_CONTEXT
 ): PublicSyncContract {
   return {
-    schemaVersion: 13,
+    schemaVersion: 14,
     jobKind: 'public_catalog',
     authority: 'interface_contract',
     decisionAuthority: 'codex',
@@ -211,7 +211,7 @@ export function getPublicSyncContract(
     fieldSemantics: {
       matchItemId: '与 matchCandidates 中现有事项语义相同时使用其 itemId；真正新增时省略。',
       catalogBaseline: '地图任务的 matchCandidates 是应用已维护的完整基准目录。本次只需联网查找基准之后的增量、改名或归属修正；没有变化时提交空 items 即可完成核验，不得为了凑数重复提交全部目录。',
-      remoteKey: '同一逻辑事项稳定、可重复同步的机器身份；周期挑战的每一期使用独立 remoteKey。',
+      remoteKey: '同一逻辑事项稳定、可重复同步的机器身份；周期挑战跨所有期次永久复用模式级 remoteKey，禁止拼接日期、期号或 periodKey。',
       category: 'Codex 根据资料语义选择最终版块分类；页面或接口的栏目名只是证据，不能代替活动容器、周期模式或地图层级的实际语义判断。',
       title: `由 ${requestContext.outputLocale} 官方本地化资料确认的游戏内名称，不自行翻译。`,
       activityTags: activityTagSemantics(requestContext.outputLocale),

@@ -71,6 +71,11 @@ describe('同步接口契约', () => {
     expect(cycleCriteria).toContain('式舆防卫战')
     expect(cycleCriteria).toContain('某一层')
     expect(cycleCriteria).toContain('不得猜测')
+    expect(cycleCriteria).toContain('提交空 items')
+    expect(cycleCriteria).toContain('永久复用同一个 modeKey 和 remoteKey')
+    expect(cycleCriteria).toContain('普通新一期不是新记录')
+    expect(getPublicSyncContract('cycles').fieldSemantics.remoteKey)
+      .toContain('禁止拼接日期')
 
     const [exploration] = getPublicSyncContract('exploration').sections
     expect(exploration.itemShapes[0].requiredFields).toContain('mapNodeKind')
