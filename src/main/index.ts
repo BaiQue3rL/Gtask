@@ -993,26 +993,12 @@ function registerIpcHandlers(): void {
     if (!appDatabase) throw new Error('数据库尚未初始化')
     return appDatabase.restoreChecklistItem(parseItemId(id))
   })
-  ipcMain.handle('checklist:empty-recycle-bin', async (_event, gameId: unknown) => {
+  ipcMain.handle('checklist:empty-recycle-bin', (_event, gameId: unknown) => {
     if (!appDatabase) throw new Error('数据库尚未初始化')
     const resolvedGameId = parseGameId(gameId)
     const count = appDatabase.listArchivedChecklistItems(resolvedGameId).length
     if (count === 0) return 0
-    const gameName = appDatabase.listGames().find((game) => game.id === resolvedGameId)?.name ?? '当前游戏'
-    const confirmationOptions = {
-      type: 'warning',
-      title: '清空回收站',
-      message: `确定永久删除${gameName}回收站中的 ${count} 个事项吗？`,
-      detail: '此操作无法撤销。',
-      buttons: ['取消', '永久删除'],
-      defaultId: 0,
-      cancelId: 0,
-      noLink: true
-    } satisfies Electron.MessageBoxOptions
-    const confirmation = mainWindow
-      ? await dialog.showMessageBox(mainWindow, confirmationOptions)
-      : await dialog.showMessageBox(confirmationOptions)
-    return confirmation.response === 1 ? appDatabase.emptyRecycleBin(resolvedGameId) : 0
+    return appDatabase.emptyRecycleBin(resolvedGameId)
   })
   ipcMain.handle('checklist:archive-completed-section', (_event, input: unknown) => {
     if (!appDatabase) throw new Error('数据库尚未初始化')

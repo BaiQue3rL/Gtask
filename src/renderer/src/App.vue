@@ -79,6 +79,15 @@ interface ChecklistPanel {
   syncTarget?: PersonalSyncTarget
 }
 
+interface ConfirmationDialogState {
+  eyebrow: string
+  title: string
+  message: string
+  detail: string
+  confirmLabel: string
+  onConfirm: () => Promise<void>
+}
+
 const panels: ChecklistPanel[] = [
   { title: '活动', section: 'events', categories: ['limited_event'], defaultCategory: 'limited_event', syncTarget: 'events', allowCreate: false, allowClear: false },
   { title: '周期', section: 'cycles', categories: ['endgame'], defaultCategory: 'endgame', syncTarget: 'cycles', allowCreate: false, allowClear: false },
@@ -134,6 +143,8 @@ const clockNow = ref(Date.now())
 const editorOpen = ref(false)
 const recycleBinOpen = ref(false)
 const settingsOpen = ref(false)
+const confirmationDialog = ref<ConfirmationDialogState | null>(null)
+const confirmationBusy = ref(false)
 const miyousheLoginOpen = ref(false)
 const miyousheLoginState = ref<MiyousheQrLoginState | null>(null)
 const startingMiyousheLogin = ref(false)
@@ -325,6 +336,10 @@ onUnmounted(() => {
 
 function handleGlobalKeydown(event: KeyboardEvent): void {
   if (event.key !== 'Escape') return
+  if (confirmationDialog.value) {
+    closeConfirmationDialog()
+    return
+  }
   if (miyousheLoginOpen.value) {
     void closeMiyousheLogin()
     return
@@ -341,6 +356,30 @@ function handleGlobalKeydown(event: KeyboardEvent): void {
   editorOpen.value = false
   recycleBinOpen.value = false
   settingsOpen.value = false
+}
+
+function openConfirmationDialog(dialog: ConfirmationDialogState): void {
+  if (confirmationBusy.value) return
+  confirmationDialog.value = dialog
+}
+
+function closeConfirmationDialog(): void {
+  if (confirmationBusy.value) return
+  confirmationDialog.value = null
+}
+
+async function confirmDialogAction(): Promise<void> {
+  const dialog = confirmationDialog.value
+  if (!dialog || confirmationBusy.value) return
+  confirmationBusy.value = true
+  try {
+    await dialog.onConfirm()
+    if (confirmationDialog.value === dialog) confirmationDialog.value = null
+  } catch (error) {
+    showError(error)
+  } finally {
+    confirmationBusy.value = false
+  }
 }
 
 watch(selectedGameId, async (gameId, previousGameId) => {
@@ -1326,35 +1365,43 @@ async function toggleCompleted(item: ChecklistItem): Promise<void> {
   }
 }
 
-async function archiveItem(item: ChecklistItem): Promise<void> {
-  if (!window.confirm(`确定删除“${item.title}”吗？`)) return
-  try {
-    await window.gacha.archiveChecklistItem(item.id)
-    items.value = items.value.filter((candidate) => candidate.id !== item.id)
-    archivedItems.value.unshift(item)
-    editorOpen.value = false
-  } catch (error) {
-    showError(error)
-  }
+function archiveItem(item: ChecklistItem): void {
+  openConfirmationDialog({
+    eyebrow: selectedGame.value?.name ?? '自定义清单',
+    title: '删除事项',
+    message: `确定删除“${item.title}”吗？`,
+    detail: '删除后可在回收站中恢复。',
+    confirmLabel: '删除',
+    onConfirm: async () => {
+      await window.gacha.archiveChecklistItem(item.id)
+      items.value = items.value.filter((candidate) => candidate.id !== item.id)
+      archivedItems.value.unshift(item)
+      editorOpen.value = false
+    }
+  })
 }
 
-async function archiveCompletedSection(
+function archiveCompletedSection(
   section: ChecklistSection,
   categories: ChecklistCategory[],
   sectionTitle: string
-): Promise<void> {
+): void {
   const completedItems = items.value.filter(
     (item) => categories.includes(item.category) && item.completed && item.source === 'manual'
   )
   if (completedItems.length === 0) return
-  if (!window.confirm(`确定删除“${sectionTitle}”中的 ${completedItems.length} 个已完成事项吗？`)) return
-
-  try {
-    await window.gacha.archiveCompletedSection({ gameId: selectedGameId.value, section })
-    await Promise.all([loadItems(), loadArchivedItems()])
-  } catch (error) {
-    showError(error)
-  }
+  const gameId = selectedGameId.value
+  openConfirmationDialog({
+    eyebrow: selectedGame.value?.name ?? '自定义清单',
+    title: '删除已完成事项',
+    message: `确定删除“${sectionTitle}”中的 ${completedItems.length} 个已完成事项吗？`,
+    detail: '删除后可在回收站中恢复。',
+    confirmLabel: '删除已完成',
+    onConfirm: async () => {
+      await window.gacha.archiveCompletedSection({ gameId, section })
+      await Promise.all([loadItems(), loadArchivedItems()])
+    }
+  })
 }
 
 async function restoreItem(item: ChecklistItem): Promise<void> {
@@ -1367,13 +1414,21 @@ async function restoreItem(item: ChecklistItem): Promise<void> {
   }
 }
 
-async function emptyRecycleBin(): Promise<void> {
-  try {
-    const deleted = await window.gacha.emptyRecycleBin(selectedGameId.value)
-    if (deleted > 0) archivedItems.value = []
-  } catch (error) {
-    showError(error)
-  }
+function emptyRecycleBin(): void {
+  const count = archivedItems.value.length
+  if (count === 0) return
+  const gameId = selectedGameId.value
+  openConfirmationDialog({
+    eyebrow: selectedGame.value?.name ?? '当前游戏',
+    title: '清空回收站',
+    message: `确定永久删除回收站中的 ${count} 个事项吗？`,
+    detail: '这些事项将从本机彻底移除，此操作无法撤销。',
+    confirmLabel: '永久删除',
+    onConfirm: async () => {
+      const deleted = await window.gacha.emptyRecycleBin(gameId)
+      if (deleted > 0) archivedItems.value = []
+    }
+  })
 }
 
 function countdown(value: string, prefix = '剩余'): string {
@@ -2079,6 +2134,53 @@ function showError(error: unknown): void {
             :disabled="kuroCredentialBusy"
             @click="closeKuroCommunityLogin"
           >取消</button>
+        </div>
+      </section>
+    </div>
+    <div
+      v-if="confirmationDialog"
+      class="modal-backdrop confirmation-backdrop"
+      @click.self="closeConfirmationDialog"
+    >
+      <section
+        class="prompt-modal confirmation-modal"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="confirmation-title"
+        aria-describedby="confirmation-message confirmation-detail"
+      >
+        <div class="confirmation-header">
+          <div class="confirmation-heading">
+            <span class="confirmation-icon" aria-hidden="true">!</span>
+            <div>
+              <p class="eyebrow">{{ confirmationDialog.eyebrow }}</p>
+              <h2 id="confirmation-title">{{ confirmationDialog.title }}</h2>
+            </div>
+          </div>
+          <button
+            class="close-button"
+            type="button"
+            aria-label="取消操作"
+            :disabled="confirmationBusy"
+            @click="closeConfirmationDialog"
+          >×</button>
+        </div>
+        <p id="confirmation-message" class="confirmation-message">{{ confirmationDialog.message }}</p>
+        <p id="confirmation-detail" class="confirmation-detail">{{ confirmationDialog.detail }}</p>
+        <div class="prompt-actions confirmation-actions">
+          <button
+            class="secondary-button"
+            type="button"
+            :disabled="confirmationBusy"
+            autofocus
+            @click="closeConfirmationDialog"
+          >取消</button>
+          <button
+            class="danger-button confirmation-danger-button"
+            type="button"
+            :disabled="confirmationBusy"
+            @click="confirmDialogAction"
+          >{{ confirmationBusy ? '处理中…' : confirmationDialog.confirmLabel }}</button>
         </div>
       </section>
     </div>

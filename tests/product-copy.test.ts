@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 const app = readFileSync(new URL('../src/renderer/src/App.vue', import.meta.url), 'utf8')
 const styles = readFileSync(new URL('../src/renderer/src/styles.css', import.meta.url), 'utf8')
+const main = readFileSync(new URL('../src/main/index.ts', import.meta.url), 'utf8')
 
 describe('product copy and built-in section boundaries', () => {
   it('does not expose maintenance-agent or public-source controls', () => {
@@ -70,6 +71,16 @@ describe('product copy and built-in section boundaries', () => {
     expect(app.match(/class="toggle-switch-input"/g)).toHaveLength(4)
     expect(styles).toContain('.toggle-switch-input:checked + .toggle-switch')
     expect(styles).toMatch(/\.editor-modal \.game-visibility-row \{[^}]*display: flex[^}]*min-height: 42px[^}]*margin-top: 0/)
+  })
+
+  it('keeps destructive checklist confirmations inside the themed renderer surface', () => {
+    expect(app).toContain('class="prompt-modal confirmation-modal"')
+    expect(app).toContain("title: '清空回收站'")
+    expect(app).toContain("title: '删除已完成事项'")
+    expect(app).not.toContain('window.confirm(`确定删除“${sectionTitle}')
+    expect(styles).toContain('.confirmation-backdrop')
+    expect(styles).toContain('.confirmation-danger-button')
+    expect(main).not.toContain("title: '清空回收站'")
   })
 
   it('keeps repository selection inside the existing software update setting', () => {

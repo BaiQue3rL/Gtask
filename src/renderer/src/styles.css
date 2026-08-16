@@ -299,6 +299,17 @@ h2 { margin: 0; font-size: 19px; }
 
 .modal-backdrop { position: fixed; z-index: 10; inset: 0; display: grid; place-items: center; padding: 30px; background: rgba(1, 7, 18, 0.72); backdrop-filter: blur(8px); }
 .editor-modal { width: min(520px, 100%); padding: 24px; border: 1px solid #42678f; border-radius: 15px; background: linear-gradient(145deg, #0d2544, #07172e); box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 28px 90px rgba(0, 0, 0, .54); }
+.confirmation-backdrop { z-index: 30; background: rgba(1, 7, 18, .8); }
+.confirmation-modal { width: min(470px, 100%); overflow: hidden; border-color: #6f5364; background: linear-gradient(145deg, #102a49, #08182f 68%, #15172b); box-shadow: inset 0 1px 0 rgba(255,255,255,.045), 0 30px 90px rgba(0,0,0,.62); }
+.confirmation-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.confirmation-heading { display: flex; min-width: 0; align-items: center; gap: 13px; }
+.confirmation-icon { display: grid; width: 36px; height: 36px; flex: 0 0 36px; place-items: center; border: 1px solid #8d534f; border-radius: 10px; color: #ffaaa0; background: linear-gradient(145deg, rgba(127,55,55,.45), rgba(87,35,48,.24)); box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 7px 20px rgba(45,8,13,.24); font-size: 19px; font-weight: 700; }
+.prompt-modal > .confirmation-message { margin: 22px 0 0; color: #e8f1fc; font-size: 15px; font-weight: 600; line-height: 1.65; }
+.prompt-modal > .confirmation-detail { margin: 8px 0 0; color: #8197b3; font-size: 12px; line-height: 1.65; }
+.confirmation-actions { margin-top: 24px; padding-top: 17px; border-top: 1px solid rgba(76,105,139,.42); }
+.confirmation-actions button:disabled, .confirmation-header button:disabled { cursor: wait; opacity: .5; }
+.confirmation-danger-button { border-color: #99534e; color: #ffe6e2; background: linear-gradient(180deg, rgba(127,54,50,.88), rgba(94,39,43,.9)); box-shadow: 0 7px 18px rgba(56,12,16,.22); }
+.confirmation-danger-button:hover:not(:disabled) { border-color: #c66b62; background: linear-gradient(180deg, rgba(151,65,58,.94), rgba(111,43,46,.94)); }
 .modal-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; }
 .close-button { border: 0; color: #91a7c1; background: transparent; font-size: 28px; cursor: pointer; }
 .editor-modal label { display: grid; gap: 7px; margin-top: 14px; color: #aebdd0; font-size: 13px; }
