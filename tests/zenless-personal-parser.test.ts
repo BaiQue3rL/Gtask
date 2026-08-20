@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   extractZenlessExplorationProgressCandidates,
   extractZenlessEventProgressCandidates,
@@ -7,6 +7,8 @@ import {
   parseZenlessShiyuDefense
 } from '../src/main/sync/zenless-personal-parser'
 import { ZenlessPersonalAdapter } from '../src/main/sync/zenless-personal-adapter'
+
+afterEach(() => vi.useRealTimers())
 
 describe('绝区零个人战绩解析', () => {
   it('把官方区域收集解析为一级、二级地图进度候选', () => {
@@ -216,6 +218,8 @@ describe('绝区零个人战绩解析', () => {
   })
 
   it('正式适配器按目标顺序请求已验证接口并拒绝用于其他游戏', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-19T12:00:00.000Z'))
     const order: string[] = []
     const adapter = new ZenlessPersonalAdapter({
       getShiyuDefense: async () => {

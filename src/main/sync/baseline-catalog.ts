@@ -1,7 +1,7 @@
 import type { GameId } from '../../shared/contracts'
 import type { CodexVersionWindow, NormalizedSyncItem } from './types'
 
-export const BUNDLED_BASELINE_VERIFIED_AT = '2026-08-12T18:20:00+08:00'
+export const BUNDLED_BASELINE_VERIFIED_AT = '2026-08-20T18:40:00+08:00'
 
 // These are per-game fallback cadences, not claims about a fixed official
 // schedule. Exact verified windows always take priority; the cadence is only
@@ -32,19 +32,19 @@ const VERSION_WINDOWS: Record<GameId, CodexVersionWindow> = {
   },
   zenless: {
     periodKey: '3.1',
-    startsAt: '2026-07-29T06:00:00+08:00',
+    startsAt: '2026-07-29T11:00:00+08:00',
     endsAt: '2026-09-09T06:00:00+08:00',
     timeZone: 'Asia/Shanghai',
-    sourceUrl: 'https://zenless.hoyoverse.com/zh-cn/news',
-    confidence: 1
+    sourceUrl: 'https://zzz.mihoyo.com/news/165374',
+    confidence: 0.96
   },
   'wuthering-waves': {
-    periodKey: 'wuthering-waves:version:3.5',
-    startsAt: '2026-07-10T11:00:00+08:00',
-    endsAt: '2026-08-20T04:00:00+08:00',
+    periodKey: 'wuthering-waves:version:3.6',
+    startsAt: '2026-08-20T11:00:00+08:00',
+    endsAt: '2026-10-01T04:00:00+08:00',
     timeZone: 'Asia/Shanghai',
-    sourceUrl: 'https://wutheringwaves.kurogames.com/main/news/detail/5023',
-    confidence: 1
+    sourceUrl: 'https://www.taptap.cn/moment/836917677271287865?group_id=330015',
+    confidence: 0.82
   }
 }
 
@@ -57,7 +57,8 @@ const GENSHIN_SEASONAL_TRAINING = 'https://ys.mihoyo.com/main/news/detail/165613
 const GENSHIN_70_WEB_EVENT = 'https://ys.mihoyo.com/main/news/detail/165696'
 const STAR_RAIL_NEWS = 'https://sr.mihoyo.com/news?nav=news&type=activity'
 const ZENLESS_NEWS = 'https://zenless.hoyoverse.com/zh-cn/news'
-const WUTHERING_WAVES_35 = 'https://wutheringwaves.kurogames.com/main/news/detail/5023'
+const ZENLESS_RETURN_TO_RIDU = 'https://zzz.mihoyo.com/news/165267?category=278'
+const WUTHERING_WAVES_36 = 'https://www.taptap.cn/moment/839214754839921356?group_id=330015'
 
 const ACTIVITIES: Record<GameId, readonly ActivitySeed[]> = {
   genshin: [
@@ -81,7 +82,7 @@ const ACTIVITIES: Record<GameId, readonly ActivitySeed[]> = {
     { remoteKey: 'event:3.1:marcel-anniversary', title: '玛瑟尔周年馈礼', activityTags: ['sign-in'], startsAt: '2026-07-29T11:00:00+08:00', endsAt: '2026-09-09T05:59:59+08:00', sourceUrl: ZENLESS_NEWS },
     { remoteKey: 'event:3.1:hunting-game', title: '潜能预演·狩猎游戏', activityTags: ['combat', 'challenge'], startsAt: '2026-07-29T11:00:00+08:00', endsAt: '2026-09-09T05:59:59+08:00', sourceUrl: ZENLESS_NEWS },
     { remoteKey: 'event:3.1:cloud-gift', title: '云端赠礼', activityTags: ['sign-in'], startsAt: '2026-07-29T11:00:00+08:00', endsAt: '2026-09-08T03:59:59+08:00', sourceUrl: ZENLESS_NEWS },
-    { remoteKey: 'event:3.1:return-to-ridu', title: '回归丽都 羽落重逢', activityTags: ['web-event'], startsAt: '2026-07-17T20:30:00+08:00', endsAt: '2026-09-09T05:59:59+08:00', sourceUrl: ZENLESS_NEWS },
+    { remoteKey: 'event:3.1:return-to-ridu', title: '回归丽都：羽落重逢', activityTags: ['web-event'], startsAt: '2026-07-17T20:30:00+08:00', endsAt: '2026-09-09T05:59:59+08:00', sourceUrl: ZENLESS_RETURN_TO_RIDU },
     { remoteKey: 'event:3.1:focus-duel', title: '咔嚓！焦点对决！', activityTags: ['photography', 'combat'], startsAt: '2026-08-07T10:00:00+08:00', endsAt: '2026-08-24T03:59:59+08:00', sourceUrl: ZENLESS_NEWS },
     { remoteKey: 'event:3.1:deep-patrol-triple', title: '深度巡防-三倍赏金', activityTags: ['combat', 'double-reward', 'material-reward'], startsAt: '2026-08-12T04:00:00+08:00', endsAt: '2026-08-17T03:59:59+08:00', sourceUrl: ZENLESS_NEWS },
     { remoteKey: 'event:3.1:bangboo-delivery', title: '「嗯呢」大派送！', activityTags: ['sign-in'], startsAt: '2026-08-19T10:00:00+08:00', endsAt: '2026-09-08T03:59:59+08:00', sourceUrl: ZENLESS_NEWS },
@@ -91,14 +92,12 @@ const ACTIVITIES: Record<GameId, readonly ActivitySeed[]> = {
     { remoteKey: 'event:3.1:combat-training-triple', title: '实战特训-三倍悬赏', activityTags: ['combat', 'double-reward', 'material-reward'], startsAt: '2026-09-02T04:00:00+08:00', endsAt: '2026-09-07T03:59:59+08:00', sourceUrl: ZENLESS_NEWS }
   ],
   'wuthering-waves': [
-    { remoteKey: 'ww:event:3.5:yuyin-zengli', title: '余音赠礼', activityTags: ['sign-in'], startsAt: '2026-07-10T11:00:00+08:00', endsAt: '2026-08-19T03:59:00+08:00', sourceUrl: WUTHERING_WAVES_35 },
-    { remoteKey: 'ww:event:3.5:yilv-zengli', title: '忆旅赠礼', activityTags: ['sign-in'], startsAt: '2026-07-10T11:00:00+08:00', endsAt: '2026-08-19T11:59:00+08:00', sourceUrl: WUTHERING_WAVES_35 },
-    { remoteKey: 'ww:event:3.5:cixi-xuanfang', title: '此隙玄方', activityTags: ['exploration', 'collection', 'quest'], startsAt: '2026-07-10T11:00:00+08:00', endsAt: '2026-08-19T03:59:00+08:00', sourceUrl: WUTHERING_WAVES_35 },
-    { remoteKey: 'ww:event:3.5:beiming-xingdong-wuyin-weiji', title: '悲鸣行动：无音危机', activityTags: ['combat', 'challenge'], startsAt: '2026-07-11T10:00:00+08:00', endsAt: '2026-08-19T11:59:00+08:00', sourceUrl: WUTHERING_WAVES_35 },
-    { remoteKey: 'ww:web-event:3.5:miyu-xunzongji', title: '秘玉寻踪记', activityTags: ['web-event', 'parkour'], startsAt: '2026-07-30T10:00:00+08:00', endsAt: '2026-08-13T10:00:00+08:00', sourceUrl: WUTHERING_WAVES_35 },
-    { remoteKey: 'ww:event:3.5:xuyu-weiju-xiangxian-yanzhan', title: '虚域危局・象限延展', activityTags: ['combat', 'challenge'], startsAt: '2026-07-30T10:00:00+08:00', endsAt: '2026-08-19T03:59:00+08:00', sourceUrl: WUTHERING_WAVES_35 },
-    { remoteKey: 'ww:event:3.5:wuwu-qihua-xinlv', title: '呜呜企划・新旅', activityTags: ['quest', 'exploration'], startsAt: '2026-08-06T04:00:00+08:00', endsAt: '2026-08-19T03:59:00+08:00', sourceUrl: WUTHERING_WAVES_35 },
-    { remoteKey: 'ww:event:shengxian-didang:2026-08-12', title: '声弦涤荡', activityTags: ['double-reward', 'material-reward'], startsAt: '2026-08-12T04:00:00+08:00', endsAt: '2026-08-19T03:59:00+08:00', sourceUrl: WUTHERING_WAVES_35 }
+    { remoteKey: 'ww:event:3.6:qunsheng-gongzhen-moniyu', title: '群声共振模拟域', activityTags: ['combat', 'challenge'], startsAt: '2026-08-22T10:00:00+08:00', endsAt: '2026-09-29T11:59:59+08:00', sourceUrl: WUTHERING_WAVES_36 },
+    { remoteKey: 'ww:event:3.6:dier-suola-guiying-mizong', title: '第二索拉・诡影迷踪', activityTags: ['quest', 'collection'], startsAt: '2026-08-27T04:00:00+08:00', endsAt: '2026-09-14T03:59:59+08:00', sourceUrl: WUTHERING_WAVES_36 },
+    { remoteKey: 'ww:event:3.6:qingxian-ji-liunian', title: '清弦纪流年', activityTags: ['rhythm', 'story'], startsAt: '2026-09-03T04:00:00+08:00', endsAt: '2026-09-21T03:59:59+08:00', sourceUrl: WUTHERING_WAVES_36 },
+    { remoteKey: 'ww:event:3.6:ruomeng-rengyou-huisheng', title: '若梦仍有回声', activityTags: ['combat', 'challenge', 'co-op'], startsAt: '2026-09-10T10:00:00+08:00', endsAt: '2026-09-29T03:59:59+08:00', sourceUrl: WUTHERING_WAVES_36 },
+    { remoteKey: 'ww:event:3.6:chaoxi-miwen-wuyinge', title: '潮汐觅闻', activityTags: ['quest', 'exploration', 'collection', 'combat'], startsAt: '2026-09-17T04:00:00+08:00', endsAt: '2026-09-29T03:59:59+08:00', sourceUrl: WUTHERING_WAVES_36 },
+    { remoteKey: 'ww:event:3.6:yanyun-zengli', title: '烟云赠礼', activityTags: ['sign-in'], startsAt: '2026-08-20T11:00:00+08:00', endsAt: '2026-09-29T03:59:59+08:00', sourceUrl: WUTHERING_WAVES_36 }
   ]
 }
 

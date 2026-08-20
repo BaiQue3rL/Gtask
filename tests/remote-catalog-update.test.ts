@@ -60,13 +60,14 @@ function feed(
 }
 
 describe('remote catalog update', () => {
-  it('publishes the verified Genshin 7.0 baseline and retracts invalid period-scoped cycle cards', () => {
+  it('publishes only the verified cross-game deltas and retracts invalid period-scoped cycle cards', () => {
     const checkedIn = parseRemoteCatalogFeed(JSON.parse(
       readFileSync(join(process.cwd(), 'updates', 'catalog.json'), 'utf8')
     ))
     expect(checkedIn.games).toHaveLength(4)
     const archivedKeys = new Set<string>()
     for (const game of checkedIn.games) {
+      expect(game.versionWindow).toBeUndefined()
       const expectedArchives = [
         `hot-update-test:${game.gameId}:events:v1`,
         `hot-update-test:${game.gameId}:cycles:v1`,
@@ -82,7 +83,6 @@ describe('remote catalog update', () => {
       for (const remoteKey of game.archives) archivedKeys.add(remoteKey)
 
       if (game.gameId === 'genshin') {
-        expect(game.versionWindow).toBeUndefined()
         expect(game.upserts).toEqual(expect.arrayContaining([
           expect.objectContaining({ title: '砺行修远', category: 'limited_event' }),
           expect.objectContaining({ title: '新芽相助·初探雪原', category: 'limited_event' }),
@@ -99,6 +99,23 @@ describe('remote catalog update', () => {
             remoteKey: 'endgame:stygian-onslaught',
             modeKey: 'stygian-onslaught'
           })
+        ])
+      } else if (game.gameId === 'zenless') {
+        expect(game.upserts).toEqual([
+          expect.objectContaining({
+            remoteKey: 'event:3.1:return-to-ridu',
+            title: '回归丽都：羽落重逢'
+          })
+        ])
+      } else if (game.gameId === 'wuthering-waves') {
+        expect(game.upserts).toHaveLength(6)
+        expect(game.upserts.map((item) => item.title)).toEqual([
+          '群声共振模拟域',
+          '第二索拉・诡影迷踪',
+          '清弦纪流年',
+          '若梦仍有回声',
+          '潮汐觅闻',
+          '烟云赠礼'
         ])
       } else {
         expect(game.upserts).toEqual([])

@@ -10,6 +10,7 @@ import type {
   AiScheduleAgentStatus,
   AiScheduleJob,
   AiScheduleJobKind,
+  AiScheduleVersionCandidate,
   CreateChecklistItemInput,
   GameId,
   GameSummary,
@@ -1123,7 +1124,8 @@ export class AppDatabase {
     verifiedEmptyTargets: Exclude<SyncTarget, 'all'>[] = [],
     archiveItems: CodexArchiveDecision[] = [],
     contentLocale?: string,
-    versionWindow?: CodexVersionWindow
+    versionWindow?: CodexVersionWindow,
+    verifiedUnchangedTargets: Exclude<SyncTarget, 'all'>[] = []
   ): {
     job: AiScheduleJob
     merge: SyncMergeResult
@@ -1188,7 +1190,48 @@ export class AppDatabase {
     ) {
       throw new Error('空版块确认与当前同步目标不一致')
     }
-    if (job.target === 'tasks' && !versionWindow) throw new Error('版本校时缺少游戏版本窗口')
+    const uniqueVerifiedUnchangedTargets = [...new Set(verifiedUnchangedTargets)]
+    const validSectionTargets: Exclude<SyncTarget, 'all'>[] = [
+      'tasks', 'events', 'cycles', 'exploration'
+    ]
+    if (uniqueVerifiedUnchangedTargets.some((target) => !validSectionTargets.includes(target))) {
+      throw new Error('无变化核查目标不受支持')
+    }
+    if (
+      job.target !== 'all' &&
+      uniqueVerifiedUnchangedTargets.some((target) => target !== job.target)
+    ) {
+      throw new Error('无变化核查目标与当前同步目标不一致')
+    }
+    if (uniqueVerifiedEmptyTargets.some((target) => uniqueVerifiedUnchangedTargets.includes(target))) {
+      throw new Error('同一版块不能同时标记为空目录和无变化')
+    }
+    const mutationTargets = new Set<Exclude<SyncTarget, 'all'>>()
+    if (versionWindow) mutationTargets.add('tasks')
+    if (items.some((item) => item.category === 'limited_event') || activityTagUpdates.length > 0) {
+      mutationTargets.add('events')
+    }
+    if (items.some((item) => item.category === 'endgame')) mutationTargets.add('cycles')
+    if (items.some((item) => item.category === 'exploration')) mutationTargets.add('exploration')
+    for (const decision of archiveItems) {
+      const category = matchCandidatesById.get(decision.itemId)?.category
+      if (category === 'limited_event') mutationTargets.add('events')
+      if (category === 'endgame') mutationTargets.add('cycles')
+      if (category === 'exploration') mutationTargets.add('exploration')
+    }
+    const contradictoryTarget = uniqueVerifiedUnchangedTargets.find((target) =>
+      mutationTargets.has(target)
+    )
+    if (contradictoryTarget) {
+      throw new Error(`版块“${contradictoryTarget}”不能同时标记为无变化并提交增删改`)
+    }
+    if (
+      job.target === 'tasks' &&
+      !versionWindow &&
+      !uniqueVerifiedUnchangedTargets.includes('tasks')
+    ) {
+      throw new Error('版本核查必须提交变化后的版本窗口，或明确标记版本时间无变化')
+    }
     if (job.target !== 'tasks' && job.target !== 'all' && versionWindow) {
       throw new Error('当前同步目标不允许回写游戏版本窗口')
     }
@@ -1276,7 +1319,7 @@ export class AppDatabase {
       (item) => item.category === 'endgame'
     )
     const coveredTargets: Exclude<SyncTarget, 'all'>[] = job.target === 'all'
-      ? [
+      ? [...new Set([
           ...(versionWindow ? ['tasks' as const] : []),
           ...(items.some((item) =>
             item.category === 'limited_event'
@@ -1286,8 +1329,9 @@ export class AppDatabase {
             ? ['events' as const]
             : []),
           ...(includesCycles ? ['cycles' as const] : []),
-          ...(items.some((item) => item.category === 'exploration') ? ['exploration' as const] : [])
-        ]
+          ...(items.some((item) => item.category === 'exploration') ? ['exploration' as const] : []),
+          ...uniqueVerifiedUnchangedTargets
+        ])]
       : [job.target]
     const allSectionTargets = ['tasks', 'events', 'cycles', 'exploration'] as const
     const missingTargets = job.target === 'all'
@@ -1387,7 +1431,10 @@ export class AppDatabase {
       ? `；仍有 ${unresolvedActivityCount} 项活动经本轮核验后暂为未知`
       : ''
     const archiveMessage = archived > 0 ? `，移入回收站 ${archived}` : ''
-    const mergeMessage = versionWindow && items.length === 0
+    const noMutation = mutationTargets.size === 0 && archiveItems.length === 0
+    const mergeMessage = noMutation && uniqueVerifiedUnchangedTargets.length > 0
+      ? '全版块核查完成，未发现变化'
+      : versionWindow && items.length === 0
       ? '版本时间已校准'
       : `新增 ${merge.added}，更新 ${merge.updated}${tagMessage}${archiveMessage}，保护 ${merge.preserved}`
     const message = effectiveMissingTargets.length > 0
@@ -1703,7 +1750,7 @@ export class AppDatabase {
       WHERE j.id = ?
     `).get(id) as Omit<
       AiScheduleJob,
-      'activityTagTargets' | 'matchCandidates' | 'contract' | 'requestContext'
+      'activityTagTargets' | 'matchCandidates' | 'currentVersionWindow' | 'contract' | 'requestContext'
     > | undefined
     if (!row) throw new Error('AI 资料任务不存在')
     const activityTagTargets = row.jobKind === 'public_catalog' && (
@@ -1731,18 +1778,33 @@ export class AppDatabase {
         itemId: item.id,
         category: item.category,
         title: item.title,
+        activityTags: normalizeActivityTags(item.activityTags, row.outputLocale),
         source: item.source,
         remoteKey: item.remoteKey,
+        sourceUrl: item.sourceUrl,
         modeKey: item.modeKey,
         periodKey: item.periodKey,
         startsAt: item.startsAt,
         endsAt: item.endsAt,
+        resetRule: item.resetRule,
+        scheduleKind: item.scheduleKind,
+        resetWeekday: item.resetWeekday,
+        timeZone: item.timeZone,
+        recurrenceRule: item.recurrenceRule,
         parentTitle: item.parentTitle,
         mapNodeKind: item.mapNodeKind,
-        parentRemoteKey: item.parentRemoteKey,
-        completed: item.completed,
-        progressPercent: item.progressPercent
+        parentRemoteKey: item.parentRemoteKey
       })) : []
+    const currentVersionWindow = row.jobKind === 'public_catalog' && (
+      row.target === 'tasks' || row.target === 'all'
+    )
+      ? this.database.prepare(`
+          SELECT period_key AS periodKey, starts_at AS startsAt, ends_at AS endsAt,
+            timezone AS timeZone, source_url AS sourceUrl, confidence
+          FROM game_version_windows
+          WHERE game_id = ?
+        `).get(row.gameId) as unknown as AiScheduleVersionCandidate | undefined
+      : null
     return {
       ...row,
       requestContext: {
@@ -1751,6 +1813,7 @@ export class AppDatabase {
       },
       activityTagTargets,
       matchCandidates,
+      currentVersionWindow: currentVersionWindow ?? null,
       contract: getPublicSyncContract(row.target, {
         outputLocale: row.outputLocale,
         userTimeZone: row.userTimeZone
@@ -2936,6 +2999,43 @@ export class AppDatabase {
         const startsAt = item.startsAt === undefined ? current.startsAt : item.startsAt
         const endsAt = item.endsAt === undefined ? current.endsAt : item.endsAt
         this.assertTimeWindow(startsAt, endsAt)
+        const parentTitle = item.parentTitle === undefined ? current.parentTitle : item.parentTitle
+        const mapNodeKind = item.mapNodeKind === undefined ? current.mapNodeKind : item.mapNodeKind
+        const parentRemoteKey = item.parentRemoteKey === undefined
+          ? current.parentRemoteKey
+          : item.parentRemoteKey
+        const resetRule = item.resetRule === undefined ? current.resetRule : item.resetRule
+        const periodKey = item.periodKey === undefined ? current.periodKey : item.periodKey
+        const scheduleKind = item.scheduleKind === undefined
+          ? current.scheduleKind
+          : item.scheduleKind
+        const resetWeekday = item.resetWeekday === undefined
+          ? current.resetWeekday
+          : item.resetWeekday
+        const timeZone = item.timeZone === undefined ? current.timeZone : item.timeZone
+        const modeKey = item.modeKey === undefined ? current.modeKey : item.modeKey
+        const sourceUrl = item.sourceUrl === undefined ? current.sourceUrl : item.sourceUrl
+        const publicStructureUnchanged = source === 'public_schedule' &&
+          current.category === item.category &&
+          current.title === item.title &&
+          JSON.stringify(normalizeActivityTags(current.activityTags)) ===
+            JSON.stringify(resolvedActivityTags) &&
+          current.parentTitle === parentTitle &&
+          current.mapNodeKind === mapNodeKind &&
+          current.parentRemoteKey === parentRemoteKey &&
+          current.startsAt === startsAt &&
+          current.endsAt === endsAt &&
+          current.resetRule === resetRule &&
+          current.periodKey === periodKey &&
+          current.scheduleKind === scheduleKind &&
+          current.resetWeekday === resetWeekday &&
+          current.timeZone === timeZone &&
+          current.modeKey === modeKey &&
+          current.sourceUrl === sourceUrl
+        if (publicStructureUnchanged) {
+          result.preserved += 1
+          continue
+        }
 
         this.database
           .prepare(`
@@ -2975,22 +3075,22 @@ export class AppDatabase {
                 ? current.progressPercent
                 : item.progressPercent
               : null,
-            item.parentTitle === undefined ? current.parentTitle : item.parentTitle,
-            item.mapNodeKind === undefined ? current.mapNodeKind : item.mapNodeKind,
-            item.parentRemoteKey === undefined ? current.parentRemoteKey : item.parentRemoteKey,
+            parentTitle,
+            mapNodeKind,
+            parentRemoteKey,
             startsAt,
             endsAt,
-            item.resetRule === undefined ? current.resetRule : item.resetRule,
-            item.periodKey === undefined ? current.periodKey : item.periodKey,
-            item.scheduleKind === undefined ? current.scheduleKind : item.scheduleKind,
-            item.resetWeekday === undefined ? current.resetWeekday : item.resetWeekday,
-            item.timeZone === undefined ? current.timeZone : item.timeZone,
-            item.modeKey === undefined ? current.modeKey : item.modeKey,
+            resetRule,
+            periodKey,
+            scheduleKind,
+            resetWeekday,
+            timeZone,
+            modeKey,
             null,
             identity.source === 'public_schedule' && source === 'personal_sync'
               ? 'public_schedule'
               : source,
-            item.sourceUrl === undefined ? current.sourceUrl : item.sourceUrl,
+            sourceUrl,
             manualCompletionLocked ? 1 : 0,
             completedAt,
             syncedAt,
@@ -3511,6 +3611,27 @@ export class AppDatabase {
     window: CodexVersionWindow,
     syncedAt: string
   ): void {
+    const current = this.database.prepare(`
+      SELECT period_key AS periodKey, starts_at AS startsAt, ends_at AS endsAt,
+        timezone AS timeZone, source_url AS sourceUrl, confidence
+      FROM game_version_windows
+      WHERE game_id = ?
+    `).get(gameId) as {
+      periodKey: string
+      startsAt: string
+      endsAt: string
+      timeZone: string
+      sourceUrl: string | null
+      confidence: number
+    } | undefined
+    if (
+      current?.periodKey === window.periodKey &&
+      current.startsAt === window.startsAt &&
+      current.endsAt === window.endsAt &&
+      current.timeZone === window.timeZone &&
+      current.sourceUrl === window.sourceUrl &&
+      current.confidence === window.confidence
+    ) return
     this.database.prepare(`
       INSERT INTO game_version_windows(
         game_id, period_key, starts_at, ends_at, timezone,

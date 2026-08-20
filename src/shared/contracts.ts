@@ -215,17 +215,31 @@ export interface AiScheduleMatchCandidate {
   itemId: string
   category: ChecklistCategory
   title: string
+  activityTags: string[]
   source: ChecklistSource
   remoteKey: string | null
+  sourceUrl: string | null
   modeKey: string | null
   periodKey: string | null
   startsAt: string | null
   endsAt: string | null
+  resetRule: string | null
+  scheduleKind: ScheduleKind | null
+  resetWeekday: number | null
+  timeZone: string | null
+  recurrenceRule: string | null
   parentTitle: string | null
   mapNodeKind: MapNodeKind | null
   parentRemoteKey: string | null
-  completed: boolean
-  progressPercent: number | null
+}
+
+export interface AiScheduleVersionCandidate {
+  periodKey: string
+  startsAt: string
+  endsAt: string
+  timeZone: string
+  sourceUrl: string | null
+  confidence: number
 }
 
 export interface SyncContractConditionalField {
@@ -307,6 +321,7 @@ export interface AiScheduleJob {
   lastFailureKind: string | null
   activityTagTargets: ActivityTagEnrichmentTarget[]
   matchCandidates: AiScheduleMatchCandidate[]
+  currentVersionWindow: AiScheduleVersionCandidate | null
   contract: PublicSyncContract
 }
 

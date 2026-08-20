@@ -26,8 +26,8 @@ const tasksContract: SyncSectionContract = {
     '当前正在运行的正式游戏版本及其全服版本结束时刻。优先采用官方已经确认的下次版本维护时刻；官方尚未公布精确时刻时，允许用当前版本官方开始时间、已公布的后续排期与既往稳定版更节奏交叉核验出可靠预计。版本阶段、卡池阶段和单个活动窗口不属于版本窗口。',
   itemShapes: [],
   completionCriteria: [
-    '通过 apply_gacha_public_schedule 的 versionWindow 提交且 items 保持为空；版本时间不是清单事项。',
-    'versionWindow 必须包含 startsAt、endsAt、periodKey、timeZone、sourceUrl 和 confidence。',
+    '先核对当前持久版本窗口；只有 periodKey、起止时间、时区、来源或置信度实际变化时才通过 versionWindow 校正，未变化时用 verifiedUnchangedTargets 标记 tasks，且 items 保持为空。版本时间不是清单事项。',
+    '提交 versionWindow 时必须包含 startsAt、endsAt、periodKey、timeZone、sourceUrl 和 confidence；不得为了表示“已核查”而重复写入相同窗口。',
     '时间覆盖当前正在运行的正式版本，而不是已经结束或尚未开始的其他版本。',
     '正例是官方版本更新公告、版本专题或能够证明整个版本起止时间的排期资料；反例是下半卡池开始时间、单个活动结束时间、维护补偿领取期限和前瞻直播时间。',
     '官方已公布精确版更时刻时必须采用官方值，并在 evidence 中保留直接来源。',
@@ -64,7 +64,8 @@ const eventsContract: SyncSectionContract = {
     forbiddenFields: ['completed', 'progressPercent', 'recurrenceRule']
   }],
   completionCriteria: [
-    '先完成活动目录枚举，再逐项补齐字段，不能只搜索到少数热门活动就结束。',
+    '先完成活动目录枚举，并与全部 matchCandidates 做逐项差异比较，不能只搜索到少数热门活动就结束。',
+    '只提交新增、确需修正或确认失效的活动；未变化的既有活动不重复回写。整个版块没有差异时提交空 items，并用 verifiedUnchangedTargets 标记 events。',
     '限时活动正例：具有独立官方活动名称、整体开始时间和整体结束时间的限时签到、限时玩法或限时剧情活动。',
     '限时活动反例：活动内部的每日阶段、单个关卡、剧情任务、活动商店、奖励档位、版本前瞻、维护公告、兑换码和角色或武器卡池；这些不能作为新的活动清单项。',
     '同一活动的预告页、规则页、玩法页和奖励页只是同一活动的不同资料，不得分别建项；标题应使用活动容器的官方本地化总名称。',
@@ -106,7 +107,7 @@ const cyclesContract: SyncSectionContract = {
     }
   ],
   completionCriteria: [
-    '没有新增模式、模式调整或官方排期规则变化时，提交空 items 即可完成核验；不得为了表示“已核查”而重写本期或下期窗口。',
+    '没有新增模式、模式调整或官方排期规则变化时，提交空 items 并用 verifiedUnchangedTargets 标记 cycles；不得为了表示“已核查”而重写本期或下期窗口。',
     '模式正例：原神“深境螺旋”“幻想真境剧诗”、星铁“混沌回忆”“虚构叙事”“末日幻影”、绝区零“式舆防卫战”“危局强袭战”等具有独立入口和重复周期的主要挑战。',
     '模式反例：某一层、节点、关卡、难度、当期增益、敌人阵容、奖励档位、每周首领、体力副本或限时活动挑战；这些不能作为新的周期模式。',
     '每种周期挑战跨所有期次永久复用同一个 modeKey 和 remoteKey；periodKey、startsAt、endsAt 只描述该稳定行当前自动计算到的期次，绝不能把日期或期号拼入 remoteKey 新建第二张卡。',
@@ -155,7 +156,7 @@ const explorationContract: SyncSectionContract = {
     ]
   }],
   completionCriteria: [
-    '先把 matchCandidates 视为已核验基准，按当前正式版本检查是否存在缺失的新增地区、官方改名或父级归属修正；没有变化时允许提交空 items 表示本次增量核验通过。',
+    '先把 matchCandidates 视为已核验基准，按当前正式版本检查是否存在缺失的新增地区、官方改名或父级归属修正；没有变化时提交空 items 并用 verifiedUnchangedTargets 标记 exploration。',
     '只提交新增或确需修正的目录节点，不重复回写未变化节点；同一地点只能出现一次。',
     'region 只表示顶层主地区，例如原神“璃月”“稻妻”、星铁“匹诺康尼”、鸣潮“瑝珑”“黑海岸”“黎那汐塔”。',
     'subregion 表示归属于某个一级主地区的具体地区，例如原神“层岩巨渊·地下矿区”归于“璃月”，鸣潮“云陵谷”“今州城”归于“瑝珑”。',
@@ -202,15 +203,16 @@ export function getPublicSyncContract(
       'contentLocale',
       'retrievedAt',
       ...(target === 'tasks'
-        ? ['versionWindow']
+        ? ['versionWindow|verifiedUnchangedTargets']
         : target === 'all'
-          ? ['items', 'versionWindow']
+          ? ['items', 'versionWindow|verifiedUnchangedTargets']
           : ['items']),
       'evidence'
     ],
     fieldSemantics: {
       matchItemId: '与 matchCandidates 中现有事项语义相同时使用其 itemId；真正新增时省略。',
-      catalogBaseline: '地图任务的 matchCandidates 是应用已维护的完整基准目录。本次只需联网查找基准之后的增量、改名或归属修正；没有变化时提交空 items 即可完成核验，不得为了凑数重复提交全部目录。',
+      currentVersionWindow: 'tasks 或 all 任务领取结果中的当前持久版本基准；先逐字段比较，只有实际变化才提交 versionWindow。',
+      catalogBaseline: 'matchCandidates 与当前持久版本窗口共同构成应用已维护的版块基准。必须先核查目标版块的完整范围，再只提交相对基准的新增、删除或字段修正；未变化的记录不得重复回写。',
       remoteKey: '同一逻辑事项稳定、可重复同步的机器身份；周期挑战跨所有期次永久复用模式级 remoteKey，禁止拼接日期、期号或 periodKey。',
       category: 'Codex 根据资料语义选择最终版块分类；页面或接口的栏目名只是证据，不能代替活动容器、周期模式或地图层级的实际语义判断。',
       title: `由 ${requestContext.outputLocale} 官方本地化资料确认的游戏内名称，不自行翻译。`,
@@ -224,7 +226,8 @@ export function getPublicSyncContract(
       titleSourceUrl: `能够核验 ${requestContext.outputLocale} 官方本地化名称的直接页面。`,
       sourceUrl: '能够核验该事项核心事实的直接 HTTP(S) 来源。',
       confidence: 'Codex 对该条结构化结果的 0 到 1 置信度；任务版更校时的暂定结束时间必须低于官方精确公告的置信度。',
-      versionWindow: '游戏级版本窗口，不是清单事项。只在 tasks 目标提交；包含当前正式版本的 startsAt、endsAt、periodKey、timeZone、sourceUrl 和 confidence。',
+      versionWindow: '游戏级版本窗口，不是清单事项。只在 tasks 实际变化时提交；包含当前正式版本的 startsAt、endsAt、periodKey、timeZone、sourceUrl 和 confidence。',
+      verifiedUnchangedTargets: '完成目标版块全范围核查且与当前基准没有任何差异时，提交对应 target；它表示“已核查但无需写入”，不能与该版块的新增、更新、归档或 versionWindow 同时提交。',
       evidence: '本次提交的交叉核验证据；至少一条，且应覆盖所提交事项。'
     },
     activityTagCatalog: serializeActivityTagCatalog(requestContext.outputLocale),

@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { GenshinPersonalAdapter } from '../src/main/sync/genshin-personal-adapter'
 import {
   extractGenshinExplorationProgressCandidates,
   extractGenshinEventProgressCandidates,
   parseGenshinPersonalData
 } from '../src/main/sync/genshin-personal-parser'
+
+afterEach(() => vi.useRealTimers())
 
 const payload = {
   profile: {
@@ -335,6 +337,8 @@ describe('Genshin personal parsing', () => {
   })
 
   it('the adapter requests each source sequentially and rejects other games', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-19T12:00:00.000Z'))
     const order: string[] = []
     const client = {
       getProfile: async () => { order.push('profile'); return payload.profile },

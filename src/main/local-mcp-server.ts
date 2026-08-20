@@ -282,28 +282,24 @@ export function createLocalMcpServer(
   server.registerTool(
     'register_gacha_schedule_agent',
     {
-      title: '登记公开资料 AI Agent',
-      description: '登记或刷新具备联网搜索能力的 AI Agent 心跳；Agent 应至少每五分钟调用一次。',
+      title: '登记 Codex 基准维护端',
+      description: '登记或刷新具备联网搜索能力的本机 Codex 维护端心跳；维护端应至少每五分钟调用一次。',
       inputSchema: {
         agentId: z.string().min(1).max(100),
         name: z.string().min(1).max(100),
         webSearch: z.literal(true).describe('必须确认具备联网搜索能力'),
-        protocolVersion: z.string().min(1).max(50)
-          .describe(`必须等于当前 Gtask MCP 协议 ${GTASK_MCP_PROTOCOL_VERSION}`)
+        protocolVersion: z.string().min(1).max(50).optional()
+          .describe(`可选诊断版本；当前 Gtask MCP 契约为 ${GTASK_MCP_PROTOCOL_VERSION}`)
       },
       annotations: { destructiveHint: false, openWorldHint: true }
     },
     async ({ agentId, name, protocolVersion }) => {
       try {
-        if (protocolVersion !== GTASK_MCP_PROTOCOL_VERSION) {
-          throw new Error(
-            `Gtask 插件协议不兼容：应用需要 ${GTASK_MCP_PROTOCOL_VERSION}，` +
-            `当前为 ${protocolVersion}。请先在设置中更新插件`
-          )
-        }
         return toolResult({
           command: 'register_schedule_agent',
           protocolVersion: GTASK_MCP_PROTOCOL_VERSION,
+          reportedProtocolVersion: protocolVersion ?? null,
+          contractAuthority: 'tool_schema_and_job_contract',
           agent: database.registerAiScheduleAgent(agentId, name)
         })
       } catch (error) {
@@ -316,7 +312,7 @@ export function createLocalMcpServer(
     'queue_gacha_baseline_maintenance',
     {
       title: '创建基准表维护任务',
-      description: '为指定游戏和版块创建一次后台基准表维护任务。任务可由任意兼容 MCP Agent 领取、联网核验并提交，不依赖软件界面。',
+      description: '由本机 Codex 管理端为指定游戏和版块创建一次基准表维护任务；调用方应只领取返回的精确 jobId。',
       inputSchema: {
         gameId: gameIdSchema,
         target: z.enum(['tasks', 'events', 'cycles', 'exploration', 'all']).default('all'),
@@ -515,6 +511,10 @@ export function createLocalMcpServer(
           reason: z.string().min(1).max(500)
         }).strict()).max(100).optional(),
         verifiedEmptyTargets: z.array(z.literal('events')).max(1).optional(),
+        verifiedUnchangedTargets: z.array(z.enum([
+          'tasks', 'events', 'cycles', 'exploration'
+        ])).max(4).optional()
+          .describe('完成目标版块全范围核查且与当前基准没有差异时填写；不能与该版块增删改同时使用'),
         evidence: z.array(z.object({
           url: httpUrlSchema,
           platform: z.string().min(1).max(100),
@@ -538,6 +538,7 @@ export function createLocalMcpServer(
       activityTagUpdates,
       archiveItems,
       verifiedEmptyTargets,
+      verifiedUnchangedTargets,
       evidence
     }) => {
       try {
@@ -547,6 +548,7 @@ export function createLocalMcpServer(
           (activityTagUpdates?.length ?? 0) === 0 &&
           (archiveItems?.length ?? 0) === 0 &&
           (verifiedEmptyTargets?.length ?? 0) === 0 &&
+          (verifiedUnchangedTargets?.length ?? 0) === 0 &&
           claimedJob.activityTagTargets.length === 0
           && !versionWindow
         ) {
@@ -571,7 +573,8 @@ export function createLocalMcpServer(
           verifiedEmptyTargets ?? [],
           (archiveItems ?? []) as CodexArchiveDecision[],
           contentLocale,
-          versionWindow as CodexVersionWindow | undefined
+          versionWindow as CodexVersionWindow | undefined,
+          verifiedUnchangedTargets ?? []
         )
         return toolResult({ command: 'apply_public_schedule', ...result })
       } catch (error) {

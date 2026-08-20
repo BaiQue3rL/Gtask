@@ -57,6 +57,32 @@ describe('bundled baseline catalog', () => {
         activityTagsMeetQualityContract(item.activityTags ?? [])
       )).toBe(true)
     }
+
+    expect(getBundledVersionWindow('zenless')).toMatchObject({
+      periodKey: '3.1',
+      startsAt: '2026-07-29T11:00:00+08:00',
+      endsAt: '2026-09-09T06:00:00+08:00'
+    })
+    expect(getBundledActivityCatalog('zenless')).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        remoteKey: 'event:3.1:return-to-ridu',
+        title: '回归丽都：羽落重逢'
+      })
+    ]))
+    expect(getBundledVersionWindow('wuthering-waves')).toMatchObject({
+      periodKey: 'wuthering-waves:version:3.6',
+      startsAt: '2026-08-20T11:00:00+08:00',
+      endsAt: '2026-10-01T04:00:00+08:00',
+      confidence: 0.82
+    })
+    expect(getBundledActivityCatalog('wuthering-waves').map((item) => item.title)).toEqual([
+      '群声共振模拟域',
+      '第二索拉・诡影迷踪',
+      '清弦纪流年',
+      '若梦仍有回声',
+      '潮汐觅闻',
+      '烟云赠礼'
+    ])
   })
 
   it('seeds a concrete current time window for every recurring challenge', () => {

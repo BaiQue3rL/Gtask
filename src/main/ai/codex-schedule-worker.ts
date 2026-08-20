@@ -280,7 +280,7 @@ export function parseCodexWorkerLine(line: string): CodexScheduleWorkerDiagnosti
     ) {
       return {
         phase: 'configuration',
-        message: 'Gtask 同步插件版本不兼容，请在设置中更新插件后重试'
+        message: 'Gtask 管理端契约不兼容，请刷新本机 Codex 维护插件后重试'
       }
     }
     if (

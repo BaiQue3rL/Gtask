@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { StarRailPersonalAdapter } from '../src/main/sync/star-rail-personal-adapter'
 import {
   extractStarRailEventProgressCandidates,
   parseStarRailPersonalData
 } from '../src/main/sync/star-rail-personal-parser'
+
+afterEach(() => vi.useRealTimers())
 
 const season = (scheduleId: number, name: string) => ({
   schedule_id: scheduleId,
@@ -218,6 +220,8 @@ describe('Star Rail personal parsing', () => {
   })
 
   it('the adapter requests each source sequentially and rejects other games', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-19T12:00:00.000Z'))
     const order: string[] = []
     const client = {
       getMemoryOfChaos: async () => { order.push('memory'); return payload.memoryOfChaos },

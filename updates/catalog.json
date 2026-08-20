@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "revision": "2026-08-13.genshin-cycle-identity-correction",
-  "publishedAt": "2026-08-13T23:02:31+08:00",
+  "revision": "2026-08-20.wuwa-3.6-zenless-3.1-refresh",
+  "publishedAt": "2026-08-20T18:40:00+08:00",
   "games": [
     {
       "gameId": "genshin",
@@ -163,7 +163,21 @@
     },
     {
       "gameId": "zenless",
-      "upserts": [],
+      "upserts": [
+        {
+          "remoteKey": "event:3.1:return-to-ridu",
+          "category": "limited_event",
+          "title": "回归丽都：羽落重逢",
+          "startsAt": "2026-07-17T20:30:00+08:00",
+          "endsAt": "2026-09-09T05:59:59+08:00",
+          "activityTags": [
+            "web-event"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://zzz.mihoyo.com/news/165267?category=278"
+        }
+      ],
       "archives": [
         "hot-update-test:zenless:events:v1",
         "hot-update-test:zenless:cycles:v1",
@@ -172,7 +186,94 @@
     },
     {
       "gameId": "wuthering-waves",
-      "upserts": [],
+      "upserts": [
+        {
+          "remoteKey": "ww:event:3.6:qunsheng-gongzhen-moniyu",
+          "category": "limited_event",
+          "title": "群声共振模拟域",
+          "startsAt": "2026-08-22T10:00:00+08:00",
+          "endsAt": "2026-09-29T11:59:59+08:00",
+          "activityTags": [
+            "combat",
+            "challenge"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/839214754839921356?group_id=330015"
+        },
+        {
+          "remoteKey": "ww:event:3.6:dier-suola-guiying-mizong",
+          "category": "limited_event",
+          "title": "第二索拉・诡影迷踪",
+          "startsAt": "2026-08-27T04:00:00+08:00",
+          "endsAt": "2026-09-14T03:59:59+08:00",
+          "activityTags": [
+            "quest",
+            "collection"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/839214754839921356?group_id=330015"
+        },
+        {
+          "remoteKey": "ww:event:3.6:qingxian-ji-liunian",
+          "category": "limited_event",
+          "title": "清弦纪流年",
+          "startsAt": "2026-09-03T04:00:00+08:00",
+          "endsAt": "2026-09-21T03:59:59+08:00",
+          "activityTags": [
+            "rhythm",
+            "story"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/839214754839921356?group_id=330015"
+        },
+        {
+          "remoteKey": "ww:event:3.6:ruomeng-rengyou-huisheng",
+          "category": "limited_event",
+          "title": "若梦仍有回声",
+          "startsAt": "2026-09-10T10:00:00+08:00",
+          "endsAt": "2026-09-29T03:59:59+08:00",
+          "activityTags": [
+            "combat",
+            "challenge",
+            "co-op"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/839214754839921356?group_id=330015"
+        },
+        {
+          "remoteKey": "ww:event:3.6:chaoxi-miwen-wuyinge",
+          "category": "limited_event",
+          "title": "潮汐觅闻",
+          "startsAt": "2026-09-17T04:00:00+08:00",
+          "endsAt": "2026-09-29T03:59:59+08:00",
+          "activityTags": [
+            "quest",
+            "exploration",
+            "collection",
+            "combat"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/839214754839921356?group_id=330015"
+        },
+        {
+          "remoteKey": "ww:event:3.6:yanyun-zengli",
+          "category": "limited_event",
+          "title": "烟云赠礼",
+          "startsAt": "2026-08-20T11:00:00+08:00",
+          "endsAt": "2026-09-29T03:59:59+08:00",
+          "activityTags": [
+            "sign-in"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/839214754839921356?group_id=330015"
+        }
+      ],
       "archives": [
         "hot-update-test:wuthering-waves:events:v1",
         "hot-update-test:wuthering-waves:cycles:v1",

@@ -66,6 +66,12 @@ describe('本地 MCP server', () => {
       'mapNodeKind',
       'parentRemoteKey',
     ]))
+    const publicScheduleTool = tools.tools.find(
+      (tool) => tool.name === 'apply_gacha_public_schedule'
+    )
+    expect(Object.keys(
+      (publicScheduleTool?.inputSchema as { properties?: Record<string, unknown> }).properties ?? {}
+    )).toContain('verifiedUnchangedTargets')
 
     const response = await connected.callTool({
       name: 'read_gacha_checklists',
@@ -325,7 +331,7 @@ describe('本地 MCP server', () => {
     expect(database!.getSyncSettings('genshin')).toMatchObject({ status: 'success' })
   })
 
-  it('拒绝协议版本不兼容的旧插件继续领取任务', async () => {
+  it('旧缓存上报的协议号只作诊断，不阻塞本机 Codex 管理端', async () => {
     const connected = await connect()
     const result = await connected.callTool({
       name: 'register_gacha_schedule_agent',
@@ -337,13 +343,72 @@ describe('本地 MCP server', () => {
       }
     })
 
-    expect(result.isError).toBe(true)
+    expect(result.isError).not.toBe(true)
     expect(result.content).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        text: expect.stringContaining('插件协议不兼容')
+        text: expect.stringContaining('"reportedProtocolVersion": "2026-07-01.0"')
       })
     ]))
-    expect(database!.getAiScheduleAgentStatus().connected).toBe(false)
+    expect(result.content).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        text: expect.stringContaining('"contractAuthority": "tool_schema_and_job_contract"')
+      })
+    ]))
+    expect(database!.getAiScheduleAgentStatus().connected).toBe(true)
+  })
+
+  it('完整核查无差异时显式完成任务且不重写任何清单项', async () => {
+    const connected = await connect()
+    await connected.callTool({
+      name: 'register_gacha_schedule_agent',
+      arguments: {
+        agentId: 'unchanged-mcp-agent',
+        name: '无变化核查 Agent',
+        webSearch: true,
+        protocolVersion: GTASK_MCP_PROTOCOL_VERSION
+      }
+    })
+    const queued = database!.createAiScheduleJob(
+      'zenless', 'public_schedule', new Date('2026-08-20T10:00:00.000Z'), false, 'cycles'
+    )
+    const claimed = await connected.callTool({
+      name: 'claim_gacha_schedule_job',
+      arguments: { agentId: 'unchanged-mcp-agent', jobId: queued.id }
+    })
+    expect(claimed.structuredContent).toMatchObject({
+      job: {
+        id: queued.id,
+        currentVersionWindow: null,
+        matchCandidates: []
+      }
+    })
+
+    const applied = await connected.callTool({
+      name: 'apply_gacha_public_schedule',
+      arguments: {
+        agentId: 'unchanged-mcp-agent',
+        jobId: queued.id,
+        contentLocale: 'zh-CN',
+        retrievedAt: '2026-08-20T10:01:00.000Z',
+        items: [],
+        verifiedUnchangedTargets: ['cycles'],
+        evidence: [{
+          url: 'https://example.com/zenless-cycles',
+          platform: '官方平台',
+          publisher: '官方账号',
+          official: true,
+          language: 'zh-CN',
+          note: '完整核查后没有模式、规则或锚点变化'
+        }]
+      }
+    })
+
+    expect(applied.isError).not.toBe(true)
+    expect(applied.structuredContent).toMatchObject({
+      job: { status: 'completed', message: expect.stringContaining('未发现变化') },
+      merge: { added: 0, updated: 0, preserved: 0 }
+    })
+    expect(database!.listChecklistItems('zenless')).toEqual([])
   })
 
   it('新活动玩法必须先注册稳定标签 ID，注册后可复用并按界面语言展示', async () => {

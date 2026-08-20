@@ -2,7 +2,7 @@
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppDatabase, CURRENT_SCHEMA_VERSION } from '../src/main/database'
 import { getBundledMapCatalog } from '../src/main/sync/map-catalog'
 import { SUPPORTED_GAME_IDS, type GameId } from '../src/shared/contracts'
@@ -51,6 +51,126 @@ afterEach(() => {
 })
 
 describe('AppDatabase', () => {
+  it('公共基准重复内容会保留原时间戳而不是伪造更新', () => {
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
+    const item = {
+      remoteKey: 'event:unchanged',
+      category: 'limited_event' as const,
+      title: '未变化活动',
+      activityTags: ['combat'],
+      startsAt: '2026-08-20T10:00:00+08:00',
+      endsAt: '2026-08-30T03:59:59+08:00',
+      scheduleKind: 'fixed_window' as const,
+      timeZone: 'Asia/Shanghai',
+      sourceUrl: 'https://example.com/unchanged'
+    }
+    database.mergeSyncedItems(
+      'zenless', 'public_schedule', [item], '2026-08-20T10:00:00.000Z'
+    )
+    const before = database.listChecklistItems('zenless')[0]
+
+    const result = database.mergeSyncedItems(
+      'zenless', 'public_schedule', [item], '2026-08-20T11:00:00.000Z'
+    )
+    const after = database.listChecklistItems('zenless')[0]
+    expect(result).toEqual({ added: 0, updated: 0, preserved: 1 })
+    expect(after.lastSyncedAt).toBe(before.lastSyncedAt)
+    expect(after.updatedAt).toBe(before.updatedAt)
+  })
+
+  it('维护任务给出可比较的完整公共结构但不暴露个人完成状态', () => {
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
+    const reference = new Date('2026-08-20T10:00:00.000Z')
+    database.mergeSyncedItems('zenless', 'public_schedule', [{
+      remoteKey: 'event:comparison-candidate',
+      category: 'limited_event',
+      title: '结构比较候选',
+      activityTags: ['combat', 'challenge'],
+      startsAt: '2026-08-20T10:00:00+08:00',
+      endsAt: '2026-08-30T03:59:59+08:00',
+      timeZone: 'Asia/Shanghai',
+      sourceUrl: 'https://example.com/comparison-candidate'
+    }], reference.toISOString())
+    const stored = database.listChecklistItems('zenless')[0]
+    database.updateChecklistItem({ id: stored.id, completed: true })
+    database.registerAiScheduleAgent('comparison-agent', '差异比较 Agent', reference)
+    database.createAiScheduleJob('zenless', 'public_schedule', reference, false, 'events')
+
+    const candidate = database.claimAiScheduleJob('comparison-agent', reference)!
+      .matchCandidates[0] as unknown as Record<string, unknown>
+
+    expect(candidate).toMatchObject({
+      activityTags: ['combat', 'challenge'],
+      timeZone: 'Asia/Shanghai',
+      sourceUrl: 'https://example.com/comparison-candidate'
+    })
+    expect(candidate).not.toHaveProperty('completed')
+    expect(candidate).not.toHaveProperty('progressPercent')
+  })
+
+  it('全版块无变化核查可以完成且不会为了留痕重写基准', () => {
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
+    const reference = new Date('2026-08-20T10:00:00.000Z')
+    database.registerAiScheduleAgent('unchanged-agent', '无变化核查 Agent', reference)
+    const queued = database.createAiScheduleJob(
+      'zenless', 'public_schedule', reference, false, 'all'
+    )
+    database.claimAiScheduleJob('unchanged-agent', reference)
+
+    const result = database.applyAiScheduleJob(
+      queued.id,
+      'unchanged-agent',
+      [],
+      [{ url: 'https://example.com/full-audit', note: '四个版块逐项比较后均无差异' }],
+      reference,
+      [],
+      [],
+      [],
+      'zh-CN',
+      undefined,
+      ['tasks', 'events', 'cycles', 'exploration']
+    )
+
+    expect(result.job).toMatchObject({
+      status: 'completed',
+      message: expect.stringContaining('未发现变化')
+    })
+    expect(result.merge).toEqual({ added: 0, updated: 0, preserved: 0 })
+    expect(result.remainingTargets).toEqual([])
+    expect(database.listChecklistItems('zenless')).toEqual([])
+  })
+
+  it('同一版块不能一边标记无变化一边提交校正', () => {
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
+    const reference = new Date('2026-08-20T10:00:00.000Z')
+    database.registerAiScheduleAgent('contradiction-agent', '矛盾核查 Agent', reference)
+    const queued = database.createAiScheduleJob(
+      'wuthering-waves', 'public_schedule', reference, false, 'tasks'
+    )
+    database.claimAiScheduleJob('contradiction-agent', reference)
+
+    expect(() => database!.applyAiScheduleJob(
+      queued.id,
+      'contradiction-agent',
+      [],
+      [],
+      reference,
+      [],
+      [],
+      [],
+      'zh-CN',
+      {
+        periodKey: 'wuthering-waves:version:3.6',
+        startsAt: '2026-08-20T11:00:00+08:00',
+        endsAt: '2026-10-01T04:00:00+08:00',
+        timeZone: 'Asia/Shanghai',
+        sourceUrl: 'https://example.com/version',
+        confidence: 0.82
+      },
+      ['tasks']
+    )).toThrow('不能同时标记为无变化并提交增删改')
+  })
+
   it('周期挑战到期后生成当前预测期，并允许官方延期校时恢复手工状态', () => {
     database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.replacePublicCatalog('genshin', 'cycles', [{
@@ -403,7 +523,7 @@ describe('AppDatabase', () => {
       [],
       reference
     )
-    expect(result.merge).toEqual({ added: 0, updated: 2, preserved: 0 })
+    expect(result.merge).toEqual({ added: 0, updated: 0, preserved: 2 })
     expect(result.job).toMatchObject({ status: 'completed' })
     expect(database.getSyncTargetStates('wuthering-waves')).toContainEqual(
       expect.objectContaining({
@@ -1178,6 +1298,8 @@ describe('AppDatabase', () => {
   })
 
   it('启动时不归并仍有效的历史挑战，并硬删除已经到期的系统挑战', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-10T12:00:00.000Z'))
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-endgame-duplicate-cleanup-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
     database = new AppDatabase(databasePath, { seedBundledBaselines: false })
