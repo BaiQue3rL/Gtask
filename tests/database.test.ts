@@ -627,7 +627,7 @@ describe('AppDatabase', () => {
   })
 
   it('启动时把旧限时活动的空标签、待识别和英文分类键统一为中文', () => {
-    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-activity-tags-test-'))
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-activity-tags-test-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
     database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     const empty = database.createChecklistItem({
@@ -677,7 +677,7 @@ describe('AppDatabase', () => {
   })
 
   it('关闭并重新打开数据库后保留数据且迁移可重复执行', () => {
-    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-task-manager-test-'))
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-test-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
     database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     const created = database.createChecklistItem({
@@ -1008,7 +1008,7 @@ describe('AppDatabase', () => {
   })
 
   it('启动时迁移封闭测试期任务时间并移除旧任务事项', () => {
-    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-version-window-migration-'))
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-version-window-migration-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
     database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     database.close()
@@ -1047,7 +1047,7 @@ describe('AppDatabase', () => {
   })
 
   it('v1 升级到 v2 时删除系统周常并保留用户事项', () => {
-    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-weekly-removal-migration-'))
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-weekly-removal-migration-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
     database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     database.close()
@@ -1083,6 +1083,70 @@ describe('AppDatabase', () => {
     database.close()
     database = null
     const verified = new DatabaseSync(databasePath)
+    expect((verified.prepare('SELECT MAX(version) AS version FROM schema_migrations').get() as {
+      version: number
+    }).version).toBe(CURRENT_SCHEMA_VERSION)
+    verified.close()
+  })
+
+  it('v3 升级到 v4 时保留任务历史并迁移后台 Agent 标识', () => {
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-agent-id-migration-'))
+    const databasePath = join(temporaryDirectory, 'test.sqlite')
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
+    database.close()
+    database = null
+
+    const raw = new DatabaseSync(databasePath)
+    raw.exec('DELETE FROM schema_migrations; INSERT INTO schema_migrations(version) VALUES (3)')
+    raw.prepare(`
+      INSERT INTO ai_schedule_agents(id, name, last_seen_at, created_at, updated_at)
+      VALUES (?, '旧后台 Agent', ?, ?, ?)
+    `).run(
+      'gacha-app-background-worker-1',
+      '2026-08-22T00:00:00.000Z',
+      '2026-08-22T00:00:00.000Z',
+      '2026-08-22T00:00:00.000Z'
+    )
+    raw.prepare(`
+      INSERT INTO ai_schedule_jobs(
+        id, game_id, scope, status, requested_at, completed_at, agent_id, updated_at
+      ) VALUES (
+        'legacy-agent-job', 'genshin', 'public_schedule', 'completed', ?, ?, ?, ?
+      )
+    `).run(
+      '2026-08-22T00:00:00.000Z',
+      '2026-08-22T00:05:00.000Z',
+      'gacha-app-background-worker-1',
+      '2026-08-22T00:05:00.000Z'
+    )
+    raw.prepare(`
+      INSERT INTO ai_schedule_job_attempts(
+        id, job_id, attempt_number, routing_tier, model, reasoning_effort,
+        agent_id, started_at, completed_at, outcome
+      ) VALUES (
+        'legacy-agent-attempt', 'legacy-agent-job', 1, 0, 'inherit', 'inherit',
+        ?, ?, ?, 'completed'
+      )
+    `).run(
+      'gacha-app-background-worker-1',
+      '2026-08-22T00:00:00.000Z',
+      '2026-08-22T00:05:00.000Z'
+    )
+    raw.close()
+
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
+    database.close()
+    database = null
+    const verified = new DatabaseSync(databasePath)
+    expect(verified.prepare('SELECT id FROM ai_schedule_agents').all()).toEqual([
+      { id: 'gtask-background-worker-1' }
+    ])
+    expect(verified.prepare(
+      "SELECT agent_id AS agentId FROM ai_schedule_jobs WHERE id = 'legacy-agent-job'"
+    ).get()).toEqual({ agentId: 'gtask-background-worker-1' })
+    expect(verified.prepare(
+      "SELECT agent_id AS agentId FROM ai_schedule_job_attempts WHERE id = 'legacy-agent-attempt'"
+    ).get()).toEqual({ agentId: 'gtask-background-worker-1' })
     expect((verified.prepare('SELECT MAX(version) AS version FROM schema_migrations').get() as {
       version: number
     }).version).toBe(CURRENT_SCHEMA_VERSION)
@@ -1300,7 +1364,7 @@ describe('AppDatabase', () => {
   it('启动时不归并仍有效的历史挑战，并硬删除已经到期的系统挑战', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-08-10T12:00:00.000Z'))
-    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-endgame-duplicate-cleanup-'))
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-endgame-duplicate-cleanup-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
     database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     database.close()
@@ -1583,7 +1647,7 @@ describe('AppDatabase', () => {
   })
 
   it.skip('旧融合流程：启动时保留 Codex 写入的个人活动状态', () => {
-    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-task-manager-star-rail-completion-'))
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-star-rail-completion-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
     database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     database.mergeSyncedItems('star-rail', 'public_schedule', [{
@@ -1658,7 +1722,7 @@ describe('AppDatabase', () => {
   })
 
   it('启动时不再擅自归档 Codex 尚未处理的无时间个人活动', () => {
-    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-task-manager-untimed-cleanup-'))
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-untimed-cleanup-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
     database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     database.close()
@@ -1692,7 +1756,7 @@ describe('AppDatabase', () => {
   })
 
   it('启动时不再按标题关键词擅自归档疑似错位活动', () => {
-    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-task-manager-section-cleanup-'))
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-section-cleanup-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
     database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     database.close()
@@ -1918,7 +1982,7 @@ describe('AppDatabase', () => {
   })
 
   it('启动时修复旧版公开子地图已完成但进度为零的状态', () => {
-    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-public-map-progress-repair-'))
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-public-map-progress-repair-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
     database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     database.mergeSyncedItems('star-rail', 'public_schedule', [{
@@ -2078,7 +2142,7 @@ describe('AppDatabase', () => {
   })
 
   it('可检测其他本地进程写入数据库，供 AI 命令触发界面刷新', () => {
-    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-task-manager-version-test-'))
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-version-test-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
     database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     const before = database.getDataVersion()
@@ -2466,16 +2530,16 @@ describe('AppDatabase', () => {
   it('应用关闭时只把后台 Codex 领取的任务立即放回队列', () => {
     database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const startedAt = new Date('2026-07-24T10:00:00.000Z')
-    database.registerAiScheduleAgent('gacha-app-background-worker', '后台 Codex', startedAt)
+    database.registerAiScheduleAgent('gtask-background-worker', '后台 Codex', startedAt)
     database.createAiScheduleJob('zenless', 'public_schedule', startedAt, false, 'events')
-    database.claimAiScheduleJob('gacha-app-background-worker', startedAt)
+    database.claimAiScheduleJob('gtask-background-worker', startedAt)
 
     expect(database.requeueClaimedAiScheduleJobsByAgent(
       'another-agent',
       new Date('2026-07-24T10:01:00.000Z')
     )).toBe(0)
     expect(database.requeueClaimedAiScheduleJobsByAgent(
-      'gacha-app-background-worker',
+      'gtask-background-worker',
       new Date('2026-07-24T10:01:00.000Z')
     )).toBe(1)
     expect(database.getActiveAiScheduleJob('zenless')).toMatchObject({
@@ -2489,14 +2553,14 @@ describe('AppDatabase', () => {
     const startedAt = new Date('2026-07-24T10:00:00.000Z')
     const gameIds = ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const
     for (const [index, gameId] of gameIds.entries()) {
-      const agentId = `gacha-app-background-worker-${index + 1}`
+      const agentId = `gtask-background-worker-${index + 1}`
       database.registerAiScheduleAgent(agentId, `后台 Codex ${index + 1}`, startedAt)
       database.createAiScheduleJob(gameId, 'public_schedule', startedAt, false, 'all')
     }
 
     const claimed = gameIds.map((_gameId, index) =>
       database!.claimAiScheduleJob(
-        `gacha-app-background-worker-${index + 1}`,
+        `gtask-background-worker-${index + 1}`,
         new Date(startedAt.getTime() + index)
       )
     )
@@ -3105,7 +3169,7 @@ describe('AppDatabase', () => {
   })
 
   it('旧程序拒绝打开更高版本数据库，避免降级写入', () => {
-    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-newer-schema-test-'))
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-newer-schema-test-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
     database = new AppDatabase(databasePath, { seedBundledBaselines: false })
     database.close()

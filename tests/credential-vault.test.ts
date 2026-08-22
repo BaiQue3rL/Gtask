@@ -23,7 +23,7 @@ const testProtector: CredentialProtector = {
 
 describe('CredentialVault', () => {
   it('磁盘不出现明文，并支持读取状态和一键清除', () => {
-    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-credential-test-'))
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-credential-test-'))
     const vault = new CredentialVault(temporaryDirectory, testProtector)
     expect(vault.status('miyoushe')).toMatchObject({ stored: false, updatedAt: null })
 
@@ -48,7 +48,7 @@ describe('CredentialVault', () => {
   })
 
   it('升级时清除已经退役的 DeepSeek 密钥文件', () => {
-    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-retired-credential-test-'))
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-retired-credential-test-'))
     const path = join(temporaryDirectory, 'deepseek.bin')
     writeFileSync(path, 'encrypted-legacy-key')
 
@@ -58,7 +58,7 @@ describe('CredentialVault', () => {
   })
 
   it('系统安全存储不可用时拒绝落盘', () => {
-    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-credential-unavailable-test-'))
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-credential-unavailable-test-'))
     const vault = new CredentialVault(temporaryDirectory, {
       ...testProtector,
       isAvailable: () => false

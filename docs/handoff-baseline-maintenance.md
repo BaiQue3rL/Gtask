@@ -2,17 +2,17 @@
 
 交接时间：2026-08-13（Asia/Shanghai）
 
-产品版本：1.0.0
+产品版本：1.1.0
 
-数据库 schema：v3
+数据库 schema：v4
 
-当前 MCP 协议：`2026-08-09.1`
+当前 MCP 协议：`2026-08-22.1`
 
 ## 交接结论
 
 Gtask 已完成从“依赖 Codex 才能使用”到“发布包自带完整持久基准表、个人接口只同步进度”的主流程改造。普通用户启动应用即可看到四款游戏的版本、活动、周期和地图目录；后台 MCP 仅用于维护基准表，不是产品运行前置条件。
 
-本轮修复版已经覆盖到 `D:\Git\Gtask`，版本号仍为 1.0.0。最后一次检查时真实数据库和凭据没有被安装流程修改；本机已启动修复版、成功应用 Gitee 镜像中的最新清单 revision，并确认周期区不存在重复卡片。
+本轮 1.1.0 已原位覆盖到 `D:\Git\Gtask`。真实数据库已从旧目录安全迁移到 `文档\Gtask\data\gtask.sqlite` 并升级到 schema v4；迁移前一致性备份、迁移后 `quick_check` 与关键表计数均已核验，凭据未被安装流程重置。本机 Codex 管理插件已切换为 `gtask@personal`。
 
 ## 必须保持的架构边界
 
@@ -100,6 +100,15 @@ Gtask 已完成从“依赖 Codex 才能使用”到“发布包自带完整持�
 
 ## 本轮已修复的高风险问题
 
+### 2026-08-22 Gtask 命名迁移与 1.1.0
+
+- 源码目录、窗口 API、AppID、后台 Agent、MCP 工具、资源 URI、插件与 skill 统一为 Gtask 命名；历史名称仅保留在一次性兼容迁移常量和测试中。
+- 本地数据目录迁移为 `文档\Gtask`，数据库与备份文件统一使用 `gtask` 前缀；迁移支持 SQLite WAL/SHM、根目录锁回退、冲突拒绝和失败回滚。
+- 数据库从 schema v3 原位升级到 v4。真实库 `quick_check=ok`，事项仍为 289 条，其中完成 246、未完成 43；迁移前备份保存在 `文档\Gtask-upgrade-backup-20260822`。
+- 公共基准中尚未开始的事项默认隐藏，到达开始时间后自动出现；设置提供“显示尚未开始的基准事项”开关，自定义事项和个人事项不受影响。
+- 正式安装升级保留既有 NSIS GUID，Windows 卸载项只有一份并显示 1.1.0；本机 Codex 插件已验证 15 个 MCP 工具和四款游戏后切换到 `gtask@personal`。
+- 完整测试 373 项通过、11 项按既有条件跳过；类型检查、构建、目录包、安装器、便携版与 MCP 冒烟均通过。
+
 - 原神地图进度重启后缺失：个人 API 层级与基准层级不同导致漏绑定；现按游戏内唯一标题绑定并保留基准父级。
 - “只看未完成”仍显示绿色已完成地图父项：筛选时不再回插已完成祖先，未完成子地区临时提升显示；100% 探索度视为完成。
 - 同步过程过于打扰：删除同步过程卡、结果通知、取消按钮及对应死代码；登录要求仍按既有弹窗流程处理。
@@ -108,18 +117,19 @@ Gtask 已完成从“依赖 Codex 才能使用”到“发布包自带完整持�
 
 ## 验证记录
 
-- `pnpm test`：56 个测试文件通过，319 项通过，10 项按既有条件跳过。
+- `pnpm test`：61 个测试文件通过、1 个文件按条件跳过；373 项通过，11 项按既有条件跳过。
 - `pnpm typecheck`：通过。
 - `pnpm build`：通过。
 - 打包 MCP 冒烟测试：15 个工具、4 款游戏均可读取。
 - 使用真实数据库完整副本执行启动迁移：成功；幽境危战补齐时间且保留完成状态，没有重复键。
-- 正式程序：`D:\Git\Gtask\Gtask.exe`，产品版本 `1.0.0.0`。
-- 当前修复版 EXE SHA-256：`90E1343AD3AD3C2CAD0F3A13C591BE12456823BC480B1A472799AF00F7EFEB78`。
+- 正式程序：`D:\Git\Gtask\Gtask.exe`，产品版本 `1.1.0.0`。
+- 当前正式 EXE SHA-256：`30859E8C4EEAF620BED0BB9B2AB92AB6E6306BFF4A4231B8DBD6C6FE30347C14`。
+- 1.1.0 安装器 SHA-256：`A914D9CA1BC7A50858E383CF14FB8528E2839B2A378693F96FFFA3DF2B5A52A0`；便携版 SHA-256：`2215D6329BD33953627DB3A33818FB9C1B1A81B4C508A33299B5241C759D28C1`。
 - 当前线上清单 revision：`2026-08-13.genshin-cycle-identity-correction`；本机于 2026-08-13 23:21（Asia/Shanghai）通过 Gitee 成功手动应用。
 
 ## 受保护的本机数据
 
-- 正式数据库：`D:\Users\Administrator\Documents\GachaTaskManager\data\gacha-task-manager.sqlite`
+- 正式数据库：`D:\Users\Administrator\Documents\Gtask\data\gtask.sqlite`
 - 凭据目录：`C:\Users\Administrator\AppData\Roaming\gtask\credentials`
 - 正式程序目录：`D:\Git\Gtask`
 
@@ -130,7 +140,7 @@ Gtask 已完成从“依赖 Codex 才能使用”到“发布包自带完整持�
 1. 阅读根目录 `AGENTS.md`、本文件、`docs/next-session.md` 和 `docs/sync-architecture-redesign.md`。
 2. 若维护地图，再完整阅读 `docs/ai-map-catalog-maintenance.md`。
 3. 检查 `git status` 和最新提交，确认工作树干净。
-4. 基准表维护契约版本为 `2026-08-09.1`。插件上报版本仅作诊断，不得阻塞本机 Codex 管理端；始终以 MCP 工具 schema 和领取到的 `job.contract` 为准，也不要调用已退役的个人复核链路。
+4. 基准表维护契约版本为 `2026-08-22.1`。插件上报版本仅作诊断，不得阻塞本机 Codex 管理端；始终以 MCP 工具 schema 和领取到的 `job.contract` 为准，也不要调用已退役的个人复核链路。
 5. 联网优先使用官方公告、官方活动说明和官方地图资料；社区资料只用于交叉核验。
 6. 更新相应基准、来源和实际受影响游戏的核验时间，同时保持稳定机器身份。
 7. 先跑针对性测试，再依次执行 `pnpm typecheck`、`pnpm test`、`pnpm build`。

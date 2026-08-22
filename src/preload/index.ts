@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { GachaApi } from '../shared/contracts'
+import type { GtaskApi } from '../shared/contracts'
 
-const gachaApi: GachaApi = {
+const gtaskApi: GtaskApi = {
   getAppInfo: () => ipcRenderer.invoke('app:get-info'),
   getRenderingModeState: () => ipcRenderer.invoke('rendering:get-mode'),
   updateRenderingMode: (mode) => ipcRenderer.invoke('rendering:update-mode', mode),
@@ -67,7 +67,7 @@ const gachaApi: GachaApi = {
 }
 
 if (process.contextIsolated) {
-  contextBridge.exposeInMainWorld('gacha', gachaApi)
+  contextBridge.exposeInMainWorld('gtask', gtaskApi)
 } else {
-  Object.assign(window, { gacha: gachaApi })
+  Object.assign(window, { gtask: gtaskApi })
 }

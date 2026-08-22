@@ -5,7 +5,7 @@ import type {
   MiyousheGeetestResult
 } from '../sync/miyoushe-chronicle-client'
 
-const COMPLETION_URL = 'gacha-verification://complete/'
+const COMPLETION_URL = 'gtask-verification://complete/'
 
 export interface GeetestWindowCopy {
   title: string

@@ -1,8 +1,8 @@
-import type { GachaApi } from '../../shared/contracts'
+import type { GtaskApi } from '../../shared/contracts'
 
 declare global {
   interface Window {
-    gacha: GachaApi
+    gtask: GtaskApi
   }
 }
 

@@ -25,4 +25,17 @@ describe('游戏显示偏好', () => {
     expect(writeHiddenGameIds({ setItem }, ['star-rail', 'star-rail'])).toEqual(['star-rail'])
     expect(setItem).toHaveBeenCalledWith(GAME_VISIBILITY_STORAGE_KEY, '["star-rail"]')
   })
+
+  it('一次性迁移旧产品名称下的显示偏好', () => {
+    const values = new Map([['gacha-task-manager.hidden-games.v1', '["zenless"]']])
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key)
+    }
+
+    expect(readHiddenGameIds(storage)).toEqual(['zenless'])
+    expect(values.get(GAME_VISIBILITY_STORAGE_KEY)).toBe('["zenless"]')
+    expect(values.has('gacha-task-manager.hidden-games.v1')).toBe(false)
+  })
 })

@@ -14,7 +14,7 @@ import type { BackupSummary } from '../shared/contracts'
 
 export const DEFAULT_DAILY_BACKUP_RETENTION = 30
 
-const DAILY_BACKUP_FILE_NAME = /^gacha-task-manager-(\d{4}-\d{2}-\d{2})\.sqlite$/
+const DAILY_BACKUP_FILE_NAME = /^gtask-(\d{4}-\d{2}-\d{2})\.sqlite$/
 
 function localDateKey(reference: Date): string {
   const year = reference.getFullYear()
@@ -79,7 +79,7 @@ export async function createDailyBackup(
 ): Promise<string | null> {
   const resolvedDirectory = resolve(backupDirectory)
   mkdirSync(resolvedDirectory, { recursive: true })
-  const destination = join(resolvedDirectory, `gacha-task-manager-${localDateKey(reference)}.sqlite`)
+  const destination = join(resolvedDirectory, `gtask-${localDateKey(reference)}.sqlite`)
   if (existsSync(destination)) return null
 
   const temporaryDestination = `${destination}.tmp`
@@ -150,7 +150,7 @@ export async function createPreMigrationBackup(
     mkdirSync(resolvedDirectory, { recursive: true })
     const destination = join(
       resolvedDirectory,
-      `gacha-task-manager-before-v${targetVersion}-${timestampKey(reference)}.sqlite`
+      `gtask-before-v${targetVersion}-${timestampKey(reference)}.sqlite`
     )
     const temporaryDestination = `${destination}.tmp`
     if (existsSync(temporaryDestination)) rmSync(temporaryDestination)
@@ -177,7 +177,7 @@ export async function createManualBackup(
   mkdirSync(resolvedDirectory, { recursive: true })
   const destination = join(
     resolvedDirectory,
-    `gacha-task-manager-manual-${timestampKey(reference)}-${String(reference.getMilliseconds()).padStart(3, '0')}.sqlite`
+    `gtask-manual-${timestampKey(reference)}-${String(reference.getMilliseconds()).padStart(3, '0')}.sqlite`
   )
   const temporaryDestination = `${destination}.tmp`
   try {
@@ -200,7 +200,7 @@ async function createPreRestoreBackup(
   mkdirSync(resolvedDirectory, { recursive: true })
   const destination = join(
     resolvedDirectory,
-    `gacha-task-manager-before-restore-${timestampKey(reference)}-${String(reference.getMilliseconds()).padStart(3, '0')}.sqlite`
+    `gtask-before-restore-${timestampKey(reference)}-${String(reference.getMilliseconds()).padStart(3, '0')}.sqlite`
   )
   const temporaryDestination = `${destination}.tmp`
   try {

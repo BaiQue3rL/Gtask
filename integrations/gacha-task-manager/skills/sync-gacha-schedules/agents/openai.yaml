@@ -1,4 +1,0 @@
-interface:
-  display_name: "同步 Gtask 资料"
-  short_description: "核验并维护 Gtask 公共基准表"
-  default_prompt: "Use $sync-gacha-schedules to process the pending Gtask baseline-maintenance job or the user's explicitly scoped public-baseline maintenance request."

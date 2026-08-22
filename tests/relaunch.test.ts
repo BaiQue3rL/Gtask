@@ -20,7 +20,7 @@ describe('恢复后的应用重启', () => {
   })
 
   it('单文件便携环境重启原始启动器并保留用户参数', () => {
-    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-portable-relaunch-test-'))
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-portable-relaunch-test-'))
     const portableExecutable = join(temporaryDirectory, 'Gtask-portable.exe')
     writeFileSync(portableExecutable, 'test')
 
@@ -42,7 +42,7 @@ describe('恢复后的应用重启', () => {
   })
 
   it('MCP 启动器优先使用不会随解包目录消失的便携版入口', () => {
-    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-portable-entry-test-'))
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-portable-entry-test-'))
     const portableExecutable = join(temporaryDirectory, 'Gtask-portable.exe')
     writeFileSync(portableExecutable, 'test')
 

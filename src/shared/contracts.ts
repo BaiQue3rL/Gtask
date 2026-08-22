@@ -1,5 +1,5 @@
 export const SUPPORTED_GAME_IDS = ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const
-export const GTASK_MCP_PROTOCOL_VERSION = '2026-08-09.1'
+export const GTASK_MCP_PROTOCOL_VERSION = '2026-08-22.1'
 
 export type GameId = (typeof SUPPORTED_GAME_IDS)[number]
 
@@ -457,7 +457,7 @@ export interface SyncResult {
   message: string
 }
 
-export interface GachaApi {
+export interface GtaskApi {
   getAppInfo: () => Promise<AppInfo>
   getRenderingModeState: () => Promise<RenderingModeState>
   updateRenderingMode: (mode: RenderingMode) => Promise<RenderingModeState>

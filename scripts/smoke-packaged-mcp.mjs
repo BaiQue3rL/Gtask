@@ -29,7 +29,7 @@ try {
   await client.connect(transport)
   const tools = await client.listTools()
   const snapshot = await client.callTool({
-    name: 'read_gacha_checklists',
+    name: 'read_gtask_checklists',
     arguments: {}
   })
   if (snapshot.isError) throw new Error('打包 MCP 读取清单失败')

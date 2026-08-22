@@ -14,6 +14,7 @@ Gtask 是一款 Windows 桌面游戏任务清单。它集中显示版本倒计�
 | --- | --- |
 | 游戏总览 | 切换查看多款游戏的版本剩余时间、活动、周期挑战和地图探索。 |
 | 内置清单 | 不登录也能查看公共基准提供的清单结构和时间。 |
+| 即将开放事项 | 默认隐藏尚未开始的公共基准事项；可在设置中提前显示，到点后自动出现。 |
 | 未完成筛选 | 隐藏已完成事项和空版块，保留未完成地图子区域。 |
 | 个人进度同步 | 米游社与库街区个人接口只更新唯一匹配项的完成状态或探索度。 |
 | 自定义清单 | 支持新增、编辑、完成、删除和回收站恢复。 |
@@ -71,9 +72,9 @@ Gtask 是一款 Windows 桌面游戏任务清单。它集中显示版本倒计�
 
 首次启动后，应用在 Windows 系统“文档”目录下创建：
 
-- `GachaTaskManager/data/gacha-task-manager.sqlite`
-- `GachaTaskManager/backups`
-- `GachaTaskManager/logs`
+- `Gtask/data/gtask.sqlite`
+- `Gtask/backups`
+- `Gtask/logs`
 
 凭据独立保存在当前 Windows 用户的应用数据目录，并由 Windows DPAPI 加密。应用支持每日备份、迁移前备份、恢复前备份和手动备份。备份轮换规则见 [数据模型](docs/data-model.md)。
 

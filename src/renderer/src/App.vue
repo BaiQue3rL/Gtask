@@ -62,6 +62,11 @@ import {
 import { credentialProviderForSyncResult } from './sync-credential-notice'
 import { isChecklistItemComplete } from './checklist-completion'
 import { claimStartupAutoSync } from './startup-auto-sync'
+import {
+  filterUpcomingBaselineItems,
+  readShowUpcomingBaselineItems,
+  writeShowUpcomingBaselineItems
+} from './upcoming-visibility'
 import genshinIcon from './assets/games/genshin.jpg'
 import starRailIcon from './assets/games/star-rail.jpg'
 import zenlessIcon from './assets/games/zenless.jpg'
@@ -129,6 +134,7 @@ let panelDragPointerId: number | null = null
 let panelDragHandle: HTMLElement | null = null
 const panelDragPoint = ref<{ x: number; y: number } | null>(null)
 const showIncompleteOnly = ref(false)
+const showUpcomingBaselineItems = ref(readShowUpcomingBaselineItems(window.localStorage))
 const globalPersonalSyncBusy = ref(false)
 const collapsedMapKeys = ref(new Set<string>())
 const collapsedMapKeysByGame = new Map<GameId, Set<string>>()
@@ -234,15 +240,24 @@ const visibleGames = computed(() => orderedGames.value.filter(
   (game) => !hiddenGameIds.value.includes(game.id)
 ))
 const gameCredentialStatuses = computed(() => credentialStatuses.value)
-const incompleteCount = computed(() => items.value.filter((item) => !isChecklistItemComplete(item)).length)
+const displayItems = computed(() => filterUpcomingBaselineItems(
+  items.value,
+  clockNow.value,
+  showUpcomingBaselineItems.value
+))
+const incompleteCount = computed(() => displayItems.value.filter(
+  (item) => !isChecklistItemComplete(item)
+).length)
 const completedCount = computed(() => {
   const weekStart = startOfCurrentWeek()
-  return items.value.filter((item) => item.completedAt && new Date(item.completedAt) >= weekStart).length
+  return displayItems.value.filter(
+    (item) => item.completedAt && new Date(item.completedAt) >= weekStart
+  ).length
 })
 const expiringCount = computed(() => {
   const now = Date.now()
   const threshold = now + 3 * 24 * 60 * 60 * 1000
-  return items.value.filter((item) => {
+  return displayItems.value.filter((item) => {
     if (item.completed || !item.endsAt) return false
     const end = new Date(item.endsAt).getTime()
     return end >= now && end <= threshold
@@ -258,9 +273,9 @@ onMounted(async () => {
       gameVersionSummaries.value,
       appInfo.value
     ] = await Promise.all([
-      window.gacha.listGames(),
-      window.gacha.listGameVersionSummaries(),
-      window.gacha.getAppInfo()
+      window.gtask.listGames(),
+      window.gtask.listGameVersionSummaries(),
+      window.gtask.getAppInfo()
     ])
     if (hiddenGameIds.value.includes(selectedGameId.value)) {
       selectedGameId.value = visibleGames.value[0]?.id ?? 'genshin'
@@ -282,7 +297,7 @@ onMounted(async () => {
   }
 })
 
-const removeSyncListener = window.gacha.onSyncCompleted((result) => {
+const removeSyncListener = window.gtask.onSyncCompleted((result) => {
   if (result.gameId !== selectedGameId.value) return
   void Promise.all([
     loadItems(),
@@ -291,7 +306,7 @@ const removeSyncListener = window.gacha.onSyncCompleted((result) => {
     loadSyncTargetStates()
   ])
 })
-const removeChecklistListener = window.gacha.onChecklistChanged(() => {
+const removeChecklistListener = window.gtask.onChecklistChanged(() => {
   void Promise.all([
     loadItems(),
     loadGameVersionSummaries(),
@@ -300,7 +315,7 @@ const removeChecklistListener = window.gacha.onChecklistChanged(() => {
     loadSyncTargetStates()
   ])
 })
-const removeSyncProgressListener = window.gacha.onSyncProgress((progress) => {
+const removeSyncProgressListener = window.gtask.onSyncProgress((progress) => {
   if (progress.source === 'personal_data') {
     if (progress.target === 'all' || progress.target === 'tasks') return
     personalSyncProgressByKey.value = applyPersonalProgressUpdate(
@@ -567,7 +582,7 @@ async function loadItems(
   if (showLoading) loading.value = true
   errorMessage.value = ''
   try {
-    const loadedItems = await window.gacha.listChecklistItems(gameId)
+    const loadedItems = await window.gtask.listChecklistItems(gameId)
     if (selectedGameId.value === gameId) {
       items.value = loadedItems
       const mapItems = loadedItems.filter((item) => item.category === 'exploration')
@@ -592,7 +607,7 @@ async function loadItems(
 
 async function loadGameVersionSummaries(): Promise<void> {
   try {
-    gameVersionSummaries.value = await window.gacha.listGameVersionSummaries()
+    gameVersionSummaries.value = await window.gtask.listGameVersionSummaries()
   } catch (error) {
     showError(error)
   }
@@ -601,7 +616,7 @@ async function loadGameVersionSummaries(): Promise<void> {
 async function loadSyncSettings(): Promise<void> {
   const gameId = selectedGameId.value
   try {
-    const loadedSettings = await window.gacha.getSyncSettings(gameId)
+    const loadedSettings = await window.gtask.getSyncSettings(gameId)
     syncSettingsByGame.value = { ...syncSettingsByGame.value, [gameId]: loadedSettings }
     if (selectedGameId.value === gameId) syncSettings.value = loadedSettings
   } catch (error) {
@@ -612,7 +627,7 @@ async function loadSyncSettings(): Promise<void> {
 async function loadAllSyncSettings(): Promise<void> {
   try {
     const settings = await Promise.all(games.value.map((game) =>
-      window.gacha.getSyncSettings(game.id)
+      window.gtask.getSyncSettings(game.id)
     ))
     syncSettingsByGame.value = Object.fromEntries(
       settings.map((entry) => [entry.gameId, entry])
@@ -624,7 +639,7 @@ async function loadAllSyncSettings(): Promise<void> {
 }
 
 async function loadCredentialStatuses(): Promise<void> {
-  credentialStatuses.value = await window.gacha.listCredentialStatuses()
+  credentialStatuses.value = await window.gtask.listCredentialStatuses()
 }
 
 async function saveAutoSyncPreference(gameId: GameId, enabled: boolean): Promise<void> {
@@ -635,7 +650,7 @@ async function saveAutoSyncPreference(gameId: GameId, enabled: boolean): Promise
     [gameId]: { ...previous, autoSyncEnabled: enabled }
   }
   try {
-    const saved = await window.gacha.updateSyncSettings(gameId, { autoSyncEnabled: enabled })
+    const saved = await window.gtask.updateSyncSettings(gameId, { autoSyncEnabled: enabled })
     syncSettingsByGame.value = { ...syncSettingsByGame.value, [gameId]: saved }
     if (selectedGameId.value === gameId) syncSettings.value = saved
   } catch (error) {
@@ -653,7 +668,7 @@ async function ensurePersonalSyncCredential(
   target: PersonalSyncTarget | 'all',
   interactive = true
 ): Promise<boolean> {
-  credentialStatuses.value = await window.gacha.listCredentialStatuses()
+  credentialStatuses.value = await window.gtask.listCredentialStatuses()
   const provider = credentialProviderForGame(gameId)
   const credential = credentialStatuses.value.find((status) => status.provider === provider)
   if (credential?.stored) return true
@@ -673,7 +688,7 @@ async function runPersonalSyncBatch(
   try {
     if (!await ensurePersonalSyncCredential(gameId, 'all', interactive)) return false
     const supportedTargets = orderPersonalSyncTargets(
-      await window.gacha.getPersonalSyncTargets(gameId)
+      await window.gtask.getPersonalSyncTargets(gameId)
     )
     if (supportedTargets.length === 0) {
       if (interactive && selectedGameId.value === gameId) {
@@ -709,7 +724,7 @@ async function runStartupAutoSync(): Promise<void> {
 async function loadSyncTargetStates(): Promise<void> {
   const gameId = selectedGameId.value
   try {
-    const states = await window.gacha.getSyncTargetStates(gameId)
+    const states = await window.gtask.getSyncTargetStates(gameId)
     if (selectedGameId.value === gameId) syncTargetStates.value = states
   } catch (error) {
     if (selectedGameId.value === gameId) showError(error)
@@ -719,7 +734,7 @@ async function loadSyncTargetStates(): Promise<void> {
 async function loadPersonalSyncTargets(): Promise<void> {
   const gameId = selectedGameId.value
   try {
-    const targets = await window.gacha.getPersonalSyncTargets(gameId)
+    const targets = await window.gtask.getPersonalSyncTargets(gameId)
     if (selectedGameId.value === gameId) personalSyncTargets.value = targets
   } catch (error) {
     if (selectedGameId.value === gameId) showError(error)
@@ -760,7 +775,7 @@ function syncStateClass(state: SyncTargetState | undefined): string {
 async function loadArchivedItems(): Promise<void> {
   const gameId = selectedGameId.value
   try {
-    const loadedItems = await window.gacha.listArchivedChecklistItems(gameId)
+    const loadedItems = await window.gtask.listArchivedChecklistItems(gameId)
     if (selectedGameId.value === gameId) archivedItems.value = loadedItems
   } catch (error) {
     if (selectedGameId.value === gameId) showError(error)
@@ -777,11 +792,11 @@ async function openSettings(): Promise<void> {
       loadedUpdateSettings,
       loadedCatalogStatus
     ] = await Promise.all([
-      window.gacha.listCredentialStatuses(),
-      window.gacha.listBackups(),
-      window.gacha.getRenderingModeState(),
-      window.gacha.getSoftwareUpdateSettings(),
-      window.gacha.getRemoteCatalogUpdateStatus()
+      window.gtask.listCredentialStatuses(),
+      window.gtask.listBackups(),
+      window.gtask.getRenderingModeState(),
+      window.gtask.getSoftwareUpdateSettings(),
+      window.gtask.getRemoteCatalogUpdateStatus()
     ])
     credentialStatuses.value = statuses
     backups.value = listedBackups
@@ -827,12 +842,23 @@ function toggleGameVisibility(gameId: GameId): void {
   }
 }
 
+function saveUpcomingBaselineVisibility(enabled: boolean): void {
+  try {
+    showUpcomingBaselineItems.value = writeShowUpcomingBaselineItems(
+      window.localStorage,
+      enabled
+    )
+  } catch (error) {
+    showError(error)
+  }
+}
+
 async function createBackup(): Promise<void> {
   if (backingUp.value) return
   backingUp.value = true
   try {
-    await window.gacha.createBackup()
-    backups.value = await window.gacha.listBackups()
+    await window.gtask.createBackup()
+    backups.value = await window.gtask.listBackups()
   } catch (error) {
     showError(error)
   } finally {
@@ -844,7 +870,7 @@ async function restoreBackup(backup: BackupSummary): Promise<void> {
   if (restoringBackup.value) return
   restoringBackup.value = backup.fileName
   try {
-    const restarting = await window.gacha.restoreBackup(backup.fileName)
+    const restarting = await window.gtask.restoreBackup(backup.fileName)
     if (!restarting) restoringBackup.value = null
   } catch (error) {
     restoringBackup.value = null
@@ -856,8 +882,8 @@ async function clearCredential(provider: CredentialProvider): Promise<void> {
   const platform = provider === 'miyoushe' ? '米游社' : '库街区'
   if (!window.confirm(`确定清除本机保存的${platform}登录凭据吗？`)) return
   try {
-    await window.gacha.clearCredential(provider)
-    credentialStatuses.value = await window.gacha.listCredentialStatuses()
+    await window.gtask.clearCredential(provider)
+    credentialStatuses.value = await window.gtask.listCredentialStatuses()
   } catch (error) {
     showError(error)
   }
@@ -868,7 +894,7 @@ async function startMiyousheLogin(): Promise<void> {
   startingMiyousheLogin.value = true
   stopMiyousheLoginPolling()
   try {
-    miyousheLoginState.value = await window.gacha.startMiyousheQrLogin()
+    miyousheLoginState.value = await window.gtask.startMiyousheQrLogin()
     miyousheLoginOpen.value = true
     miyousheLoginTimer = window.setInterval(() => void pollMiyousheLogin(), 1_000)
   } catch (error) {
@@ -883,12 +909,12 @@ async function pollMiyousheLogin(): Promise<void> {
   if (!state || pollingMiyousheLogin.value || ['confirmed', 'expired'].includes(state.status)) return
   pollingMiyousheLogin.value = true
   try {
-    const nextState = await window.gacha.pollMiyousheQrLogin(state.sessionId)
+    const nextState = await window.gtask.pollMiyousheQrLogin(state.sessionId)
     if (miyousheLoginState.value?.sessionId !== state.sessionId) return
     miyousheLoginState.value = nextState
     if (nextState.status === 'confirmed') {
       stopMiyousheLoginPolling()
-      credentialStatuses.value = await window.gacha.listCredentialStatuses()
+      credentialStatuses.value = await window.gtask.listCredentialStatuses()
     } else if (nextState.status === 'expired') {
       stopMiyousheLoginPolling()
     }
@@ -909,7 +935,7 @@ async function closeMiyousheLogin(): Promise<void> {
   miyousheLoginState.value = null
   if (sessionId && !finished) {
     try {
-      await window.gacha.cancelMiyousheQrLogin(sessionId)
+      await window.gtask.cancelMiyousheQrLogin(sessionId)
     } catch {
       // Closing the UI remains safe even if the in-memory session already expired.
     }
@@ -946,7 +972,7 @@ async function closeKuroCommunityLogin(): Promise<void> {
   kuroCredentialMessage.value = ''
   if (sessionId) {
     try {
-      await window.gacha.cancelKuroCommunityLogin(sessionId)
+      await window.gtask.cancelKuroCommunityLogin(sessionId)
     } catch {
       // The server-side session may already have been consumed or expired.
     }
@@ -958,7 +984,7 @@ async function sendKuroCommunitySms(): Promise<void> {
   kuroCredentialBusy.value = true
   kuroCredentialMessage.value = '请在弹出的窗口中完成官方滑块验证…'
   try {
-    const state = await window.gacha.sendKuroCommunitySms(kuroLoginPhone.value)
+    const state = await window.gtask.sendKuroCommunitySms(kuroLoginPhone.value)
     kuroLoginSessionId.value = state.sessionId
     kuroLoginPhase.value = 'code'
     kuroCredentialMessage.value = state.message
@@ -975,7 +1001,7 @@ async function completeKuroCommunityLogin(): Promise<void> {
   kuroCredentialBusy.value = true
   kuroCredentialMessage.value = '正在登录库街区并读取鸣潮角色…'
   try {
-    const result = await window.gacha.completeKuroCommunityLogin(
+    const result = await window.gtask.completeKuroCommunityLogin(
       kuroLoginSessionId.value,
       kuroLoginCode.value
     )
@@ -1005,12 +1031,12 @@ async function saveKuroCommunityLogin(): Promise<void> {
   kuroCredentialBusy.value = true
   kuroCredentialMessage.value = '正在向库街区校验角色数据权限…'
   try {
-    await window.gacha.storeKuroCommunityLogin(
+    await window.gtask.storeKuroCommunityLogin(
       kuroLoginSessionId.value,
       role.roleId,
       role.serverId
     )
-    credentialStatuses.value = await window.gacha.listCredentialStatuses()
+    credentialStatuses.value = await window.gtask.listCredentialStatuses()
     kuroCredentialBusy.value = false
     await closeKuroCommunityLogin()
     await resumePendingPersonalSync()
@@ -1047,7 +1073,7 @@ async function resumePendingPersonalSync(): Promise<void> {
 
 async function openDataDirectory(): Promise<void> {
   try {
-    await window.gacha.openDataDirectory()
+    await window.gtask.openDataDirectory()
   } catch (error) {
     showError(error)
   }
@@ -1058,14 +1084,14 @@ async function saveRenderingMode(): Promise<void> {
   renderingModeBusy.value = true
   renderingModeMessage.value = '正在保存…'
   try {
-    const state = await window.gacha.updateRenderingMode(renderingModeSelection.value)
+    const state = await window.gtask.updateRenderingMode(renderingModeSelection.value)
     renderingModeState.value = state
     if (!state.restartRequired) {
       renderingModeMessage.value = '当前已使用此模式。'
       return
     }
     renderingModeMessage.value = '已保存，正在重启 Gtask…'
-    await window.gacha.restartApp()
+    await window.gtask.restartApp()
   } catch (error) {
     renderingModeMessage.value = ''
     showError(error)
@@ -1079,13 +1105,13 @@ async function saveSoftwareUpdatePreference(): Promise<void> {
   softwareUpdateBusy.value = true
   softwareUpdateMessage.value = '正在保存…'
   try {
-    softwareUpdateSettings.value = await window.gacha.updateSoftwareUpdateSettings({
+    softwareUpdateSettings.value = await window.gtask.updateSoftwareUpdateSettings({
       autoCheckEnabled: softwareUpdateSettings.value.autoCheckEnabled,
       updateSource: softwareUpdateSettings.value.updateSource
     })
     softwareUpdateMessage.value = '设置已保存'
   } catch (error) {
-    softwareUpdateSettings.value = await window.gacha.getSoftwareUpdateSettings()
+    softwareUpdateSettings.value = await window.gtask.getSoftwareUpdateSettings()
     softwareUpdateMessage.value = ''
     showError(error)
   } finally {
@@ -1099,12 +1125,12 @@ async function checkSoftwareUpdate(): Promise<void> {
   softwareUpdateBusy.value = true
   softwareUpdateMessage.value = '正在检查更新…'
   try {
-    const result: SoftwareUpdateCheckResult = await window.gacha.checkSoftwareUpdate()
+    const result: SoftwareUpdateCheckResult = await window.gtask.checkSoftwareUpdate()
     softwareUpdateMessage.value = result.message
-    softwareUpdateSettings.value = await window.gacha.getSoftwareUpdateSettings()
+    softwareUpdateSettings.value = await window.gtask.getSoftwareUpdateSettings()
     if (result.outcome === 'update_available' && result.releaseUrl) {
       const confirmed = window.confirm(`${result.message}，是否查看更新？`)
-      if (confirmed) await window.gacha.openExternalUrl(result.releaseUrl)
+      if (confirmed) await window.gtask.openExternalUrl(result.releaseUrl)
     }
   } catch (error) {
     softwareUpdateMessage.value = '暂时无法检查更新，请稍后重试'
@@ -1120,7 +1146,7 @@ async function checkRemoteCatalogUpdate(): Promise<void> {
   remoteCatalogUpdateBusy.value = true
   remoteCatalogUpdateMessage.value = '正在同步公共清单…'
   try {
-    const result: RemoteCatalogCheckResult = await window.gacha.checkRemoteCatalogUpdate()
+    const result: RemoteCatalogCheckResult = await window.gtask.checkRemoteCatalogUpdate()
     remoteCatalogUpdateMessage.value = result.message
     remoteCatalogManualRetryAt.value = result.manualRetryAt
   } catch (error) {
@@ -1187,7 +1213,7 @@ const globalSyncBusy = computed(() =>
 
 const visiblePanels = computed(() => filterChecklistPanels(
   orderedPanels.value,
-  items.value.map((item) => ({
+  displayItems.value.map((item) => ({
     category: item.category,
     completed: isChecklistItemComplete(item)
   })),
@@ -1207,7 +1233,7 @@ async function runPersonalSync(
   delete nextProgress[progressKey]
   personalSyncProgressByKey.value = nextProgress
   try {
-    const result = await window.gacha.syncPersonalData(gameId, target, {
+    const result = await window.gtask.syncPersonalData(gameId, target, {
       outputLocale: document.documentElement.lang || 'zh-CN',
       userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
     })
@@ -1234,7 +1260,7 @@ async function runPersonalSync(
 }
 
 function itemsFor(categories: ChecklistCategory[]): ChecklistItem[] {
-  return items.value.filter(
+  return displayItems.value.filter(
     (item) =>
       categories.includes(item.category) &&
       (!showIncompleteOnly.value || !isChecklistItemComplete(item))
@@ -1254,7 +1280,7 @@ function panelItems(panel: ChecklistPanel): ChecklistTreeRow[] {
   const rows = buildMapTreeRows(
     visible,
     collapsedMapKeys.value,
-    items.value.filter((item) => item.category === 'exploration'),
+    displayItems.value.filter((item) => item.category === 'exploration'),
     !showIncompleteOnly.value
   )
   return showIncompleteOnly.value ? filterIncompleteMapTreeRows(rows) : rows
@@ -1323,8 +1349,8 @@ async function saveItem(): Promise<void> {
       recurrenceRule: null
     }
     const saved = editingItem.value
-      ? await window.gacha.updateChecklistItem({ id: editingItem.value.id, ...common })
-      : await window.gacha.createChecklistItem({ gameId: selectedGameId.value, ...common })
+      ? await window.gtask.updateChecklistItem({ id: editingItem.value.id, ...common })
+      : await window.gtask.createChecklistItem({ gameId: selectedGameId.value, ...common })
 
     const index = items.value.findIndex((item) => item.id === saved.id)
     if (index >= 0) items.value[index] = saved
@@ -1341,7 +1367,7 @@ async function toggleCompleted(item: ChecklistItem): Promise<void> {
   const scrollTop = workspaceElement.value?.scrollTop ?? 0
   const scrollLeft = workspaceElement.value?.scrollLeft ?? 0
   try {
-    const updatedItems = await window.gacha.setChecklistCompletion(item.id, !item.completed)
+    const updatedItems = await window.gtask.setChecklistCompletion(item.id, !item.completed)
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
     for (const updated of updatedItems) {
       const index = items.value.findIndex((candidate) => candidate.id === updated.id)
@@ -1373,7 +1399,7 @@ function archiveItem(item: ChecklistItem): void {
     detail: '删除后可在回收站中恢复。',
     confirmLabel: '删除',
     onConfirm: async () => {
-      await window.gacha.archiveChecklistItem(item.id)
+      await window.gtask.archiveChecklistItem(item.id)
       items.value = items.value.filter((candidate) => candidate.id !== item.id)
       archivedItems.value.unshift(item)
       editorOpen.value = false
@@ -1398,7 +1424,7 @@ function archiveCompletedSection(
     detail: '删除后可在回收站中恢复。',
     confirmLabel: '删除已完成',
     onConfirm: async () => {
-      await window.gacha.archiveCompletedSection({ gameId, section })
+      await window.gtask.archiveCompletedSection({ gameId, section })
       await Promise.all([loadItems(), loadArchivedItems()])
     }
   })
@@ -1406,7 +1432,7 @@ function archiveCompletedSection(
 
 async function restoreItem(item: ChecklistItem): Promise<void> {
   try {
-    const restored = await window.gacha.restoreChecklistItem(item.id)
+    const restored = await window.gtask.restoreChecklistItem(item.id)
     archivedItems.value = archivedItems.value.filter((candidate) => candidate.id !== item.id)
     items.value.push(restored)
   } catch (error) {
@@ -1425,7 +1451,7 @@ function emptyRecycleBin(): void {
     detail: '这些事项将从本机彻底移除，此操作无法撤销。',
     confirmLabel: '永久删除',
     onConfirm: async () => {
-      const deleted = await window.gacha.emptyRecycleBin(gameId)
+      const deleted = await window.gtask.emptyRecycleBin(gameId)
       if (deleted > 0) archivedItems.value = []
     }
   })
@@ -1836,6 +1862,25 @@ function showError(error: unknown): void {
             </span>
           </label>
         </div>
+        <h3 class="settings-heading">事项显示</h3>
+        <div class="settings-box software-update-box">
+          <label class="software-update-toggle">
+            <span>
+              <strong>显示尚未开始的基准事项</strong>
+              <small>默认隐藏尚未开放的活动与任务；到达开始时间后会自动出现。</small>
+            </span>
+            <input
+              class="toggle-switch-input"
+              type="checkbox"
+              :checked="showUpcomingBaselineItems"
+              aria-label="显示尚未开始的基准事项"
+              @change="saveUpcomingBaselineVisibility(($event.target as HTMLInputElement).checked)"
+            >
+            <span class="toggle-switch" aria-hidden="true">
+              <span class="toggle-switch-thumb"></span>
+            </span>
+          </label>
+        </div>
         <h3 class="settings-heading">启动后自动同步</h3>
         <p class="recycle-hint">启动时自动读取所选游戏的官方个人进度；10 分钟内重复启动会安静跳过。</p>
         <div class="game-visibility-list">
@@ -1986,7 +2031,7 @@ function showError(error: unknown): void {
             <button class="secondary-button" type="button" @click="openDataDirectory">打开目录</button>
           </div>
         </div>
-        <p class="recycle-hint">数据保存在系统“文档\GachaTaskManager”目录，自动保留最近 30 份每日备份。</p>
+        <p class="recycle-hint">数据保存在系统“文档\Gtask”目录，自动保留最近 30 份每日备份。</p>
         <div class="backup-list">
           <div v-for="backup in backups" :key="backup.fileName" class="backup-row">
             <div><strong>{{ backup.fileName }}</strong><span>{{ formatLocalTime(backup.updatedAt) }}</span></div>

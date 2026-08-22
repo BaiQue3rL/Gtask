@@ -13,18 +13,18 @@ CLI 可从标准输入、`--request-file` 或 UTF-8 Base64 的 `--request-base64
 
 ## 常用 MCP 工具
 
-- `describe_gacha_commands`、`read_gacha_checklists`：读取命令边界和清单快照。
-- `create_gacha_item`、`update_gacha_item`、`restore_gacha_item`：通用维护写入。
-- `archive_gacha_item`、`archive_completed_gacha_section`：需要 `confirm: true` 的破坏性操作。
-- `write_gacha_checklists`：高级批量命令入口，仍受确认和系统数据保护。
-- `queue_gacha_baseline_maintenance`：为指定游戏和目标排队后台公共基准维护。
-- `register_gacha_schedule_agent`、`claim_gacha_schedule_job`：登记本机 Codex 管理端并领取指定维护任务。
-- `update_gacha_schedule_job_progress`：提交结构化维护阶段和计数。
-- `apply_gacha_public_schedule`：提交版本窗口或公共基准增量。
-- `fail_gacha_schedule_job`：明确结束失败任务并保留已有基准。
-- `register_gacha_activity_tag`：在有可靠证据时注册可复用的 `custom.*` 玩法标签。
+- `describe_gtask_commands`、`read_gtask_checklists`：读取命令边界和清单快照。
+- `create_gtask_item`、`update_gtask_item`、`restore_gtask_item`：通用维护写入。
+- `archive_gtask_item`、`archive_completed_gtask_section`：需要 `confirm: true` 的破坏性操作。
+- `write_gtask_checklists`：高级批量命令入口，仍受确认和系统数据保护。
+- `queue_gtask_baseline_maintenance`：为指定游戏和目标排队后台公共基准维护。
+- `register_gtask_schedule_agent`、`claim_gtask_schedule_job`：登记本机 Codex 管理端并领取指定维护任务。
+- `update_gtask_schedule_job_progress`：提交结构化维护阶段和计数。
+- `apply_gtask_public_schedule`：提交版本窗口或公共基准增量。
+- `fail_gtask_schedule_job`：明确结束失败任务并保留已有基准。
+- `register_gtask_activity_tag`：在有可靠证据时注册可复用的 `custom.*` 玩法标签。
 
-只读资源 `gacha://backups` 返回备份摘要，不返回凭据内容，不提供删除或恢复工具。
+只读资源 `gtask://backups` 返回备份摘要，不返回凭据内容，不提供删除或恢复工具。
 
 ## 公共基准维护协议
 

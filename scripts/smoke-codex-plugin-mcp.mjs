@@ -11,12 +11,12 @@ function argument(name) {
 const configPath = argument('--config')
 if (!configPath) throw new Error('需要 --config 指向插件 .mcp.json')
 const document = JSON.parse(readFileSync(resolve(configPath), 'utf8'))
-const server = document.mcpServers?.gacha_task_manager
+const server = document.mcpServers?.gtask
 if (!server?.command || !Array.isArray(server.args)) {
-  throw new Error('插件 MCP 配置缺少 gacha_task_manager')
+  throw new Error('插件 MCP 配置缺少 gtask')
 }
 
-const client = new Client({ name: 'gacha-plugin-smoke-test', version: '1.0.0' })
+const client = new Client({ name: 'gtask-plugin-smoke-test', version: '1.0.0' })
 const transport = new StdioClientTransport({
   command: server.command,
   args: server.args,
@@ -30,7 +30,7 @@ try {
   await client.connect(transport)
   const tools = await client.listTools()
   const snapshot = await client.callTool({
-    name: 'read_gacha_checklists',
+    name: 'read_gtask_checklists',
     arguments: {}
   })
   if (snapshot.isError) throw new Error('插件 MCP 读取清单失败')

@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync } from 'node:fs'
+import { appendFileSync, cpSync, existsSync, mkdirSync } from 'node:fs'
 import { arch, cpus, release, totalmem } from 'node:os'
 import { dirname, join } from 'node:path'
 import { app, BrowserWindow, dialog, ipcMain, net, powerMonitor, safeStorage, screen, shell } from 'electron'
@@ -24,9 +24,10 @@ import {
   isCodexPluginUsable
 } from './ai/codex-plugin'
 import {
+  hasCodexMcpLauncher,
   prepareStableMcpElectronRuntime,
   refreshCodexMcpLauncher
-} from './ai/codex-plugin-installer'
+} from './ai/codex-mcp-runtime'
 import {
   MAX_CODEX_SCHEDULE_WORKERS,
   CodexScheduleWorkerPool,
@@ -71,7 +72,7 @@ import {
   automaticRemoteCheckDelay,
   remoteCheckCooldownRemaining
 } from './remote-check-cooldown'
-import { resolveAppDataPaths } from './data-paths'
+import { migrateLegacyAppDataPaths } from './data-paths'
 import {
   getBundledMapCatalog
 } from './sync/map-catalog'
@@ -474,7 +475,7 @@ function codexMcpLauncherOptions() {
     integrationDirectory,
     executablePath,
     mcpScriptPath: join(runtimeDirectory, 'local-mcp-server-cli.js'),
-    databasePath: appDatabasePath ?? join(app.getPath('documents'), 'GachaTaskManager', 'data', 'gacha-task-manager.sqlite'),
+    databasePath: appDatabasePath ?? join(app.getPath('documents'), 'Gtask', 'data', 'gtask.sqlite'),
     commandShellPath: process.env.ComSpec ??
       join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'cmd.exe')
   }
@@ -1148,7 +1149,29 @@ if (!app.requestSingleInstanceLock()) {
   })
 
   app.whenReady().then(async () => {
-    const dataPaths = resolveAppDataPaths(app.getPath('documents'))
+    let dataPaths
+    const documentsPath = app.getPath('documents')
+    try {
+      dataPaths = migrateLegacyAppDataPaths(documentsPath)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '本地数据目录迁移失败'
+      try {
+        mkdirSync(app.getPath('userData'), { recursive: true })
+        appendFileSync(
+          join(app.getPath('userData'), 'migration-error.log'),
+          `${JSON.stringify({ timestamp: new Date().toISOString(), documentsPath, message })}\n`,
+          'utf8'
+        )
+      } catch {
+        // The error dialog remains the final fallback when even userData is unavailable.
+      }
+      dialog.showErrorBox(
+        '无法安全迁移本地数据',
+        message
+      )
+      app.quit()
+      return
+    }
     const databasePath = dataPaths.database
     const backupDirectory = dataPaths.backups
     try {
@@ -1246,7 +1269,8 @@ if (!app.requestSingleInstanceLock()) {
       console.error('创建或整理每日数据库备份失败', error)
     }
     try {
-      if (currentCodexPluginStatus().installed) {
+      const integrationDirectory = join(app.getPath('userData'), 'codex-integration')
+      if (currentCodexPluginStatus().installed || hasCodexMcpLauncher(integrationDirectory)) {
         const launcherOptions = codexMcpLauncherOptions()
         refreshCodexMcpLauncher(launcherOptions)
       }

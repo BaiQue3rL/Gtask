@@ -1,6 +1,7 @@
 import { SUPPORTED_GAME_IDS, type GameId } from '../../shared/contracts'
 
-export const GAME_VISIBILITY_STORAGE_KEY = 'gacha-task-manager.hidden-games.v1'
+export const GAME_VISIBILITY_STORAGE_KEY = 'gtask.hidden-games.v1'
+const LEGACY_GAME_VISIBILITY_STORAGE_KEY = 'gacha-task-manager.hidden-games.v1'
 
 export function normalizeHiddenGameIds(value: unknown): GameId[] {
   if (!Array.isArray(value)) return []
@@ -14,10 +15,18 @@ export function normalizeHiddenGameIds(value: unknown): GameId[] {
     : hidden
 }
 
-export function readHiddenGameIds(storage: Pick<Storage, 'getItem'>): GameId[] {
+export function readHiddenGameIds(
+  storage: Pick<Storage, 'getItem'> & Partial<Pick<Storage, 'setItem' | 'removeItem'>>
+): GameId[] {
   try {
-    const stored = storage.getItem(GAME_VISIBILITY_STORAGE_KEY)
-    return stored ? normalizeHiddenGameIds(JSON.parse(stored)) : []
+    const current = storage.getItem(GAME_VISIBILITY_STORAGE_KEY)
+    if (current) return normalizeHiddenGameIds(JSON.parse(current))
+    const legacy = storage.getItem(LEGACY_GAME_VISIBILITY_STORAGE_KEY)
+    if (!legacy) return []
+    const migrated = normalizeHiddenGameIds(JSON.parse(legacy))
+    storage.setItem?.(GAME_VISIBILITY_STORAGE_KEY, JSON.stringify(migrated))
+    storage.removeItem?.(LEGACY_GAME_VISIBILITY_STORAGE_KEY)
+    return migrated
   } catch {
     return []
   }

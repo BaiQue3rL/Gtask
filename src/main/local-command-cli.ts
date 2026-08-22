@@ -12,7 +12,7 @@ function argumentValue(name: string): string | undefined {
 function defaultDatabasePath(): string {
   const appData = process.env.APPDATA
   if (!appData) throw new Error('无法确定 APPDATA，请通过 --database 指定数据库路径')
-  return join(appData, 'gacha-task-manager', 'data', 'gacha-task-manager.sqlite')
+  return join(appData, 'gtask', 'data', 'gtask.sqlite')
 }
 
 function readRequest(): unknown {

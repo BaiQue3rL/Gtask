@@ -1,6 +1,6 @@
 # 下一窗口项目交接说明
 
-更新时间：2026-08-13 23:40（Asia/Shanghai）
+更新时间：2026-08-22（Asia/Shanghai）
 
 这份文档是下一位 Agent 的首要接续入口。先读根目录 `AGENTS.md`，再完整阅读本文；涉及同步架构时继续读 `docs/sync-architecture-redesign.md`，涉及地图时必须完整阅读 `docs/ai-map-catalog-maintenance.md`。
 
@@ -19,15 +19,16 @@ Gtask 是一款面向 Windows 的本地游戏任务清单，技术栈为 Electro
 
 ## 2. 当前状态
 
-- 正式产品版本：`1.0.0`，不得因普通修复自行递增。
-- 数据库 schema：v3，支持 v1 → v2 → v3 安全迁移。
+- 当前产品版本：`1.1.0`，按 SemVer 作为向后兼容的功能版本递增。
+- 数据库 schema：v4，支持 v1 → v2 → v3 → v4 安全迁移。
 - GitHub 权威仓库：`https://github.com/BaiQue3rL/Gtask`。
-- 当前 Git 主分支：`main`；交接时与 `origin/main` 一致，最新合并提交为 `9b1bbf3`。
+- 当前 Git 主分支：`main`；本轮完成后已推送 `origin/main`，准确提交号以 `git log -1 --oneline` 为准。
 - GitHub Release：`v1.0.0` 已发布；Gitee 作为免费中国区镜像与默认下载/更新源。
-- 本机正式安装目录：`D:\Git\Gtask`；当前 EXE 产品版本为 `1.0.0.0`，SHA-256 为 `2FEB73596B94B9B1BD44DF82915190F57201E1D5D8F73A2A0D87C73ADD37A040`。
+- 本机正式安装目录：`D:\Git\Gtask`；当前 EXE 产品版本为 `1.1.0.0`，SHA-256 为 `30859E8C4EEAF620BED0BB9B2AB92AB6E6306BFF4A4231B8DBD6C6FE30347C14`。
 - 当前远程清单 revision：`2026-08-13.genshin-cycle-identity-correction`；已由本机通过 Gitee 镜像成功手动应用。
-- 当前代码已通过：完整测试 364 项、11 项按既有条件跳过；`pnpm typecheck`、`pnpm build`、`pnpm package:dir` 均通过。
-- 本轮没有产品版本升级、标签或新 Release。
+- 当前代码已通过：完整测试 373 项、11 项按既有条件跳过；`pnpm typecheck`、`pnpm build`、`pnpm package:dir`、安装器、便携版和 15 工具 MCP 冒烟均通过。
+- 本轮产品版本升级到 1.1.0；是否创建标签和新 Release 仍与源码推送分开处理。
+- 本机 Codex 插件已切换为 `gtask@personal` `1.1.0+codex.20260822150112`；旧插件登记已移除。插件更新后应新建 Codex 任务以加载最新 skill/MCP。
 
 ## 3. 不可破坏的架构边界
 
@@ -126,9 +127,9 @@ Gtask 是一款面向 Windows 的本地游戏任务清单，技术栈为 Electro
 
 ## 7. 本机路径与保护范围
 
-- 源码仓库：`D:\Users\Administrator\Documents\Codex Project\Gacha_task_manager`
+- 源码仓库：`D:\Users\Administrator\Documents\Codex Project\Gtask`
 - 正式安装目录：`D:\Git\Gtask`
-- 正式数据库：`D:\Users\Administrator\Documents\GachaTaskManager\data\gacha-task-manager.sqlite`
+- 正式数据库：`D:\Users\Administrator\Documents\Gtask\data\gtask.sqlite`
 - 凭据：`C:\Users\Administrator\AppData\Roaming\gtask\credentials`
 - 远程清单状态：`C:\Users\Administrator\AppData\Roaming\gtask\remote-catalog-update.json`
 
@@ -168,4 +169,4 @@ pnpm build
 pnpm exec vitest run tests/map-catalog.test.ts tests/map-catalog-freshness.test.ts
 ```
 
-涉及安装包时运行 `pnpm package:dir`，必要时再运行便携版/安装版构建与对应 verify。任何修复都不得自行更改 1.0.0 产品版本。
+涉及安装包时运行 `pnpm package:dir`，必要时再运行便携版/安装版构建与对应 verify。后续版本继续按 SemVer 判断 MAJOR/MINOR/PATCH，未经用户明确授权不得自行发布标签或 Release。

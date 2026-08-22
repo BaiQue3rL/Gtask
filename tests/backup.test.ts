@@ -25,7 +25,7 @@ afterEach(() => {
 
 describe('createDailyBackup', () => {
   it('每天只创建一份可重新打开的 SQLite 一致性备份', async () => {
-    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-task-manager-backup-test-'))
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-backup-test-'))
     const databasePath = join(temporaryDirectory, 'source.sqlite')
     const backupDirectory = join(temporaryDirectory, 'backups')
     database = new AppDatabase(databasePath)
@@ -50,7 +50,7 @@ describe('createDailyBackup', () => {
   })
 
   it('仅在数据库版本落后时创建迁移前备份', async () => {
-    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-pre-migration-backup-test-'))
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-pre-migration-backup-test-'))
     const databasePath = join(temporaryDirectory, 'source.sqlite')
     const backupDirectory = join(temporaryDirectory, 'backups')
     database = new AppDatabase(databasePath)
@@ -69,7 +69,7 @@ describe('createDailyBackup', () => {
   })
 
   it('可以立即创建手动备份并按时间列出备份类型', async () => {
-    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-manual-backup-test-'))
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-manual-backup-test-'))
     const databasePath = join(temporaryDirectory, 'source.sqlite')
     const backupDirectory = join(temporaryDirectory, 'backups')
     database = new AppDatabase(databasePath)
@@ -81,28 +81,28 @@ describe('createDailyBackup', () => {
   })
 
   it('只清理超出保留数量的每日备份，不删除手动或安全备份', () => {
-    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-backup-retention-test-'))
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-backup-retention-test-'))
     const backupDirectory = join(temporaryDirectory, 'backups')
     mkdirSync(backupDirectory)
 
     for (const day of ['17', '18', '19', '20']) {
-      writeFileSync(join(backupDirectory, `gacha-task-manager-2026-07-${day}.sqlite`), day)
+      writeFileSync(join(backupDirectory, `gtask-2026-07-${day}.sqlite`), day)
     }
     const protectedNames = [
-      'gacha-task-manager-manual-20260720-090000-000.sqlite',
-      'gacha-task-manager-before-restore-20260720-091000-000.sqlite',
-      'gacha-task-manager-before-v7-20260720-092000.sqlite'
+      'gtask-manual-20260720-090000-000.sqlite',
+      'gtask-before-restore-20260720-091000-000.sqlite',
+      'gtask-before-v7-20260720-092000.sqlite'
     ]
     for (const fileName of protectedNames) writeFileSync(join(backupDirectory, fileName), fileName)
 
     expect(pruneDailyBackups(backupDirectory, 2)).toEqual([
-      'gacha-task-manager-2026-07-18.sqlite',
-      'gacha-task-manager-2026-07-17.sqlite'
+      'gtask-2026-07-18.sqlite',
+      'gtask-2026-07-17.sqlite'
     ])
     expect(listBackups(backupDirectory).map((backup) => backup.fileName)).toEqual(
       expect.arrayContaining([
-        'gacha-task-manager-2026-07-20.sqlite',
-        'gacha-task-manager-2026-07-19.sqlite',
+        'gtask-2026-07-20.sqlite',
+        'gtask-2026-07-19.sqlite',
         ...protectedNames
       ])
     )
@@ -110,7 +110,7 @@ describe('createDailyBackup', () => {
   })
 
   it('恢复已知备份前保留当前数据库的安全副本', async () => {
-    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-restore-backup-test-'))
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-restore-backup-test-'))
     const databasePath = join(temporaryDirectory, 'source.sqlite')
     const backupDirectory = join(temporaryDirectory, 'backups')
     database = new AppDatabase(databasePath)
@@ -142,7 +142,7 @@ describe('createDailyBackup', () => {
   })
 
   it('拒绝恢复备份目录之外的路径', async () => {
-    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-restore-path-test-'))
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-restore-path-test-'))
     const databasePath = join(temporaryDirectory, 'source.sqlite')
     const backupDirectory = join(temporaryDirectory, 'backups')
     database = new AppDatabase(databasePath)
@@ -154,7 +154,7 @@ describe('createDailyBackup', () => {
   })
 
   it('替换当前数据库前拒绝来自未来版本的备份', async () => {
-    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-restore-version-test-'))
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-restore-version-test-'))
     const databasePath = join(temporaryDirectory, 'source.sqlite')
     const backupDirectory = join(temporaryDirectory, 'backups')
     database = new AppDatabase(databasePath)

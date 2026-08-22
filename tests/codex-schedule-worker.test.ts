@@ -135,7 +135,7 @@ describe('Codex schedule worker', () => {
       return new FakeChildProcess() as unknown as ChildProcess
     }) as typeof spawn
     const worker = new CodexScheduleWorker({
-      workingDirectory: 'C:\\AppData\\gacha-task-manager',
+      workingDirectory: 'C:\\AppData\\gtask',
       env: {},
       findExecutable: () => executablePath,
       spawnProcess
@@ -146,7 +146,7 @@ describe('Codex schedule worker', () => {
     expect(spawnOptions).toEqual(expect.objectContaining({
       env: expect.objectContaining({
         PATH: process.env.PATH,
-        CODEX_GACHA_BACKGROUND: '1'
+        CODEX_GTASK_BACKGROUND: '1'
       })
     }))
   })
@@ -154,10 +154,10 @@ describe('Codex schedule worker', () => {
   it('uses a ChatGPT-authenticated HTTPS provider only for compatibility mode', () => {
     expect(codexWorkerTransportArguments()).toEqual([])
     const args = codexWorkerTransportArguments('https_compatibility')
-    expect(args).toContain('model_provider="gacha-chatgpt-http"')
-    expect(args).toContain('model_providers.gacha-chatgpt-http.supports_websockets=false')
+    expect(args).toContain('model_provider="gtask-chatgpt-http"')
+    expect(args).toContain('model_providers.gtask-chatgpt-http.supports_websockets=false')
     expect(args).toContain(
-      'model_providers.gacha-chatgpt-http.base_url="https://chatgpt.com/backend-api/codex"'
+      'model_providers.gtask-chatgpt-http.base_url="https://chatgpt.com/backend-api/codex"'
     )
   })
 

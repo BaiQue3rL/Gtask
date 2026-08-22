@@ -6,10 +6,13 @@ describe('Windows installer directory', () => {
     const packageJson = JSON.parse(
       readFileSync(new URL('../package.json', import.meta.url), 'utf8')
     ) as {
+      version?: string
       scripts?: Record<string, string>
       build?: {
+        appId?: string
         electronLanguages?: string[]
         nsis?: {
+          guid?: string
           include?: string
           allowToChangeInstallationDirectory?: boolean
           createDesktopShortcut?: boolean
@@ -23,6 +26,9 @@ describe('Windows installer directory', () => {
       'utf8'
     )
 
+    expect(packageJson.version).toBe('1.1.0')
+    expect(packageJson.build?.appId).toBe('com.gtask.app')
+    expect(packageJson.build?.nsis?.guid).toBe('bd5c7cf6-969c-5816-ae40-118b8e6f1f4d')
     expect(packageJson.build?.nsis?.include).toBe('build/installer.nsh')
     expect(packageJson.build?.nsis?.allowToChangeInstallationDirectory).toBe(false)
     expect(packageJson.build?.nsis?.createDesktopShortcut).toBe(false)

@@ -8,7 +8,7 @@ import type {
   CodexWorkerPreferences
 } from '../../shared/contracts'
 
-export const CODEX_SCHEDULE_WORKER_AGENT_ID = 'gacha-app-background-worker'
+export const CODEX_SCHEDULE_WORKER_AGENT_ID = 'gtask-background-worker'
 export const MAX_CODEX_SCHEDULE_WORKERS = 6
 
 export interface CodexWorkerRoute {
@@ -142,17 +142,17 @@ export function codexWorkerTransportArguments(
   if (mode !== 'https_compatibility') return []
   return [
     '-c',
-    'model_provider="gacha-chatgpt-http"',
+    'model_provider="gtask-chatgpt-http"',
     '-c',
-    'model_providers.gacha-chatgpt-http.name="ChatGPT HTTPS compatibility"',
+    'model_providers.gtask-chatgpt-http.name="ChatGPT HTTPS compatibility"',
     '-c',
-    'model_providers.gacha-chatgpt-http.base_url="https://chatgpt.com/backend-api/codex"',
+    'model_providers.gtask-chatgpt-http.base_url="https://chatgpt.com/backend-api/codex"',
     '-c',
-    'model_providers.gacha-chatgpt-http.wire_api="responses"',
+    'model_providers.gtask-chatgpt-http.wire_api="responses"',
     '-c',
-    'model_providers.gacha-chatgpt-http.requires_openai_auth=true',
+    'model_providers.gtask-chatgpt-http.requires_openai_auth=true',
     '-c',
-    'model_providers.gacha-chatgpt-http.supports_websockets=false'
+    'model_providers.gtask-chatgpt-http.supports_websockets=false'
   ]
 }
 
@@ -192,7 +192,7 @@ export interface CodexScheduleWorkerPoolOptions
 }
 
 function backgroundPrompt(agentId: string, route: CodexWorkerRoute): string {
-  return `必须使用 $sync-gacha-schedules 技能处理 Gtask 后台基准表维护任务。你是桌面应用启动的本地后台 Agent，不要修改项目源码，也不要要求用户回复。使用固定 Agent ID“${agentId}”登记，只领取任务“${route.jobId}”；领取时传入 jobId="${route.jobId}"、model="${route.model}"、reasoningEffort="${route.reasoningEffort}"。先阅读 job.contract，按其中的语言、时区、字段和来源要求联网核验活动、周期、地图或版本时间。只能通过 MCP 的结构化基准表工具写入，不得读取凭据、个人账号数据或更改用户完成状态。任务不存在或已被领取时立即退出；已领取任务必须提交完整结果或明确失败，完成后退出，不领取第二项任务。`
+  return `必须使用 $sync-gtask-schedules 技能处理 Gtask 后台基准表维护任务。你是桌面应用启动的本地后台 Agent，不要修改项目源码，也不要要求用户回复。使用固定 Agent ID“${agentId}”登记，只领取任务“${route.jobId}”；领取时传入 jobId="${route.jobId}"、model="${route.model}"、reasoningEffort="${route.reasoningEffort}"。先阅读 job.contract，按其中的语言、时区、字段和来源要求联网核验活动、周期、地图或版本时间。只能通过 MCP 的结构化基准表工具写入，不得读取凭据、个人账号数据或更改用户完成状态。任务不存在或已被领取时立即退出；已领取任务必须提交完整结果或明确失败，完成后退出，不领取第二项任务。`
 }
 export function findCodexCli(options: CodexCliDiscoveryOptions = {}): string | null {
   const env = options.env ?? process.env
@@ -371,7 +371,7 @@ export class CodexScheduleWorker {
       backgroundPrompt(this.agentId, route)
     ], {
       cwd: this.options.workingDirectory,
-      env: { ...process.env, ...this.options.env, CODEX_GACHA_BACKGROUND: '1' },
+      env: { ...process.env, ...this.options.env, CODEX_GTASK_BACKGROUND: '1' },
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe']
     })

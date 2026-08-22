@@ -68,7 +68,7 @@ describe('product copy and built-in section boundaries', () => {
   })
 
   it('uses the shared compact switch treatment for every settings toggle', () => {
-    expect(app.match(/class="toggle-switch-input"/g)).toHaveLength(4)
+    expect(app.match(/class="toggle-switch-input"/g)).toHaveLength(5)
     expect(styles).toContain('.toggle-switch-input:checked + .toggle-switch')
     expect(styles).toMatch(/\.editor-modal \.game-visibility-row \{[^}]*display: flex[^}]*min-height: 42px[^}]*margin-top: 0/)
   })

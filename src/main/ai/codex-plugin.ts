@@ -42,7 +42,7 @@ export function detectCodexPlugin(
     if (exists(configPath)) {
       const config = readText(configPath)
       const matches = [...config.matchAll(
-        /\[plugins\."gacha-task-manager@([^"]+)"\]([\s\S]*?)(?=\r?\n\[|$)/g
+        /\[plugins\."gtask@([^"]+)"\]([\s\S]*?)(?=\r?\n\[|$)/g
       )]
       const active = matches.find((match) => /^enabled\s*=\s*true\s*$/m.test(match[2]))
       marketplaceName = active?.[1] ?? matches[0]?.[1] ?? marketplaceName
@@ -52,7 +52,7 @@ export function detectCodexPlugin(
     enabled = false
   }
 
-  let cachePath = join(cacheRoot, marketplaceName, 'gacha-task-manager')
+  let cachePath = join(cacheRoot, marketplaceName, 'gtask')
   let cached = false
   try {
     cached = exists(cachePath) && listDirectory(cachePath).length > 0
@@ -67,6 +67,6 @@ export function detectCodexPlugin(
     installed: enabled && cached,
     marketplacePath,
     cachePath,
-    deeplink: `codex://plugins/gacha-task-manager?marketplacePath=${encodeURIComponent(marketplacePath)}`
+    deeplink: `codex://plugins/gtask?marketplacePath=${encodeURIComponent(marketplacePath)}`
   }
 }

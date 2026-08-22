@@ -94,7 +94,7 @@ const DEFAULT_GAMES: GameSummary[] = [
 
 // Version 1 is the public Gtask 1.0 baseline. All later structural changes use
 // explicit forward migrations so existing user data remains intact.
-export const CURRENT_SCHEMA_VERSION = 3
+export const CURRENT_SCHEMA_VERSION = 4
 
 const AI_AGENT_MAX_AGE_MS = 5 * 60 * 1000
 const AI_JOB_CLAIM_MAX_AGE_MS = 15 * 60 * 1000
@@ -3701,6 +3701,10 @@ export class AppDatabase {
         'SELECT MAX(version) AS version FROM schema_migrations'
       ).get() as { version: number | null }
       if (migrated.version === 2) this.migrateVersion2To3()
+      const renamed = this.database.prepare(
+        'SELECT MAX(version) AS version FROM schema_migrations'
+      ).get() as { version: number | null }
+      if (renamed.version === 3) this.migrateVersion3To4()
       const current = this.database.prepare(
         'SELECT MAX(version) AS version FROM schema_migrations'
       ).get() as { version: number | null }
@@ -4061,6 +4065,45 @@ export class AppDatabase {
       `).run()
       this.database.prepare(`
         INSERT INTO schema_migrations(version, applied_at) VALUES (3, ?)
+      `).run(now)
+      this.database.exec('COMMIT')
+    } catch (error) {
+      this.database.exec('ROLLBACK')
+      throw error
+    }
+  }
+
+  private migrateVersion3To4(): void {
+    const now = new Date().toISOString()
+    this.database.exec('BEGIN IMMEDIATE')
+    try {
+      // Keep historical job relationships intact while moving the persisted
+      // background worker identity to the current product namespace.
+      this.database.prepare(`
+        INSERT OR IGNORE INTO ai_schedule_agents(id, name, last_seen_at, created_at, updated_at)
+        SELECT REPLACE(id, 'gacha-app-background-worker', 'gtask-background-worker'),
+          name, last_seen_at, created_at, ?
+        FROM ai_schedule_agents
+        WHERE id LIKE 'gacha-app-background-worker%'
+      `).run(now)
+      this.database.exec(`
+        UPDATE ai_schedule_jobs
+        SET agent_id = REPLACE(agent_id, 'gacha-app-background-worker', 'gtask-background-worker')
+        WHERE agent_id LIKE 'gacha-app-background-worker%';
+        UPDATE ai_schedule_job_attempts
+        SET agent_id = REPLACE(agent_id, 'gacha-app-background-worker', 'gtask-background-worker')
+        WHERE agent_id LIKE 'gacha-app-background-worker%';
+        UPDATE activity_tag_registry
+        SET created_by_agent = REPLACE(
+          created_by_agent,
+          'gacha-app-background-worker',
+          'gtask-background-worker'
+        )
+        WHERE created_by_agent LIKE 'gacha-app-background-worker%';
+        DELETE FROM ai_schedule_agents WHERE id LIKE 'gacha-app-background-worker%';
+      `)
+      this.database.prepare(`
+        INSERT INTO schema_migrations(version, applied_at) VALUES (4, ?)
       `).run(now)
       this.database.exec('COMMIT')
     } catch (error) {

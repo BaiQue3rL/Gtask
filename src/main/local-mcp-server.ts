@@ -102,10 +102,10 @@ export function createLocalMcpServer(
   options: LocalMcpServerOptions = {}
 ): McpServer {
   const commands = new LocalCommandService(database)
-  const server = new McpServer({ name: 'gacha-task-manager', version: '0.1.0' })
+  const server = new McpServer({ name: 'gtask', version: '1.1.0' })
 
   server.registerTool(
-    'describe_gacha_commands',
+    'describe_gtask_commands',
     {
       title: '查看 Gtask 命令能力',
       description: '返回支持的游戏、分类、版块、命令和需要显式确认的删除操作。',
@@ -116,7 +116,7 @@ export function createLocalMcpServer(
   )
 
   server.registerTool(
-    'read_gacha_checklists',
+    'read_gtask_checklists',
     {
       title: '读取 Gtask',
       description: '读取全部已启用游戏或指定游戏的本地清单、同步状态和可选回收站内容。',
@@ -148,11 +148,11 @@ export function createLocalMcpServer(
   )
 
   server.registerTool(
-    'write_gacha_checklists',
+    'write_gtask_checklists',
     {
       title: '更新 Gtask',
       description:
-        '执行新增、更新、恢复或软删除命令。先调用 describe_gacha_commands；删除必须在 request 中显式传入 confirm: true。',
+        '执行新增、更新、恢复或软删除命令。先调用 describe_gtask_commands；删除必须在 request 中显式传入 confirm: true。',
       inputSchema: {
         request: z.record(z.string(), z.unknown()).describe('LocalCommandService 命令对象')
       },
@@ -168,7 +168,7 @@ export function createLocalMcpServer(
   )
 
   server.registerTool(
-    'create_gacha_item',
+    'create_gtask_item',
     {
       title: '新增 Gtask 事项',
       description: '向指定游戏新增活动、周期事项、地图探索或自定义事项。字段语义与清单记录一致。',
@@ -185,7 +185,7 @@ export function createLocalMcpServer(
   )
 
   server.registerTool(
-    'update_gacha_item',
+    'update_gtask_item',
     {
       title: '更新 Gtask 事项',
       description: '按事项 ID 修改名称、分类、完成状态、进度、时间或周期字段。只需传入需要改变的字段。',
@@ -220,7 +220,7 @@ export function createLocalMcpServer(
   )
 
   server.registerTool(
-    'restore_gacha_item',
+    'restore_gtask_item',
     {
       title: '恢复 Gtask 事项',
       description: '按事项 ID 从回收站恢复一条事项。',
@@ -237,7 +237,7 @@ export function createLocalMcpServer(
   )
 
   server.registerTool(
-    'archive_gacha_item',
+    'archive_gtask_item',
     {
       title: '删除 Gtask 事项',
       description: '按事项 ID 软删除一条事项，可从回收站恢复。必须显式确认。',
@@ -257,7 +257,7 @@ export function createLocalMcpServer(
   )
 
   server.registerTool(
-    'archive_completed_gacha_section',
+    'archive_completed_gtask_section',
     {
       title: '删除版块已完成事项',
       description: '仅软删除指定游戏和指定版块中的已完成事项。必须显式确认。',
@@ -280,7 +280,7 @@ export function createLocalMcpServer(
   )
 
   server.registerTool(
-    'register_gacha_schedule_agent',
+    'register_gtask_schedule_agent',
     {
       title: '登记 Codex 基准维护端',
       description: '登记或刷新具备联网搜索能力的本机 Codex 维护端心跳；维护端应至少每五分钟调用一次。',
@@ -309,7 +309,7 @@ export function createLocalMcpServer(
   )
 
   server.registerTool(
-    'queue_gacha_baseline_maintenance',
+    'queue_gtask_baseline_maintenance',
     {
       title: '创建基准表维护任务',
       description: '由本机 Codex 管理端为指定游戏和版块创建一次基准表维护任务；调用方应只领取返回的精确 jobId。',
@@ -341,7 +341,7 @@ export function createLocalMcpServer(
   )
 
   server.registerTool(
-    'claim_gacha_schedule_job',
+    'claim_gtask_schedule_job',
     {
       title: '领取基准表维护任务',
       description: '领取最早的后台基准表维护任务。返回的 job.contract 是当前版块所需数据、字段语义和完成条件的权威机器可读契约；Agent 应先读取契约再联网检索。无任务时返回 null。',
@@ -371,7 +371,7 @@ export function createLocalMcpServer(
   )
 
   server.registerTool(
-    'update_gacha_schedule_job_progress',
+    'update_gtask_schedule_job_progress',
     {
       title: '更新公开资料同步进度',
       description: '记录 Codex 当前的结构化阶段、数量与内部诊断。Gtask 只按 phase/current/total 生成固定用户文案，不直接展示 message。',
@@ -405,7 +405,7 @@ export function createLocalMcpServer(
   )
 
   server.registerTool(
-    'register_gacha_activity_tag',
+    'register_gtask_activity_tag',
     {
       title: '注册新的活动标签',
       description: '仅在现有 activityTagCatalog 无法准确描述一种新玩法时使用。注册可复用的 custom.* 稳定标签 ID 后，再在当前任务提交中引用该 ID。',
@@ -449,7 +449,7 @@ export function createLocalMcpServer(
   )
 
   server.registerTool(
-    'apply_gacha_public_schedule',
+    'apply_gtask_public_schedule',
     {
       title: '提交已验证的公开资料',
       description: '按已领取 job.contract 提交 Codex 核验后的当前版本时间、活动、周期排期或地图目录；输入 schema 是各版块字段的并集，条件必填与禁止字段以 contract 为准。也可把确认错误、重复或失效的同步项移入回收站。',
@@ -584,7 +584,7 @@ export function createLocalMcpServer(
   )
 
   server.registerTool(
-    'fail_gacha_schedule_job',
+    'fail_gtask_schedule_job',
     {
       title: '报告公开资料检索失败',
       description: 'Codex 穷尽有用检索后结束已领取任务；不撤销此前已经安全保存的版块结果。',
@@ -609,8 +609,8 @@ export function createLocalMcpServer(
 
   if (options.backupDirectory) {
     server.registerResource(
-      'gacha-backups',
-      'gacha://backups',
+      'gtask-backups',
+      'gtask://backups',
       {
         title: 'Gtask 本地备份',
         description: '最近的每日、手动和数据库升级前备份元数据；不包含登录凭据。',
@@ -619,7 +619,7 @@ export function createLocalMcpServer(
       async () => ({
         contents: [
           {
-            uri: 'gacha://backups',
+            uri: 'gtask://backups',
             mimeType: 'application/json',
             text: JSON.stringify({ backups: listBackups(options.backupDirectory!) }, null, 2)
           }

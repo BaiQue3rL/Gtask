@@ -28,10 +28,10 @@ afterEach(async () => {
 
 async function connect(): Promise<Client> {
   database = new AppDatabase(':memory:', { seedBundledBaselines: false })
-  temporaryDirectory = mkdtempSync(join(tmpdir(), 'gacha-mcp-resource-test-'))
+  temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-mcp-resource-test-'))
   await createDailyBackup(database, temporaryDirectory, new Date('2026-07-20T08:00:00+08:00'))
   server = createLocalMcpServer(database, { backupDirectory: temporaryDirectory })
-  client = new Client({ name: 'gacha-test-client', version: '1.0.0' })
+  client = new Client({ name: 'gtask-test-client', version: '1.0.0' })
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
   await Promise.all([server.connect(serverTransport), client.connect(clientTransport)])
   return client
@@ -42,23 +42,23 @@ describe('本地 MCP server', () => {
     const connected = await connect()
     const tools = await connected.listTools()
     expect(tools.tools.map((tool) => tool.name)).toEqual([
-      'describe_gacha_commands',
-      'read_gacha_checklists',
-      'write_gacha_checklists',
-      'create_gacha_item',
-      'update_gacha_item',
-      'restore_gacha_item',
-      'archive_gacha_item',
-      'archive_completed_gacha_section',
-      'register_gacha_schedule_agent',
-      'queue_gacha_baseline_maintenance',
-      'claim_gacha_schedule_job',
-      'update_gacha_schedule_job_progress',
-      'register_gacha_activity_tag',
-      'apply_gacha_public_schedule',
-      'fail_gacha_schedule_job'
+      'describe_gtask_commands',
+      'read_gtask_checklists',
+      'write_gtask_checklists',
+      'create_gtask_item',
+      'update_gtask_item',
+      'restore_gtask_item',
+      'archive_gtask_item',
+      'archive_completed_gtask_section',
+      'register_gtask_schedule_agent',
+      'queue_gtask_baseline_maintenance',
+      'claim_gtask_schedule_job',
+      'update_gtask_schedule_job_progress',
+      'register_gtask_activity_tag',
+      'apply_gtask_public_schedule',
+      'fail_gtask_schedule_job'
     ])
-    const updateTool = tools.tools.find((tool) => tool.name === 'update_gacha_item')
+    const updateTool = tools.tools.find((tool) => tool.name === 'update_gtask_item')
     expect(Object.keys(
       (updateTool?.inputSchema as { properties?: Record<string, unknown> }).properties ?? {}
     )).toEqual(expect.arrayContaining([
@@ -67,14 +67,14 @@ describe('本地 MCP server', () => {
       'parentRemoteKey',
     ]))
     const publicScheduleTool = tools.tools.find(
-      (tool) => tool.name === 'apply_gacha_public_schedule'
+      (tool) => tool.name === 'apply_gtask_public_schedule'
     )
     expect(Object.keys(
       (publicScheduleTool?.inputSchema as { properties?: Record<string, unknown> }).properties ?? {}
     )).toContain('verifiedUnchangedTargets')
 
     const response = await connected.callTool({
-      name: 'read_gacha_checklists',
+      name: 'read_gtask_checklists',
       arguments: {}
     })
     expect(response.isError).not.toBe(true)
@@ -90,9 +90,9 @@ describe('本地 MCP server', () => {
 
     const resources = await connected.listResources()
     expect(resources.resources).toEqual(
-      expect.arrayContaining([expect.objectContaining({ uri: 'gacha://backups' })])
+      expect.arrayContaining([expect.objectContaining({ uri: 'gtask://backups' })])
     )
-    const backupResource = await connected.readResource({ uri: 'gacha://backups' })
+    const backupResource = await connected.readResource({ uri: 'gtask://backups' })
     const backupContent = backupResource.contents[0]
     if (!('text' in backupContent)) throw new Error('备份资源不是文本 JSON')
     expect(JSON.parse(backupContent.text)).toMatchObject({
@@ -103,7 +103,7 @@ describe('本地 MCP server', () => {
   it('通过协议写入并保留删除显式确认保护', async () => {
     const connected = await connect()
     const created = await connected.callTool({
-      name: 'create_gacha_item',
+      name: 'create_gtask_item',
       arguments: {
         gameId: 'genshin',
         category: 'custom',
@@ -118,7 +118,7 @@ describe('本地 MCP server', () => {
 
     const item = (created.structuredContent as { item: { id: string } }).item
     const rejected = await connected.callTool({
-      name: 'archive_gacha_item',
+      name: 'archive_gtask_item',
       arguments: { id: item.id, confirm: false }
     })
     expect(rejected.isError).toBe(true)
@@ -133,7 +133,7 @@ describe('本地 MCP server', () => {
     expect(() => database!.createAiScheduleJob('genshin', 'public_schedule')).toThrow('尚未连接')
 
     const registered = await connected.callTool({
-      name: 'register_gacha_schedule_agent',
+      name: 'register_gtask_schedule_agent',
       arguments: {
         agentId: 'test-agent',
         name: '测试搜索 Agent',
@@ -162,7 +162,7 @@ describe('本地 MCP server', () => {
       'events'
     ).id).toBe(queued.id)
     const claimed = await connected.callTool({
-      name: 'claim_gacha_schedule_job',
+      name: 'claim_gtask_schedule_job',
       arguments: { agentId: 'test-agent' }
     })
     expect(claimed.structuredContent).toMatchObject({
@@ -205,7 +205,7 @@ describe('本地 MCP server', () => {
     })
 
     const progress = await connected.callTool({
-      name: 'update_gacha_schedule_job_progress',
+      name: 'update_gtask_schedule_job_progress',
       arguments: {
         agentId: 'test-agent',
         jobId: queued.id,
@@ -227,7 +227,7 @@ describe('本地 MCP server', () => {
     })
 
     const rejectedCompletion = await connected.callTool({
-      name: 'apply_gacha_public_schedule',
+      name: 'apply_gtask_public_schedule',
       arguments: {
         agentId: 'test-agent',
         jobId: queued.id,
@@ -255,7 +255,7 @@ describe('本地 MCP server', () => {
     expect(database!.listChecklistItems('genshin').some((item) => item.title === '不能夹带完成状态')).toBe(false)
 
     const rejectedEnglishTitle = await connected.callTool({
-      name: 'apply_gacha_public_schedule',
+      name: 'apply_gtask_public_schedule',
       arguments: {
         agentId: 'test-agent',
         jobId: queued.id,
@@ -281,7 +281,7 @@ describe('本地 MCP server', () => {
     expect(rejectedEnglishTitle.isError).toBe(true)
 
     const applied = await connected.callTool({
-      name: 'apply_gacha_public_schedule',
+      name: 'apply_gtask_public_schedule',
       arguments: {
         agentId: 'test-agent',
         jobId: queued.id,
@@ -334,7 +334,7 @@ describe('本地 MCP server', () => {
   it('旧缓存上报的协议号只作诊断，不阻塞本机 Codex 管理端', async () => {
     const connected = await connect()
     const result = await connected.callTool({
-      name: 'register_gacha_schedule_agent',
+      name: 'register_gtask_schedule_agent',
       arguments: {
         agentId: 'old-plugin-agent',
         name: '旧插件 Agent',
@@ -360,7 +360,7 @@ describe('本地 MCP server', () => {
   it('完整核查无差异时显式完成任务且不重写任何清单项', async () => {
     const connected = await connect()
     await connected.callTool({
-      name: 'register_gacha_schedule_agent',
+      name: 'register_gtask_schedule_agent',
       arguments: {
         agentId: 'unchanged-mcp-agent',
         name: '无变化核查 Agent',
@@ -372,7 +372,7 @@ describe('本地 MCP server', () => {
       'zenless', 'public_schedule', new Date('2026-08-20T10:00:00.000Z'), false, 'cycles'
     )
     const claimed = await connected.callTool({
-      name: 'claim_gacha_schedule_job',
+      name: 'claim_gtask_schedule_job',
       arguments: { agentId: 'unchanged-mcp-agent', jobId: queued.id }
     })
     expect(claimed.structuredContent).toMatchObject({
@@ -384,7 +384,7 @@ describe('本地 MCP server', () => {
     })
 
     const applied = await connected.callTool({
-      name: 'apply_gacha_public_schedule',
+      name: 'apply_gtask_public_schedule',
       arguments: {
         agentId: 'unchanged-mcp-agent',
         jobId: queued.id,
@@ -414,7 +414,7 @@ describe('本地 MCP server', () => {
   it('新活动玩法必须先注册稳定标签 ID，注册后可复用并按界面语言展示', async () => {
     const connected = await connect()
     await connected.callTool({
-      name: 'register_gacha_schedule_agent',
+      name: 'register_gtask_schedule_agent',
       arguments: {
         agentId: 'custom-tag-agent',
         name: '新玩法标签 Agent',
@@ -430,12 +430,12 @@ describe('本地 MCP server', () => {
       'events'
     )
     await connected.callTool({
-      name: 'claim_gacha_schedule_job',
+      name: 'claim_gtask_schedule_job',
       arguments: { agentId: 'custom-tag-agent' }
     })
 
     const unregistered = await connected.callTool({
-      name: 'apply_gacha_public_schedule',
+      name: 'apply_gtask_public_schedule',
       arguments: {
         agentId: 'custom-tag-agent',
         jobId: queued.id,
@@ -464,7 +464,7 @@ describe('本地 MCP server', () => {
     expect(unregistered.isError).toBe(true)
 
     const registered = await connected.callTool({
-      name: 'register_gacha_activity_tag',
+      name: 'register_gtask_activity_tag',
       arguments: {
         agentId: 'custom-tag-agent',
         jobId: queued.id,
@@ -483,7 +483,7 @@ describe('本地 MCP server', () => {
     })
 
     const applied = await connected.callTool({
-      name: 'apply_gacha_public_schedule',
+      name: 'apply_gtask_public_schedule',
       arguments: {
         agentId: 'custom-tag-agent',
         jobId: queued.id,
@@ -518,7 +518,7 @@ describe('本地 MCP server', () => {
   it('公开资料回写拒绝不带时区的时间', async () => {
     const connected = await connect()
     await connected.callTool({
-      name: 'register_gacha_schedule_agent',
+      name: 'register_gtask_schedule_agent',
       arguments: {
         agentId: 'timezone-agent',
         name: '时区测试 Agent',
@@ -528,11 +528,11 @@ describe('本地 MCP server', () => {
     })
     const queued = database!.createAiScheduleJob('genshin', 'public_schedule')
     await connected.callTool({
-      name: 'claim_gacha_schedule_job',
+      name: 'claim_gtask_schedule_job',
       arguments: { agentId: 'timezone-agent' }
     })
     const result = await connected.callTool({
-      name: 'apply_gacha_public_schedule',
+      name: 'apply_gtask_public_schedule',
       arguments: {
         agentId: 'timezone-agent',
         jobId: queued.id,
@@ -570,7 +570,7 @@ describe('本地 MCP server', () => {
       endsAt: '2026-08-20T00:00:00.000Z'
     }])
     await connected.callTool({
-      name: 'register_gacha_schedule_agent',
+      name: 'register_gtask_schedule_agent',
       arguments: {
         agentId: 'tag-mcp-agent',
         name: '标签 MCP Agent',
@@ -586,7 +586,7 @@ describe('本地 MCP server', () => {
       'events'
     )
     const claimed = await connected.callTool({
-      name: 'claim_gacha_schedule_job',
+      name: 'claim_gtask_schedule_job',
       arguments: { agentId: 'tag-mcp-agent' }
     })
     const target = (
@@ -597,7 +597,7 @@ describe('本地 MCP server', () => {
     expect(target).toMatchObject({ title: '巡星之礼' })
 
     const omitted = await connected.callTool({
-      name: 'apply_gacha_public_schedule',
+      name: 'apply_gtask_public_schedule',
       arguments: {
         agentId: 'tag-mcp-agent',
         jobId: queued.id,
@@ -637,7 +637,7 @@ describe('本地 MCP server', () => {
       'events'
     )
     const tagClaimed = await connected.callTool({
-      name: 'claim_gacha_schedule_job',
+      name: 'claim_gtask_schedule_job',
       arguments: { agentId: 'tag-mcp-agent' }
     })
     const tagTarget = (
@@ -647,7 +647,7 @@ describe('本地 MCP server', () => {
     ).job.activityTagTargets.find((candidate) => candidate.title === '巡星之礼')!
 
     const applied = await connected.callTool({
-      name: 'apply_gacha_public_schedule',
+      name: 'apply_gtask_public_schedule',
       arguments: {
         agentId: 'tag-mcp-agent',
         jobId: tagJob.id,
@@ -678,7 +678,7 @@ describe('本地 MCP server', () => {
   it('公开资料 MCP 接受地图区域目录并以 0% 初始化', async () => {
     const connected = await connect()
     await connected.callTool({
-      name: 'register_gacha_schedule_agent',
+      name: 'register_gtask_schedule_agent',
       arguments: {
         agentId: 'map-agent',
         name: '地图测试 Agent',
@@ -694,12 +694,12 @@ describe('本地 MCP server', () => {
       'exploration'
     )
     await connected.callTool({
-      name: 'claim_gacha_schedule_job',
+      name: 'claim_gtask_schedule_job',
       arguments: { agentId: 'map-agent' }
     })
     const sourceUrl = 'https://example.com/genshin-map-cn'
     const result = await connected.callTool({
-      name: 'apply_gacha_public_schedule',
+      name: 'apply_gtask_public_schedule',
       arguments: {
         agentId: 'map-agent',
         jobId: queued.id,
@@ -758,7 +758,7 @@ describe('本地 MCP server', () => {
   it('公开资料 MCP 通过“版更校时”更新独立版本窗口而不创建任务事项', async () => {
     const connected = await connect()
     await connected.callTool({
-      name: 'register_gacha_schedule_agent',
+      name: 'register_gtask_schedule_agent',
       arguments: {
         agentId: 'version-agent',
         name: '版本校时 Agent',
@@ -774,7 +774,7 @@ describe('本地 MCP server', () => {
       'tasks'
     )
     await connected.callTool({
-      name: 'claim_gacha_schedule_job',
+      name: 'claim_gtask_schedule_job',
       arguments: { agentId: 'version-agent' }
     })
     const now = Date.now()
@@ -782,7 +782,7 @@ describe('本地 MCP server', () => {
     const endsAt = new Date(now + 40 * 24 * 60 * 60 * 1_000).toISOString()
     const sourceUrl = 'https://example.com/genshin-version-cn'
     const result = await connected.callTool({
-      name: 'apply_gacha_public_schedule',
+      name: 'apply_gtask_public_schedule',
       arguments: {
         agentId: 'version-agent',
         jobId: queued.id,
@@ -822,7 +822,7 @@ describe('本地 MCP server', () => {
   it('可在无界面和无在线 Agent 时创建基准表维护任务', async () => {
     const connected = await connect()
     const queued = await connected.callTool({
-      name: 'queue_gacha_baseline_maintenance',
+      name: 'queue_gtask_baseline_maintenance',
       arguments: {
         gameId: 'genshin',
         target: 'events',

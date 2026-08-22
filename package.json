@@ -1,6 +1,6 @@
 {
   "name": "gtask",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Windows desktop checklist for game schedules, tasks, and progress",
   "main": "./out/main/index.js",
   "author": "Gtask contributors",
@@ -52,7 +52,7 @@
     "zod": "4.0.0"
   },
   "build": {
-    "appId": "com.gachataskmanager.app",
+    "appId": "com.gtask.app",
     "productName": "Gtask",
     "electronDist": "node_modules/electron/dist",
     "electronLanguages": [
@@ -74,7 +74,7 @@
     ],
     "extraResources": [
       {
-        "from": "integrations/gacha-task-manager",
+        "from": "integrations/gtask",
         "to": "codex-plugin"
       },
       {
@@ -92,6 +92,7 @@
       "artifactName": "${productName}-${version}-portable.${ext}"
     },
     "nsis": {
+      "guid": "bd5c7cf6-969c-5816-ae40-118b8e6f1f4d",
       "artifactName": "${productName}-${version}-setup.${ext}",
       "include": "build/installer.nsh",
       "oneClick": false,

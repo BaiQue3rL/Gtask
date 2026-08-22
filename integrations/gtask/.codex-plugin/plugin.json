@@ -1,6 +1,6 @@
 {
-  "name": "gacha-task-manager",
-  "version": "1.0.0+codex.20260820110031",
+  "name": "gtask",
+  "version": "1.1.0+codex.20260822150112",
   "description": "Connect the local Codex maintainer to Gtask to verify and update public baseline data.",
   "author": {
     "name": "Gtask contributors"
