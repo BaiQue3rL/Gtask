@@ -29,7 +29,6 @@ import { readHiddenGameIds, writeHiddenGameIds } from './game-visibility'
 import {
   formatGameVersionRemaining,
   gameVersionDeadlineTone,
-  isGameVersionDeadlineUrgent,
   orderGamesByVersion
 } from './game-navigation'
 import { kuroRoleKey } from './kuro-role-key'
@@ -93,6 +92,8 @@ interface ConfirmationDialogState {
   onConfirm: () => Promise<void>
 }
 
+type SettingsSection = 'games' | 'appearance' | 'account-data' | 'updates'
+
 const panels: ChecklistPanel[] = [
   { title: '活动', section: 'events', categories: ['limited_event'], defaultCategory: 'limited_event', syncTarget: 'events', allowCreate: false, allowClear: false },
   { title: '周期', section: 'cycles', categories: ['endgame'], defaultCategory: 'endgame', syncTarget: 'cycles', allowCreate: false, allowClear: false },
@@ -149,6 +150,7 @@ const clockNow = ref(Date.now())
 const editorOpen = ref(false)
 const recycleBinOpen = ref(false)
 const settingsOpen = ref(false)
+const settingsSection = ref<SettingsSection>('games')
 const confirmationDialog = ref<ConfirmationDialogState | null>(null)
 const confirmationBusy = ref(false)
 const miyousheLoginOpen = ref(false)
@@ -765,6 +767,7 @@ async function loadArchivedItems(): Promise<void> {
 }
 
 async function openSettings(): Promise<void> {
+  settingsSection.value = 'games'
   settingsOpen.value = true
   try {
     const [
@@ -1454,6 +1457,10 @@ function versionRemainingForGame(gameId: GameId): string | null {
   return formatGameVersionRemaining(gameVersionEndsAt(gameId), clockNow.value)
 }
 
+function sidebarVersionRemainingForGame(gameId: GameId): string | null {
+  return versionRemainingForGame(gameId)?.replace(/^版本/, '') ?? null
+}
+
 function gameVersionEndsAt(gameId: GameId): string | null {
   return gameVersionSummaries.value.find((summary) => summary.gameId === gameId)?.endsAt ?? null
 }
@@ -1467,7 +1474,8 @@ function isExpired(value: string): boolean {
 }
 
 function isUrgentDeadline(value: string): boolean {
-  return isGameVersionDeadlineUrgent(value, clockNow.value)
+  const remaining = new Date(value).getTime() - clockNow.value
+  return remaining > 0 && remaining < 48 * 60 * 60 * 1_000
 }
 
 function isUpcoming(value: string): boolean {
@@ -1499,13 +1507,9 @@ function showError(error: unknown): void {
     <aside class="sidebar">
       <div class="brand">
         <img class="brand-mark" :src="appIcon" alt="" aria-hidden="true">
-        Gtask
+        <span>Gtask</span>
       </div>
-      <button class="overview active" type="button">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-        总览
-      </button>
-      <p class="section-label">我的游戏</p>
+      <p class="section-label">游戏</p>
       <nav class="game-list" aria-label="支持的游戏">
         <button
           v-for="game in visibleGames"
@@ -1514,42 +1518,60 @@ function showError(error: unknown): void {
           :class="{ selected: selectedGameId === game.id }"
           :style="{ '--game-accent': game.accent }"
           type="button"
+          :title="game.name"
           :aria-current="selectedGameId === game.id ? 'page' : undefined"
           @click="selectedGameId = game.id"
         >
           <img class="game-icon" :src="gameIcons[game.id]" alt="" aria-hidden="true">
           <span class="game-name">{{ game.name }}</span>
           <small
-            v-if="versionRemainingForGame(game.id)"
+            v-if="sidebarVersionRemainingForGame(game.id)"
             class="game-version-remaining"
             :class="versionDeadlineToneForGame(game.id)"
           >
-            {{ versionRemainingForGame(game.id) }}
+            {{ sidebarVersionRemainingForGame(game.id) }}
           </small>
         </button>
       </nav>
       <div class="sidebar-footer">
-        <button type="button" @click="recycleBinOpen = true">
+        <button type="button" title="回收站" @click="recycleBinOpen = true">
           <span class="sidebar-action-label">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></svg>
-            回收站
+            <svg class="sidebar-action-icon sidebar-action-icon-recycle" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></svg>
+            <span>回收站</span>
           </span>
           <span class="sidebar-action-count">{{ archivedItems.length }}</span>
         </button>
-        <button type="button" @click="openSettings">
+        <button type="button" title="设置" @click="openSettings">
           <span class="sidebar-action-label">
-            <svg class="settings-sidebar-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4A2 2 0 0 0 4 9.9l.2.1a2 2 0 0 1 1 1.7v.6a2 2 0 0 1-1 1.7l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7v.2a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.7v-.6a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></svg>
-            设置
+            <svg class="sidebar-action-icon sidebar-action-icon-settings" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4A2 2 0 0 0 4 9.9l.2.1a2 2 0 0 1 1 1.7v.6a2 2 0 0 1-1 1.7l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7v.2a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.7v-.6a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></svg>
+            <span>设置</span>
           </span>
         </button>
+        <p v-if="appInfo" class="sidebar-meta">v{{ appInfo.version }} · 数据仅保存在本机</p>
       </div>
     </aside>
 
     <section ref="workspaceElement" class="workspace">
       <header class="topbar">
-        <div>
-          <p class="eyebrow">我的任务</p>
-          <h1>{{ selectedGame?.name ?? 'Gtask' }}</h1>
+        <div class="page-heading">
+          <img
+            v-if="selectedGame"
+            class="page-game-icon"
+            :src="gameIcons[selectedGame.id]"
+            alt=""
+            aria-hidden="true"
+          >
+          <div class="page-heading-copy">
+            <p class="eyebrow">任务清单</p>
+            <div class="page-title-line">
+              <h1>{{ selectedGame?.name ?? 'Gtask' }}</h1>
+              <span
+                v-if="versionRemainingForGame(selectedGameId)"
+                class="page-version-remaining"
+                :class="versionDeadlineToneForGame(selectedGameId)"
+              >{{ versionRemainingForGame(selectedGameId) }}</span>
+            </div>
+          </div>
         </div>
         <div v-if="!loading && !restoringGameView" class="topbar-actions">
           <label class="incomplete-filter-control">
@@ -1651,7 +1673,8 @@ function showError(error: unknown): void {
                       :disabled="hasActivePersonalSyncForTarget(panel.syncTarget)"
                       @click="runPersonalSync(panel.syncTarget)"
                     >
-                      <span>↻ 同步进度</span>
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.34 5.66"/><path d="M20 5v6h-6"/></svg>
+                      <span>同步进度</span>
                     </button>
                   </div>
                   <button
@@ -1740,7 +1763,6 @@ function showError(error: unknown): void {
         </TransitionGroup>
       </div>
 
-      <footer v-if="appInfo" class="dev-footer">v{{ appInfo.version }} · 数据仅保存在本机</footer>
     </section>
 
     <div v-if="editorOpen" class="modal-backdrop" @click.self="editorOpen = false">
@@ -1791,214 +1813,209 @@ function showError(error: unknown): void {
     </div>
 
     <div v-if="settingsOpen" class="modal-backdrop" @click.self="closeSettings">
-      <section class="editor-modal recycle-modal settings-modal" role="dialog" aria-modal="true" aria-label="设置">
+      <section
+        class="editor-modal recycle-modal settings-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="设置"
+      >
         <div class="modal-header">
           <div><p class="eyebrow">本机设置</p><h2>设置</h2></div>
           <button class="close-button" type="button" aria-label="关闭设置" @click="closeSettings">×</button>
         </div>
-        <h3 class="settings-heading">我的游戏</h3>
-        <p class="recycle-hint">隐藏游戏只会收起侧栏入口，不会删除数据。</p>
-        <div class="game-visibility-list">
-          <label v-for="game in games" :key="game.id" class="game-visibility-row">
-            <span class="settings-game-label"><img class="game-icon" :src="gameIcons[game.id]" alt="" aria-hidden="true">{{ game.name }}</span>
-            <input
-              class="toggle-switch-input"
-              type="checkbox"
-              :checked="isGameVisible(game.id)"
-              :disabled="isGameVisible(game.id) && visibleGames.length === 1"
-              :aria-label="`显示 ${game.name}`"
-              @change="toggleGameVisibility(game.id)"
-            >
-            <span class="toggle-switch" aria-hidden="true">
-              <span class="toggle-switch-thumb"></span>
-            </span>
-          </label>
-        </div>
-        <h3 class="settings-heading">启动后自动同步</h3>
-        <p class="recycle-hint">打开 Gtask 时自动同步所选游戏的个人进度；10 分钟内重复打开不会再次同步。</p>
-        <div class="game-visibility-list">
-          <label v-for="game in games" :key="`auto-sync:${game.id}`" class="game-visibility-row">
-            <span class="settings-game-label"><img class="game-icon" :src="gameIcons[game.id]" alt="" aria-hidden="true">{{ game.name }}</span>
-            <input
-              class="toggle-switch-input"
-              type="checkbox"
-              :checked="syncSettingsByGame[game.id]?.autoSyncEnabled ?? false"
-              :aria-label="`启动后自动同步 ${game.name}`"
-              @change="saveAutoSyncPreference(game.id, ($event.target as HTMLInputElement).checked)"
-            >
-            <span class="toggle-switch" aria-hidden="true">
-              <span class="toggle-switch-thumb"></span>
-            </span>
-          </label>
-        </div>
-        <h3 class="settings-heading">显示内容</h3>
-        <div class="settings-box software-update-box">
-          <label class="software-update-toggle">
-            <span>
-              <strong>显示还没开始的事项</strong>
-              <small>默认隐藏还没开始的活动和任务，开始后会自动显示。</small>
-            </span>
-            <input
-              class="toggle-switch-input"
-              type="checkbox"
-              :checked="showUpcomingBaselineItems"
-              aria-label="显示还没开始的事项"
-              @change="saveUpcomingBaselineVisibility(($event.target as HTMLInputElement).checked)"
-            >
-            <span class="toggle-switch" aria-hidden="true">
-              <span class="toggle-switch-thumb"></span>
-            </span>
-          </label>
-        </div>
-        <h3 class="settings-heading">版块顺序</h3>
-        <div class="panel-order-setting">
-          <div>
-            <strong>{{ selectedGame?.name }}</strong>
-            <span>在总览里拖动标题旁的手柄，就能调整版块顺序。</span>
-          </div>
-          <button
-            class="secondary-button settings-action-button"
-            type="button"
-            :disabled="panelOrderIsDefault"
-            @click="resetPanelOrder"
-          >默认顺序</button>
-        </div>
-        <h3 class="settings-heading">显示设置</h3>
-        <div class="settings-box rendering-provider-box">
-          <label class="rendering-mode-field">
-            <span>显示模式</span>
-            <select v-model="renderingModeSelection">
-              <option value="compatibility">兼容模式（推荐）· 和游戏一起运行更稳定</option>
-              <option value="accelerated">GPU 加速 · 更流畅</option>
-            </select>
-          </label>
-          <div class="settings-control-footer">
-            <span>{{ renderingModeMessage || (renderingModeState?.active === 'compatibility'
-              ? '现在使用兼容模式，可以减少游戏、显卡驱动或叠加工具造成的残影。'
-              : '现在使用 GPU 加速；如果和游戏一起运行时出现残影，请改回兼容模式。') }}</span>
+        <div class="settings-layout">
+          <nav class="settings-nav" aria-label="设置分类">
             <button
-              class="primary-button settings-action-button"
               type="button"
-              :disabled="renderingModeBusy"
-              @click="saveRenderingMode"
-            >{{ renderingModeBusy ? '保存中…' : renderingModeSelection === renderingModeState?.active ? '保存设置' : '保存并重启' }}</button>
-          </div>
-        </div>
-        <h3 class="settings-heading">软件更新</h3>
-        <div class="settings-box software-update-box">
-          <label class="software-update-toggle">
-            <span>
-              <strong>启动后自动检查更新</strong>
-              <small>自动检查软件、活动和任务更新；24 小时内不会重复检查。</small>
-            </span>
-            <input
-              v-model="softwareUpdateSettings.autoCheckEnabled"
-              class="toggle-switch-input"
-              type="checkbox"
-              :disabled="softwareUpdateBusy || remoteCatalogUpdateBusy"
-              aria-label="启动后自动检查更新"
-              @change="saveSoftwareUpdatePreference"
-            >
-            <span class="toggle-switch" aria-hidden="true">
-              <span class="toggle-switch-thumb"></span>
-            </span>
-          </label>
-          <label class="software-update-source-field">
-            <span>更新来源</span>
-            <select
-              v-model="softwareUpdateSettings.updateSource"
-              :disabled="softwareUpdateBusy || remoteCatalogUpdateBusy"
-              aria-label="更新来源"
-              @change="saveSoftwareUpdatePreference"
-            >
-              <option value="auto">自动（Gitee 优先）</option>
-              <option value="gitee">Gitee 镜像</option>
-              <option value="github">GitHub</option>
-            </select>
-          </label>
-          <div class="software-update-footer">
-            <span>
-              <strong>当前版本 v{{ appInfo?.version ?? '—' }}</strong>
-              <small>{{ remoteCatalogUpdateMessage || softwareUpdateMessage || formatUpdateCheckTime(softwareUpdateSettings.lastSuccessfulCheckAt) }}</small>
-            </span>
-            <div class="software-update-actions">
-              <button
-                class="secondary-button settings-action-button"
-                type="button"
-                :disabled="softwareUpdateBusy || remoteCatalogUpdateBusy || remoteCatalogManualRetryMinutes > 0"
-                @click="checkRemoteCatalogUpdate"
-              >{{ remoteCatalogUpdateBusy ? '更新中…' : remoteCatalogManualRetryMinutes > 0 ? `${remoteCatalogManualRetryMinutes}分重试` : '更新清单' }}</button>
-              <button
-                class="secondary-button settings-action-button"
-                type="button"
-                :disabled="softwareUpdateBusy || remoteCatalogUpdateBusy"
-                @click="checkSoftwareUpdate"
-              >{{ softwareUpdateBusy ? '检查中…' : '检查更新' }}</button>
-            </div>
-          </div>
-        </div>
-        <h3 class="settings-heading data-heading">登录信息</h3>
-        <p class="recycle-hint">不登录也能正常使用；登录信息会由 Windows 加密后保存在本机。</p>
-        <div class="recycle-list">
-          <div
-            v-for="status in gameCredentialStatuses"
-            :key="status.provider"
-            class="recycle-row"
-            :data-credential-provider="status.provider"
-          >
-            <div>
-              <strong>{{ status.provider === 'miyoushe' ? '米游社' : '库街区' }}</strong>
-              <span>{{ status.stored ? `已安全保存 · ${formatLocalTime(status.updatedAt!)}` : '未登录' }}</span>
-            </div>
-            <div class="credential-actions">
-              <button
-                v-if="status.provider === 'miyoushe'"
-                class="secondary-button"
-                type="button"
-                :disabled="startingMiyousheLogin"
-                @click="startMiyousheLogin"
-              >{{ startingMiyousheLogin ? '获取中…' : status.stored ? '重新登录' : '扫码登录' }}</button>
-              <button
-                v-else
-                class="secondary-button"
-                type="button"
-                @click="openKuroCommunityLogin"
-              >{{ status.stored ? '重新登录' : '手机登录' }}</button>
-              <button
-                class="danger-button"
-                type="button"
-                :disabled="!status.stored"
-                @click="clearCredential(status.provider)"
-              >清除凭据</button>
-            </div>
-          </div>
-        </div>
-        <h3 class="settings-heading data-heading">本地数据与备份</h3>
-        <div class="data-location">
-          <span>{{ appInfo?.dataPath }}</span>
-          <div class="data-location-actions">
-            <button class="secondary-button" type="button" :disabled="backingUp" @click="createBackup">
-              {{ backingUp ? '备份中…' : '立即备份' }}
-            </button>
-            <button class="secondary-button" type="button" @click="openDataDirectory">打开目录</button>
-          </div>
-        </div>
-        <p class="recycle-hint">数据保存在系统“文档\Gtask”目录，自动保留最近 30 份每日备份。</p>
-        <div class="backup-list">
-          <div v-for="backup in backups" :key="backup.fileName" class="backup-row">
-            <div><strong>{{ backup.fileName }}</strong><span>{{ formatLocalTime(backup.updatedAt) }}</span></div>
-            <small>{{ backup.kind === 'daily' ? '每日' : backup.kind === 'manual' ? '手动' : backup.kind === 'pre_restore' ? '恢复前' : '升级前' }} · {{ formatFileSize(backup.sizeBytes) }}</small>
+              :class="{ active: settingsSection === 'games' }"
+              :aria-current="settingsSection === 'games' ? 'page' : undefined"
+              @click="settingsSection = 'games'"
+            >游戏与同步</button>
             <button
-              class="secondary-button"
               type="button"
-              :disabled="Boolean(restoringBackup)"
-              :aria-label="`恢复备份 ${backup.fileName}`"
-              @click="restoreBackup(backup)"
-            >{{ restoringBackup === backup.fileName ? '恢复中…' : '恢复' }}</button>
+              :class="{ active: settingsSection === 'appearance' }"
+              :aria-current="settingsSection === 'appearance' ? 'page' : undefined"
+              @click="settingsSection = 'appearance'"
+            >外观</button>
+            <button
+              type="button"
+              :class="{ active: settingsSection === 'account-data' }"
+              :aria-current="settingsSection === 'account-data' ? 'page' : undefined"
+              @click="settingsSection = 'account-data'"
+            >账号与数据</button>
+            <button
+              type="button"
+              :class="{ active: settingsSection === 'updates' }"
+              :aria-current="settingsSection === 'updates' ? 'page' : undefined"
+              @click="settingsSection = 'updates'"
+            >软件更新</button>
+          </nav>
+
+          <div class="settings-content">
+            <section v-if="settingsSection === 'games'" class="settings-page">
+              <div class="settings-page-header">
+                <p class="eyebrow">游戏与同步</p>
+                <h3>管理游戏</h3>
+                <p>选择侧栏显示的游戏，以及打开 Gtask 后是否自动同步进度。</p>
+              </div>
+              <div class="game-preference-table">
+                <div class="game-preference-header" aria-hidden="true">
+                  <span>游戏</span><span>显示</span><span>自动同步</span>
+                </div>
+                <div v-for="game in games" :key="game.id" class="game-preference-row">
+                  <span class="settings-game-label"><img class="game-icon" :src="gameIcons[game.id]" alt="" aria-hidden="true">{{ game.name }}</span>
+                  <label class="preference-toggle">
+                    <input
+                      class="toggle-switch-input"
+                      type="checkbox"
+                      :checked="isGameVisible(game.id)"
+                      :disabled="isGameVisible(game.id) && visibleGames.length === 1"
+                      :aria-label="`显示 ${game.name}`"
+                      @change="toggleGameVisibility(game.id)"
+                    >
+                    <span class="toggle-switch" aria-hidden="true"><span class="toggle-switch-thumb"></span></span>
+                  </label>
+                  <label class="preference-toggle">
+                    <input
+                      class="toggle-switch-input"
+                      type="checkbox"
+                      :checked="syncSettingsByGame[game.id]?.autoSyncEnabled ?? false"
+                      :aria-label="`启动后自动同步 ${game.name}`"
+                      @change="saveAutoSyncPreference(game.id, ($event.target as HTMLInputElement).checked)"
+                    >
+                    <span class="toggle-switch" aria-hidden="true"><span class="toggle-switch-thumb"></span></span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="settings-section-block">
+                <h3 class="settings-heading">显示还没开始的事项</h3>
+                <div class="settings-box">
+                  <label class="software-update-toggle">
+                    <span>
+                      <strong>提前显示</strong>
+                      <small>默认等活动和任务开始后再显示，减少不必要的等待感。</small>
+                    </span>
+                    <input
+                      class="toggle-switch-input"
+                      type="checkbox"
+                      :checked="showUpcomingBaselineItems"
+                      aria-label="显示还没开始的事项"
+                      @change="saveUpcomingBaselineVisibility(($event.target as HTMLInputElement).checked)"
+                    >
+                    <span class="toggle-switch" aria-hidden="true"><span class="toggle-switch-thumb"></span></span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="settings-section-block">
+                <h3 class="settings-heading">版块顺序</h3>
+                <div class="panel-order-setting">
+                  <div>
+                    <strong>{{ selectedGame?.name }}</strong>
+                    <span>在任务页拖动版块标题旁的手柄即可排序。</span>
+                  </div>
+                  <button class="secondary-button" type="button" :disabled="panelOrderIsDefault" @click="resetPanelOrder">恢复默认</button>
+                </div>
+              </div>
+            </section>
+
+            <section v-else-if="settingsSection === 'appearance'" class="settings-page">
+              <div class="settings-page-header">
+                <p class="eyebrow">外观</p>
+                <h3>显示效果</h3>
+                <p>默认使用兼容模式；只有在界面运行稳定时才建议启用 GPU 加速。</p>
+              </div>
+              <div class="settings-box rendering-provider-box">
+                <label class="rendering-mode-field">
+                  <span>显示模式</span>
+                  <select v-model="renderingModeSelection">
+                    <option value="compatibility">兼容模式（推荐）· 和游戏一起运行更稳定</option>
+                    <option value="accelerated">GPU 加速 · 更流畅</option>
+                  </select>
+                </label>
+                <div class="settings-control-footer">
+                  <span>{{ renderingModeMessage || (renderingModeState?.active === 'compatibility'
+                    ? '现在使用兼容模式，可以减少游戏、显卡驱动或叠加工具造成的残影。'
+                    : '现在使用 GPU 加速；如果和游戏一起运行时出现残影，请改回兼容模式。') }}</span>
+                  <button class="primary-button" type="button" :disabled="renderingModeBusy" @click="saveRenderingMode">{{ renderingModeBusy ? '保存中…' : renderingModeSelection === renderingModeState?.active ? '保存设置' : '保存并重启' }}</button>
+                </div>
+              </div>
+            </section>
+
+            <section v-else-if="settingsSection === 'account-data'" class="settings-page">
+              <div class="settings-page-header">
+                <p class="eyebrow">账号与数据</p>
+                <h3>登录信息</h3>
+                <p>不登录也能正常使用；登录信息由 Windows 加密后保存在本机。</p>
+              </div>
+              <div class="account-list">
+                <div v-for="status in gameCredentialStatuses" :key="status.provider" class="account-row" :data-credential-provider="status.provider">
+                  <div>
+                    <strong>{{ status.provider === 'miyoushe' ? '米游社' : '库街区' }}</strong>
+                    <span>{{ status.stored ? `已安全保存 · ${formatLocalTime(status.updatedAt!)}` : '未登录' }}</span>
+                  </div>
+                  <div class="credential-actions">
+                    <button v-if="status.provider === 'miyoushe'" class="secondary-button" type="button" :disabled="startingMiyousheLogin" @click="startMiyousheLogin">{{ startingMiyousheLogin ? '获取中…' : status.stored ? '重新登录' : '扫码登录' }}</button>
+                    <button v-else class="secondary-button" type="button" @click="openKuroCommunityLogin">{{ status.stored ? '重新登录' : '手机登录' }}</button>
+                    <button class="danger-button" type="button" :disabled="!status.stored" @click="clearCredential(status.provider)">清除凭据</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="settings-section-block">
+                <h3 class="settings-heading">本地数据与备份</h3>
+                <div class="data-location">
+                  <span>{{ appInfo?.dataPath }}</span>
+                  <div class="data-location-actions">
+                    <button class="secondary-button" type="button" :disabled="backingUp" @click="createBackup">{{ backingUp ? '备份中…' : '立即备份' }}</button>
+                    <button class="secondary-button" type="button" @click="openDataDirectory">打开目录</button>
+                  </div>
+                </div>
+                <p class="settings-help">自动保留最近 30 份每日备份。</p>
+                <div class="backup-list">
+                  <div v-for="backup in backups" :key="backup.fileName" class="backup-row">
+                    <div><strong>{{ backup.fileName }}</strong><span>{{ formatLocalTime(backup.updatedAt) }}</span></div>
+                    <small>{{ backup.kind === 'daily' ? '每日' : backup.kind === 'manual' ? '手动' : backup.kind === 'pre_restore' ? '恢复前' : '升级前' }} · {{ formatFileSize(backup.sizeBytes) }}</small>
+                    <button class="secondary-button" type="button" :disabled="Boolean(restoringBackup)" :aria-label="`恢复备份 ${backup.fileName}`" @click="restoreBackup(backup)">{{ restoringBackup === backup.fileName ? '恢复中…' : '恢复' }}</button>
+                  </div>
+                  <p v-if="backups.length === 0" class="empty-text">还没有备份</p>
+                </div>
+              </div>
+              <p class="settings-note">米游社支持扫码登录，库街区支持手机号登录；登录信息只会加密保存在本机。</p>
+            </section>
+
+            <section v-else class="settings-page">
+              <div class="settings-page-header">
+                <p class="eyebrow">软件更新</p>
+                <h3>保持 Gtask 最新</h3>
+                <p>在这里检查软件版本，以及活动和任务更新。</p>
+              </div>
+              <div class="settings-box software-update-box">
+                <label class="software-update-toggle">
+                  <span><strong>启动后自动检查更新</strong><small>24 小时内不会重复检查。</small></span>
+                  <input v-model="softwareUpdateSettings.autoCheckEnabled" class="toggle-switch-input" type="checkbox" :disabled="softwareUpdateBusy || remoteCatalogUpdateBusy" aria-label="启动后自动检查更新" @change="saveSoftwareUpdatePreference">
+                  <span class="toggle-switch" aria-hidden="true"><span class="toggle-switch-thumb"></span></span>
+                </label>
+                <label class="software-update-source-field">
+                  <span>更新来源</span>
+                  <select v-model="softwareUpdateSettings.updateSource" :disabled="softwareUpdateBusy || remoteCatalogUpdateBusy" aria-label="更新来源" @change="saveSoftwareUpdatePreference">
+                    <option value="auto">自动（Gitee 优先）</option>
+                    <option value="gitee">Gitee 镜像</option>
+                    <option value="github">GitHub</option>
+                  </select>
+                </label>
+                <div class="software-update-footer">
+                  <span><strong>当前版本 v{{ appInfo?.version ?? '—' }}</strong><small>{{ remoteCatalogUpdateMessage || softwareUpdateMessage || formatUpdateCheckTime(softwareUpdateSettings.lastSuccessfulCheckAt) }}</small></span>
+                  <div class="software-update-actions">
+                    <button class="secondary-button" type="button" :disabled="softwareUpdateBusy || remoteCatalogUpdateBusy || remoteCatalogManualRetryMinutes > 0" @click="checkRemoteCatalogUpdate">{{ remoteCatalogUpdateBusy ? '更新中…' : remoteCatalogManualRetryMinutes > 0 ? `${remoteCatalogManualRetryMinutes}分重试` : '更新清单' }}</button>
+                    <button class="secondary-button" type="button" :disabled="softwareUpdateBusy || remoteCatalogUpdateBusy" @click="checkSoftwareUpdate">{{ softwareUpdateBusy ? '检查中…' : '检查更新' }}</button>
+                  </div>
+                </div>
+              </div>
+            </section>
           </div>
-          <p v-if="backups.length === 0" class="empty-text">还没有备份</p>
         </div>
-        <p class="settings-note">米游社支持扫码登录，库街区支持手机号登录；登录信息只会加密保存在本机。</p>
       </section>
     </div>
     <div v-if="loginRequiredOpen" class="modal-backdrop login-backdrop" @click.self="loginRequiredOpen = false">
@@ -2148,7 +2165,9 @@ function showError(error: unknown): void {
       >
         <div class="confirmation-header">
           <div class="confirmation-heading">
-            <span class="confirmation-icon" aria-hidden="true">!</span>
+            <span class="confirmation-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M10.2 4.6 2.9 17.2A2 2 0 0 0 4.6 20h14.8a2 2 0 0 0 1.7-2.8L13.8 4.6a2 2 0 0 0-3.6 0Z"/><path d="M12 9v4"/><path d="M12 16.5h.01"/></svg>
+            </span>
             <div>
               <p class="eyebrow">{{ confirmationDialog.eyebrow }}</p>
               <h2 id="confirmation-title">{{ confirmationDialog.title }}</h2>

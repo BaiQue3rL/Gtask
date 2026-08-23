@@ -20,7 +20,7 @@ describe('product copy and built-in section boundaries', () => {
   })
 
   it('offers direct progress sync, direct login, and startup preferences', () => {
-    expect(app).toContain('↻ 同步进度')
+    expect(app).toContain('<span>同步进度</span>')
     expect(app).toContain('同步进度需要登录')
     expect(app).toContain('启动后自动同步')
     expect(app).toContain('saveAutoSyncPreference')
@@ -39,12 +39,13 @@ describe('product copy and built-in section boundaries', () => {
     expect(app).toContain("if (item.category !== 'custom' || item.source !== 'manual') return")
   })
 
-  it('uses compact single-line identity cards without category or source chips', () => {
+  it('uses compact grouped list rows without category or source chips', () => {
     expect(app).toContain('class="item-identity"')
     expect(app).not.toContain('class="item-details"')
     expect(app).not.toContain('class="source-detail"')
-    expect(styles).toContain('min-height: 50px')
-    expect(styles).toContain('.item-identity .activity-tag')
+    expect(styles).toContain('min-height: 48px')
+    expect(styles).toContain('.checklist-row + .checklist-row')
+    expect(styles).toContain('.activity-tag {')
   })
 
   it('renders the incomplete filter as an accessible stateful switch', () => {
@@ -53,18 +54,26 @@ describe('product copy and built-in section boundaries', () => {
     expect(app).toContain('class="incomplete-filter-label"')
     expect(app).not.toContain(':class="{ active: showIncompleteOnly }"')
     expect(styles).not.toContain('.incomplete-filter-button.active')
-    expect(styles).toContain('transform: translateX(16px)')
-    expect(styles).toMatch(/\.incomplete-filter-label \{[^}]*color: #f5f9ff[^}]*font-size: 15px[^}]*font-weight: 650/)
-    expect(styles).toMatch(/\.incomplete-filter-control \{[^}]*justify-content: space-between/)
+    expect(styles).toContain('transform: translateX(14px)')
+    expect(styles).toMatch(/\.incomplete-filter-label \{[^}]*font-size: 13px[^}]*font-weight: 500/)
+    expect(styles).toMatch(/\.incomplete-filter-control \{[^}]*min-height: var\(--control-height\)/)
   })
 
-  it('aligns the incomplete filter with the game title row', () => {
-    expect(styles).toMatch(/\.topbar \{[^}]*align-items: end/)
-    expect(styles).toMatch(/\.topbar \{[^}]*grid-template-columns: calc\(66\.6667% - 3px\)/)
-    expect(styles).toMatch(/\.topbar-actions \{[^}]*align-self: end[^}]*\}/)
-    expect(styles).not.toMatch(/\.topbar-actions \{[^}]*margin-right/)
-    expect(styles).toMatch(/\.incomplete-filter-control \{[^}]*height: 36px/)
-    expect(styles).toMatch(/h1 \{[^}]*line-height: 36px/)
+  it('aligns the incomplete filter with the selected game heading', () => {
+    expect(app).toContain('class="page-heading"')
+    expect(app).toContain('class="page-game-icon"')
+    expect(app).toContain('class="page-version-remaining"')
+    expect(styles).toMatch(/\.topbar \{[^}]*display: flex[^}]*align-items: center[^}]*justify-content: space-between/)
+    expect(styles).toMatch(/\.topbar, \.checklist-content-frame, \.error-banner \{[^}]*width: min\(100%, 920px\)/)
+    expect(styles).toMatch(/h1 \{[^}]*font-size: 22px[^}]*line-height: 1\.25/)
+  })
+
+  it('keeps footer metadata with aligned sidebar actions and preserves the narrow filter label', () => {
+    expect(app).toContain('class="sidebar-meta"')
+    expect(app).not.toContain('class="dev-footer"')
+    expect(styles).toContain('grid-template-columns: 18px minmax(0, 1fr)')
+    expect(styles).not.toMatch(/\.incomplete-filter-label \{\s*display: none/)
+    expect(styles).toMatch(/@media \(max-width: 620px\)[\s\S]*?\.app-shell \{ grid-template-columns: 72px minmax\(0, 1fr\)/)
   })
 
   it('does not render the unused checklist summary board', () => {
@@ -80,18 +89,37 @@ describe('product copy and built-in section boundaries', () => {
   it('uses the shared compact switch treatment for every settings toggle', () => {
     expect(app.match(/class="toggle-switch-input"/g)).toHaveLength(5)
     expect(styles).toContain('.toggle-switch-input:checked + .toggle-switch')
-    expect(styles).toMatch(/\.editor-modal \.game-visibility-row \{[^}]*display: flex[^}]*min-height: 42px[^}]*margin-top: 0/)
+    expect(styles).toMatch(/\.game-preference-row \{[^}]*min-height: 46px/)
+    expect(styles).toMatch(/\.preference-toggle \{[^}]*display: flex !important[^}]*justify-content: center/)
   })
 
-  it('keeps the global item visibility setting after both per-game toggle groups', () => {
-    const gamesIndex = app.indexOf('<h3 class="settings-heading">我的游戏</h3>')
-    const autoSyncIndex = app.indexOf('<h3 class="settings-heading">启动后自动同步</h3>')
-    const itemVisibilityIndex = app.indexOf('<h3 class="settings-heading">显示内容</h3>')
+  it('keeps the settings frame stable while switching categories', () => {
+    expect(app).not.toContain('settings-modal-compact')
+    expect(styles).not.toContain('.settings-modal.settings-modal-compact')
+    expect(styles).toMatch(/\.settings-modal \{[^}]*height: min\(680px, calc\(100vh - 48px\)\)/)
+  })
+
+  it('combines per-game preferences before the global item visibility setting', () => {
+    const preferencesIndex = app.indexOf('<div class="game-preference-table">')
+    const visibilityColumnIndex = app.indexOf('<span>游戏</span><span>显示</span><span>自动同步</span>')
+    const itemVisibilityIndex = app.indexOf('<h3 class="settings-heading">显示还没开始的事项</h3>')
     const layoutIndex = app.indexOf('<h3 class="settings-heading">版块顺序</h3>')
 
-    expect(gamesIndex).toBeLessThan(autoSyncIndex)
-    expect(autoSyncIndex).toBeLessThan(itemVisibilityIndex)
+    expect(preferencesIndex).toBeLessThan(visibilityColumnIndex)
+    expect(visibilityColumnIndex).toBeLessThan(itemVisibilityIndex)
     expect(itemVisibilityIndex).toBeLessThan(layoutIndex)
+  })
+
+  it('uses a restrained semantic dark theme instead of decorative blue gradients', () => {
+    expect(styles).toContain('--color-neutral-background-1:')
+    expect(styles).toContain('--color-brand-background:')
+    expect(styles).not.toContain('linear-gradient')
+    expect(styles).not.toContain('radial-gradient')
+    expect(app).not.toContain('class="overview')
+    expect(styles).toMatch(/\.completed \.item-title \{[^}]*text-decoration: line-through/)
+    expect(styles).not.toMatch(/\.checklist-row\.completed \{[^}]*background:/)
+    expect(styles).toMatch(/\.game-version-remaining \{[^}]*color: var\(--color-info-muted\)/)
+    expect(styles).toMatch(/\.item-timing \{[^}]*color: var\(--color-info-muted\)/)
   })
 
   it('keeps user-facing copy conversational and free of maintenance terms', () => {
