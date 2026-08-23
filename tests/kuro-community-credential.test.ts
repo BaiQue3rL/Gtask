@@ -132,7 +132,7 @@ describe('KuroCommunityCredentialService', () => {
         roleId: '123',
         serverId: 'server'
       })
-    ).rejects.toThrow('凭据未保存')
+    ).rejects.toThrow('因此没有保存')
   })
 
   it('明确提示 App Token 已过期', async () => {

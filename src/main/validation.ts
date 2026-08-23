@@ -229,7 +229,7 @@ export function parseCredentialProvider(value: unknown): CredentialProvider {
     typeof value !== 'string' ||
     !CREDENTIAL_PROVIDERS.includes(value as CredentialProvider)
   ) {
-    throw new Error('不支持的凭据平台')
+    throw new Error('不支持这个登录平台')
   }
   return value as CredentialProvider
 }

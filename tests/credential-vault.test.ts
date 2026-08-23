@@ -64,7 +64,7 @@ describe('CredentialVault', () => {
       isAvailable: () => false
     })
     expect(() => vault.store('kuro-community', { kind: 'token', value: 'secret' })).toThrow(
-      '无法使用安全凭据存储'
+      'Windows 暂时无法安全保存登录信息'
     )
   })
 })

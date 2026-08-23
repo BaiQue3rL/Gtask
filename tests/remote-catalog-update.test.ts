@@ -311,7 +311,7 @@ describe('remote catalog update', () => {
     }])
 
     await expect(service.check(undefined, reference)).rejects.toThrow(
-      '暂时无法连接公共清单源'
+      '暂时连不上活动和任务更新服务'
     )
   })
 

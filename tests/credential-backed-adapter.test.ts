@@ -8,7 +8,7 @@ describe('CredentialBackedAdapter', () => {
       throw new Error('不应创建内部适配器')
     })
     await expect(adapter.sync('genshin')).rejects.toBeInstanceOf(SyncVerificationRequiredError)
-    await expect(adapter.sync('genshin')).rejects.toThrow('米游社尚未登录')
+    await expect(adapter.sync('genshin')).rejects.toThrow('米游社还没登录')
   })
 
   it('只把解密后的凭据交给内部适配器，并仅输出不可逆账号作用域', async () => {

@@ -44,7 +44,7 @@ export class KuroCommunityCredentialService {
       .filter((role) => String(role.gameId) === '3')
       .map(parseRole)
 
-    if (roles.length === 0) throw new Error('该库街区账号没有找到已绑定的鸣潮角色')
+    if (roles.length === 0) throw new Error('这个库街区账号里没有找到已绑定的鸣潮角色')
     return roles
   }
 
@@ -67,7 +67,7 @@ export class KuroCommunityCredentialService {
     const bat = extractKuroBatToken(data)
     if (!bat) {
       throw new Error(
-        `库街区未返回有效的数据令牌，凭据未保存（${describeResponseShape(data)}）`
+        `库街区没有返回完整的登录信息，因此没有保存（${describeResponseShape(data)}）`
       )
     }
     return { ...credential, bat }
@@ -103,7 +103,7 @@ export class KuroCommunityCredentialService {
         headers,
         body: new URLSearchParams(body).toString()
       })
-      if (!response.ok) throw new Error(`库街区凭据校验失败（HTTP ${response.status}）`)
+      if (!response.ok) throw new Error(`库街区登录信息验证失败（HTTP ${response.status}）`)
       const envelope = await response.json() as KuroEnvelope
       const code = typeof envelope.code === 'number'
         ? envelope.code
@@ -113,12 +113,12 @@ export class KuroCommunityCredentialService {
       if (code === 220) throw new Error('库街区 App Token 已过期，请重新获取')
       if (code === 270) throw new Error('库街区判定当前网络环境存在风险，请稍后重试')
       if (code !== 0 && code !== 200) {
-        throw new Error(envelope.msg?.trim() || `库街区凭据校验失败（${code}）`)
+        throw new Error(envelope.msg?.trim() || `库街区登录信息验证失败（${code}）`)
       }
       return envelope.data
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error('库街区凭据校验超时，请稍后重试')
+        throw new Error('库街区登录信息验证超时，请稍后重试')
       }
       throw error
     } finally {

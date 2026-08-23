@@ -70,6 +70,6 @@ describe('MiyousheQrLoginService', () => {
     const service = new MiyousheQrLoginService(fetcher)
     const started = await service.start()
 
-    await expect(service.poll(started.sessionId)).rejects.toThrow('登录凭据不完整')
+    await expect(service.poll(started.sessionId)).rejects.toThrow('没有拿到完整的登录信息')
   })
 })

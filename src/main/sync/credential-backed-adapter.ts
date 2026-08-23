@@ -40,10 +40,10 @@ export class CredentialBackedAdapter implements SyncAdapter {
     try {
       credential = this.credentials.read(this.provider)
     } catch {
-      throw new SyncVerificationRequiredError(`${PROVIDER_LABELS[this.provider]}凭据无法解密，请重新登录`)
+      throw new SyncVerificationRequiredError(`${PROVIDER_LABELS[this.provider]}登录信息无法读取，请重新登录`)
     }
     if (!credential) {
-      throw new SyncVerificationRequiredError(`${PROVIDER_LABELS[this.provider]}尚未登录`)
+      throw new SyncVerificationRequiredError(`${PROVIDER_LABELS[this.provider]}还没登录`)
     }
     const adapter = this.createAdapter(credential, reportProgress, signal)
     const output = await adapter.sync(gameId, target, reportProgress, signal)
@@ -66,7 +66,7 @@ function createPersonalAccountScope(
     : readKuroRoleIdentity(credential.value) ?? credential.accountLabel
   if (!stableIdentity) {
     throw new SyncVerificationRequiredError(
-      `${PROVIDER_LABELS[provider]}凭据缺少稳定账号标识，请重新登录`
+      `${PROVIDER_LABELS[provider]}登录信息不完整，请重新登录`
     )
   }
   const digest = createHash('sha256')

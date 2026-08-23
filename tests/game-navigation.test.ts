@@ -35,7 +35,7 @@ describe('sidebar game navigation', () => {
   it('formats a compact days-and-hours countdown and hides unavailable windows', () => {
     const now = Date.parse('2026-08-03T12:20:00.000Z')
     expect(formatGameVersionRemaining('2026-08-05T15:05:00.000Z', now))
-      .toBe('版本剩余 2 天 3 小时')
+      .toBe('版本还剩 2 天 3 小时')
     expect(formatGameVersionRemaining(null, now)).toBeNull()
     expect(formatGameVersionRemaining('2026-08-03T12:00:00.000Z', now)).toBeNull()
     expect(isGameVersionDeadlineUrgent('2026-08-10T12:19:59.000Z', now)).toBe(true)

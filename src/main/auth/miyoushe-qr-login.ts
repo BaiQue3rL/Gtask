@@ -95,7 +95,7 @@ export class MiyousheQrLoginService {
 
     const cookies = parseSetCookieHeaders(response.response.headers)
     for (const name of REQUIRED_COOKIE_NAMES) {
-      if (!cookies[name]) throw new Error('米游社登录已确认，但返回的登录凭据不完整，请重新登录')
+      if (!cookies[name]) throw new Error('米游社登录已确认，但没有拿到完整的登录信息，请重新登录')
     }
     this.sessions.delete(sessionId)
     return {

@@ -19,7 +19,7 @@ export interface GeetestWindowCopy {
 const MIYOUSHE_COPY: GeetestWindowCopy = {
   title: '米游社安全验证',
   heading: '米游社安全验证',
-  description: '请手动完成官方滑块。应用只接收本次验证票据，不保存滑块内容。',
+  description: '请完成官方滑块验证。Gtask 只会接收这次验证结果，不会保存滑块内容。',
   apiServers: ['gcaptcha4.captchami.com'],
   includeSessionUserInfo: true,
   showMethod: 'showCaptcha'

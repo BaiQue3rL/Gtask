@@ -23,14 +23,14 @@ export function encodeKuroCommunityCredential(
 export function decodeKuroCommunityCredential(
   payload: CredentialPayload
 ): KuroCommunityCredential {
-  if (payload.kind !== 'token') throw new Error('库街区凭据类型不正确')
+  if (payload.kind !== 'token') throw new Error('库街区登录信息已失效，请重新登录')
   let parsed: unknown
   try {
     parsed = JSON.parse(payload.value)
   } catch {
-    throw new Error('库街区凭据格式已损坏')
+    throw new Error('库街区登录信息已损坏，请重新登录')
   }
-  if (!isRecord(parsed)) throw new Error('库街区凭据格式已损坏')
+  if (!isRecord(parsed)) throw new Error('库街区登录信息已损坏，请重新登录')
   return normalizeCredential({
     token: parsed.token,
     did: parsed.did,

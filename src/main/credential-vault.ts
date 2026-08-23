@@ -35,8 +35,8 @@ export class CredentialVault {
   }
 
   store(provider: CredentialProvider, payload: CredentialPayload): CredentialStatus {
-    if (!this.protector.isAvailable()) throw new Error('当前系统无法使用安全凭据存储')
-    if (!payload.value) throw new Error('凭据内容不能为空')
+    if (!this.protector.isAvailable()) throw new Error('Windows 暂时无法安全保存登录信息')
+    if (!payload.value) throw new Error('登录信息为空，请重新登录')
     mkdirSync(this.directory, { recursive: true })
     const path = this.pathFor(provider)
     const temporaryPath = `${path}.tmp`
@@ -54,7 +54,7 @@ export class CredentialVault {
   read(provider: CredentialProvider): CredentialPayload | null {
     const path = this.pathFor(provider)
     if (!existsSync(path)) return null
-    if (!this.protector.isAvailable()) throw new Error('当前系统无法解密已保存凭据')
+    if (!this.protector.isAvailable()) throw new Error('Windows 无法读取已保存的登录信息，请重新登录')
     const parsed = JSON.parse(this.protector.unprotect(readFileSync(path))) as unknown
     if (
       typeof parsed !== 'object' ||
@@ -64,7 +64,7 @@ export class CredentialVault {
       !['cookie', 'token', 'session'].includes(String(parsed.kind)) ||
       typeof parsed.value !== 'string'
     ) {
-      throw new Error('已保存凭据格式损坏')
+      throw new Error('已保存的登录信息已损坏，请重新登录')
     }
     return parsed as CredentialPayload
   }
@@ -77,7 +77,7 @@ export class CredentialVault {
   }
 
   private pathFor(provider: CredentialProvider): string {
-    if (!CREDENTIAL_PROVIDERS.includes(provider)) throw new Error('不支持的凭据平台')
+    if (!CREDENTIAL_PROVIDERS.includes(provider)) throw new Error('不支持这个登录平台')
     return join(this.directory, `${provider}.bin`)
   }
 }

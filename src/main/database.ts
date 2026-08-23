@@ -2441,7 +2441,7 @@ export class AppDatabase {
         item.category === 'limited_event' && item.completed === true &&
         item.startsAt && Date.parse(item.startsAt) > reference.getTime()
       ) {
-        throw new Error(`尚未开始的活动“${item.title}”不能标记为已完成`)
+        throw new Error(`活动“${item.title}”还没开始，暂时不能标为完成`)
       }
       const identity = item.sourceIdentity!
       // Catalog placeholders are local period predictions rather than

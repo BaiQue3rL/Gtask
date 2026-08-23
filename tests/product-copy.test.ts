@@ -76,12 +76,31 @@ describe('product copy and built-in section boundaries', () => {
   it('keeps the global item visibility setting after both per-game toggle groups', () => {
     const gamesIndex = app.indexOf('<h3 class="settings-heading">我的游戏</h3>')
     const autoSyncIndex = app.indexOf('<h3 class="settings-heading">启动后自动同步</h3>')
-    const itemVisibilityIndex = app.indexOf('<h3 class="settings-heading">事项显示</h3>')
-    const layoutIndex = app.indexOf('<h3 class="settings-heading">版块布局</h3>')
+    const itemVisibilityIndex = app.indexOf('<h3 class="settings-heading">显示内容</h3>')
+    const layoutIndex = app.indexOf('<h3 class="settings-heading">版块顺序</h3>')
 
     expect(gamesIndex).toBeLessThan(autoSyncIndex)
     expect(autoSyncIndex).toBeLessThan(itemVisibilityIndex)
     expect(itemVisibilityIndex).toBeLessThan(layoutIndex)
+  })
+
+  it('keeps user-facing copy conversational and free of maintenance terms', () => {
+    expect(app).toContain('显示还没开始的事项')
+    expect(app).toContain('登录信息')
+    expect(app).toContain('还没有备份')
+    expect(app).toContain('>清除凭据</button>')
+    expect(app).toContain('>打开目录</button>')
+    expect(app).not.toContain('>清除登录信息</button>')
+    expect(app).not.toContain('>打开数据文件夹</button>')
+    for (const stiffCopy of [
+      '显示尚未开始的基准事项',
+      '登录凭据',
+      '尚无备份',
+      '该版块尚未同步',
+      '界面渲染'
+    ]) {
+      expect(app).not.toContain(stiffCopy)
+    }
   })
 
   it('keeps destructive checklist confirmations inside the themed renderer surface', () => {

@@ -336,7 +336,7 @@ export class RemoteCatalogUpdateService {
     const valid = candidates.filter((candidate): candidate is NonNullable<typeof candidate> =>
       candidate !== null
     )
-    if (valid.length === 0) throw new Error('暂时无法连接公共清单源')
+    if (valid.length === 0) throw new Error('暂时连不上活动和任务更新服务')
     valid.sort((left, right) => Date.parse(right.feed.publishedAt) - Date.parse(left.feed.publishedAt))
     const github = valid.find((candidate) => candidate.providerId === 'github')
     const mirrorConflict = github && valid.some((candidate) =>

@@ -122,7 +122,7 @@ export class SyncOrchestrator {
     const operation = this.runPersonalAdapter(
       gameId,
       this.adapters.personalData[gameId],
-      `${PERSONAL_PLATFORM_NAMES[gameId]}个人数据适配器尚未接入`,
+      `暂时还不能同步${PERSONAL_PLATFORM_NAMES[gameId]}进度`,
       target,
       requestContext,
       controller.signal

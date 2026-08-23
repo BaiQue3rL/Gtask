@@ -101,7 +101,7 @@ describe('KuroCommunityLoginService', () => {
 
     await expect(
       service.finish(sms.sessionId, 'other-role', 'server-cn')
-    ).rejects.toThrow('不属于本次登录账号')
+    ).rejects.toThrow('不属于刚才登录的账号')
     expect(credentialService.validateCredential).not.toHaveBeenCalled()
   })
 

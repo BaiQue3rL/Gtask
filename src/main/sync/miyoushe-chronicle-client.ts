@@ -90,7 +90,7 @@ class MiyousheChronicleClient {
     private readonly reportProgress?: SyncProgressReporter,
     private readonly externalSignal?: AbortSignal
   ) {
-    if (!cookie.trim()) throw new Error('米游社登录凭据为空')
+    if (!cookie.trim()) throw new Error('米游社还没登录')
     const accountId = readCookieValue(cookie, 'account_id_v2') ?? readCookieValue(cookie, 'ltuid_v2')
     this.deviceId = reuseLoginDevice && accountId ? createStableDeviceId(accountId) : null
   }
@@ -525,7 +525,7 @@ export function createMiyousheZenlessPersonalAdapter(
   signal?: AbortSignal
 ): ZenlessPersonalAdapter {
   if (credential.kind !== 'cookie') {
-    throw new SyncVerificationRequiredError('米游社凭据格式已过期，请重新登录')
+    throw new SyncVerificationRequiredError('米游社登录信息已失效，请重新登录')
   }
   return new ZenlessPersonalAdapter(
     new MiyousheZenlessClient(
@@ -546,7 +546,7 @@ export function createMiyousheGenshinPersonalAdapter(
   signal?: AbortSignal
 ): GenshinPersonalAdapter {
   if (credential.kind !== 'cookie') {
-    throw new SyncVerificationRequiredError('米游社凭据格式已过期，请重新登录')
+    throw new SyncVerificationRequiredError('米游社登录信息已失效，请重新登录')
   }
   return new GenshinPersonalAdapter(
     new MiyousheGenshinClient(
@@ -567,7 +567,7 @@ export function createMiyousheStarRailPersonalAdapter(
   signal?: AbortSignal
 ): StarRailPersonalAdapter {
   if (credential.kind !== 'cookie') {
-    throw new SyncVerificationRequiredError('米游社凭据格式已过期，请重新登录')
+    throw new SyncVerificationRequiredError('米游社登录信息已失效，请重新登录')
   }
   return new StarRailPersonalAdapter(
     new MiyousheStarRailClient(

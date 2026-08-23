@@ -95,7 +95,7 @@ export class KuroCommunityLoginService {
       await this.resolveIosDevCode()
     )
     if (!isRecord(data) || typeof data.token !== 'string' || !data.token.trim()) {
-      throw new Error('库街区登录成功，但未返回有效凭据，请重试')
+      throw new Error('库街区登录成功，但没有拿到完整的登录信息，请重试')
     }
 
     const token = data.token.trim()
@@ -122,7 +122,7 @@ export class KuroCommunityLoginService {
     const role = session.roles.find(
       (candidate) => candidate.roleId === roleId && candidate.serverId === serverId
     )
-    if (!role) throw new Error('所选鸣潮角色不属于本次登录账号')
+    if (!role) throw new Error('这个鸣潮角色不属于刚才登录的账号')
 
     const credential = await this.credentialService.validateCredential({
       token: session.token,
@@ -149,10 +149,10 @@ export class KuroCommunityLoginService {
   private getSession(value: unknown): PendingLogin {
     const sessionId = requiredSessionId(value)
     const session = this.sessions.get(sessionId)
-    if (!session) throw new Error('库街区登录会话不存在或已结束，请重新登录')
+    if (!session) throw new Error('这次库街区登录已结束，请重新登录')
     if (session.expiresAt <= this.now()) {
       this.sessions.delete(sessionId)
-      throw new Error('短信验证码登录已超时，请重新获取验证码')
+      throw new Error('这次短信登录已超时，请重新获取验证码')
     }
     return session
   }

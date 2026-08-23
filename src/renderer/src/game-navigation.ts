@@ -36,7 +36,7 @@ export function formatGameVersionRemaining(
   const totalHours = Math.max(1, Math.ceil((timestamp - referenceTime) / 3_600_000))
   const days = Math.floor(totalHours / 24)
   const hours = totalHours % 24
-  return `版本剩余 ${days} 天 ${hours} 小时`
+  return `版本还剩 ${days} 天 ${hours} 小时`
 }
 
 export function isGameVersionDeadlineUrgent(

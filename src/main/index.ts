@@ -328,7 +328,7 @@ async function checkForRemoteCatalogUpdate(automatic: boolean): Promise<RemoteCa
         preserved: 0,
         archived: 0,
         expiredRemoved: 0,
-        message: '公共清单刚刚检查过',
+        message: '活动和任务刚检查过',
         manualRetryAt: status.manualRetryAt
       }
     }
@@ -356,7 +356,7 @@ async function checkForRemoteCatalogUpdate(automatic: boolean): Promise<RemoteCa
       preserved: 0,
       archived: 0,
       expiredRemoved: 0,
-      message: '公共清单已是最新',
+      message: '活动和任务已经是最新',
       manualRetryAt: getRemoteCatalogUpdateStatus(reference).manualRetryAt
     }
   }
@@ -385,7 +385,7 @@ async function checkForRemoteCatalogUpdate(automatic: boolean): Promise<RemoteCa
     revision: update.feed.revision,
     checkedAt: reference.toISOString(),
     ...merge,
-    message: `公共清单已更新：新增 ${merge.added}，修改 ${merge.updated}，撤回 ${merge.archived}`,
+    message: `活动和任务已更新：新增 ${merge.added}，修改 ${merge.updated}，下线 ${merge.archived}`,
     manualRetryAt: getRemoteCatalogUpdateStatus(reference).manualRetryAt
   }
 }
@@ -415,7 +415,7 @@ async function checkForSoftwareUpdate(automatic: boolean): Promise<SoftwareUpdat
     type: 'info',
     title: '发现 Gtask 新版本',
     message: result.message,
-    detail: '可以稍后在设置中再次检查更新。',
+    detail: '也可以稍后到设置里再检查。',
     buttons: hasReleaseUrl ? ['稍后', '查看更新'] : ['知道了'],
     defaultId: hasReleaseUrl ? 1 : 0,
     cancelId: 0,
@@ -911,7 +911,7 @@ function registerIpcHandlers(): void {
       type: 'warning',
       title: '恢复本地备份',
       message: `确定恢复备份“${candidate.fileName}”吗？`,
-      detail: '当前数据库会先自动生成一份“恢复前”安全备份，随后应用将重新启动。',
+      detail: '恢复前会先自动备份当前数据，完成后 Gtask 会重新启动。',
       buttons: ['取消', '恢复并重启'],
       defaultId: 0,
       cancelId: 0,
@@ -965,7 +965,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle('checklist:create', (_event, input: unknown) => {
     if (!appDatabase) throw new Error('数据库尚未初始化')
     const parsed = parseCreateChecklistItem(input)
-    if (parsed.category !== 'custom') throw new Error('内置版块由基准表维护，只能新增自定义事项')
+    if (parsed.category !== 'custom') throw new Error('这里只能添加自定义事项')
     return appDatabase.createChecklistItem(parsed)
   })
   ipcMain.handle('checklist:update', (_event, input: unknown) => {
@@ -973,7 +973,7 @@ function registerIpcHandlers(): void {
     const parsed = parseUpdateChecklistItem(input)
     const current = appDatabase.getChecklistItem(parsed.id)
     if (current.category !== 'custom' || (parsed.category && parsed.category !== 'custom')) {
-      throw new Error('内置版块由基准表维护，只能编辑自定义事项')
+      throw new Error('这里只能编辑自定义事项')
     }
     return appDatabase.updateChecklistItem(parsed)
   })
@@ -986,7 +986,7 @@ function registerIpcHandlers(): void {
     if (!appDatabase) throw new Error('数据库尚未初始化')
     const itemId = parseItemId(id)
     if (appDatabase.getChecklistItem(itemId).category !== 'custom') {
-      throw new Error('内置基准表事项不能删除')
+      throw new Error('内置事项不能删除')
     }
     appDatabase.archiveChecklistItem(itemId)
   })
@@ -1007,7 +1007,7 @@ function registerIpcHandlers(): void {
     const value = input as Record<string, unknown>
     const gameId = parseGameId(value.gameId)
     const section = parseChecklistSection(value.section)
-    if (section !== 'custom') throw new Error('内置基准表事项不能批量删除')
+    if (section !== 'custom') throw new Error('内置事项不能批量删除')
     return appDatabase.archiveCompletedSection(gameId, [...SECTION_CATEGORIES[section]])
   })
   ipcMain.handle('sync:get-settings', (_event, gameId: unknown) => {
@@ -1042,14 +1042,14 @@ function registerIpcHandlers(): void {
       throw new Error('同步个人数据只能从活动、周期或地图版块发起')
     }
     if (!supportsPersonalSyncTarget(parsedGameId, parsedTarget)) {
-      throw new Error('当前游戏的个人数据接口不提供该版块进度')
+      throw new Error('这个游戏暂时不能同步这个版块的进度')
     }
     const publicJob = appDatabase.listActiveAiScheduleJobs(parsedGameId).find((job) =>
       job.jobKind === 'public_catalog' &&
       (job.target === parsedTarget || job.target === 'all')
     )
     if (publicJob) {
-      throw new Error('对应版块正在进行后台基准表维护，请稍后再同步进度')
+      throw new Error('这个版块正在后台更新，请稍后再同步进度')
     }
     const result = await syncOrchestrator.syncPersonalOnly(
       parsedGameId,
@@ -1099,7 +1099,7 @@ function registerIpcHandlers(): void {
       {
         title: '库街区安全验证',
         heading: '库街区安全验证',
-        description: '请手动完成官方滑块。应用只接收本次验证票据，不保存滑块内容。',
+        description: '请完成官方滑块验证。Gtask 只会接收这次验证结果，不会保存滑块内容。',
         includeSessionUserInfo: false,
         showMethod: 'showBox'
       }
