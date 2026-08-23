@@ -245,24 +245,6 @@ const displayItems = computed(() => filterUpcomingBaselineItems(
   clockNow.value,
   showUpcomingBaselineItems.value
 ))
-const incompleteCount = computed(() => displayItems.value.filter(
-  (item) => !isChecklistItemComplete(item)
-).length)
-const completedCount = computed(() => {
-  const weekStart = startOfCurrentWeek()
-  return displayItems.value.filter(
-    (item) => item.completedAt && new Date(item.completedAt) >= weekStart
-  ).length
-})
-const expiringCount = computed(() => {
-  const now = Date.now()
-  const threshold = now + 3 * 24 * 60 * 60 * 1000
-  return displayItems.value.filter((item) => {
-    if (item.completed || !item.endsAt) return false
-    const end = new Date(item.endsAt).getTime()
-    return end >= now && end <= threshold
-  }).length
-})
 onMounted(async () => {
   window.addEventListener('keydown', handleGlobalKeydown)
   window.addEventListener('wheel', handlePanelDragWheel, { capture: true, passive: false })
@@ -1507,14 +1489,6 @@ function formatFileSize(value: number): string {
   return `${(value / 1024).toFixed(value < 10 * 1024 ? 1 : 0)} KB`
 }
 
-function startOfCurrentWeek(): Date {
-  const date = new Date()
-  const day = date.getDay() || 7
-  date.setDate(date.getDate() - day + 1)
-  date.setHours(0, 0, 0, 0)
-  return date
-}
-
 function showError(error: unknown): void {
   errorMessage.value = error instanceof Error ? error.message : '操作失败，请重试'
 }
@@ -1594,28 +1568,6 @@ function showError(error: unknown): void {
       </header>
 
       <p v-if="!loading && !restoringGameView && errorMessage" class="error-banner" role="alert">{{ errorMessage }}</p>
-      <section v-if="!loading && !restoringGameView" class="summary-grid">
-        <article class="summary-card">
-          <span class="summary-icon coral" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5" /></svg>
-          </span>
-          <div><small>未完成</small><strong>{{ incompleteCount }}<em> 项</em></strong></div>
-        </article>
-        <article class="summary-card">
-          <span class="summary-icon gold" aria-hidden="true">
-            <svg viewBox="0 0 24 24">
-              <path d="M7 4h10M7 20h10M8 5c0 4 4 4.2 4 7s-4 3-4 7M16 5c0 4-4 4.2-4 7s4 3 4 7" />
-            </svg>
-          </span>
-          <div><small>即将到期</small><strong>{{ expiringCount }}<em> 项</em></strong></div>
-        </article>
-        <article class="summary-card">
-          <span class="summary-icon green" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="m6.5 12.5 3.5 3.5 7.5-8" /></svg>
-          </span>
-          <div><small>本周完成</small><strong>{{ completedCount }}<em> 项</em></strong></div>
-        </article>
-      </section>
 
       <section
         v-if="loading || restoringGameView"

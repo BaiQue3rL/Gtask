@@ -67,6 +67,16 @@ describe('product copy and built-in section boundaries', () => {
     expect(styles).toMatch(/h1 \{[^}]*line-height: 36px/)
   })
 
+  it('does not render the unused checklist summary board', () => {
+    expect(app).not.toContain('class="summary-grid"')
+    expect(app).not.toContain('incompleteCount')
+    expect(app).not.toContain('expiringCount')
+    expect(app).not.toContain('completedCount')
+    expect(styles).not.toContain('.summary-grid')
+    expect(styles).not.toContain('.summary-card')
+    expect(styles).not.toContain('.summary-icon')
+  })
+
   it('uses the shared compact switch treatment for every settings toggle', () => {
     expect(app.match(/class="toggle-switch-input"/g)).toHaveLength(5)
     expect(styles).toContain('.toggle-switch-input:checked + .toggle-switch')

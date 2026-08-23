@@ -111,23 +111,12 @@ h2 { margin: 0; font-size: 19px; }
 .status-pill { padding: 9px 14px; border: 1px solid #315a87; border-radius: 999px; color: #a9c6ed; font-size: 13px; }
 .status-pill i { display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: #68d7a5; box-shadow: 0 0 8px #68d7a5; }
 
-.panel, .summary-grid {
+.panel {
   border: 1px solid var(--surface-border-soft);
   border-radius: 12px;
   background: linear-gradient(145deg, rgba(12, 34, 63, .9), rgba(7, 22, 44, .84));
   box-shadow: inset 0 1px 0 rgba(255,255,255,.025), 0 12px 34px rgba(0,0,0,.12);
 }
-.summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); margin-bottom: 17px; padding: 14px 10px; }
-.summary-card { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 72px; padding: 0 8px; border-right: 1px solid #203851; }
-.summary-card:last-child { border-right: 0; }
-.summary-icon { display: grid; width: 42px; height: 42px; flex: 0 0 42px; place-items: center; border: 1px solid currentColor; border-radius: 50%; background: rgba(255,255,255,.025); box-shadow: inset 0 0 18px rgba(255,255,255,.025), 0 0 18px color-mix(in srgb, currentColor 14%, transparent); }
-.summary-icon svg { display: block; width: 21px; height: 21px; overflow: visible; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.summary-icon.coral { color: #ff735b; }
-.summary-icon.gold { color: #f1b431; }
-.summary-icon.green { color: #62d89a; }
-.summary-card small { display: block; color: #afbed2; }
-.summary-card strong { display: block; margin-top: 4px; font-size: 26px; }
-.summary-card em { color: #aebed3; font-size: 13px; font-style: normal; font-weight: 400; }
 
 .content-grid { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 16px; }
 .empty-card { min-height: 180px; padding: 18px; }
@@ -423,12 +412,6 @@ h2 { margin: 0; font-size: 19px; }
   .workspace { padding: 16px 12px; }
   .topbar { grid-template-columns: calc(66.6667% - 3px) minmax(0, 1fr); gap: 0; }
   .incomplete-filter-control { padding-right: 8px; padding-left: 8px; }
-  .summary-grid { padding: 10px 4px; }
-  .summary-card { gap: 6px; min-height: 66px; padding: 0 3px; }
-  .summary-icon { width: 34px; height: 34px; flex-basis: 34px; }
-  .summary-icon svg { width: 18px; height: 18px; }
-  .summary-card small { font-size: 11px; }
-  .summary-card strong { font-size: 22px; }
   .section-header { gap: 7px; }
   .section-title h2 { gap: 7px; font-size: 19px; }
   .panel-icon { width: 28px; height: 28px; }
