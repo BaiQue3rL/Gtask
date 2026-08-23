@@ -33,6 +33,7 @@ import {
 } from './game-navigation'
 import { kuroRoleKey } from './kuro-role-key'
 import { compareChecklistItems } from './checklist-sort'
+import { checklistDeadlineTone } from './checklist-deadline'
 import {
   DEFAULT_PANEL_ORDER,
   movePanelSection,
@@ -1473,9 +1474,8 @@ function isExpired(value: string): boolean {
   return new Date(value).getTime() <= clockNow.value
 }
 
-function isUrgentDeadline(value: string): boolean {
-  const remaining = new Date(value).getTime() - clockNow.value
-  return remaining > 0 && remaining < 48 * 60 * 60 * 1_000
+function deadlineTone(value: string): ReturnType<typeof checklistDeadlineTone> {
+  return checklistDeadlineTone(value, clockNow.value)
 }
 
 function isUpcoming(value: string): boolean {
@@ -1745,7 +1745,7 @@ function showError(error: unknown): void {
                     <span
                       v-else-if="row.item.endsAt"
                       class="item-timing deadline"
-                      :class="{ expired: isExpired(row.item.endsAt), urgent: isUrgentDeadline(row.item.endsAt) }"
+                      :class="isExpired(row.item.endsAt) ? 'expired' : deadlineTone(row.item.endsAt)"
                     >{{ countdown(row.item.endsAt) }}</span>
                   </button>
                     <button v-if="panel.section === 'custom'" class="more-button" type="button" aria-label="编辑" @click="openEdit(row.item)">⋮</button>

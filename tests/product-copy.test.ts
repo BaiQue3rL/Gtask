@@ -130,6 +130,12 @@ describe('product copy and built-in section boundaries', () => {
     expect(styles).not.toMatch(/\.checklist-row\.completed \{[^}]*background:/)
     expect(styles).toMatch(/\.game-version-remaining \{[^}]*color: var\(--color-info-muted\)/)
     expect(styles).toMatch(/\.item-timing \{[^}]*color: var\(--color-info-muted\)/)
+    expect(styles).toMatch(/\.deadline\.warning \{[^}]*color: var\(--color-warning\)/)
+    expect(styles).toMatch(/\.deadline\.urgent \{[^}]*color: var\(--color-danger\)[^}]*font-weight: 600/)
+    expect(styles).toMatch(/\.game-version-remaining\.warning \{[^}]*color: var\(--color-warning\)/)
+    expect(styles).toMatch(/\.game-version-remaining\.urgent \{[^}]*color: var\(--color-danger\)/)
+    expect(styles).toMatch(/\.page-version-remaining\.warning \{[^}]*color: var\(--color-warning\)/)
+    expect(styles).toMatch(/\.page-version-remaining\.urgent \{[^}]*color: var\(--color-danger\)/)
   })
 
   it('keeps user-facing copy conversational and free of maintenance terms', () => {
