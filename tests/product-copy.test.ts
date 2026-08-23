@@ -99,6 +99,16 @@ describe('product copy and built-in section boundaries', () => {
     expect(styles).toMatch(/\.settings-modal \{[^}]*height: min\(680px, calc\(100vh - 48px\)\)/)
   })
 
+  it('aligns settings actions to a shared right-side column', () => {
+    expect(styles).toMatch(/\.credential-actions, \.data-location-actions, \.software-update-actions \{[^}]*width: 190px[^}]*flex: 0 0 190px/)
+    expect(styles).toMatch(/\.backup-row \{[^}]*grid-template-columns: minmax\(0, 1fr\) auto 190px/)
+    expect(styles).toMatch(/\.backup-row button \{[^}]*width: 91px[^}]*margin-right: -8px[^}]*justify-self: end/)
+    expect(styles).toMatch(/\.backup-list \{[^}]*scrollbar-gutter: stable/)
+    expect(styles).toMatch(/\.data-location > span \{[^}]*width: 100%[^}]*min-width: 0[^}]*text-overflow: ellipsis/)
+    expect(styles).toMatch(/@media \(max-width: 620px\)[\s\S]*?\.credential-actions, \.data-location-actions \{[^}]*align-self: flex-end[^}]*flex: 0 0 auto/)
+    expect(styles).toMatch(/@media \(max-width: 620px\)[\s\S]*?\.software-update-actions \{[^}]*width: 100%[^}]*flex: 0 0 auto/)
+  })
+
   it('combines per-game preferences before the global item visibility setting', () => {
     const preferencesIndex = app.indexOf('<div class="game-preference-table">')
     const visibilityColumnIndex = app.indexOf('<span>游戏</span><span>显示</span><span>自动同步</span>')

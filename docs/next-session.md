@@ -24,9 +24,9 @@ Gtask 是一款面向 Windows 的本地游戏任务清单，技术栈为 Electro
 - GitHub 权威仓库：`https://github.com/BaiQue3rL/Gtask`。
 - 当前 Git 主分支：`main`；最近一次已推送提交以 `git log -1 --oneline origin/main` 为准。
 - GitHub Release：`v1.0.0` 已发布；Gitee 作为免费中国区镜像与默认下载/更新源。
-- 本机正式安装目录：`D:\Git\Gtask`；当前 EXE 产品版本为 `1.1.0.0`，SHA-256 为 `CB98040E36ECF3CDA58F8F8E6D359642CE775714F99A441D1D32E41EB6FDF4A2`。
+- 本机正式安装目录：`D:\Git\Gtask`；当前 EXE 产品版本为 `1.1.0.0`，SHA-256 为 `DF187F51A9E2AF393B712B4FA610BCF99572BE0EC56DC430EAABF4C2DF9D7A70`。
 - 当前远程清单 revision：`2026-08-13.genshin-cycle-identity-correction`；已由本机通过 Gitee 镜像成功手动应用。
-- 当前代码已通过：完整测试 379 项、11 项按既有条件跳过；`pnpm typecheck`、`pnpm build` 和 1.1.0 解包目录构建均通过。
+- 当前代码已通过：完整测试 380 项、11 项按既有条件跳过；`pnpm typecheck`、`pnpm build` 和 1.1.0 解包目录构建均通过。
 - 本轮设置位置和用户文案调整继续归入 1.1.0；是否推送、部署、创建标签和新 Release 仍分别处理。
 - 本机 Codex 插件已切换为 `gtask@personal` `1.1.0+codex.20260822150112`；旧插件登记已移除。插件更新后应新建 Codex 任务以加载最新 skill/MCP。
 

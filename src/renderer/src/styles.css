@@ -627,6 +627,12 @@ h3 { margin: 0; font-size: 16px; font-weight: 650; }
 .recycle-row div, .backup-row div { display: grid; min-width: 0; gap: 3px; }
 .recycle-row strong, .backup-row strong { overflow: hidden; color: var(--color-neutral-foreground-2); font-size: 12px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .recycle-row span, .backup-row span, .backup-row small { color: var(--color-neutral-foreground-4); font-size: 11px; }
+.backup-row { display: grid; grid-template-columns: minmax(0, 1fr) auto 190px; }
+.backup-row button {
+  width: 91px;
+  margin-right: -8px;
+  justify-self: end;
+}
 
 .settings-modal {
   display: grid;
@@ -719,13 +725,21 @@ h3 { margin: 0; font-size: 16px; font-weight: 650; }
 .settings-control-footer .primary-button { justify-self: end; }
 .account-list { overflow: hidden; }
 .account-row + .account-row { border-top: 1px solid var(--color-neutral-stroke-subtle); }
-.credential-actions { flex: 0 0 auto; }
+.credential-actions, .data-location-actions, .software-update-actions { width: 190px; flex: 0 0 190px; }
+.credential-actions .secondary-button, .credential-actions .danger-button,
+.data-location-actions .secondary-button, .software-update-actions .secondary-button { min-width: 0; flex: 1; }
 .data-location { min-width: 0; }
-.data-location > span { overflow: hidden; color: var(--color-neutral-foreground-4); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.data-location-actions { flex: 0 0 auto; }
+.data-location > span { width: 100%; min-width: 0; overflow: hidden; color: var(--color-neutral-foreground-4); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .settings-help { margin: 8px 2px 0; color: var(--color-neutral-foreground-4); font-size: 12px; }
-.backup-list { display: grid; max-height: 220px; margin-top: 10px; overflow-y: auto; border: 1px solid var(--color-neutral-stroke-subtle); border-radius: var(--radius-medium); }
-.backup-row button { flex: 0 0 auto; }
+.backup-list {
+  display: grid;
+  max-height: 220px;
+  margin-top: 10px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  border: 1px solid var(--color-neutral-stroke-subtle);
+  border-radius: var(--radius-medium);
+}
 .settings-note { margin: 16px 0 0; color: var(--color-neutral-foreground-4); font-size: 12px; line-height: 1.6; }
 .software-update-source-field {
   display: grid !important;
@@ -827,7 +841,8 @@ h3 { margin: 0; font-size: 16px; font-weight: 650; }
   .item-main { grid-template-columns: minmax(0, 1fr); gap: 2px; }
   .item-timing { justify-self: start; }
   .panel-order-setting, .data-location, .account-row { align-items: flex-start; flex-direction: column; }
-  .credential-actions, .data-location-actions { width: 100%; flex-wrap: wrap; }
+  .credential-actions, .data-location-actions { align-self: flex-end; flex: 0 0 auto; flex-wrap: nowrap; }
+  .software-update-actions { width: 100%; flex: 0 0 auto; }
   .software-update-source-field { grid-template-columns: minmax(0, 1fr); }
   .game-preference-header, .game-preference-row { grid-template-columns: minmax(0, 1fr) 58px 76px; }
 }
