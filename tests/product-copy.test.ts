@@ -73,6 +73,17 @@ describe('product copy and built-in section boundaries', () => {
     expect(styles).toMatch(/\.editor-modal \.game-visibility-row \{[^}]*display: flex[^}]*min-height: 42px[^}]*margin-top: 0/)
   })
 
+  it('keeps the global item visibility setting after both per-game toggle groups', () => {
+    const gamesIndex = app.indexOf('<h3 class="settings-heading">我的游戏</h3>')
+    const autoSyncIndex = app.indexOf('<h3 class="settings-heading">启动后自动同步</h3>')
+    const itemVisibilityIndex = app.indexOf('<h3 class="settings-heading">事项显示</h3>')
+    const layoutIndex = app.indexOf('<h3 class="settings-heading">版块布局</h3>')
+
+    expect(gamesIndex).toBeLessThan(autoSyncIndex)
+    expect(autoSyncIndex).toBeLessThan(itemVisibilityIndex)
+    expect(itemVisibilityIndex).toBeLessThan(layoutIndex)
+  })
+
   it('keeps destructive checklist confirmations inside the themed renderer surface', () => {
     expect(app).toContain('class="prompt-modal confirmation-modal"')
     expect(app).toContain("title: '清空回收站'")

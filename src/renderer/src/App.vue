@@ -1862,6 +1862,23 @@ function showError(error: unknown): void {
             </span>
           </label>
         </div>
+        <h3 class="settings-heading">启动后自动同步</h3>
+        <p class="recycle-hint">启动时自动读取所选游戏的官方个人进度；10 分钟内重复启动会安静跳过。</p>
+        <div class="game-visibility-list">
+          <label v-for="game in games" :key="`auto-sync:${game.id}`" class="game-visibility-row">
+            <span class="settings-game-label"><img class="game-icon" :src="gameIcons[game.id]" alt="" aria-hidden="true">{{ game.name }}</span>
+            <input
+              class="toggle-switch-input"
+              type="checkbox"
+              :checked="syncSettingsByGame[game.id]?.autoSyncEnabled ?? false"
+              :aria-label="`启动后自动同步 ${game.name}`"
+              @change="saveAutoSyncPreference(game.id, ($event.target as HTMLInputElement).checked)"
+            >
+            <span class="toggle-switch" aria-hidden="true">
+              <span class="toggle-switch-thumb"></span>
+            </span>
+          </label>
+        </div>
         <h3 class="settings-heading">事项显示</h3>
         <div class="settings-box software-update-box">
           <label class="software-update-toggle">
@@ -1875,23 +1892,6 @@ function showError(error: unknown): void {
               :checked="showUpcomingBaselineItems"
               aria-label="显示尚未开始的基准事项"
               @change="saveUpcomingBaselineVisibility(($event.target as HTMLInputElement).checked)"
-            >
-            <span class="toggle-switch" aria-hidden="true">
-              <span class="toggle-switch-thumb"></span>
-            </span>
-          </label>
-        </div>
-        <h3 class="settings-heading">启动后自动同步</h3>
-        <p class="recycle-hint">启动时自动读取所选游戏的官方个人进度；10 分钟内重复启动会安静跳过。</p>
-        <div class="game-visibility-list">
-          <label v-for="game in games" :key="`auto-sync:${game.id}`" class="game-visibility-row">
-            <span class="settings-game-label"><img class="game-icon" :src="gameIcons[game.id]" alt="" aria-hidden="true">{{ game.name }}</span>
-            <input
-              class="toggle-switch-input"
-              type="checkbox"
-              :checked="syncSettingsByGame[game.id]?.autoSyncEnabled ?? false"
-              :aria-label="`启动后自动同步 ${game.name}`"
-              @change="saveAutoSyncPreference(game.id, ($event.target as HTMLInputElement).checked)"
             >
             <span class="toggle-switch" aria-hidden="true">
               <span class="toggle-switch-thumb"></span>

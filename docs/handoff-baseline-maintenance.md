@@ -117,14 +117,14 @@ Gtask 已完成从“依赖 Codex 才能使用”到“发布包自带完整持�
 
 ## 验证记录
 
-- `pnpm test`：61 个测试文件通过、1 个文件按条件跳过；373 项通过，11 项按既有条件跳过。
+- `pnpm test`：61 个测试文件通过、1 个文件按条件跳过；374 项通过，11 项按既有条件跳过。
 - `pnpm typecheck`：通过。
 - `pnpm build`：通过。
 - 打包 MCP 冒烟测试：15 个工具、4 款游戏均可读取。
 - 使用真实数据库完整副本执行启动迁移：成功；幽境危战补齐时间且保留完成状态，没有重复键。
 - 正式程序：`D:\Git\Gtask\Gtask.exe`，产品版本 `1.1.0.0`。
-- 当前正式 EXE SHA-256：`30859E8C4EEAF620BED0BB9B2AB92AB6E6306BFF4A4231B8DBD6C6FE30347C14`。
-- 1.1.0 安装器 SHA-256：`A914D9CA1BC7A50858E383CF14FB8528E2839B2A378693F96FFFA3DF2B5A52A0`；便携版 SHA-256：`2215D6329BD33953627DB3A33818FB9C1B1A81B4C508A33299B5241C759D28C1`。
+- 当前正式 EXE SHA-256：`F90BF12C0CC1DA63F7ADF894D6562C82A5CFFD02BAEC2B121EEF515F4AC58C14`。
+- 1.1.0 安装器 SHA-256：`D065621DB85CE430D507DBBC4B8632232E9D8A821B683622C9802322ACF0ACDA`。
 - 当前线上清单 revision：`2026-08-13.genshin-cycle-identity-correction`；本机于 2026-08-13 23:21（Asia/Shanghai）通过 Gitee 成功手动应用。
 
 ## 受保护的本机数据

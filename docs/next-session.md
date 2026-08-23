@@ -19,15 +19,15 @@ Gtask 是一款面向 Windows 的本地游戏任务清单，技术栈为 Electro
 
 ## 2. 当前状态
 
-- 当前产品版本：`1.1.0`，按 SemVer 作为向后兼容的功能版本递增。
+- 当前产品版本：`1.1.0`；本轮小型设置页布局调整不单独递增版本。
 - 数据库 schema：v4，支持 v1 → v2 → v3 → v4 安全迁移。
 - GitHub 权威仓库：`https://github.com/BaiQue3rL/Gtask`。
 - 当前 Git 主分支：`main`；本轮完成后已推送 `origin/main`，准确提交号以 `git log -1 --oneline` 为准。
 - GitHub Release：`v1.0.0` 已发布；Gitee 作为免费中国区镜像与默认下载/更新源。
-- 本机正式安装目录：`D:\Git\Gtask`；当前 EXE 产品版本为 `1.1.0.0`，SHA-256 为 `30859E8C4EEAF620BED0BB9B2AB92AB6E6306BFF4A4231B8DBD6C6FE30347C14`。
+- 本机正式安装目录：`D:\Git\Gtask`；当前 EXE 产品版本为 `1.1.0.0`，SHA-256 为 `F90BF12C0CC1DA63F7ADF894D6562C82A5CFFD02BAEC2B121EEF515F4AC58C14`。
 - 当前远程清单 revision：`2026-08-13.genshin-cycle-identity-correction`；已由本机通过 Gitee 镜像成功手动应用。
-- 当前代码已通过：完整测试 373 项、11 项按既有条件跳过；`pnpm typecheck`、`pnpm build`、`pnpm package:dir`、安装器、便携版和 15 工具 MCP 冒烟均通过。
-- 本轮产品版本升级到 1.1.0；是否创建标签和新 Release 仍与源码推送分开处理。
+- 当前代码已通过：完整测试 374 项、11 项按既有条件跳过；`pnpm typecheck`、`pnpm build` 和 1.1.0 安装器均通过。
+- 本轮仅调整设置项位置，继续归入 1.1.0；是否推送、创建标签和新 Release 仍分别处理。
 - 本机 Codex 插件已切换为 `gtask@personal` `1.1.0+codex.20260822150112`；旧插件登记已移除。插件更新后应新建 Codex 任务以加载最新 skill/MCP。
 
 ## 3. 不可破坏的架构边界
