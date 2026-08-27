@@ -1981,6 +1981,152 @@ describe('AppDatabase', () => {
     ]))
   })
 
+  it('个人地图同步后立即按完整二级目录重算一级进度', () => {
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-personal-map-rollup-'))
+    const databasePath = join(temporaryDirectory, 'test.sqlite')
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
+    const cases = [
+      ['genshin', 'miyoushe', 'a'],
+      ['zenless', 'miyoushe', 'b'],
+      ['wuthering-waves', 'kuro-community', 'c']
+    ] as const
+    const reference = new Date('2026-08-23T12:00:00.000Z')
+
+    for (const [gameId, provider, scopeCharacter] of cases) {
+      const regionKey = `map:${gameId}:region`
+      database.mergeSyncedItems(gameId, 'public_schedule', [
+        {
+          remoteKey: regionKey,
+          category: 'exploration',
+          title: `${gameId} 主地区`,
+          mapNodeKind: 'region'
+        },
+        {
+          remoteKey: `map:${gameId}:a`,
+          category: 'exploration',
+          title: `${gameId} 子地区 A`,
+          mapNodeKind: 'subregion',
+          parentRemoteKey: regionKey
+        },
+        {
+          remoteKey: `map:${gameId}:b`,
+          category: 'exploration',
+          title: `${gameId} 子地区 B`,
+          mapNodeKind: 'subregion',
+          parentRemoteKey: regionKey
+        }
+      ], reference.toISOString())
+
+      database.replacePersonalSnapshot(
+        gameId,
+        'exploration',
+        `test:${scopeCharacter.repeat(64)}`,
+        [
+          {
+            remoteKey: `personal:${gameId}:region`,
+            category: 'exploration',
+            title: `${gameId} 主地区`,
+            mapNodeKind: 'region',
+            progressPercent: 14,
+            sourceIdentity: {
+              provider,
+              endpoint: 'personal-map-progress',
+              externalId: `${gameId}-region`
+            }
+          },
+          {
+            remoteKey: `personal:${gameId}:a`,
+            category: 'exploration',
+            title: `${gameId} 子地区 A`,
+            mapNodeKind: 'subregion',
+            progressPercent: 20,
+            sourceIdentity: {
+              provider,
+              endpoint: 'personal-map-progress',
+              externalId: `${gameId}-a`
+            }
+          },
+          {
+            remoteKey: `personal:${gameId}:b`,
+            category: 'exploration',
+            title: `${gameId} 子地区 B`,
+            mapNodeKind: 'subregion',
+            progressPercent: 48,
+            sourceIdentity: {
+              provider,
+              endpoint: 'personal-map-progress',
+              externalId: `${gameId}-b`
+            }
+          }
+        ],
+        `${gameId}-personal-v1`,
+        reference
+      )
+
+      expect(database.listChecklistItems(gameId).find(
+        (item) => item.remoteKey === regionKey
+      )).toMatchObject({ progressPercent: 34, completed: false })
+    }
+
+    database.close()
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
+    for (const [gameId] of cases) {
+      expect(database.listChecklistItems(gameId).find(
+        (item) => item.remoteKey === `map:${gameId}:region`
+      )).toMatchObject({ progressPercent: 34, completed: false })
+    }
+  })
+
+  it('个人接口仅提供一级地图进度时重启后保留接口值', () => {
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-personal-map-region-only-'))
+    const databasePath = join(temporaryDirectory, 'test.sqlite')
+    const reference = new Date('2026-08-23T12:00:00.000Z')
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
+    database.mergeSyncedItems('genshin', 'public_schedule', [
+      {
+        remoteKey: 'map:genshin:region-only',
+        category: 'exploration',
+        title: '只提供一级进度的地区',
+        mapNodeKind: 'region'
+      },
+      {
+        remoteKey: 'map:genshin:region-only:child',
+        category: 'exploration',
+        title: '未由接口提供的子地区',
+        mapNodeKind: 'subregion',
+        parentRemoteKey: 'map:genshin:region-only'
+      }
+    ], reference.toISOString())
+    database.replacePersonalSnapshot(
+      'genshin',
+      'exploration',
+      `test:${'d'.repeat(64)}`,
+      [{
+        remoteKey: 'personal:genshin:region-only',
+        category: 'exploration',
+        title: '只提供一级进度的地区',
+        mapNodeKind: 'region',
+        progressPercent: 86,
+        sourceIdentity: {
+          provider: 'miyoushe',
+          endpoint: 'personal-map-progress',
+          externalId: 'genshin-region-only'
+        }
+      }],
+      'genshin-personal-v1',
+      reference
+    )
+    expect(database.listChecklistItems('genshin').find(
+      (item) => item.remoteKey === 'map:genshin:region-only'
+    )).toMatchObject({ progressPercent: 86, completed: false })
+
+    database.close()
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
+    expect(database.listChecklistItems('genshin').find(
+      (item) => item.remoteKey === 'map:genshin:region-only'
+    )).toMatchObject({ progressPercent: 86, completed: false })
+  })
+
   it('启动时修复旧版公开子地图已完成但进度为零的状态', () => {
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-public-map-progress-repair-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')

@@ -2700,7 +2700,27 @@ export class AppDatabase {
           active_account_scope = excluded.active_account_scope,
           active_snapshot_id = excluded.active_snapshot_id
       `).run(gameId, target, now, now, accountScope, snapshotId)
-      if (target === 'exploration') this.assertActiveMapReferences(gameId)
+      if (target === 'exploration') {
+        // Personal providers may report a first-level percentage using a
+        // different denominator from Gtask's complete canonical child list.
+        // Keep the rendered region total deterministic before and after a
+        // restart when the provider actually exposes child-level progress.
+        const affectedRegionIdentities = new Set(
+          activeItems
+            .filter((item) => item.mapNodeKind === 'subregion')
+            .flatMap((item) => item.parentRemoteKey
+              ? [item.parentRemoteKey]
+              : item.parentTitle
+                ? [`title:${item.parentTitle}`]
+                : [])
+        )
+        if (affectedRegionIdentities.size > 0) {
+          this.recalculatePublicMapRegionProgress(gameId, reference, {
+            onlyRegionIdentities: affectedRegionIdentities
+          })
+        }
+        this.assertActiveMapReferences(gameId)
+      }
       return { ...merge, expiredRemoved }
     }
     return manageTransaction ? this.runTransaction(replace) : replace()
@@ -4405,7 +4425,9 @@ export class AppDatabase {
         AND (progress_percent IS NULL OR progress_percent <> 100)
     `).run(now)
     for (const game of DEFAULT_GAMES) {
-      this.recalculatePublicMapRegionProgress(game.id, reference)
+      this.recalculatePublicMapRegionProgress(game.id, reference, {
+        preserveDirectlyBoundRegionsWithoutBoundChildren: true
+      })
     }
   }
 
@@ -4482,7 +4504,11 @@ export class AppDatabase {
 
   private recalculatePublicMapRegionProgress(
     gameId: GameId,
-    reference = new Date()
+    reference = new Date(),
+    options: {
+      onlyRegionIdentities?: ReadonlySet<string>
+      preserveDirectlyBoundRegionsWithoutBoundChildren?: boolean
+    } = {}
   ): string[] {
     const regions = this.database.prepare(`
       SELECT id, remote_key AS remoteKey, title
@@ -4491,14 +4517,24 @@ export class AppDatabase {
         AND map_node_kind = 'region' AND archived = 0
     `).all(gameId) as Array<{ id: string; remoteKey: string | null; title: string }>
     const readChildren = this.database.prepare(`
-      SELECT progress_percent AS progressPercent, completed
-      FROM checklist_items
-      WHERE game_id = ? AND category = 'exploration' AND source = 'public_schedule'
-        AND map_node_kind = 'subregion' AND archived = 0
+      SELECT child.progress_percent AS progressPercent, child.completed,
+        EXISTS(
+          SELECT 1 FROM source_bindings binding
+          WHERE binding.game_id = ? AND binding.item_id = child.id
+        ) AS hasPersonalBinding
+      FROM checklist_items child
+      WHERE child.game_id = ? AND child.category = 'exploration'
+        AND child.source = 'public_schedule'
+        AND child.map_node_kind = 'subregion' AND child.archived = 0
         AND (
-          (? IS NOT NULL AND parent_remote_key = ?)
-          OR (parent_remote_key IS NULL AND parent_title = ?)
+          (? IS NOT NULL AND child.parent_remote_key = ?)
+          OR (child.parent_remote_key IS NULL AND child.parent_title = ?)
         )
+    `)
+    const hasDirectPersonalBinding = this.database.prepare(`
+      SELECT 1 FROM source_bindings
+      WHERE game_id = ? AND item_id = ?
+      LIMIT 1
     `)
     const update = this.database.prepare(`
       UPDATE checklist_items
@@ -4520,13 +4556,28 @@ export class AppDatabase {
     const now = reference.toISOString()
     const updatedIds: string[] = []
     for (const region of regions) {
+      const regionIdentity = region.remoteKey ?? `title:${region.title}`
+      if (
+        options.onlyRegionIdentities &&
+        !options.onlyRegionIdentities.has(regionIdentity)
+      ) continue
       const children = readChildren.all(
+        gameId,
         gameId,
         region.remoteKey,
         region.remoteKey,
         region.title
-      ) as Array<{ progressPercent: number | null; completed: number }>
+      ) as Array<{
+        progressPercent: number | null
+        completed: number
+        hasPersonalBinding: number
+      }>
       if (children.length === 0) continue
+      if (
+        options.preserveDirectlyBoundRegionsWithoutBoundChildren &&
+        hasDirectPersonalBinding.get(gameId, region.id) &&
+        children.every((child) => !child.hasPersonalBinding)
+      ) continue
       const progress = Math.round(
         children.reduce(
           (sum, child) => sum + (child.completed ? 100 : (child.progressPercent ?? 0)),
