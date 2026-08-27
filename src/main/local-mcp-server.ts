@@ -59,6 +59,58 @@ const activityTagIdSchema = z.string().min(1).max(80).refine(
   (value) => isValidActivityTagId(value),
   '活动标签必须引用 contract.activityTagCatalog 中已注册的稳定 ID'
 )
+const webEvidenceSchema = z.object({
+  kind: z.literal('web').optional(),
+  url: httpUrlSchema,
+  platform: z.string().min(1).max(100),
+  publisher: z.string().min(1).max(100),
+  official: z.boolean(),
+  language: z.string().min(2).max(35),
+  publishedAt: isoDateSchema.nullable().optional(),
+  note: z.string().max(500).optional()
+}).strict()
+const firstPartyObservationEvidenceSchema = z.object({
+  kind: z.literal('first_party_observation'),
+  observationId: z.string().uuid(),
+  note: z.string().max(500).optional()
+}).strict()
+const publicScheduleItemSchema = z.object({
+  matchItemId: z.string().min(1).max(100).optional()
+    .describe('与领取任务的 matchCandidates 语义相同时填写其 itemId'),
+  remoteKey: z.string().min(1).max(200)
+    .describe('稳定机器身份；同一逻辑事项重复同步时保持稳定'),
+  category: publicScheduleCategorySchema,
+  title: z.string().min(1).max(100),
+  titleSourceUrl: httpUrlSchema.optional(),
+  sourceObservationId: z.string().uuid().optional()
+    .describe('仅用于已有事项的时间校正；必须来自当前 job.sourceObservations'),
+  activityTags: z.array(activityTagIdSchema)
+    .min(MIN_AI_ACTIVITY_TAGS).max(MAX_AI_ACTIVITY_TAGS).optional()
+    .describe('限时活动必填；依据玩法规则提交稳定 ID'),
+  parentTitle: z.string().max(200).nullable().optional(),
+  mapNodeKind: mapNodeKindSchema.nullable().optional(),
+  parentRemoteKey: z.string().max(200).nullable().optional(),
+  startsAt: isoDateSchema.nullable().optional()
+    .describe('绝对开始时间；限时活动必须提供'),
+  endsAt: isoDateSchema.nullable().optional()
+    .describe('绝对结束时间；限时活动必须提供'),
+  resetRule: z.string().max(200).nullable().optional(),
+  periodKey: z.string().max(200).nullable().optional(),
+  scheduleKind: scheduleKindSchema.nullable().optional(),
+  resetWeekday: z.number().int().min(1).max(7).nullable().optional(),
+  timeZone: z.string().max(200).nullable().optional(),
+  modeKey: z.string().max(200).nullable().optional(),
+  recurrenceRule: recurrenceRuleSchema,
+  sourceUrl: httpUrlSchema.optional(),
+  confidence: z.number().min(0).max(1)
+}).strict().superRefine((item, context) => {
+  if (!item.sourceUrl && !item.sourceObservationId) {
+    context.addIssue({ code: 'custom', message: '事项必须提供公开来源或第一方档期观察' })
+  }
+  if (!item.matchItemId && (!item.titleSourceUrl || !item.sourceUrl)) {
+    context.addIssue({ code: 'custom', message: '新增事项必须提供名称与核心事实的公开来源' })
+  }
+})
 
 const checklistFields = {
   category: categorySchema,
@@ -102,7 +154,7 @@ export function createLocalMcpServer(
   options: LocalMcpServerOptions = {}
 ): McpServer {
   const commands = new LocalCommandService(database)
-  const server = new McpServer({ name: 'gtask', version: '1.1.0' })
+  const server = new McpServer({ name: 'gtask', version: '1.1.1' })
 
   server.registerTool(
     'describe_gtask_commands',
@@ -344,7 +396,7 @@ export function createLocalMcpServer(
     'claim_gtask_schedule_job',
     {
       title: '领取基准表维护任务',
-      description: '领取最早的后台基准表维护任务。返回的 job.contract 是当前版块所需数据、字段语义和完成条件的权威机器可读契约；Agent 应先读取契约再联网检索。无任务时返回 null。',
+      description: '领取最早的后台基准表维护任务。先读取 job.contract、当前基准与脱敏第一方档期观察；只有字段缺失或冲突时再联网补查。无任务时返回 null。',
       inputSchema: {
         agentId: z.string().min(1).max(100),
         jobId: z.string().uuid().optional(),
@@ -452,7 +504,7 @@ export function createLocalMcpServer(
     'apply_gtask_public_schedule',
     {
       title: '提交已验证的公开资料',
-      description: '按已领取 job.contract 提交 Codex 核验后的当前版本时间、活动、周期排期或地图目录；输入 schema 是各版块字段的并集，条件必填与禁止字段以 contract 为准。也可把确认错误、重复或失效的同步项移入回收站。',
+      description: '按已领取 job.contract 提交 Codex 核验后的当前版本时间、活动、周期排期或地图目录；已有事项可引用 job.sourceObservations 校时，缺失或冲突字段再使用公开来源。也可把确认错误、重复或失效的同步项移入回收站。',
       inputSchema: {
         agentId: z.string().min(1).max(100),
         jobId: z.string().uuid(),
@@ -468,34 +520,8 @@ export function createLocalMcpServer(
           confidence: z.number().min(0).max(1)
         }).strict().optional()
           .describe('仅版本校时使用的游戏级窗口；不是清单事项'),
-        items: z.array(z.object({
-          matchItemId: z.string().min(1).max(100).optional()
-            .describe('与领取任务的 matchCandidates 语义相同时填写其 itemId'),
-          remoteKey: z.string().min(1).max(200)
-            .describe('稳定机器身份；同一逻辑事项重复同步时保持稳定'),
-          category: publicScheduleCategorySchema,
-          title: z.string().min(1).max(100),
-          titleSourceUrl: httpUrlSchema,
-          activityTags: z.array(activityTagIdSchema)
-            .min(MIN_AI_ACTIVITY_TAGS).max(MAX_AI_ACTIVITY_TAGS).optional()
-            .describe('限时活动必填；依据玩法规则提交稳定 ID'),
-          parentTitle: z.string().max(200).nullable().optional(),
-          mapNodeKind: mapNodeKindSchema.nullable().optional(),
-          parentRemoteKey: z.string().max(200).nullable().optional(),
-          startsAt: isoDateSchema.nullable().optional()
-            .describe('绝对开始时间；限时活动必须提供'),
-          endsAt: isoDateSchema.nullable().optional()
-            .describe('绝对结束时间；限时活动必须提供'),
-          resetRule: z.string().max(200).nullable().optional(),
-          periodKey: z.string().max(200).nullable().optional(),
-          scheduleKind: scheduleKindSchema.nullable().optional(),
-          resetWeekday: z.number().int().min(1).max(7).nullable().optional(),
-          timeZone: z.string().max(200).nullable().optional(),
-          modeKey: z.string().max(200).nullable().optional(),
-          recurrenceRule: recurrenceRuleSchema,
-          sourceUrl: httpUrlSchema,
-          confidence: z.number().min(0).max(1)
-        }).strict()).max(200).describe('结构化事项；字段要求以领取任务的 contract 为准'),
+        items: z.array(publicScheduleItemSchema).max(200)
+          .describe('结构化事项；字段要求以领取任务的 contract 为准'),
         activityTagUpdates: z.array(z.object({
           itemId: z.string().min(1).max(100),
           title: z.string().min(1).max(100),
@@ -515,16 +541,11 @@ export function createLocalMcpServer(
           'tasks', 'events', 'cycles', 'exploration'
         ])).max(4).optional()
           .describe('完成目标版块全范围核查且与当前基准没有差异时填写；不能与该版块增删改同时使用'),
-        evidence: z.array(z.object({
-          url: httpUrlSchema,
-          platform: z.string().min(1).max(100),
-          publisher: z.string().min(1).max(100),
-          official: z.boolean(),
-          language: z.string().min(2).max(35),
-          publishedAt: isoDateSchema.nullable().optional(),
-          note: z.string().max(500).optional()
-        }).strict()).min(1).max(100)
-          .describe('覆盖本次提交核心事实的至少一条直接证据')
+        evidence: z.array(z.union([
+          webEvidenceSchema,
+          firstPartyObservationEvidenceSchema
+        ])).min(1).max(100)
+          .describe('覆盖本次提交核心事实的网页证据或 job.sourceObservations 引用')
       },
       annotations: { destructiveHint: false, openWorldHint: true }
     },
@@ -543,6 +564,27 @@ export function createLocalMcpServer(
     }) => {
       try {
         const claimedJob = database.getAiScheduleJobById(jobId)
+        const observationIds = new Set(claimedJob.sourceObservations.map(
+          (observation) => observation.observationId
+        ))
+        const evidencedObservationIds = new Set(evidence.flatMap((entry) =>
+          entry.kind === 'first_party_observation' ? [entry.observationId] : []
+        ))
+        for (const item of items) {
+          if (!item.sourceObservationId) continue
+          if (!observationIds.has(item.sourceObservationId)) {
+            throw new Error('事项引用的第一方档期观察不属于当前任务')
+          }
+          if (!evidencedObservationIds.has(item.sourceObservationId)) {
+            throw new Error('事项引用的第一方档期观察必须同时列入 evidence')
+          }
+        }
+        for (const entry of evidence) {
+          if (entry.kind === 'first_party_observation' &&
+            !observationIds.has(entry.observationId)) {
+            throw new Error('证据引用的第一方档期观察不属于当前任务')
+          }
+        }
         if (
           items.length === 0 &&
           (activityTagUpdates?.length ?? 0) === 0 &&
@@ -559,10 +601,15 @@ export function createLocalMcpServer(
           titleSourceUrl: _titleSourceUrl,
           ...item
         }) => item)
-        const normalizedEvidence = evidence.map(({ language, ...entry }) => ({
-          ...entry,
-          note: [entry.note, `页面语言：${language}`].filter(Boolean).join('；')
-        }))
+        const normalizedEvidence = evidence.map((entry) => {
+          if (entry.kind === 'first_party_observation') return entry
+          const { language, ...webEntry } = entry
+          return {
+            ...webEntry,
+            kind: 'web',
+            note: [entry.note, `页面语言：${language}`].filter(Boolean).join('；')
+          }
+        })
         const result = database.applyAiScheduleJob(
           jobId,
           agentId,

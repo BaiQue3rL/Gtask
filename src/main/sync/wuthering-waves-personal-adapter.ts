@@ -10,6 +10,7 @@ import {
   parseWutheringWavesPersonalData
 } from './wuthering-waves-personal-parser'
 import type { SyncAdapter, SyncAdapterOutput, SyncProgressReporter } from './types'
+import { scheduleObservationsFromItems } from './schedule-observations'
 import { personalMapsFromCandidates, withPersonalIdentity } from './personal-snapshot'
 
 export interface WutheringWavesCommunityClient {
@@ -72,11 +73,20 @@ export class WutheringWavesPersonalAdapter implements SyncAdapter {
       'kuro-community',
       explorationCandidates
     )
+    const endpointByMode: Record<string, string> = {
+      'tower-of-adversity': 'aki/roleBox/akiBox/towerDataDetail',
+      'whimpering-wastes': 'aki/roleBox/akiBox/slashDetail',
+      'endstate-matrix': 'aki/roleBox/akiBox/newTowerDetail'
+    }
+    const items = [
+      ...explorationItems,
+      ...withPersonalIdentity(cycleItems, 'kuro-community', (item) => (
+        endpointByMode[item.modeKey ?? ''] ?? 'kuro-community-challenge-record'
+      ))
+    ]
     return {
-      items: [
-        ...explorationItems,
-        ...withPersonalIdentity(cycleItems, 'kuro-community', 'personal-challenge-record')
-      ],
+      items,
+      scheduleObservations: scheduleObservationsFromItems(items),
       snapshotCompleteness: outcomes.every((outcome) => outcome.succeeded) ? 'complete' : 'partial',
       adapterVersion: 'wuthering-waves-personal-v1',
       message: (target === 'exploration'

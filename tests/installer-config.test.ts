@@ -26,7 +26,7 @@ describe('Windows installer directory', () => {
       'utf8'
     )
 
-    expect(packageJson.version).toBe('1.1.0')
+    expect(packageJson.version).toBe('1.1.1')
     expect(packageJson.build?.appId).toBe('com.gtask.app')
     expect(packageJson.build?.nsis?.guid).toBe('bd5c7cf6-969c-5816-ae40-118b8e6f1f4d')
     expect(packageJson.build?.nsis?.include).toBe('build/installer.nsh')

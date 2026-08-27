@@ -91,7 +91,7 @@ describe('鸣潮个人进度解析', () => {
       title: '逆境深塔',
       completed: true,
       startsAt: null,
-      endsAt: null,
+      endsAt: '2026-08-19T23:59:59.000Z',
       modeKey: 'tower-of-adversity'
     })
 
@@ -106,7 +106,7 @@ describe('鸣潮个人进度解析', () => {
       title: '冥歌海墟',
       completed: true,
       startsAt: null,
-      endsAt: null
+      endsAt: '2026-08-19T23:59:59.000Z'
     })
 
     expect(parseWutheringWavesMatrix({
@@ -117,8 +117,8 @@ describe('鸣潮个人进度解析', () => {
       title: '终焉矩阵',
       completed: true,
       startsAt: null,
-      endsAt: null,
-      periodKey: 'wuthering-waves:endstate-matrix:current'
+      endsAt: '2026-08-19T23:59:59.000Z',
+      periodKey: 'wuthering-waves:endstate-matrix:2026-08-19T23:59:59.000Z'
     })
   })
 
@@ -222,6 +222,20 @@ describe('鸣潮个人进度解析', () => {
       expect.objectContaining({ category: 'endgame', modeKey: 'endstate-matrix' })
     ]))
     expect(output.snapshotCompleteness).toBe('partial')
+    expect(output.scheduleObservations).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        target: 'cycles',
+        modeKey: 'tower-of-adversity',
+        endpoint: 'aki/roleBox/akiBox/towerDataDetail',
+        endsAt: '2026-08-19T23:59:59.000Z'
+      }),
+      expect.objectContaining({
+        target: 'cycles',
+        modeKey: 'endstate-matrix',
+        endpoint: 'aki/roleBox/akiBox/newTowerDetail',
+        endsAt: '2026-08-19T23:59:59.000Z'
+      })
+    ]))
     expect(output.message).toContain('部分成功 2/3')
     expect(progress).toEqual(expect.arrayContaining([
       expect.objectContaining({ message: '正在读取逆境深塔战绩', current: 1, total: 3 }),

@@ -223,6 +223,30 @@ describe('cycle catalog', () => {
     })
   })
 
+  it('终焉矩阵跟随当前版本第七天开启并在下次维护时结束', () => {
+    const definition = listCycleModes('wuthering-waves').find(
+      (candidate) => candidate.modeKey === 'endstate-matrix'
+    )!
+    const versionWindow = {
+      startsAt: '2026-08-20T11:00:00+08:00',
+      endsAt: '2026-09-30T04:00:00+08:00'
+    }
+    const window = predictCycleWindow(
+      definition,
+      new Date('2026-08-27T20:00:00+08:00'),
+      {
+        startsAt: '2026-08-28T04:00:00+08:00',
+        endsAt: '2026-10-01T04:00:00+08:00'
+      },
+      versionWindow
+    )
+
+    expect(window).toEqual({
+      startsAt: '2026-08-26T20:00:00.000Z',
+      endsAt: '2026-09-29T20:00:00.000Z'
+    })
+  })
+
   it('只按稳定模式或明确别名识别，不猜测未知玩法', () => {
     expect(findCycleMode('genshin', {
       remoteKey: 'unknown', modeKey: null, title: '深境螺旋'

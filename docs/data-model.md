@@ -37,7 +37,9 @@
 
 ## 数据库与备份
 
-- 当前 schema：v4。
+- 当前 schema：v5。
+- `schedule_observations` 保存个人接口同步过程中提取的脱敏官方档期事实；它不包含账号与进度，只供本机 Codex 维护任务比较公共基准。
+- `ai_schedule_jobs.completed_targets_json` / `remaining_targets_json` 保存全量维护任务的阶段闭环，续接时据此返回新的版块契约。
 - v1 → v2 删除旧固定周常并把用户周常迁入自定义。
 - v2 → v3 增加按游戏自动同步开关，迁移内置手动项，种完整基准并吸收旧个人进度，删除废弃个人复核缓存。
 - 启动启用 WAL、外键约束和忙等待；未来版本数据库拒绝打开。

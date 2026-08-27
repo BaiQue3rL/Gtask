@@ -192,7 +192,7 @@ export interface CodexScheduleWorkerPoolOptions
 }
 
 function backgroundPrompt(agentId: string, route: CodexWorkerRoute): string {
-  return `必须使用 $sync-gtask-schedules 技能处理 Gtask 后台基准表维护任务。你是桌面应用启动的本地后台 Agent，不要修改项目源码，也不要要求用户回复。使用固定 Agent ID“${agentId}”登记，只领取任务“${route.jobId}”；领取时传入 jobId="${route.jobId}"、model="${route.model}"、reasoningEffort="${route.reasoningEffort}"。先阅读 job.contract，按其中的语言、时区、字段和来源要求联网核验活动、周期、地图或版本时间。只能通过 MCP 的结构化基准表工具写入，不得读取凭据、个人账号数据或更改用户完成状态。任务不存在或已被领取时立即退出；已领取任务必须提交完整结果或明确失败，完成后退出，不领取第二项任务。`
+  return `必须使用 $sync-gtask-schedules 技能处理 Gtask 后台基准表维护任务。你是桌面应用启动的本地后台 Agent，不要修改项目源码，也不要要求用户回复。使用固定 Agent ID“${agentId}”登记，只领取任务“${route.jobId}”；领取时传入 jobId="${route.jobId}"、model="${route.model}"、reasoningEffort="${route.reasoningEffort}"。先阅读 job.contract、当前基准和脱敏 sourceObservations；第一方观察足以支持的字段直接引用，只有缺失或冲突字段再联网补查。只能通过 MCP 的结构化基准表工具写入，不得读取凭据、原始个人账号数据或更改用户完成状态。任务不存在或已被领取时立即退出；已领取任务必须提交完整结果或明确失败，每次续接都使用返回的新 contract，完成后退出，不领取第二项任务。`
 }
 export function findCodexCli(options: CodexCliDiscoveryOptions = {}): string | null {
   const env = options.env ?? process.env

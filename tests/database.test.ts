@@ -108,6 +108,134 @@ describe('AppDatabase', () => {
     expect(candidate).not.toHaveProperty('progressPercent')
   })
 
+  it('个人接口档期观察只暴露结构差异且可以校正既有事项时间', () => {
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
+    const reference = new Date('2026-08-27T12:00:00.000Z')
+    database.mergeSyncedItems('zenless', 'public_schedule', [{
+      remoteKey: 'event:official:calendar-test',
+      category: 'limited_event',
+      title: '档期观察测试',
+      activityTags: ['combat', 'challenge'],
+      startsAt: '2026-08-27T04:00:00.000Z',
+      endsAt: '2026-09-10T04:00:00.000Z',
+      sourceUrl: 'https://example.com/original'
+    }], reference.toISOString())
+    database.replaceScheduleObservations('zenless', 'events', [{
+      target: 'events',
+      provider: 'miyoushe',
+      endpoint: 'miyoushe-zenless-event-calendar',
+      remoteKey: 'personal:event:calendar-test',
+      title: '档期观察测试',
+      modeKey: 'official-event-calendar-test',
+      periodKey: null,
+      startsAt: '2026-08-27T04:00:00.000Z',
+      endsAt: '2026-09-11T04:00:00.000Z'
+    }], reference)
+    database.registerAiScheduleAgent('observation-agent', '第一方观察 Agent', reference)
+    const queued = database.createAiScheduleJob(
+      'zenless', 'public_schedule', reference, false, 'events'
+    )
+    const claimed = database.claimAiScheduleJob('observation-agent', reference)!
+    const observation = claimed.sourceObservations[0]
+    const matched = claimed.matchCandidates[0]
+
+    expect(observation).toMatchObject({
+      target: 'events',
+      provider: 'miyoushe',
+      matchedItemId: matched.itemId,
+      differences: ['endsAt'],
+      endsAt: '2026-09-11T04:00:00.000Z'
+    })
+    expect(observation).not.toHaveProperty('completed')
+    expect(observation).not.toHaveProperty('progressPercent')
+    expect(observation).not.toHaveProperty('accountScope')
+
+    database.applyAiScheduleJob(
+      queued.id,
+      'observation-agent',
+      [{
+        matchItemId: matched.itemId,
+        sourceObservationId: observation.observationId,
+        remoteKey: 'ignored-by-match',
+        category: 'limited_event',
+        title: '档期观察测试',
+        activityTags: ['combat', 'challenge'],
+        startsAt: '2026-08-27T04:00:00.000Z',
+        endsAt: observation.endsAt
+      }],
+      [{ kind: 'first_party_observation', observationId: observation.observationId }],
+      reference
+    )
+
+    expect(database.listChecklistItems('zenless')[0]).toMatchObject({
+      endsAt: '2026-09-11T04:00:00.000Z',
+      sourceUrl: 'https://example.com/original'
+    })
+    const recheck = database.createAiScheduleJob(
+      'zenless', 'public_schedule', new Date(reference.getTime() + 1_000), false, 'events'
+    )
+    expect(recheck.sourceObservations).toEqual([])
+  })
+
+  it('全量任务进入最后地图阶段时返回新的地图契约', () => {
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
+    const reference = new Date('2026-08-27T12:00:00.000Z')
+    database.mergeSyncedItems('genshin', 'public_schedule', [{
+      remoteKey: 'map:stage-contract',
+      category: 'exploration',
+      title: '地图阶段测试',
+      mapNodeKind: 'region'
+    }], reference.toISOString())
+    database.registerAiScheduleAgent('stage-agent', '阶段契约 Agent', reference)
+    const queued = database.createAiScheduleJob(
+      'genshin', 'public_schedule', reference, false, 'all'
+    )
+    database.claimAiScheduleJob('stage-agent', reference)
+
+    const partial = database.applyAiScheduleJob(
+      queued.id,
+      'stage-agent',
+      [],
+      [{ url: 'https://example.com/audit' }],
+      reference,
+      [],
+      [],
+      [],
+      'zh-CN',
+      undefined,
+      ['tasks', 'events', 'cycles']
+    )
+
+    expect(partial.remainingTargets).toEqual(['exploration'])
+    expect(partial.job).toMatchObject({
+      target: 'all',
+      activeTarget: 'exploration',
+      completedTargets: ['tasks', 'events', 'cycles'],
+      remainingTargets: ['exploration'],
+      contract: { target: 'exploration' }
+    })
+    expect(partial.job.contract.sections.map((section) => section.target))
+      .toEqual(['exploration'])
+    expect(partial.job.matchCandidates).toEqual([
+      expect.objectContaining({ title: '地图阶段测试', category: 'exploration' })
+    ])
+
+    const completed = database.applyAiScheduleJob(
+      queued.id,
+      'stage-agent',
+      [],
+      [{ url: 'https://example.com/map-audit' }],
+      new Date(reference.getTime() + 1_000),
+      [],
+      [],
+      [],
+      'zh-CN',
+      undefined,
+      ['exploration']
+    )
+    expect(completed.job).toMatchObject({ status: 'completed', remainingTargets: [] })
+  })
+
   it('全版块无变化核查可以完成且不会为了留痕重写基准', () => {
     database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const reference = new Date('2026-08-20T10:00:00.000Z')
@@ -2568,7 +2696,7 @@ describe('AppDatabase', () => {
         userTimeZone: 'America/Los_Angeles'
       },
       contract: {
-        schemaVersion: 14,
+        schemaVersion: 15,
         decisionAuthority: 'codex',
         executorPolicy: 'mechanical_validation_only'
       }

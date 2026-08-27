@@ -13,13 +13,13 @@ const CYCLE_TITLE_PATTERNS: Record<GameId, RegExp[]> = {
 export function withPersonalIdentity(
   items: NormalizedSyncItem[],
   provider: PersonalProvider,
-  endpoint: string
+  endpoint: string | ((item: NormalizedSyncItem) => string)
 ): NormalizedSyncItem[] {
   return items.map((item) => ({
     ...item,
     sourceIdentity: {
       provider,
-      endpoint,
+      endpoint: typeof endpoint === 'string' ? endpoint : endpoint(item),
       externalId: item.periodKey
         ? `${item.remoteKey}|period:${item.periodKey}`
         : item.remoteKey

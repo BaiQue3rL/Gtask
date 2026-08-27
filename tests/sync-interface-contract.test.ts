@@ -12,7 +12,8 @@ describe('同步接口契约', () => {
     })
     expect(contract.workflow).toEqual([
       'inventory',
-      'research_required_fields',
+      'inspect_first_party_observations',
+      'research_missing_or_conflicting_fields',
       'verify',
       'match_existing',
       'submit'
@@ -22,6 +23,8 @@ describe('同步接口契约', () => {
       'events',
       'cycles'
     ])
+    expect(contract.schemaVersion).toBe(15)
+    expect(contract.fieldSemantics.sourcePriority).toContain('字段缺失')
   })
 
   it('活动契约只接受具有完整时间窗的限时活动', () => {

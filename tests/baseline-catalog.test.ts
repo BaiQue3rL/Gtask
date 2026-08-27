@@ -72,7 +72,7 @@ describe('bundled baseline catalog', () => {
     expect(getBundledVersionWindow('wuthering-waves')).toMatchObject({
       periodKey: 'wuthering-waves:version:3.6',
       startsAt: '2026-08-20T11:00:00+08:00',
-      endsAt: '2026-10-01T04:00:00+08:00',
+      endsAt: '2026-09-30T04:00:00+08:00',
       confidence: 0.82
     })
     expect(getBundledActivityCatalog('wuthering-waves').map((item) => item.title)).toEqual([

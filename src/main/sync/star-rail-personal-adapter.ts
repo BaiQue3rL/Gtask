@@ -10,6 +10,7 @@ import {
   type PersonalRequestOutcome
 } from './personal-sync-settler'
 import type { SyncAdapter, SyncAdapterOutput, SyncProgressReporter } from './types'
+import { scheduleObservationsFromItems } from './schedule-observations'
 import { personalEventsFromCandidates, withPersonalIdentity } from './personal-snapshot'
 
 export interface StarRailBattleChronicleClient {
@@ -52,6 +53,7 @@ export class StarRailPersonalAdapter implements SyncAdapter {
       )
       return {
         items: eventItems,
+        scheduleObservations: scheduleObservationsFromItems(eventItems),
         snapshotCompleteness: 'complete',
         adapterVersion: 'star-rail-personal-v1',
         message: '星铁活动进度已读取'
@@ -114,11 +116,15 @@ export class StarRailPersonalAdapter implements SyncAdapter {
       'miyoushe',
       eventCandidates
     )
+    const items = [
+      ...eventItems,
+      ...withPersonalIdentity(cycleItems, 'miyoushe', (item) => (
+        `miyoushe-star-rail-${item.modeKey ?? 'challenge-record'}`
+      ))
+    ]
     return {
-      items: [
-        ...eventItems,
-        ...withPersonalIdentity(cycleItems, 'miyoushe', 'personal-challenge-record')
-      ],
+      items,
+      scheduleObservations: scheduleObservationsFromItems(items),
       snapshotCompleteness: outcomes.every((outcome) => outcome.succeeded) ? 'complete' : 'partial',
       adapterVersion: 'star-rail-personal-v1',
       message: '星铁四种周期战绩已同步' + suffix

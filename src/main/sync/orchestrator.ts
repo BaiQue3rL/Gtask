@@ -209,7 +209,8 @@ export class SyncOrchestrator {
           normalizedItems,
           this.database.listChecklistItems(gameId),
           'personal_sync',
-          new Date()
+          new Date(),
+          this.database.getRelevantGameVersionWindow(gameId)
         )
       }
       throwIfSyncCancelled(signal)
@@ -233,6 +234,12 @@ export class SyncOrchestrator {
         result.adapterVersion ?? 'personal-adapter-v1',
         new Date(),
         requestContext
+      )
+      this.database.replaceScheduleObservations(
+        gameId,
+        target,
+        result.scheduleObservations ?? [],
+        new Date()
       )
       merge.added += replaced.added
       merge.updated += replaced.updated

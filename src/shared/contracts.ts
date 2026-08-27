@@ -1,5 +1,5 @@
 export const SUPPORTED_GAME_IDS = ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const
-export const GTASK_MCP_PROTOCOL_VERSION = '2026-08-22.1'
+export const GTASK_MCP_PROTOCOL_VERSION = '2026-08-27.1'
 
 export type GameId = (typeof SUPPORTED_GAME_IDS)[number]
 
@@ -242,6 +242,24 @@ export interface AiScheduleVersionCandidate {
   confidence: number
 }
 
+export type ScheduleObservationTarget = 'events' | 'cycles'
+
+export interface AiScheduleSourceObservation {
+  observationId: string
+  target: ScheduleObservationTarget
+  provider: CredentialProvider
+  endpoint: string
+  remoteKey: string
+  title: string
+  modeKey: string | null
+  periodKey: string | null
+  startsAt: string | null
+  endsAt: string | null
+  observedAt: string
+  matchedItemId: string | null
+  differences: Array<'missing_from_baseline' | 'startsAt' | 'endsAt'>
+}
+
 export interface SyncContractConditionalField {
   field: string
   when: string
@@ -278,7 +296,7 @@ export interface ActivityTagContractEntry {
 }
 
 export interface PublicSyncContract {
-  schemaVersion: 14
+  schemaVersion: 15
   jobKind: 'public_catalog'
   authority: 'interface_contract'
   decisionAuthority: 'codex'
@@ -286,7 +304,14 @@ export interface PublicSyncContract {
   allowedMutations: ['create', 'update', 'archive']
   target: SyncTarget
   requestContext: SyncRequestContext
-  workflow: ['inventory', 'research_required_fields', 'verify', 'match_existing', 'submit']
+  workflow: [
+    'inventory',
+    'inspect_first_party_observations',
+    'research_missing_or_conflicting_fields',
+    'verify',
+    'match_existing',
+    'submit'
+  ]
   commonRequiredItemFields: string[]
   submissionRequiredFields: string[]
   fieldSemantics: Record<string, string>
@@ -300,6 +325,9 @@ export interface AiScheduleJob {
   gameId: GameId
   scope: SyncScope
   target: SyncTarget
+  activeTarget: SyncTarget
+  completedTargets: Exclude<SyncTarget, 'all'>[]
+  remainingTargets: Exclude<SyncTarget, 'all'>[]
   userTimeZone: string
   outputLocale: string
   requestContext: SyncRequestContext
@@ -322,6 +350,7 @@ export interface AiScheduleJob {
   activityTagTargets: ActivityTagEnrichmentTarget[]
   matchCandidates: AiScheduleMatchCandidate[]
   currentVersionWindow: AiScheduleVersionCandidate | null
+  sourceObservations: AiScheduleSourceObservation[]
   contract: PublicSyncContract
 }
 

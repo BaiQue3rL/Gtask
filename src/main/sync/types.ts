@@ -1,12 +1,14 @@
 import type {
   ChecklistCategory,
+  CredentialProvider,
   GameId,
   MapNodeKind,
   ScheduleKind,
   SyncProgressPhase,
   SyncProgressStatus,
   SyncSourceResult,
-  SyncTarget
+  SyncTarget,
+  ScheduleObservationTarget
 } from '../../shared/contracts'
 
 export interface NormalizedSyncItem {
@@ -39,6 +41,7 @@ export interface NormalizedSyncItem {
 
 export interface CodexScheduleItem extends NormalizedSyncItem {
   matchItemId?: string
+  sourceObservationId?: string
 }
 
 export interface CodexVersionWindow {
@@ -84,8 +87,25 @@ export interface PersonalProgressCandidate {
   payload: Record<string, unknown>
 }
 
+export interface ScheduleObservationInput {
+  target: ScheduleObservationTarget
+  provider: CredentialProvider
+  endpoint: string
+  remoteKey: string
+  title: string
+  modeKey: string | null
+  periodKey: string | null
+  startsAt: string | null
+  endsAt: string | null
+}
+
 export interface SyncAdapterOutput {
   items: NormalizedSyncItem[]
+  /**
+   * Account-free official schedule facts observed while syncing personal progress.
+   * Completion, scores, progress, account identifiers and credentials are forbidden.
+   */
+  scheduleObservations?: ScheduleObservationInput[]
   /** A partial personal response must never replace the active snapshot. */
   snapshotCompleteness?: 'complete' | 'partial'
   adapterVersion?: string

@@ -173,7 +173,7 @@ describe('本地 MCP server', () => {
         status: 'claimed',
         progressPhase: 'searching',
         contract: {
-          schemaVersion: 14,
+          schemaVersion: 15,
           authority: 'interface_contract',
           target: 'events',
           requestContext: {
@@ -182,7 +182,8 @@ describe('本地 MCP server', () => {
           },
           workflow: [
             'inventory',
-            'research_required_fields',
+            'inspect_first_party_observations',
+            'research_missing_or_conflicting_fields',
             'verify',
             'match_existing',
             'submit'
@@ -558,6 +559,89 @@ describe('本地 MCP server', () => {
     })
     expect(result.isError).toBe(true)
     expect(database!.listChecklistItems('genshin').some((item) => item.remoteKey === 'event:no-timezone')).toBe(false)
+  })
+
+  it('MCP 允许用当前任务的第一方档期观察校正既有事项', async () => {
+    const connected = await connect()
+    const reference = new Date('2026-08-27T12:00:00.000Z')
+    database!.mergeSyncedItems('zenless', 'public_schedule', [{
+      remoteKey: 'event:first-party-proof',
+      category: 'limited_event',
+      title: '第一方校时活动',
+      activityTags: ['combat', 'challenge'],
+      startsAt: '2026-08-27T04:00:00.000Z',
+      endsAt: '2026-09-10T04:00:00.000Z',
+      sourceUrl: 'https://example.com/original'
+    }], reference.toISOString())
+    database!.replaceScheduleObservations('zenless', 'events', [{
+      target: 'events',
+      provider: 'miyoushe',
+      endpoint: 'miyoushe-zenless-event-calendar',
+      remoteKey: 'personal:event:first-party-proof',
+      title: '第一方校时活动',
+      modeKey: 'official-event-first-party-proof',
+      periodKey: null,
+      startsAt: '2026-08-27T04:00:00.000Z',
+      endsAt: '2026-09-11T04:00:00.000Z'
+    }], reference)
+    await connected.callTool({
+      name: 'register_gtask_schedule_agent',
+      arguments: {
+        agentId: 'first-party-agent',
+        name: '第一方校时 Agent',
+        webSearch: true,
+        protocolVersion: GTASK_MCP_PROTOCOL_VERSION
+      }
+    })
+    const queued = database!.createAiScheduleJob(
+      'zenless', 'public_schedule', reference, false, 'events'
+    )
+    const claimed = await connected.callTool({
+      name: 'claim_gtask_schedule_job',
+      arguments: { agentId: 'first-party-agent', jobId: queued.id }
+    })
+    const job = (claimed.structuredContent as {
+      job: {
+        sourceObservations: Array<{
+          observationId: string
+          matchedItemId: string
+          endsAt: string
+        }>
+      }
+    }).job
+    const observation = job.sourceObservations[0]
+
+    const applied = await connected.callTool({
+      name: 'apply_gtask_public_schedule',
+      arguments: {
+        agentId: 'first-party-agent',
+        jobId: queued.id,
+        contentLocale: 'zh-CN',
+        retrievedAt: reference.toISOString(),
+        items: [{
+          matchItemId: observation.matchedItemId,
+          sourceObservationId: observation.observationId,
+          remoteKey: 'ignored-by-match',
+          category: 'limited_event',
+          title: '第一方校时活动',
+          activityTags: ['combat', 'challenge'],
+          startsAt: '2026-08-27T04:00:00.000Z',
+          endsAt: observation.endsAt,
+          confidence: 1
+        }],
+        evidence: [{
+          kind: 'first_party_observation',
+          observationId: observation.observationId,
+          note: '个人接口返回的官方活动结束时间'
+        }]
+      }
+    })
+
+    expect(applied.isError).not.toBe(true)
+    expect(database!.listChecklistItems('zenless')[0]).toMatchObject({
+      endsAt: '2026-09-11T04:00:00.000Z',
+      sourceUrl: 'https://example.com/original'
+    })
   })
 
   it('活动任务通过 MCP 明示全部旧标签目标并支持安全的标签专用回写', async () => {

@@ -1,7 +1,7 @@
 import type { GameId } from '../../shared/contracts'
 import type { CodexVersionWindow, NormalizedSyncItem } from './types'
 
-export const BUNDLED_BASELINE_VERIFIED_AT = '2026-08-20T18:40:00+08:00'
+export const BUNDLED_BASELINE_VERIFIED_AT = '2026-08-27T20:30:00+08:00'
 
 // These are per-game fallback cadences, not claims about a fixed official
 // schedule. Exact verified windows always take priority; the cadence is only
@@ -41,7 +41,7 @@ const VERSION_WINDOWS: Record<GameId, CodexVersionWindow> = {
   'wuthering-waves': {
     periodKey: 'wuthering-waves:version:3.6',
     startsAt: '2026-08-20T11:00:00+08:00',
-    endsAt: '2026-10-01T04:00:00+08:00',
+    endsAt: '2026-09-30T04:00:00+08:00',
     timeZone: 'Asia/Shanghai',
     sourceUrl: 'https://www.taptap.cn/moment/836917677271287865?group_id=330015',
     confidence: 0.82

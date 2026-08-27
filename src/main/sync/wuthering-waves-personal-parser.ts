@@ -124,7 +124,12 @@ export function parseWutheringWavesTower(value: unknown): NormalizedSyncItem {
     explicitFlags: manualFloors.map((floor) => floor.hasRecord),
     positiveValues: manualFloors.flatMap((floor) => [floor.star, floor.score])
   })
-  return endgameItem('tower-of-adversity', '逆境深塔', completed)
+  return endgameItem(
+    'tower-of-adversity',
+    '逆境深塔',
+    completed,
+    optionalUnixIso(root.seasonEndTime)
+  )
 }
 
 export function parseWutheringWavesSlash(value: unknown): NormalizedSyncItem {
@@ -149,7 +154,12 @@ export function parseWutheringWavesSlash(value: unknown): NormalizedSyncItem {
       ...halves.map((half) => half.score)
     ]
   })
-  return endgameItem('whimpering-wastes', '冥歌海墟', completed)
+  return endgameItem(
+    'whimpering-wastes',
+    '冥歌海墟',
+    completed,
+    optionalUnixIso(root.seasonEndTime)
+  )
 }
 
 export function parseWutheringWavesMatrix(value: unknown): NormalizedSyncItem {
@@ -159,13 +169,19 @@ export function parseWutheringWavesMatrix(value: unknown): NormalizedSyncItem {
     explicitFlags: [root.hasRecord, ...modes.map((mode) => mode.hasRecord)],
     positiveValues: modes.flatMap((mode) => [mode.score, mode.passBoss])
   })
-  return endgameItem('endstate-matrix', '终焉矩阵', completed)
+  return endgameItem(
+    'endstate-matrix',
+    '终焉矩阵',
+    completed,
+    optionalUnixIso(root.endTime)
+  )
 }
 
 function endgameItem(
   modeKey: string,
   title: string,
-  completed: boolean
+  completed: boolean,
+  endsAt: string | null
 ): NormalizedSyncItem {
   return {
     remoteKey: `endgame:${modeKey}`,
@@ -173,11 +189,19 @@ function endgameItem(
     title,
     completed,
     startsAt: null,
-    endsAt: null,
-    periodKey: `wuthering-waves:${modeKey}:current`,
+    endsAt,
+    periodKey: `wuthering-waves:${modeKey}:${endsAt ?? 'current'}`,
     scheduleKind: 'remote_schedule',
     modeKey
   }
+}
+
+function optionalUnixIso(value: unknown): string | null {
+  const number = finiteNumber(value)
+  if (number === null || number <= 0) return null
+  const milliseconds = number >= 1e12 ? number : number * 1000
+  const date = new Date(milliseconds)
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
 }
 
 function percentage(value: unknown, field: string): number {

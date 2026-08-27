@@ -10,6 +10,7 @@ import type {
   AiScheduleAgentStatus,
   AiScheduleJob,
   AiScheduleJobKind,
+  AiScheduleSourceObservation,
   AiScheduleVersionCandidate,
   CreateChecklistItemInput,
   GameId,
@@ -23,6 +24,7 @@ import type {
   SyncSettings,
   SyncStatus,
   SyncRequestContext,
+  ScheduleObservationTarget,
   UpdateChecklistItemInput
 } from '../shared/contracts'
 import { getPublicSyncContract } from './sync/interface-contract'
@@ -53,6 +55,7 @@ import {
   type CodexScheduleItem,
   type CodexVersionWindow,
   type NormalizedSyncItem,
+  type ScheduleObservationInput,
   type SyncMergeResult
 } from './sync/types'
 import type { RemoteCatalogFeed } from './remote-catalog-update'
@@ -94,11 +97,12 @@ const DEFAULT_GAMES: GameSummary[] = [
 
 // Version 1 is the public Gtask 1.0 baseline. All later structural changes use
 // explicit forward migrations so existing user data remains intact.
-export const CURRENT_SCHEMA_VERSION = 4
+export const CURRENT_SCHEMA_VERSION = 5
 
 const AI_AGENT_MAX_AGE_MS = 5 * 60 * 1000
 const AI_JOB_CLAIM_MAX_AGE_MS = 15 * 60 * 1000
 const DAY_MS = 24 * 60 * 60 * 1000
+const AI_SECTION_TARGETS = ['tasks', 'events', 'cycles', 'exploration'] as const
 
 interface SyncMergeOptions {
   codexReviewed?: boolean
@@ -130,6 +134,29 @@ function assertAccountScope(value: string): void {
   if (!/^[a-z0-9-]+:[a-f0-9]{64}$/u.test(value)) {
     throw new Error('个人账号作用域格式不正确')
   }
+}
+
+function parseAiSectionTargets(value: string | null | undefined): Exclude<SyncTarget, 'all'>[] {
+  try {
+    const parsed = JSON.parse(value ?? '[]') as unknown
+    if (!Array.isArray(parsed)) return []
+    return [...new Set(parsed.filter((target): target is Exclude<SyncTarget, 'all'> =>
+      AI_SECTION_TARGETS.includes(target as (typeof AI_SECTION_TARGETS)[number])
+    ))]
+  } catch {
+    return []
+  }
+}
+
+function normalizedScheduleTitle(value: string): string {
+  return value.normalize('NFKC').toLocaleLowerCase('zh-CN').replace(/[\s\p{P}\p{S}]+/gu, '')
+}
+
+function sameInstant(left: string | null, right: string | null): boolean {
+  if (!left || !right) return left === right
+  const leftTime = Date.parse(left)
+  const rightTime = Date.parse(right)
+  return Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime === rightTime
 }
 
 function assertSourceIdentity(provider: string, endpoint: string, externalId: string): void {
@@ -546,6 +573,53 @@ export class AppDatabase {
     return row?.catalogCoverage === 'complete'
   }
 
+  replaceScheduleObservations(
+    gameId: GameId,
+    target: PersonalSyncTarget,
+    observations: ScheduleObservationInput[],
+    reference = new Date()
+  ): number {
+    if (target === 'exploration') return 0
+    const sanitized = observations.filter((observation) => observation.target === target)
+    if (sanitized.length !== observations.length) {
+      throw new Error('个人接口档期观察与当前同步版块不一致')
+    }
+    const observedAt = reference.toISOString()
+    return this.runTransaction(() => {
+      this.database.prepare(`
+        DELETE FROM schedule_observations WHERE game_id = ? AND target = ?
+      `).run(gameId, target)
+      const insert = this.database.prepare(`
+        INSERT INTO schedule_observations(
+          id, game_id, target, provider, endpoint, remote_key, title,
+          mode_key, period_key, starts_at, ends_at, observed_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+      let inserted = 0
+      for (const observation of sanitized) {
+        if (!observation.title.trim() || !observation.remoteKey.trim() ||
+          !observation.endpoint.trim()) continue
+        if (!observation.startsAt && !observation.endsAt) continue
+        insert.run(
+          randomUUID(),
+          gameId,
+          target,
+          observation.provider,
+          observation.endpoint,
+          observation.remoteKey,
+          observation.title.trim(),
+          observation.modeKey,
+          observation.periodKey,
+          observation.startsAt,
+          observation.endsAt,
+          observedAt
+        )
+        inserted += 1
+      }
+      return inserted
+    })
+  }
+
   recordSyncTargetAttempt(
     gameId: GameId,
     target: SyncTarget,
@@ -769,9 +843,10 @@ export class AppDatabase {
     this.database.prepare(`
       INSERT INTO ai_schedule_jobs(
         id, game_id, scope, target, user_timezone, output_locale, job_kind, status, requested_at,
-        progress_phase, progress_updated_at, message, updated_at
+        progress_phase, progress_updated_at, message, completed_targets_json,
+        remaining_targets_json, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, 'public_catalog', 'pending', ?, 'queued', ?,
-        '同步任务正在排队', ?)
+        '同步任务正在排队', '[]', ?, ?)
     `).run(
       id,
       gameId,
@@ -781,6 +856,7 @@ export class AppDatabase {
       resolvedRequestContext.outputLocale,
       now,
       now,
+      JSON.stringify(target === 'all' ? AI_SECTION_TARGETS : [target]),
       now
     )
     this.database.prepare(`
@@ -1142,18 +1218,44 @@ export class AppDatabase {
     if (job.status !== 'claimed' || job.agentId !== agentId) {
       throw new Error('AI 资料任务未由当前 Agent 领取或已经结束')
     }
+    const activeTarget = job.activeTarget
     const targetCategories: Partial<Record<SyncTarget, ChecklistCategory[]>> = {
       events: ['limited_event'],
       cycles: ['endgame'],
       exploration: ['exploration'],
       tasks: []
     }
-    const allowedCategories = targetCategories[job.target]
+    const allowedCategories = targetCategories[activeTarget]
     if (allowedCategories) {
       const invalid = items.find((item) => !allowedCategories.includes(item.category))
-      if (invalid) throw new Error(`当前任务只允许回写“${job.target}”版块数据`)
+      if (invalid) throw new Error(`当前任务只允许回写“${activeTarget}”版块数据`)
     }
-    items = items.map(({ matchItemId, ...item }) => {
+    const observationById = new Map(job.sourceObservations.map((observation) => [
+      observation.observationId,
+      observation
+    ]))
+    for (const item of items) {
+      if (!item.sourceObservationId) continue
+      const observation = observationById.get(item.sourceObservationId)
+      if (!observation) throw new Error('提交引用的个人接口档期观察不属于当前任务')
+      const expectedCategory = observation.target === 'events' ? 'limited_event' : 'endgame'
+      if (item.category !== expectedCategory) {
+        throw new Error('提交事项与个人接口档期观察的版块不一致')
+      }
+      if (item.matchItemId && observation.matchedItemId &&
+        item.matchItemId !== observation.matchedItemId) {
+        throw new Error('提交事项与个人接口档期观察匹配的基准项不一致')
+      }
+      const supportedWindow = (
+        observation.startsAt !== null && sameInstant(item.startsAt ?? null, observation.startsAt)
+      ) || (
+        observation.endsAt !== null && sameInstant(item.endsAt ?? null, observation.endsAt)
+      )
+      if (!supportedWindow) {
+        throw new Error('个人接口档期观察没有支持本次提交的时间字段')
+      }
+    }
+    items = items.map(({ matchItemId, sourceObservationId: _sourceObservationId, ...item }) => {
       if (!matchItemId) return item
       const matched = this.listChecklistItems(job.gameId).find(
         (checklistItem) => checklistItem.id === matchItemId
@@ -1185,8 +1287,8 @@ export class AppDatabase {
     }
     if (
       uniqueVerifiedEmptyTargets.length > 0 &&
-      job.target !== 'all' &&
-      !uniqueVerifiedEmptyTargets.includes(job.target as Exclude<SyncTarget, 'all'>)
+      activeTarget !== 'all' &&
+      !uniqueVerifiedEmptyTargets.includes(activeTarget as Exclude<SyncTarget, 'all'>)
     ) {
       throw new Error('空版块确认与当前同步目标不一致')
     }
@@ -1198,8 +1300,8 @@ export class AppDatabase {
       throw new Error('无变化核查目标不受支持')
     }
     if (
-      job.target !== 'all' &&
-      uniqueVerifiedUnchangedTargets.some((target) => target !== job.target)
+      activeTarget !== 'all' &&
+      uniqueVerifiedUnchangedTargets.some((target) => target !== activeTarget)
     ) {
       throw new Error('无变化核查目标与当前同步目标不一致')
     }
@@ -1226,13 +1328,13 @@ export class AppDatabase {
       throw new Error(`版块“${contradictoryTarget}”不能同时标记为无变化并提交增删改`)
     }
     if (
-      job.target === 'tasks' &&
+      activeTarget === 'tasks' &&
       !versionWindow &&
       !uniqueVerifiedUnchangedTargets.includes('tasks')
     ) {
       throw new Error('版本核查必须提交变化后的版本窗口，或明确标记版本时间无变化')
     }
-    if (job.target !== 'tasks' && job.target !== 'all' && versionWindow) {
+    if (activeTarget !== 'tasks' && activeTarget !== 'all' && versionWindow) {
       throw new Error('当前同步目标不允许回写游戏版本窗口')
     }
     if (versionWindow) this.validateVersionWindow(versionWindow, reference)
@@ -1283,7 +1385,7 @@ export class AppDatabase {
     }
     const requiredTagTargets = job.activityTagTargets
     if (requiredTagTargets.length > 0 || activityTagUpdates.length > 0) {
-      if (job.target !== 'events' && job.target !== 'all') {
+      if (activeTarget !== 'events' && activeTarget !== 'all') {
         throw new Error('当前任务不允许回写活动玩法标签')
       }
       const requiredById = new Map(requiredTagTargets.map((target) => [target.itemId, target]))
@@ -1315,7 +1417,7 @@ export class AppDatabase {
         }
       }
     }
-    const includesCycles = job.target === 'cycles' || items.some(
+    const includesCycles = activeTarget === 'cycles' || items.some(
       (item) => item.category === 'endgame'
     )
     const coveredTargets: Exclude<SyncTarget, 'all'>[] = job.target === 'all'
@@ -1333,20 +1435,12 @@ export class AppDatabase {
           ...uniqueVerifiedUnchangedTargets
         ])]
       : [job.target]
-    const allSectionTargets = ['tasks', 'events', 'cycles', 'exploration'] as const
+    const allSectionTargets = AI_SECTION_TARGETS
     const missingTargets = job.target === 'all'
       ? allSectionTargets.filter((target) => !coveredTargets.includes(target))
       : []
     const requiresFullCoverage = job.target === 'all'
-    const previouslyCoveredTargets = requiresFullCoverage
-      ? this.getSyncTargetStates(job.gameId)
-          .filter((state) =>
-            state.target !== 'all' &&
-            state.lastSuccessAt !== null &&
-            Date.parse(state.lastSuccessAt) >= Date.parse(job.requestedAt)
-          )
-          .map((state) => state.target as Exclude<SyncTarget, 'all'>)
-      : []
+    const previouslyCoveredTargets = requiresFullCoverage ? job.completedTargets : []
     const coveredAcrossJob = new Set([...previouslyCoveredTargets, ...coveredTargets])
     const effectiveMissingTargets = requiresFullCoverage
       ? allSectionTargets.filter((target) => !coveredAcrossJob.has(target))
@@ -1413,7 +1507,7 @@ export class AppDatabase {
       this.assertActiveMapReferences(job.gameId)
       return { merge: result, archived }
     })
-    const unresolvedActivityCount = (job.target === 'events' || job.target === 'all')
+    const unresolvedActivityCount = (activeTarget === 'events' || activeTarget === 'all')
       ? this.listActivityTagEnrichmentTargets(
           job.gameId,
           now,
@@ -1456,12 +1550,15 @@ export class AppDatabase {
         UPDATE ai_schedule_jobs
         SET evidence_json = ?, message = ?, progress_phase = 'retrying',
             progress_current = 0, progress_total = ?,
+            completed_targets_json = ?, remaining_targets_json = ?,
             progress_updated_at = ?, updated_at = ?
         WHERE id = ? AND status = 'claimed' AND agent_id = ?
       `).run(
         JSON.stringify(evidence),
         retryMessage,
         effectiveMissingTargets.length,
+        JSON.stringify([...coveredAcrossJob]),
+        JSON.stringify(effectiveMissingTargets),
         now,
         now,
         jobId,
@@ -1480,9 +1577,19 @@ export class AppDatabase {
       SET status = 'completed', completed_at = ?, evidence_json = ?, message = ?,
           progress_phase = 'completed',
           progress_current = COALESCE(progress_total, progress_current),
+          completed_targets_json = ?, remaining_targets_json = '[]',
           progress_updated_at = ?, updated_at = ?
       WHERE id = ? AND status = 'claimed' AND agent_id = ?
-    `).run(now, JSON.stringify(evidence), message, now, now, jobId, agentId)
+    `).run(
+      now,
+      JSON.stringify(evidence),
+      message,
+      JSON.stringify(job.target === 'all' ? AI_SECTION_TARGETS : [job.target]),
+      now,
+      now,
+      jobId,
+      agentId
+    )
     const partialPublicResult = job.target === 'all' && effectiveMissingTargets.length > 0
     const finalStatus = partialPublicResult ? 'stale' : 'success'
     this.recordSyncOutcome(
@@ -1744,18 +1851,38 @@ export class AppDatabase {
         j.attempt_count AS attemptCount,
         j.assigned_model AS assignedModel,
         j.assigned_reasoning_effort AS assignedReasoningEffort,
-        j.last_failure_kind AS lastFailureKind
+        j.last_failure_kind AS lastFailureKind,
+        j.completed_targets_json AS completedTargetsJson,
+        j.remaining_targets_json AS remainingTargetsJson
       FROM ai_schedule_jobs j
       LEFT JOIN ai_schedule_agents a ON a.id = j.agent_id
       WHERE j.id = ?
     `).get(id) as Omit<
       AiScheduleJob,
-      'activityTagTargets' | 'matchCandidates' | 'currentVersionWindow' | 'contract' | 'requestContext'
-    > | undefined
+      'activeTarget' | 'completedTargets' | 'remainingTargets' | 'activityTagTargets' |
+      'matchCandidates' | 'currentVersionWindow' | 'sourceObservations' | 'contract' |
+      'requestContext'
+    > & { completedTargetsJson: string; remainingTargetsJson: string } | undefined
     if (!row) throw new Error('AI 资料任务不存在')
+    const completedTargets = parseAiSectionTargets(row.completedTargetsJson)
+    const persistedRemainingTargets = parseAiSectionTargets(row.remainingTargetsJson)
+    const remainingTargets = persistedRemainingTargets.length > 0 || row.status === 'completed'
+      ? persistedRemainingTargets
+      : row.target === 'all'
+        ? [...AI_SECTION_TARGETS]
+        : [row.target]
+    const activeTarget: SyncTarget = row.target === 'all' && remainingTargets.length === 1
+      ? remainingTargets[0]
+      : row.target
+    const activeSectionTargets = row.target === 'all'
+      ? remainingTargets
+      : [row.target as Exclude<SyncTarget, 'all'>]
+    const contractSectionTargets = activeTarget === 'all'
+      ? activeSectionTargets.filter((target) => target !== 'exploration')
+      : activeSectionTargets
     const activityTagTargets = row.jobKind === 'public_catalog' && (
       row.status === 'pending' || row.status === 'claimed'
-    ) && (row.target === 'events' || row.target === 'all')
+    ) && contractSectionTargets.includes('events')
       ? this.listActivityTagEnrichmentTargets(row.gameId, row.requestedAt, row.outputLocale)
       : []
     const targetCategories: Record<SyncTarget, ChecklistCategory[]> = {
@@ -1769,10 +1896,11 @@ export class AppDatabase {
         'exploration'
       ]
     }
+    const activeCategories = contractSectionTargets.flatMap((target) => targetCategories[target])
     const matchCandidates = row.jobKind === 'public_catalog' ? this.listChecklistItems(row.gameId)
       .filter((item) =>
         item.source === 'public_schedule' &&
-        targetCategories[row.target].includes(item.category)
+        activeCategories.includes(item.category)
       )
       .map((item) => ({
         itemId: item.id,
@@ -1795,9 +1923,8 @@ export class AppDatabase {
         mapNodeKind: item.mapNodeKind,
         parentRemoteKey: item.parentRemoteKey
       })) : []
-    const currentVersionWindow = row.jobKind === 'public_catalog' && (
-      row.target === 'tasks' || row.target === 'all'
-    )
+    const currentVersionWindow = row.jobKind === 'public_catalog' &&
+      contractSectionTargets.includes('tasks')
       ? this.database.prepare(`
           SELECT period_key AS periodKey, starts_at AS startsAt, ends_at AS endsAt,
             timezone AS timeZone, source_url AS sourceUrl, confidence
@@ -1805,8 +1932,16 @@ export class AppDatabase {
           WHERE game_id = ?
         `).get(row.gameId) as unknown as AiScheduleVersionCandidate | undefined
       : null
+    const sourceObservations = row.jobKind === 'public_catalog'
+      ? this.listScheduleSourceObservations(row.gameId, contractSectionTargets, new Date())
+      : []
+    const { completedTargetsJson: _completedTargetsJson,
+      remainingTargetsJson: _remainingTargetsJson, ...jobRow } = row
     return {
-      ...row,
+      ...jobRow,
+      activeTarget,
+      completedTargets,
+      remainingTargets,
       requestContext: {
         outputLocale: row.outputLocale,
         userTimeZone: row.userTimeZone
@@ -1814,11 +1949,60 @@ export class AppDatabase {
       activityTagTargets,
       matchCandidates,
       currentVersionWindow: currentVersionWindow ?? null,
-      contract: getPublicSyncContract(row.target, {
+      sourceObservations,
+      contract: getPublicSyncContract(activeTarget, {
         outputLocale: row.outputLocale,
         userTimeZone: row.userTimeZone
-      })
+      }, contractSectionTargets)
     }
+  }
+
+  private listScheduleSourceObservations(
+    gameId: GameId,
+    targets: Exclude<SyncTarget, 'all'>[],
+    reference: Date
+  ): AiScheduleSourceObservation[] {
+    const observationTargets = targets.filter((target): target is ScheduleObservationTarget =>
+      target === 'events' || target === 'cycles'
+    )
+    if (observationTargets.length === 0) return []
+    const placeholders = observationTargets.map(() => '?').join(', ')
+    const rows = this.database.prepare(`
+      SELECT id AS observationId, target, provider, endpoint,
+        remote_key AS remoteKey, title, mode_key AS modeKey,
+        period_key AS periodKey, starts_at AS startsAt, ends_at AS endsAt,
+        observed_at AS observedAt
+      FROM schedule_observations
+      WHERE game_id = ? AND target IN (${placeholders})
+      ORDER BY observed_at DESC, title ASC
+    `).all(gameId, ...observationTargets) as Array<Omit<
+      AiScheduleSourceObservation,
+      'matchedItemId' | 'differences'
+    >>
+    const baselines = this.listChecklistItems(gameId).filter((item) =>
+      item.source === 'public_schedule'
+    )
+    return rows.flatMap((row) => {
+      if (row.endsAt && Date.parse(row.endsAt) <= reference.getTime()) return []
+      const candidate = baselines.find((item) => row.target === 'cycles'
+        ? Boolean(row.modeKey && item.modeKey === row.modeKey)
+        : item.category === 'limited_event' &&
+          normalizedScheduleTitle(item.title) === normalizedScheduleTitle(row.title)
+      )
+      const differences: AiScheduleSourceObservation['differences'] = []
+      if (!candidate) differences.push('missing_from_baseline')
+      if (candidate && row.startsAt && !sameInstant(candidate.startsAt, row.startsAt)) {
+        differences.push('startsAt')
+      }
+      if (candidate && row.endsAt && !sameInstant(candidate.endsAt, row.endsAt)) {
+        differences.push('endsAt')
+      }
+      return differences.length > 0 ? [{
+        ...row,
+        matchedItemId: candidate?.id ?? null,
+        differences
+      }] : []
+    })
   }
 
   private listActivityTagEnrichmentTargets(
@@ -3510,7 +3694,12 @@ export class AppDatabase {
           completed: Boolean(row.completed),
           manualCompletionLocked: Boolean(row.manualCompletionLocked)
         }
-        const next = nextCyclePeriod(row.gameId, item, reference)
+        const next = nextCyclePeriod(
+          row.gameId,
+          item,
+          reference,
+          this.getRelevantGameVersionWindow(row.gameId, reference)
+        )
         if (!next || next.periodKey === row.periodKey) continue
         insertHistory.run(
           randomUUID(),
@@ -3725,6 +3914,10 @@ export class AppDatabase {
         'SELECT MAX(version) AS version FROM schema_migrations'
       ).get() as { version: number | null }
       if (renamed.version === 3) this.migrateVersion3To4()
+      const observed = this.database.prepare(
+        'SELECT MAX(version) AS version FROM schema_migrations'
+      ).get() as { version: number | null }
+      if (observed.version === 4) this.migrateVersion4To5()
       const current = this.database.prepare(
         'SELECT MAX(version) AS version FROM schema_migrations'
       ).get() as { version: number | null }
@@ -3880,7 +4073,9 @@ export class AppDatabase {
         attempt_count INTEGER NOT NULL DEFAULT 0,
         assigned_model TEXT,
         assigned_reasoning_effort TEXT,
-        last_failure_kind TEXT
+        last_failure_kind TEXT,
+        completed_targets_json TEXT NOT NULL DEFAULT '[]',
+        remaining_targets_json TEXT NOT NULL DEFAULT '[]'
       );
       CREATE INDEX ai_schedule_jobs_pending ON ai_schedule_jobs(status, requested_at);
       CREATE UNIQUE INDEX ai_schedule_jobs_active_game_target_kind
@@ -3943,6 +4138,23 @@ export class AppDatabase {
       );
       CREATE INDEX personal_sync_snapshots_target
         ON personal_sync_snapshots(game_id, target, activated_at DESC);
+
+      CREATE TABLE schedule_observations (
+        id TEXT PRIMARY KEY,
+        game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+        target TEXT NOT NULL CHECK (target IN ('events', 'cycles')),
+        provider TEXT NOT NULL CHECK (provider IN ('miyoushe', 'kuro-community')),
+        endpoint TEXT NOT NULL,
+        remote_key TEXT NOT NULL,
+        title TEXT NOT NULL,
+        mode_key TEXT,
+        period_key TEXT,
+        starts_at TEXT,
+        ends_at TEXT,
+        observed_at TEXT NOT NULL
+      );
+      CREATE INDEX schedule_observations_lookup
+        ON schedule_observations(game_id, target, observed_at DESC);
 
       CREATE TABLE personal_expiry_tombstones (
         game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
@@ -4132,6 +4344,66 @@ export class AppDatabase {
     }
   }
 
+  private migrateVersion4To5(): void {
+    const now = new Date().toISOString()
+    this.database.exec('BEGIN IMMEDIATE')
+    try {
+      const jobColumns = this.database.prepare('PRAGMA table_info(ai_schedule_jobs)').all() as Array<{
+        name: string
+      }>
+      const columnNames = new Set(jobColumns.map((column) => column.name))
+      if (!columnNames.has('completed_targets_json')) {
+        this.database.exec(`
+          ALTER TABLE ai_schedule_jobs
+            ADD COLUMN completed_targets_json TEXT NOT NULL DEFAULT '[]';
+        `)
+      }
+      if (!columnNames.has('remaining_targets_json')) {
+        this.database.exec(`
+          ALTER TABLE ai_schedule_jobs
+            ADD COLUMN remaining_targets_json TEXT NOT NULL DEFAULT '[]';
+        `)
+      }
+      this.database.exec(`
+        CREATE TABLE IF NOT EXISTS schedule_observations (
+          id TEXT PRIMARY KEY,
+          game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+          target TEXT NOT NULL CHECK (target IN ('events', 'cycles')),
+          provider TEXT NOT NULL CHECK (provider IN ('miyoushe', 'kuro-community')),
+          endpoint TEXT NOT NULL,
+          remote_key TEXT NOT NULL,
+          title TEXT NOT NULL,
+          mode_key TEXT,
+          period_key TEXT,
+          starts_at TEXT,
+          ends_at TEXT,
+          observed_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS schedule_observations_lookup
+          ON schedule_observations(game_id, target, observed_at DESC);
+        UPDATE ai_schedule_jobs
+        SET completed_targets_json = CASE
+              WHEN status = 'completed' AND target = 'all'
+                THEN '["tasks","events","cycles","exploration"]'
+              WHEN status = 'completed' THEN '["' || target || '"]'
+              ELSE '[]'
+            END,
+            remaining_targets_json = CASE
+              WHEN status = 'completed' THEN '[]'
+              WHEN target = 'all' THEN '["tasks","events","cycles","exploration"]'
+              ELSE '["' || target || '"]'
+            END;
+      `)
+      this.database.prepare(`
+        INSERT INTO schema_migrations(version, applied_at) VALUES (5, ?)
+      `).run(now)
+      this.database.exec('COMMIT')
+    } catch (error) {
+      this.database.exec('ROLLBACK')
+      throw error
+    }
+  }
+
   private loadRuntimeActivityTags(): void {
     const rows = this.database.prepare(`
       SELECT id, dimension, labels_json AS labelsJson, description,
@@ -4289,7 +4561,14 @@ export class AppDatabase {
       this.mergeSyncedItems(
         gameId,
         'public_schedule',
-        completeCycleCatalog(gameId, [], [], 'public_schedule', reference),
+        completeCycleCatalog(
+          gameId,
+          [],
+          [],
+          'public_schedule',
+          reference,
+          this.getRelevantGameVersionWindow(gameId, reference)
+        ),
         reference.toISOString()
       )
       this.recordCatalogCoverage(gameId, 'cycles', 'public_schedule', 'complete')

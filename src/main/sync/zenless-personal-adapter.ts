@@ -11,6 +11,7 @@ import {
   type PersonalRequestOutcome
 } from './personal-sync-settler'
 import type { SyncAdapter, SyncAdapterOutput, SyncProgressReporter } from './types'
+import { scheduleObservationsFromItems } from './schedule-observations'
 import {
   personalEventsFromCandidates,
   personalMapsFromCandidates,
@@ -88,12 +89,16 @@ export class ZenlessPersonalAdapter implements SyncAdapter {
       'miyoushe',
       explorationCandidates
     )
+    const items = [
+      ...eventItems,
+      ...withPersonalIdentity(cycleItems, 'miyoushe', (item) => (
+        `miyoushe-zenless-${item.modeKey ?? 'challenge-record'}`
+      )),
+      ...explorationItems
+    ]
     return {
-      items: [
-        ...eventItems,
-        ...withPersonalIdentity(cycleItems, 'miyoushe', 'personal-challenge-record'),
-        ...explorationItems
-      ],
+      items,
+      scheduleObservations: scheduleObservationsFromItems(items),
       snapshotCompleteness: outcomes.every((outcome) => outcome.succeeded) ? 'complete' : 'partial',
       adapterVersion: 'zenless-personal-v1',
       message: (target === 'events'

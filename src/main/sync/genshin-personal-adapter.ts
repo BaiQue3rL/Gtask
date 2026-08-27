@@ -11,6 +11,7 @@ import {
   type PersonalRequestOutcome
 } from './personal-sync-settler'
 import type { SyncAdapter, SyncAdapterOutput, SyncProgressReporter } from './types'
+import { scheduleObservationsFromItems } from './schedule-observations'
 import {
   personalEventsFromCandidates,
   personalMapsFromCandidates,
@@ -93,12 +94,16 @@ export class GenshinPersonalAdapter implements SyncAdapter {
       'miyoushe',
       explorationCandidates
     )
+    const items = [
+      ...eventItems,
+      ...explorationItems,
+      ...withPersonalIdentity(cycleItems, 'miyoushe', (item) => (
+        `miyoushe-genshin-${item.modeKey ?? 'challenge-record'}`
+      ))
+    ]
     return {
-      items: [
-        ...eventItems,
-        ...explorationItems,
-        ...withPersonalIdentity(cycleItems, 'miyoushe', 'personal-challenge-record')
-      ],
+      items,
+      scheduleObservations: scheduleObservationsFromItems(items),
       snapshotCompleteness: outcomes.every((outcome) => outcome.succeeded) ? 'complete' : 'partial',
       adapterVersion: 'genshin-personal-v1',
       message: (target === 'events'

@@ -6,6 +6,18 @@ const DAY_MS = 24 * 60 * 60 * 1000
 type CyclePredictionPolicy =
   | { kind: 'monthly'; startDay: number; hour: number; timeZoneOffsetHours: number }
   | { kind: 'interval'; anchorStartsAt: string; cadenceDays: number; durationDays: number }
+  | {
+      kind: 'version-relative'
+      startDayOffset: number
+      hour: number
+      timeZoneOffsetHours: number
+      fallback: Extract<CyclePredictionPolicy, { kind: 'interval' }>
+    }
+
+export interface CycleVersionWindow {
+  startsAt: string
+  endsAt: string
+}
 
 export interface CycleModeDefinition {
   gameId: GameId
@@ -162,10 +174,16 @@ export const CYCLE_MODE_CATALOG: readonly CycleModeDefinition[] = [
     title: '终焉矩阵',
     aliases: ['终焉矩阵'],
     prediction: {
-      kind: 'interval',
-      anchorStartsAt: '2026-07-17T04:00:00+08:00',
-      cadenceDays: 42,
-      durationDays: 34
+      kind: 'version-relative',
+      startDayOffset: 7,
+      hour: 4,
+      timeZoneOffsetHours: 8,
+      fallback: {
+        kind: 'interval',
+        anchorStartsAt: '2026-07-17T04:00:00+08:00',
+        cadenceDays: 42,
+        durationDays: 34
+      }
     }
   }
 ] as const
@@ -244,6 +262,29 @@ function intervalWindow(
   }
 }
 
+function versionRelativeWindow(
+  policy: Extract<CyclePredictionPolicy, { kind: 'version-relative' }>,
+  versionWindow: CycleVersionWindow
+): CycleWindow | null {
+  const versionStart = Date.parse(versionWindow.startsAt)
+  const versionEnd = Date.parse(versionWindow.endsAt)
+  if (!Number.isFinite(versionStart) || !Number.isFinite(versionEnd) || versionStart >= versionEnd) {
+    return null
+  }
+  const shifted = new Date(versionStart + policy.timeZoneOffsetHours * 60 * 60 * 1000)
+  const startsAt = Date.UTC(
+    shifted.getUTCFullYear(),
+    shifted.getUTCMonth(),
+    shifted.getUTCDate() + policy.startDayOffset,
+    policy.hour - policy.timeZoneOffsetHours
+  )
+  if (startsAt >= versionEnd) return null
+  return {
+    startsAt: new Date(startsAt).toISOString(),
+    endsAt: new Date(versionEnd).toISOString()
+  }
+}
+
 function activeObservedWindow(
   existing: Pick<ChecklistItem, 'startsAt' | 'endsAt'> | undefined,
   reference: Date
@@ -260,8 +301,13 @@ function activeObservedWindow(
 export function predictCycleWindow(
   definition: CycleModeDefinition,
   reference = new Date(),
-  existing?: Pick<ChecklistItem, 'startsAt' | 'endsAt'>
+  existing?: Pick<ChecklistItem, 'startsAt' | 'endsAt'>,
+  versionWindow?: CycleVersionWindow | null
 ): CycleWindow | null {
+  if (definition.prediction.kind === 'version-relative' && versionWindow) {
+    const predicted = versionRelativeWindow(definition.prediction, versionWindow)
+    if (predicted) return predicted
+  }
   const observed = activeObservedWindow(existing, reference)
   if (observed) return observed
   if (definition.prediction.kind === 'monthly') {
@@ -269,6 +315,9 @@ export function predictCycleWindow(
   }
   if (definition.prediction.kind === 'interval') {
     return intervalWindow(reference, definition.prediction)
+  }
+  if (definition.prediction.kind === 'version-relative') {
+    return intervalWindow(reference, definition.prediction.fallback)
   }
   return null
 }
@@ -334,7 +383,8 @@ export function completeCycleCatalog(
   items: NormalizedSyncItem[],
   existingItems: ChecklistItem[],
   source: Extract<ChecklistSource, 'public_schedule' | 'personal_sync'>,
-  reference = new Date()
+  reference = new Date(),
+  versionWindow?: CycleVersionWindow | null
 ): NormalizedSyncItem[] {
   // A provider may keep returning the previous period until the player enters
   // the newly opened challenge.  Preserve that expired observation long
@@ -353,7 +403,7 @@ export function completeCycleCatalog(
     return normalizedKnownItem(
       definition,
       item,
-      predictCycleWindow(definition, reference, existing)
+      predictCycleWindow(definition, reference, existing, versionWindow)
     )
   }).filter((item) => item.category !== 'endgame' || !isFutureCycleItem(item, reference))
   const presentModes = new Set(normalized
@@ -367,7 +417,12 @@ export function completeCycleCatalog(
       (item.modeKey === definition.modeKey || item.remoteKey === definition.remoteKey)
     )
     const observedWindow = latestObservedWindow(definition, normalized, existingItems)
-    const window = predictCycleWindow(definition, reference, observedWindow ?? existing)
+    const window = predictCycleWindow(
+      definition,
+      reference,
+      observedWindow ?? existing,
+      versionWindow
+    )
     const periodIdentity = window?.startsAt ?? 'awaiting-official-window'
     const periodKey = `predicted:${gameId}:${definition.modeKey}:${periodIdentity}`
     const placeholder: NormalizedSyncItem = {
@@ -397,7 +452,8 @@ export function completeCycleCatalog(
 export function nextCyclePeriod(
   gameId: GameId,
   item: Pick<ChecklistItem, 'modeKey' | 'remoteKey' | 'title' | 'startsAt' | 'endsAt'>,
-  reference = new Date()
+  reference = new Date(),
+  versionWindow?: CycleVersionWindow | null
 ): (CycleWindow & { definition: CycleModeDefinition; periodKey: string }) | null {
   const definition = findCycleMode(gameId, {
     modeKey: item.modeKey,
@@ -405,7 +461,7 @@ export function nextCyclePeriod(
     title: item.title
   })
   if (!definition) return null
-  const window = predictCycleWindow(definition, reference, item)
+  const window = predictCycleWindow(definition, reference, item, versionWindow)
   if (!window || Date.parse(window.endsAt) <= reference.getTime()) return null
   return {
     ...window,
