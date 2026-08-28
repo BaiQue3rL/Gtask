@@ -41,7 +41,7 @@ import {
   type ActivityTagDefinition,
   type ActivityTagDimension
 } from './activity-tags'
-import { completeCycleCatalog, findCycleMode, nextCyclePeriod } from './sync/cycle-catalog'
+import { completePublicCycleCatalog, findCycleMode, nextCyclePeriod } from './sync/cycle-catalog'
 import { getBundledMapCatalog, getBundledMapCatalogVerifiedAt } from './sync/map-catalog'
 import {
   BUNDLED_BASELINE_VERIFIED_AT,
@@ -133,6 +133,14 @@ function stableJson(value: unknown): string {
 function assertAccountScope(value: string): void {
   if (!/^[a-z0-9-]+:[a-f0-9]{64}$/u.test(value)) {
     throw new Error('个人账号作用域格式不正确')
+  }
+}
+
+function assertPublicCatalogMergeSource(
+  source: Exclude<ChecklistSource, 'manual'>
+): void {
+  if (source !== 'public_schedule') {
+    throw new Error('个人进度不能通过目录合并器写入；请使用个人快照更新已有事项')
   }
 }
 
@@ -2543,7 +2551,7 @@ export class AppDatabase {
     items: NormalizedSyncItem[],
     adapterVersion: string,
     reference = new Date(),
-    requestContext: SyncRequestContext = {
+    _requestContext: SyncRequestContext = {
       outputLocale: 'zh-CN',
       userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
     },
@@ -2564,6 +2572,9 @@ export class AppDatabase {
     const identities = new Set<string>()
     for (const item of items) {
       if (!item.sourceIdentity) throw new Error(`个人事项“${item.title}”缺少官方来源标识`)
+      if (item.sourceIdentity.provider === 'gtask-cycle-catalog') {
+        throw new Error('个人进度不能使用本地预测周期代替官方完成记录')
+      }
       assertSourceIdentity(
         item.sourceIdentity.provider,
         item.sourceIdentity.endpoint,
@@ -2573,216 +2584,25 @@ export class AppDatabase {
       if (identities.has(identity)) throw new Error(`个人快照包含重复官方标识：${item.title}`)
       identities.add(identity)
     }
-    const preparedItems = items.flatMap((item) => {
-      const baseline = this.findBaselineItemForPersonalProgress(gameId, item)
-      if (!baseline?.remoteKey) return []
-      return [{
-        item: {
-          ...item,
-          remoteKey: baseline.remoteKey,
-          title: baseline.title,
-          activityTags: baseline.activityTags,
-          parentTitle: baseline.parentTitle,
-          mapNodeKind: baseline.mapNodeKind,
-          parentRemoteKey: baseline.parentRemoteKey,
-          startsAt: baseline.startsAt,
-          endsAt: baseline.endsAt,
-          resetRule: baseline.resetRule,
-          periodKey: baseline.periodKey,
-          scheduleKind: baseline.scheduleKind,
-          resetWeekday: baseline.resetWeekday,
-          timeZone: baseline.timeZone,
-          modeKey: baseline.modeKey,
-          sourceUrl: baseline.sourceUrl
-        } satisfies NormalizedSyncItem,
-        observedStartsAt: item.startsAt,
-        observedEndsAt: item.endsAt
-      }]
-    })
-    const activeItems: NormalizedSyncItem[] = []
-    const expiredItems: NormalizedSyncItem[] = []
-    const suppressedItems: NormalizedSyncItem[] = []
-    const correctedIdentities: NormalizedSyncItem['sourceIdentity'][] = []
-    for (const prepared of preparedItems) {
-      const item = prepared.item
-      // The persistent baseline owns the rendered period window, but the
-      // provider's observed window still owns the lifecycle of its personal
-      // identity.  Classify recurring observations before projecting them
-      // onto the current baseline period; otherwise an expired observation
-      // and the new-period placeholder become two active rows with the same
-      // stable remote key.
-      const lifecycleStartsAt = item.category === 'endgame'
-        ? prepared.observedStartsAt
-        : item.startsAt
-      const lifecycleEndsAt = item.category === 'endgame'
-        ? prepared.observedEndsAt
-        : item.endsAt
-      this.assertTimeWindow(item.startsAt ?? null, item.endsAt ?? null)
-      if (item.category === 'endgame') {
-        this.assertTimeWindow(lifecycleStartsAt ?? null, lifecycleEndsAt ?? null)
-      }
-      if (
-        item.category === 'limited_event' && item.completed === true &&
-        item.startsAt && Date.parse(item.startsAt) > reference.getTime()
-      ) {
-        throw new Error(`活动“${item.title}”还没开始，暂时不能标为完成`)
-      }
-      const identity = item.sourceIdentity!
-      // Catalog placeholders are local period predictions rather than
-      // official identities.  They must be allowed to reappear in a later
-      // period even if an older prediction was enriched with an end time and
-      // expired.  Expiry tombstones remain reserved for actual provider IDs.
-      const isCatalogPrediction = identity.provider === 'gtask-cycle-catalog'
-      const isKnownRecurringCycle = item.category === 'endgame' && Boolean(findCycleMode(gameId, item))
-      const tombstone = isCatalogPrediction
-        ? undefined
-        : this.database.prepare(`
-            SELECT expired_ends_at AS expiredEndsAt
-            FROM personal_expiry_tombstones
-            WHERE game_id = ? AND provider = ? AND endpoint = ? AND external_id = ?
-          `).get(
-            gameId,
-            identity.provider,
-            identity.endpoint,
-            identity.externalId
-          ) as { expiredEndsAt: string } | undefined
-      const endsAtMs = lifecycleEndsAt ? Date.parse(lifecycleEndsAt) : Number.NaN
-      if (Number.isFinite(endsAtMs) && endsAtMs <= reference.getTime()) {
-        expiredItems.push({
-          ...item,
-          startsAt: lifecycleStartsAt,
-          endsAt: lifecycleEndsAt
-        })
-        continue
-      }
-      if (tombstone) {
-        if (isKnownRecurringCycle && !Number.isFinite(endsAtMs)) {
-          // Stable official mode IDs can legitimately return again for a new
-          // period before the provider exposes the new window. Keep the old
-          // period tombstone until the current window is bound, and never
-          // carry the old period's completion bit into the placeholder.
-          activeItems.push({ ...item, completed: false })
-          continue
-        }
-        if (
-          Number.isFinite(endsAtMs) &&
-          endsAtMs > reference.getTime() &&
-          endsAtMs > Date.parse(tombstone.expiredEndsAt)
-        ) {
-          correctedIdentities.push(identity)
-          activeItems.push(item)
-        } else {
-          suppressedItems.push(item)
-        }
-        continue
-      }
-      activeItems.push(item)
-    }
     const replace = (): SyncMergeResult => {
       const now = reference.toISOString()
-      const categories = expectedCategories[target]
-      const placeholders = categories.map(() => '?').join(', ')
-      let expiredRemoved = 0
-      const deleteExactPersonalItem = this.database.prepare(`
-        DELETE FROM checklist_items
-        WHERE game_id = ? AND source = 'personal_sync'
-          AND (
-            remote_key = ? OR id IN (
-              SELECT item_id FROM source_bindings
-              WHERE game_id = ? AND provider = ? AND endpoint = ? AND external_id = ?
-            )
-          )
-      `)
-      const upsertExpiry = this.database.prepare(`
-        INSERT INTO personal_expiry_tombstones(
-          game_id, provider, endpoint, external_id, category, expired_ends_at, observed_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(game_id, provider, endpoint, external_id) DO UPDATE SET
-          category = excluded.category,
-          expired_ends_at = CASE
-            WHEN julianday(excluded.expired_ends_at) > julianday(personal_expiry_tombstones.expired_ends_at)
-              THEN excluded.expired_ends_at
-            ELSE personal_expiry_tombstones.expired_ends_at
-          END,
-          observed_at = excluded.observed_at
-      `)
-      for (const item of expiredItems) {
-        const identity = item.sourceIdentity!
-        if (identity.provider !== 'gtask-cycle-catalog') {
-          upsertExpiry.run(
-            gameId,
-            identity.provider,
-            identity.endpoint,
-            identity.externalId,
-            item.category,
-            item.endsAt!,
-            now
-          )
-        }
-        expiredRemoved += Number(deleteExactPersonalItem.run(
-          gameId,
-          item.remoteKey,
-          gameId,
-          identity.provider,
-          identity.endpoint,
-          identity.externalId
-        ).changes)
-      }
-      for (const item of suppressedItems) {
-        const identity = item.sourceIdentity!
-        expiredRemoved += Number(deleteExactPersonalItem.run(
-          gameId,
-          item.remoteKey,
-          gameId,
-          identity.provider,
-          identity.endpoint,
-          identity.externalId
-        ).changes)
-      }
-      for (const identity of correctedIdentities) {
-        if (!identity) continue
-        this.database.prepare(`
-          DELETE FROM personal_expiry_tombstones
-          WHERE game_id = ? AND provider = ? AND endpoint = ? AND external_id = ?
-        `).run(gameId, identity.provider, identity.endpoint, identity.externalId)
-      }
-      const previouslyExpired = this.database.prepare(`
-        SELECT i.id, i.category, i.remote_key AS remoteKey, i.ends_at AS endsAt,
-          b.provider, b.endpoint, b.external_id AS externalId
-        FROM checklist_items i
-        LEFT JOIN source_bindings b ON b.game_id = i.game_id AND b.item_id = i.id
-        WHERE i.game_id = ? AND i.source = 'personal_sync'
-          AND i.category IN (${placeholders})
-          AND i.ends_at IS NOT NULL AND julianday(i.ends_at) <= julianday(?)
-      `).all(gameId, ...categories, now) as Array<{
-        id: string
-        category: Extract<ChecklistCategory, 'limited_event' | 'endgame'>
-        remoteKey: string | null
-        endsAt: string
-        provider: string | null
-        endpoint: string | null
-        externalId: string | null
-      }>
-      for (const row of previouslyExpired) {
-        if (
-          row.provider && row.endpoint && row.externalId &&
-          row.provider !== 'gtask-cycle-catalog'
-        ) {
-          upsertExpiry.run(
-            gameId,
-            row.provider,
-            row.endpoint,
-            row.externalId,
-            row.category,
-            row.endsAt,
-            now
-          )
-        }
-        expiredRemoved += Number(this.database.prepare(
-          `DELETE FROM checklist_items WHERE id = ? AND game_id = ? AND source = 'personal_sync'`
-        ).run(row.id, gameId).changes)
-      }
       const snapshotId = randomUUID()
+      const result: SyncMergeResult = { added: 0, updated: 0, preserved: 0 }
+      const matched: Array<{ item: NormalizedSyncItem; baseline: ChecklistItem }> = []
+      const matchedBaselineIds = new Set<string>()
+      for (const item of items) {
+        const baseline = this.findBaselineItemForPersonalProgress(gameId, item)
+        if (!baseline?.remoteKey || baseline.category !== item.category) {
+          result.preserved += 1
+          continue
+        }
+        if (matchedBaselineIds.has(baseline.id)) {
+          throw new Error(`个人快照中多条记录匹配同一事项：“${baseline.title}”`)
+        }
+        matchedBaselineIds.add(baseline.id)
+        matched.push({ item, baseline })
+      }
+
       this.database.prepare(`
         INSERT INTO personal_sync_snapshots(
           id, game_id, target, account_scope, adapter_version,
@@ -2794,43 +2614,10 @@ export class AppDatabase {
         target,
         accountScope,
         adapterVersion.trim(),
-        activeItems.length,
+        matched.length,
         now,
         now
       )
-
-      const merge = this.mergeSyncedItems(
-        gameId,
-        'personal_sync',
-        activeItems,
-        now,
-        false,
-        { codexReviewed: true, identityPolicy: 'remote-key-only' }
-      )
-      merge.preserved += items.length - preparedItems.length + suppressedItems.length
-      const remoteKeys = activeItems.map((item) => item.remoteKey)
-      if (remoteKeys.length === 0) {
-        this.database.prepare(`
-          DELETE FROM checklist_items
-          WHERE game_id = ? AND category IN (${placeholders})
-            AND source = 'personal_sync' AND archived = 0
-        `).run(gameId, ...categories)
-      } else {
-        const keyPlaceholders = remoteKeys.map(() => '?').join(', ')
-        this.database.prepare(`
-          DELETE FROM checklist_items
-          WHERE game_id = ? AND category IN (${placeholders}) AND source = 'personal_sync'
-            AND archived = 0
-            AND remote_key NOT IN (${keyPlaceholders})
-        `).run(gameId, ...categories, ...remoteKeys)
-      }
-
-      const findItem = this.database.prepare(`
-        SELECT id, archived FROM checklist_items
-        WHERE game_id = ? AND source IN ('public_schedule', 'personal_sync') AND remote_key = ?
-        ORDER BY archived ASC, CASE WHEN source = 'public_schedule' THEN 0 ELSE 1 END, updated_at DESC
-        LIMIT 1
-      `)
       const bind = this.database.prepare(`
         INSERT INTO source_bindings(
           game_id, provider, endpoint, external_id, item_id,
@@ -2843,28 +2630,81 @@ export class AppDatabase {
           state_rule_json = NULL,
           updated_at = excluded.updated_at
       `)
-      const markSnapshot = this.database.prepare(`
+      const updateProgress = this.database.prepare(`
         UPDATE checklist_items
-        SET source_snapshot_id = ?, last_synced_at = ?, updated_at = ?
-        WHERE id = ?
+        SET completed = ?, progress_percent = ?, completed_at = ?,
+            source_snapshot_id = ?, last_synced_at = ?, updated_at = ?
+        WHERE id = ? AND source = 'public_schedule' AND archived = 0
       `)
-      for (const item of activeItems) {
-        const row = findItem.get(gameId, item.remoteKey) as {
-          id: string
-          archived: number
-        } | undefined
-        if (!row || !item.sourceIdentity) throw new Error(`个人事项“${item.title}”写入失败`)
-        // An archived row deliberately stays in the recycle bin and is not part
-        // of the active snapshot. Emptying the recycle bin removes it, after
-        // which a later complete personal snapshot may recreate the item.
-        if (row.archived === 1) continue
-        markSnapshot.run(snapshotId, now, now, row.id)
+      const touchProgress = this.database.prepare(`
+        UPDATE checklist_items
+        SET source_snapshot_id = ?, last_synced_at = ?
+        WHERE id = ? AND source = 'public_schedule' AND archived = 0
+      `)
+
+      for (const { item, baseline } of matched) {
+        const identity = item.sourceIdentity!
+        let completed = baseline.completed
+        let progressPercent = baseline.progressPercent
+        let completedAt = baseline.completedAt
+        let hasProgressEvidence = false
+
+        if (item.category === 'exploration' && item.progressPercent !== undefined &&
+          item.progressPercent !== null) {
+          if (!Number.isFinite(item.progressPercent) ||
+            item.progressPercent < 0 || item.progressPercent > 100) {
+            throw new Error(`个人事项“${baseline.title}”的探索进度格式不正确`)
+          }
+          progressPercent = item.progressPercent
+          completed = item.progressPercent === 100
+          hasProgressEvidence = true
+        } else if (item.completed !== undefined) {
+          completed = item.completed
+          hasProgressEvidence = true
+        }
+
+        const startsInFuture = Boolean(
+          baseline.startsAt && Date.parse(baseline.startsAt) > reference.getTime()
+        )
+        if (startsInFuture && completed) {
+          hasProgressEvidence = false
+          completed = baseline.completed
+          progressPercent = baseline.progressPercent
+        }
+
+        const completionProtected = hasProgressEvidence && !completed &&
+          baseline.manualCompletionLocked
+        if (completionProtected) completed = baseline.completed
+        if (hasProgressEvidence && !completionProtected) {
+          completedAt = completed ? baseline.completedAt ?? now : null
+        }
+
+        const changed = hasProgressEvidence && (
+          completed !== baseline.completed ||
+          (item.category === 'exploration' && progressPercent !== baseline.progressPercent)
+        )
+        if (changed) {
+          updateProgress.run(
+            completed ? 1 : 0,
+            progressPercent,
+            completedAt,
+            snapshotId,
+            now,
+            now,
+            baseline.id
+          )
+          result.updated += 1
+          if (completionProtected) result.preserved += 1
+        } else {
+          touchProgress.run(snapshotId, now, baseline.id)
+          result.preserved += 1
+        }
         bind.run(
           gameId,
-          item.sourceIdentity.provider,
-          item.sourceIdentity.endpoint,
-          item.sourceIdentity.externalId,
-          row.id,
+          identity.provider,
+          identity.endpoint,
+          identity.externalId,
+          baseline.id,
           now,
           now
         )
@@ -2890,12 +2730,13 @@ export class AppDatabase {
         // Keep the rendered region total deterministic before and after a
         // restart when the provider actually exposes child-level progress.
         const affectedRegionIdentities = new Set(
-          activeItems
-            .filter((item) => item.mapNodeKind === 'subregion')
-            .flatMap((item) => item.parentRemoteKey
-              ? [item.parentRemoteKey]
-              : item.parentTitle
-                ? [`title:${item.parentTitle}`]
+          matched
+            .map(({ baseline }) => baseline)
+            .filter((baseline) => baseline.mapNodeKind === 'subregion')
+            .flatMap((baseline) => baseline.parentRemoteKey
+              ? [baseline.parentRemoteKey]
+              : baseline.parentTitle
+                ? [`title:${baseline.parentTitle}`]
                 : [])
         )
         if (affectedRegionIdentities.size > 0) {
@@ -2905,7 +2746,7 @@ export class AppDatabase {
         }
         this.assertActiveMapReferences(gameId)
       }
-      return { ...merge, expiredRemoved }
+      return result
     }
     return manageTransaction ? this.runTransaction(replace) : replace()
   }
@@ -3053,6 +2894,7 @@ export class AppDatabase {
     manageTransaction = true,
     options: SyncMergeOptions = {}
   ): SyncMergeResult {
+    assertPublicCatalogMergeSource(source)
     const result: SyncMergeResult = { added: 0, updated: 0, preserved: 0 }
     for (const item of items) {
       if (item.category === 'limited_event') {
@@ -3062,49 +2904,26 @@ export class AppDatabase {
         )
       }
     }
-    if (source === 'public_schedule') {
-      this.assertPublicCycleStableIdentities(gameId, items)
-    }
+    this.assertPublicCycleStableIdentities(gameId, items)
     const seenRemoteKeys = new Set<string>()
     this.assertMapStructure(gameId, items)
 
     if (manageTransaction) this.database.exec('BEGIN IMMEDIATE')
     try {
-      if (source === 'public_schedule') {
-        this.restorePublicCycleCompletionFromHistory(gameId, items, syncedAt)
-      }
+      this.restorePublicCycleCompletionFromHistory(gameId, items, syncedAt)
       for (const item of items) {
         const remoteKey = item.remoteKey.trim()
         if (!remoteKey || remoteKey.length > 200) throw new Error('远端事项标识格式不正确')
         this.assertTimeWindow(item.startsAt ?? null, item.endsAt ?? null)
-        const startsInFuture =
-          item.category === 'limited_event' &&
-          Boolean(item.startsAt) &&
-          Date.parse(item.startsAt!) > Date.parse(syncedAt)
         if (seenRemoteKeys.has(remoteKey)) throw new Error(`同步数据包含重复标识：${remoteKey}`)
         seenRemoteKeys.add(remoteKey)
 
-        const identity = this.findSyncIdentity(
+        const identity = this.findPublicSyncIdentity(
           gameId,
-          source,
           item,
           remoteKey,
-          syncedAt,
           options.identityPolicy ?? 'heuristic'
         )
-
-        const isUntimedPersonalEvent =
-          source === 'personal_sync' &&
-          item.category === 'limited_event' &&
-          (!item.startsAt || !item.endsAt)
-        if (
-          isUntimedPersonalEvent &&
-          !options.codexReviewed &&
-          identity?.source !== 'public_schedule'
-        ) {
-          result.preserved += 1
-          continue
-        }
 
         if (identity?.archived) {
           result.preserved += 1
@@ -3113,11 +2932,6 @@ export class AppDatabase {
 
         if (!identity) {
           const id = randomUUID()
-          const inferredCompletion = item.category === 'exploration' && item.progressPercent !== undefined
-            ? item.progressPercent === 100
-            : item.completed
-          const safeCompletion = startsInFuture ? false : inferredCompletion
-          const remoteCompleted = source === 'personal_sync' && safeCompletion === true
           this.database
             .prepare(`
               INSERT INTO checklist_items(
@@ -3141,12 +2955,8 @@ export class AppDatabase {
               )
                   : []
               ),
-              remoteCompleted ? 1 : 0,
-              item.category === 'exploration'
-                ? source === 'personal_sync'
-                  ? item.progressPercent ?? null
-                  : 0
-                : null,
+              0,
+              item.category === 'exploration' ? 0 : null,
               item.parentTitle ?? null,
               item.mapNodeKind ?? (item.category === 'exploration' ? 'region' : null),
               item.parentRemoteKey ?? null,
@@ -3159,10 +2969,10 @@ export class AppDatabase {
               item.timeZone ?? null,
               item.modeKey ?? null,
               null,
-              source,
+              'public_schedule',
               remoteKey,
               item.sourceUrl ?? null,
-              remoteCompleted ? syncedAt : null,
+              null,
               syncedAt,
               syncedAt,
               syncedAt
@@ -3180,26 +2990,6 @@ export class AppDatabase {
                 options.outputLocale ?? 'zh-CN'
               )
           : []
-        const currentCompleted = current.completed
-        const currentCompletedAt = current.completedAt
-        const manualCompletionLocked = current.manualCompletionLocked
-        const inferredCompletion = item.category === 'exploration' && item.progressPercent !== undefined
-          ? item.progressPercent === 100
-          : item.completed
-        const safeCompletion = startsInFuture ? false : inferredCompletion
-        const acceptsRemoteCompletion = source === 'personal_sync' && safeCompletion !== undefined
-        const completionProtected =
-          acceptsRemoteCompletion && safeCompletion === false && manualCompletionLocked
-        const completed = completionProtected
-          ? currentCompleted
-          : acceptsRemoteCompletion
-            ? safeCompletion!
-            : currentCompleted
-        const completedAt = completed
-          ? currentCompletedAt ?? syncedAt
-          : acceptsRemoteCompletion
-            ? null
-            : currentCompletedAt
         const startsAt = item.startsAt === undefined ? current.startsAt : item.startsAt
         const endsAt = item.endsAt === undefined ? current.endsAt : item.endsAt
         this.assertTimeWindow(startsAt, endsAt)
@@ -3219,7 +3009,7 @@ export class AppDatabase {
         const timeZone = item.timeZone === undefined ? current.timeZone : item.timeZone
         const modeKey = item.modeKey === undefined ? current.modeKey : item.modeKey
         const sourceUrl = item.sourceUrl === undefined ? current.sourceUrl : item.sourceUrl
-        const publicStructureUnchanged = source === 'public_schedule' &&
+        const publicStructureUnchanged =
           current.category === item.category &&
           current.title === item.title &&
           JSON.stringify(normalizeActivityTags(current.activityTags)) ===
@@ -3273,12 +3063,8 @@ export class AppDatabase {
             item.category,
             item.title,
             JSON.stringify(resolvedActivityTags),
-            completed ? 1 : 0,
-            item.category === 'exploration'
-              ? source === 'public_schedule' || item.progressPercent === undefined
-                ? current.progressPercent
-                : item.progressPercent
-              : null,
+            current.completed ? 1 : 0,
+            item.category === 'exploration' ? current.progressPercent : null,
             parentTitle,
             mapNodeKind,
             parentRemoteKey,
@@ -3291,20 +3077,17 @@ export class AppDatabase {
             timeZone,
             modeKey,
             null,
-            identity.source === 'public_schedule' && source === 'personal_sync'
-              ? 'public_schedule'
-              : source,
+            'public_schedule',
             sourceUrl,
-            manualCompletionLocked ? 1 : 0,
-            completedAt,
+            current.manualCompletionLocked ? 1 : 0,
+            current.completedAt,
             syncedAt,
             syncedAt,
             current.id
           )
         result.updated += 1
-        if (completionProtected) result.preserved += 1
       }
-      if (source === 'public_schedule' && items.some((item) => item.category === 'exploration')) {
+      if (items.some((item) => item.category === 'exploration')) {
         this.recalculatePublicMapRegionProgress(gameId, new Date(syncedAt))
       }
       if (manageTransaction) this.database.exec('COMMIT')
@@ -3336,12 +3119,10 @@ export class AppDatabase {
     }
   }
 
-  private findSyncIdentity(
+  private findPublicSyncIdentity(
     gameId: GameId,
-    source: Exclude<ChecklistSource, 'manual'>,
     item: NormalizedSyncItem,
     remoteKey: string,
-    syncedAt: string,
     identityPolicy: 'heuristic' | 'remote-key-only'
   ): { id: string; archived: number; source: ChecklistSource } | undefined {
     if (identityPolicy === 'remote-key-only') {
@@ -3349,11 +3130,11 @@ export class AppDatabase {
         SELECT id, archived, source
         FROM checklist_items
         WHERE game_id = ?
+          AND source = 'public_schedule'
           AND remote_key = ?
-          AND (source = ? OR (? = 'personal_sync' AND source = 'public_schedule'))
-        ORDER BY CASE WHEN source = 'public_schedule' THEN 0 ELSE 1 END, updated_at DESC
+        ORDER BY updated_at DESC
         LIMIT 1
-      `).get(gameId, remoteKey, source, source) as {
+      `).get(gameId, remoteKey) as {
         id: string
         archived: number
         source: ChecklistSource
@@ -3366,7 +3147,7 @@ export class AppDatabase {
         FROM checklist_items
         WHERE game_id = ?
           AND category = 'exploration'
-          AND source = ?
+          AND source = 'public_schedule'
           AND (
             remote_key = ?
             OR (? IS NOT NULL AND mode_key = ?)
@@ -3374,12 +3155,10 @@ export class AppDatabase {
           )
         ORDER BY CASE WHEN remote_key = ? THEN 0 ELSE 1 END,
           CASE WHEN ? IS NOT NULL AND mode_key = ? THEN 0 ELSE 1 END,
-          CASE WHEN source = 'public_schedule' THEN 0 ELSE 1 END,
           updated_at DESC
         LIMIT 1
       `).get(
         gameId,
-        source,
         remoteKey,
         item.modeKey ?? null,
         item.modeKey ?? null,
@@ -3397,7 +3176,7 @@ export class AppDatabase {
         FROM checklist_items
         WHERE game_id = ?
           AND category = 'limited_event'
-          AND source = ?
+          AND source = 'public_schedule'
           AND (
             remote_key = ?
             OR (? IS NOT NULL AND mode_key = ?)
@@ -3411,7 +3190,6 @@ export class AppDatabase {
           )
       `).all(
         gameId,
-        source,
         remoteKey,
         item.modeKey ?? null,
         item.modeKey ?? null,
@@ -3436,27 +3214,22 @@ export class AppDatabase {
         )
         .sort((left, right) => {
           const score = (row: typeof left): number => {
-            if (
-              source === 'personal_sync' &&
-              row.source === 'public_schedule' &&
-              eventTitlesEquivalent(row.title, item.title)
-            ) return 0
-            if (row.remoteKey === remoteKey) return 1
-            if (item.modeKey && row.modeKey === item.modeKey) return 2
-            if (row.title === item.title) return 3
-            return 4
+            if (row.remoteKey === remoteKey) return 0
+            if (item.modeKey && row.modeKey === item.modeKey) return 1
+            if (row.title === item.title) return 2
+            return 3
           }
           return score(left) - score(right)
         })[0]
     }
 
-    if (item.category === 'endgame' && source === 'public_schedule') {
+    if (item.category === 'endgame') {
       return this.database.prepare(`
         SELECT id, archived, source
         FROM checklist_items
         WHERE game_id = ?
           AND category = 'endgame'
-          AND source = ?
+          AND source = 'public_schedule'
           AND (
             remote_key = ?
             OR (? IS NOT NULL AND mode_key = ? AND period_key IS ?)
@@ -3465,19 +3238,13 @@ export class AppDatabase {
               AND ? IS NOT NULL AND ? IS NOT NULL
               AND julianday(starts_at) < julianday(?)
               AND julianday(ends_at) > julianday(?))
-            OR (? IS NOT NULL AND mode_key = ? AND source = 'personal_sync'
-              AND starts_at IS NOT NULL AND ends_at IS NOT NULL
-              AND julianday(starts_at) <= julianday(?)
-              AND julianday(ends_at) >= julianday(?))
           )
         ORDER BY CASE WHEN remote_key = ? THEN 0 ELSE 1 END,
           CASE WHEN period_key IS ? THEN 0 ELSE 1 END,
-          CASE WHEN source = 'public_schedule' THEN 0 ELSE 1 END,
           updated_at DESC
         LIMIT 1
       `).get(
         gameId,
-        source,
         remoteKey,
         item.modeKey ?? null,
         item.modeKey ?? null,
@@ -3488,47 +3255,8 @@ export class AppDatabase {
         item.endsAt ?? null,
         item.endsAt ?? null,
         item.startsAt ?? null,
-        item.modeKey ?? null,
-        item.modeKey ?? null,
-        syncedAt,
-        syncedAt,
         remoteKey,
         item.periodKey ?? null
-      ) as { id: string; archived: number; source: ChecklistSource } | undefined
-    }
-
-    if (item.category === 'endgame' && source === 'personal_sync') {
-      return this.database.prepare(`
-        SELECT id, archived, source
-        FROM checklist_items
-        WHERE game_id = ?
-          AND category = 'endgame'
-          AND source = ?
-          AND (
-            remote_key = ?
-            OR (? IS NOT NULL AND mode_key = ?)
-            OR title = ?
-          )
-        ORDER BY CASE WHEN ? IS NOT NULL AND period_key = ? THEN 0 ELSE 1 END,
-          CASE WHEN starts_at IS NOT NULL AND ends_at IS NOT NULL
-            AND julianday(starts_at) <= julianday(?)
-            AND julianday(ends_at) >= julianday(?) THEN 0 ELSE 1 END,
-          CASE WHEN source = 'public_schedule' THEN 0 ELSE 1 END,
-          CASE WHEN title = ? THEN 0 ELSE 1 END,
-          updated_at DESC
-        LIMIT 1
-      `).get(
-        gameId,
-        source,
-        remoteKey,
-        item.modeKey ?? null,
-        item.modeKey ?? null,
-        item.title,
-        item.periodKey ?? null,
-        item.periodKey ?? null,
-        syncedAt,
-        syncedAt,
-        item.title
       ) as { id: string; archived: number; source: ChecklistSource } | undefined
     }
 
@@ -3540,10 +3268,9 @@ export class AppDatabase {
           remote_key = ?
           OR (? IS NOT NULL AND mode_key = ? AND category = ?)
         )
-        AND source = ?
+        AND source = 'public_schedule'
       ORDER BY CASE WHEN remote_key = ? THEN 0 ELSE 1 END,
         CASE WHEN ? IS NOT NULL AND period_key = ? THEN 0 ELSE 1 END,
-        CASE WHEN source = ? THEN 0 ELSE 1 END,
         updated_at DESC
       LIMIT 1
     `).get(
@@ -3552,22 +3279,17 @@ export class AppDatabase {
       item.modeKey ?? null,
       item.modeKey ?? null,
       item.category,
-      source,
       remoteKey,
       item.periodKey ?? null,
-      item.periodKey ?? null,
-      source
+      item.periodKey ?? null
     ) as { id: string; archived: number; source: ChecklistSource } | undefined
   }
 
   /**
-   * Permanently removes expired, system-owned time-limited entries.
-   *
-   * Known recurring challenges must be rolled forward before this method is
-   * called. Manual entries are deliberately outside this query: only public
-   * and authenticated snapshots are lifecycle-managed by the application.
-   * Personal provider identities receive an expiry tombstone before the row
-   * is deleted so a stale official snapshot cannot recreate the old period.
+   * Permanently removes expired public limited-time activities.
+   * Recurring challenges are never deleted here; their stable rows are rolled
+   * forward by rolloverDueCycleItems. Personal sync never participates in
+   * either lifecycle decision.
    */
   pruneExpiredSystemItems(reference = new Date()): number {
     return this.runTransaction(() => this.pruneExpiredSystemItemsInTransaction(reference))
@@ -3576,66 +3298,28 @@ export class AppDatabase {
   private pruneExpiredSystemItemsInTransaction(reference: Date): number {
     const now = reference.toISOString()
     const rows = this.database.prepare(`
-      SELECT i.id, i.game_id AS gameId, i.category, i.source,
-        i.ends_at AS endsAt,
-        b.provider, b.endpoint, b.external_id AS externalId
-      FROM checklist_items i
-      LEFT JOIN source_bindings b
-        ON b.game_id = i.game_id AND b.item_id = i.id
-      WHERE i.source IN ('public_schedule', 'personal_sync')
-        AND i.category IN ('limited_event', 'endgame')
-        AND i.ends_at IS NOT NULL
-        AND julianday(i.ends_at) <= julianday(?)
-      ORDER BY i.id
+      SELECT id, game_id AS gameId, category, source, ends_at AS endsAt
+      FROM checklist_items
+      WHERE source = 'public_schedule'
+        AND category = 'limited_event'
+        AND ends_at IS NOT NULL
+        AND julianday(ends_at) <= julianday(?)
+      ORDER BY id
     `).all(now) as Array<{
       id: string
       gameId: GameId
-      category: Extract<ChecklistCategory, 'limited_event' | 'endgame'>
-      source: Extract<ChecklistSource, 'public_schedule' | 'personal_sync'>
+      category: Extract<ChecklistCategory, 'limited_event'>
+      source: Extract<ChecklistSource, 'public_schedule'>
       endsAt: string
-      provider: string | null
-      endpoint: string | null
-      externalId: string | null
     }>
     if (rows.length === 0) return 0
 
-    const upsertExpiry = this.database.prepare(`
-      INSERT INTO personal_expiry_tombstones(
-        game_id, provider, endpoint, external_id, category, expired_ends_at, observed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(game_id, provider, endpoint, external_id) DO UPDATE SET
-        category = excluded.category,
-        expired_ends_at = CASE
-          WHEN julianday(excluded.expired_ends_at) > julianday(personal_expiry_tombstones.expired_ends_at)
-            THEN excluded.expired_ends_at
-          ELSE personal_expiry_tombstones.expired_ends_at
-        END,
-        observed_at = excluded.observed_at
-    `)
     const deleteItem = this.database.prepare(`
       DELETE FROM checklist_items
-      WHERE id = ? AND source IN ('public_schedule', 'personal_sync')
+      WHERE id = ? AND source = 'public_schedule' AND category = 'limited_event'
     `)
-    const deleted = new Set<string>()
     let removed = 0
     for (const row of rows) {
-      if (
-        row.source === 'personal_sync' &&
-        row.provider && row.endpoint && row.externalId &&
-        row.provider !== 'gtask-cycle-catalog'
-      ) {
-        upsertExpiry.run(
-          row.gameId,
-          row.provider,
-          row.endpoint,
-          row.externalId,
-          row.category,
-          row.endsAt,
-          now
-        )
-      }
-      if (deleted.has(row.id)) continue
-      deleted.add(row.id)
       removed += Number(deleteItem.run(row.id).changes)
     }
     return removed
@@ -3658,7 +3342,7 @@ export class AppDatabase {
         created_at AS createdAt, updated_at AS updatedAt
       FROM checklist_items
       WHERE category = 'endgame' AND archived = 0
-        AND source IN ('public_schedule', 'personal_sync')
+        AND source = 'public_schedule'
         AND mode_key IS NOT NULL AND remote_key IS NOT NULL
         AND ends_at IS NOT NULL AND julianday(ends_at) <= julianday(?)
     `).all(now) as Array<Omit<ChecklistItem, 'activityTags' | 'completed' | 'manualCompletionLocked'> & {
@@ -4561,11 +4245,10 @@ export class AppDatabase {
       this.mergeSyncedItems(
         gameId,
         'public_schedule',
-        completeCycleCatalog(
+        completePublicCycleCatalog(
           gameId,
           [],
           [],
-          'public_schedule',
           reference,
           this.getRelevantGameVersionWindow(gameId, reference)
         ),
@@ -4704,9 +4387,7 @@ export class AppDatabase {
         AND (progress_percent IS NULL OR progress_percent <> 100)
     `).run(now)
     for (const game of DEFAULT_GAMES) {
-      this.recalculatePublicMapRegionProgress(game.id, reference, {
-        preserveDirectlyBoundRegionsWithoutBoundChildren: true
-      })
+      this.recalculatePublicMapRegionProgress(game.id, reference)
     }
   }
 
@@ -4786,9 +4467,16 @@ export class AppDatabase {
     reference = new Date(),
     options: {
       onlyRegionIdentities?: ReadonlySet<string>
-      preserveDirectlyBoundRegionsWithoutBoundChildren?: boolean
     } = {}
   ): string[] {
+    const activeSnapshot = this.database.prepare(`
+      SELECT active_snapshot_id AS activeSnapshotId
+      FROM sync_target_states
+      WHERE game_id = ? AND target = 'exploration'
+        AND active_snapshot_id IS NOT NULL
+      LIMIT 1
+    `).get(gameId) as { activeSnapshotId: string | null } | undefined
+    const activePersonalSnapshotId = activeSnapshot?.activeSnapshotId ?? null
     const regions = this.database.prepare(`
       SELECT id, remote_key AS remoteKey, title
       FROM checklist_items
@@ -4796,11 +4484,7 @@ export class AppDatabase {
         AND map_node_kind = 'region' AND archived = 0
     `).all(gameId) as Array<{ id: string; remoteKey: string | null; title: string }>
     const readChildren = this.database.prepare(`
-      SELECT child.progress_percent AS progressPercent, child.completed,
-        EXISTS(
-          SELECT 1 FROM source_bindings binding
-          WHERE binding.game_id = ? AND binding.item_id = child.id
-        ) AS hasPersonalBinding
+      SELECT child.progress_percent AS progressPercent, child.completed
       FROM checklist_items child
       WHERE child.game_id = ? AND child.category = 'exploration'
         AND child.source = 'public_schedule'
@@ -4810,9 +4494,10 @@ export class AppDatabase {
           OR (child.parent_remote_key IS NULL AND child.parent_title = ?)
         )
     `)
-    const hasDirectPersonalBinding = this.database.prepare(`
-      SELECT 1 FROM source_bindings
-      WHERE game_id = ? AND item_id = ?
+    const hasCurrentPersonalSnapshotProgress = this.database.prepare(`
+      SELECT 1 FROM checklist_items
+      WHERE id = ? AND source = 'public_schedule'
+        AND source_snapshot_id = ? AND archived = 0
       LIMIT 1
     `)
     const update = this.database.prepare(`
@@ -4840,8 +4525,16 @@ export class AppDatabase {
         options.onlyRegionIdentities &&
         !options.onlyRegionIdentities.has(regionIdentity)
       ) continue
+      // A region value from the active personal snapshot is authoritative.
+      // Only derive a parent from children when this snapshot did not provide
+      // a parent value. Historical bindings alone are not enough: a later
+      // complete response may legitimately omit the parent and should then
+      // fall back to the canonical child average.
+      if (
+        activePersonalSnapshotId &&
+        hasCurrentPersonalSnapshotProgress.get(region.id, activePersonalSnapshotId)
+      ) continue
       const children = readChildren.all(
-        gameId,
         gameId,
         region.remoteKey,
         region.remoteKey,
@@ -4849,14 +4542,8 @@ export class AppDatabase {
       ) as Array<{
         progressPercent: number | null
         completed: number
-        hasPersonalBinding: number
       }>
       if (children.length === 0) continue
-      if (
-        options.preserveDirectlyBoundRegionsWithoutBoundChildren &&
-        hasDirectPersonalBinding.get(gameId, region.id) &&
-        children.every((child) => !child.hasPersonalBinding)
-      ) continue
       const progress = Math.round(
         children.reduce(
           (sum, child) => sum + (child.completed ? 100 : (child.progressPercent ?? 0)),

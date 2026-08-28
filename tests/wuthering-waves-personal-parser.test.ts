@@ -90,8 +90,6 @@ describe('鸣潮个人进度解析', () => {
     })).toMatchObject({
       title: '逆境深塔',
       completed: true,
-      startsAt: null,
-      endsAt: '2026-08-19T23:59:59.000Z',
       modeKey: 'tower-of-adversity'
     })
 
@@ -104,9 +102,7 @@ describe('鸣潮个人进度解析', () => {
       }]
     })).toMatchObject({
       title: '冥歌海墟',
-      completed: true,
-      startsAt: null,
-      endsAt: '2026-08-19T23:59:59.000Z'
+      completed: true
     })
 
     expect(parseWutheringWavesMatrix({
@@ -115,11 +111,23 @@ describe('鸣潮个人进度解析', () => {
       modeDetails: [{ hasRecord: true, score: 0, teams: [] }]
     })).toMatchObject({
       title: '终焉矩阵',
-      completed: true,
-      startsAt: null,
-      endsAt: '2026-08-19T23:59:59.000Z',
-      periodKey: 'wuthering-waves:endstate-matrix:2026-08-19T23:59:59.000Z'
+      completed: true
     })
+  })
+
+  it('个人挑战解析不输出基准时间或期次', () => {
+    const items = [
+      parseWutheringWavesTower({ difficultyList: [] }),
+      parseWutheringWavesSlash({ difficultyList: [] }),
+      parseWutheringWavesMatrix({ modeDetails: [] })
+    ]
+
+    for (const item of items) {
+      expect(item).not.toHaveProperty('startsAt')
+      expect(item).not.toHaveProperty('endsAt')
+      expect(item).not.toHaveProperty('periodKey')
+      expect(item).not.toHaveProperty('scheduleKind')
+    }
   })
 
   it('完全没有碰过挑战时保持未完成', () => {
@@ -140,6 +148,18 @@ describe('鸣潮个人进度解析', () => {
       isUnlock: true,
       endTime: 1787183999,
       modeDetails: [{ hasRecord: false, score: 0, passBoss: 0, teams: [{ roleIds: [] }] }]
+    })).toMatchObject({ completed: false })
+  })
+
+  it('终焉矩阵只有快速通过结果时不算手动完成', () => {
+    expect(parseWutheringWavesMatrix({
+      isUnlock: true,
+      modeDetails: [{
+        hasRecord: false,
+        score: 0,
+        passBoss: 1,
+        teams: [{ roleIds: [] }]
+      }]
     })).toMatchObject({ completed: false })
   })
 
@@ -222,20 +242,7 @@ describe('鸣潮个人进度解析', () => {
       expect.objectContaining({ category: 'endgame', modeKey: 'endstate-matrix' })
     ]))
     expect(output.snapshotCompleteness).toBe('partial')
-    expect(output.scheduleObservations).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        target: 'cycles',
-        modeKey: 'tower-of-adversity',
-        endpoint: 'aki/roleBox/akiBox/towerDataDetail',
-        endsAt: '2026-08-19T23:59:59.000Z'
-      }),
-      expect.objectContaining({
-        target: 'cycles',
-        modeKey: 'endstate-matrix',
-        endpoint: 'aki/roleBox/akiBox/newTowerDetail',
-        endsAt: '2026-08-19T23:59:59.000Z'
-      })
-    ]))
+    expect(output.scheduleObservations).toEqual([])
     expect(output.message).toContain('部分成功 2/3')
     expect(progress).toEqual(expect.arrayContaining([
       expect.objectContaining({ message: '正在读取逆境深塔战绩', current: 1, total: 3 }),

@@ -18,7 +18,6 @@ import {
   type SyncAdapterRegistry
 } from './types'
 import { normalizeSyncItems } from './normalization'
-import { completeCycleCatalog } from './cycle-catalog'
 
 const PERSONAL_PLATFORM_NAMES: Record<GameId, string> = {
   genshin: '米游社',
@@ -200,19 +199,9 @@ export class SyncOrchestrator {
         exploration: ['exploration']
       } as const
       const categories = targetCategories[target]
-      let normalizedItems = normalizeSyncItems(result.items).filter(
+      const normalizedItems = normalizeSyncItems(result.items).filter(
         (item) => (categories as readonly string[]).includes(item.category)
       )
-      if (target === 'cycles') {
-        normalizedItems = completeCycleCatalog(
-          gameId,
-          normalizedItems,
-          this.database.listChecklistItems(gameId),
-          'personal_sync',
-          new Date(),
-          this.database.getRelevantGameVersionWindow(gameId)
-        )
-      }
       throwIfSyncCancelled(signal)
       reportProgress({
         phase: 'merging',
@@ -317,9 +306,7 @@ export class SyncOrchestrator {
       phase: progress.phase,
       status: progress.status ?? 'running',
       retryKind: progress.phase === 'retrying' ? 'source_request' : null,
-      // Adapter diagnostics are deliberately not transported to the product
-      // UI. User-facing copy is derived from source/target/phase/count.
-      message: '',
+      message: progress.message,
       current: progress.current ?? null,
       total: progress.total ?? null,
       updatedAt: new Date().toISOString()

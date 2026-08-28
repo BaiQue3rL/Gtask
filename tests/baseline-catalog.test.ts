@@ -13,7 +13,6 @@ import {
 } from '../src/main/sync/baseline-catalog'
 import {
   CYCLE_MODE_CATALOG,
-  completeCycleCatalog,
   predictCycleWindow
 } from '../src/main/sync/cycle-catalog'
 
@@ -111,13 +110,6 @@ describe('bundled baseline catalog', () => {
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-baseline-migration-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
     database = new AppDatabase(databasePath, { seedBundledBaselines: false })
-    database.mergeSyncedItems('star-rail', 'personal_sync', [{
-      remoteKey: 'legacy-personal:chaos',
-      category: 'endgame',
-      title: '混沌回忆',
-      completed: true,
-      modeKey: 'memory-of-chaos'
-    }])
     database.createChecklistItem({
       gameId: 'star-rail',
       category: 'exploration',
@@ -127,6 +119,17 @@ describe('bundled baseline catalog', () => {
     database = null
 
     const raw = new DatabaseSync(databasePath)
+    raw.prepare(`
+      INSERT INTO checklist_items(
+        id, game_id, category, title, completed, mode_key, source, remote_key
+      ) VALUES (?, ?, 'endgame', ?, 1, ?, 'personal_sync', ?)
+    `).run(
+      'legacy-personal-chaos',
+      'star-rail',
+      '混沌回忆',
+      'memory-of-chaos',
+      'legacy-personal:chaos'
+    )
     raw.exec(`
       ALTER TABLE sync_states ADD COLUMN mode TEXT NOT NULL DEFAULT 'manual';
       ALTER TABLE sync_states ADD COLUMN run_mode TEXT NOT NULL DEFAULT 'manual';
@@ -249,7 +252,7 @@ describe('bundled baseline catalog', () => {
     })
   })
 
-  it('keeps every built-in recurring challenge syncable when the provider still returns the expired period', () => {
+  it('personal cycle timing cannot replace the current public window', () => {
     vi.useFakeTimers()
     const reference = new Date('2026-08-11T12:00:00.000Z')
     vi.setSystemTime(reference)
@@ -277,21 +280,18 @@ describe('bundled baseline catalog', () => {
           }
         }
       })
-      const snapshot = completeCycleCatalog(
-        gameId,
-        expiredObservations,
-        database.listChecklistItems(gameId),
-        'personal_sync',
-        reference
+      const currentCyclesBefore = database.listChecklistItems(gameId).filter(
+        (item) => item.category === 'endgame'
       )
-
-      expect(snapshot).toHaveLength(definitions.length * 2)
-      expect(new Set(snapshot.map((item) => item.remoteKey)).size).toBe(definitions.length)
+      const windowsBefore = new Map(currentCyclesBefore.map((item) => [
+        item.modeKey,
+        { startsAt: item.startsAt, endsAt: item.endsAt, periodKey: item.periodKey }
+      ]))
       expect(() => database!.replacePersonalSnapshot(
         gameId,
         'cycles',
         `test:${'a'.repeat(64)}`,
-        snapshot,
+        expiredObservations,
         'cycle-rollover-test',
         reference
       )).not.toThrow()
@@ -300,8 +300,15 @@ describe('bundled baseline catalog', () => {
         (item) => item.category === 'endgame'
       )
       expect(currentCycles).toHaveLength(definitions.length)
-      expect(currentCycles.every((item) => item.completed === false)).toBe(true)
-      expect(currentCycles.every((item) => item.lastSyncedAt === reference.toISOString())).toBe(true)
+      for (const item of currentCycles) {
+        const started = !item.startsAt || Date.parse(item.startsAt) <= reference.getTime()
+        expect(item.completed).toBe(started)
+        expect({
+          startsAt: item.startsAt,
+          endsAt: item.endsAt,
+          periodKey: item.periodKey
+        }).toEqual(windowsBefore.get(item.modeKey))
+      }
       expect(database.getSyncTargetStates(gameId).find((state) => state.target === 'cycles'))
         .toMatchObject({ status: 'success', lastSuccessAt: reference.toISOString() })
     }

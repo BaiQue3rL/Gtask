@@ -345,6 +345,35 @@ describe('AppDatabase', () => {
     })
   })
 
+  it('生命周期只硬删除到期限时活动，不删除周期事项', () => {
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
+    database.mergeSyncedItems('zenless', 'public_schedule', [
+      {
+        remoteKey: 'event:expires-once',
+        category: 'limited_event',
+        title: '到期后删除的活动',
+        startsAt: '2026-08-01T00:00:00.000Z',
+        endsAt: '2026-08-02T00:00:00.000Z'
+      },
+      {
+        remoteKey: 'endgame:unknown-stable-mode',
+        category: 'endgame',
+        title: '等待 Agent 维护的周期',
+        startsAt: '2026-08-01T00:00:00.000Z',
+        endsAt: '2026-08-02T00:00:00.000Z',
+        modeKey: 'unknown-stable-mode'
+      }
+    ], '2026-08-01T12:00:00.000Z')
+
+    expect(database.pruneExpiredSystemItems(new Date('2026-08-03T00:00:00.000Z'))).toBe(1)
+    expect(database.listChecklistItems('zenless')).toEqual([
+      expect.objectContaining({
+        remoteKey: 'endgame:unknown-stable-mode',
+        category: 'endgame'
+      })
+    ])
+  })
+
   it('新用户初始化游戏但不创建任务版块事项', () => {
     database = new AppDatabase(':memory:', { seedBundledBaselines: false })
 
@@ -494,31 +523,14 @@ describe('AppDatabase', () => {
     expect(moved.activityTags).toEqual([])
   })
 
-  it('公开资料刷新不会融合或改写旧个人活动', () => {
+  it('目录合并器拒绝个人数据创建清单结构', () => {
     database = new AppDatabase(':memory:', { seedBundledBaselines: false })
-    database.mergeSyncedItems('star-rail', 'personal_sync', [{
-      remoteKey: 'personal:event:legacy',
+    expect(() => database!.mergeSyncedItems('star-rail', 'personal_sync', [{
+      remoteKey: 'personal:event:forbidden',
       category: 'limited_event',
-      title: '旧活动',
-      startsAt: '2026-07-20T02:00:00.000Z',
-      endsAt: '2026-08-10T01:59:00.000Z'
-    }])
-    expect(database.listChecklistItems('star-rail').find((item) => item.title === '旧活动'))
-      .toMatchObject({ activityTags: [] })
-
-    database.mergeSyncedItems('star-rail', 'public_schedule', [{
-      remoteKey: 'public:event:legacy',
-      category: 'limited_event',
-      title: '旧活动',
-      activityTags: ['战斗'],
-      startsAt: '2026-07-20T02:00:00.000Z',
-      endsAt: '2026-08-10T01:59:00.000Z'
-    }])
-    expect(database.listChecklistItems('star-rail').filter((item) => item.title === '旧活动'))
-      .toEqual(expect.arrayContaining([
-        expect.objectContaining({ source: 'personal_sync', activityTags: [] }),
-        expect.objectContaining({ source: 'public_schedule', activityTags: ['战斗'] })
-      ]))
+      title: '不能创建的个人活动'
+    }])).toThrow('个人进度不能通过目录合并器写入')
+    expect(database.listChecklistItems('star-rail')).toEqual([])
   })
 
   it('四款游戏的活动同步都会把有效未知活动列为强制标签补全目标', () => {
@@ -1281,64 +1293,56 @@ describe('AppDatabase', () => {
     verified.close()
   })
 
-  it('同步合并保留手动事项、手动完成锁和已归档远端事项', () => {
+  it('个人快照只更新基准完成状态并保护手动完成锁', () => {
     database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const manual = database.createChecklistItem({
       gameId: 'genshin',
       category: 'custom',
       title: '手动事项'
     })
-
-    expect(
-      database.mergeSyncedItems('genshin', 'personal_sync', [
-        {
-          remoteKey: 'abyss:2026-07',
-          category: 'endgame',
-          title: '深境螺旋',
-          completed: false,
-          periodKey: '2026-07'
-        }
-      ])
-    ).toEqual({ added: 1, updated: 0, preserved: 0 })
-
-    const remote = database
-      .listChecklistItems('genshin')
-      .find((item) => item.remoteKey === 'abyss:2026-07')!
+    database.mergeSyncedItems('genshin', 'public_schedule', [{
+      remoteKey: 'endgame:spiral-abyss',
+      category: 'endgame',
+      title: '深境螺旋',
+      completed: false,
+      startsAt: '2026-07-15T20:00:00.000Z',
+      endsAt: '2026-08-15T20:00:00.000Z',
+      periodKey: '2026-07',
+      modeKey: 'spiral-abyss'
+    }])
+    const remote = database.listChecklistItems('genshin').find(
+      (item) => item.remoteKey === 'endgame:spiral-abyss'
+    )!
     database.updateChecklistItem({ id: remote.id, completed: true })
 
-    expect(
-      database.mergeSyncedItems('genshin', 'personal_sync', [
-        {
-          remoteKey: 'abyss:2026-07',
-          category: 'endgame',
-          title: '深境螺旋（远端更新）',
-          completed: false,
-          periodKey: '2026-07'
+    expect(database.replacePersonalSnapshot(
+      'genshin',
+      'cycles',
+      `miyoushe:${'a'.repeat(64)}`,
+      [{
+        remoteKey: 'personal:spiral-abyss',
+        category: 'endgame',
+        title: '深境螺旋（接口名称）',
+        completed: false,
+        modeKey: 'spiral-abyss',
+        sourceIdentity: {
+          provider: 'miyoushe',
+          endpoint: 'challenge-record',
+          externalId: 'spiral-abyss'
         }
-      ])
-    ).toEqual({ added: 0, updated: 1, preserved: 1 })
+      }],
+      'test-personal-v1',
+      new Date('2026-08-01T00:00:00.000Z')
+    )).toEqual({ added: 0, updated: 0, preserved: 1 })
 
     const protectedRemote = database
       .listChecklistItems('genshin')
       .find((item) => item.id === remote.id)!
     expect(protectedRemote.completed).toBe(true)
-    expect(protectedRemote.title).toBe('深境螺旋（远端更新）')
+    expect(protectedRemote.title).toBe('深境螺旋')
     expect(database.listChecklistItems('genshin').find((item) => item.id === manual.id)?.title).toBe(
       '手动事项'
     )
-
-    expect(() => database!.archiveChecklistItem(remote.id)).toThrow('系统清单由同步维护，不能删除')
-    expect(
-      database.mergeSyncedItems('genshin', 'personal_sync', [
-        {
-          remoteKey: 'abyss:2026-07',
-          category: 'endgame',
-          title: '深境螺旋',
-          completed: true
-        }
-      ])
-    ).toEqual({ added: 0, updated: 1, preserved: 0 })
-    expect(database.listChecklistItems('genshin').some((item) => item.id === remote.id)).toBe(true)
   })
 
   it('同步批次异常时事务回滚且不删除上次成功数据', () => {
@@ -1489,7 +1493,7 @@ describe('AppDatabase', () => {
     }
   })
 
-  it('启动时不归并仍有效的历史挑战，并硬删除已经到期的系统挑战', () => {
+  it('启动时不会把未知周期当作到期活动删除', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-08-10T12:00:00.000Z'))
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-endgame-duplicate-cleanup-'))
@@ -1583,7 +1587,7 @@ describe('AppDatabase', () => {
         .filter((item) => item.modeKey === `${gameId}:historical-mode`)).toHaveLength(0)
     }
     expect(database.listChecklistItems('zenless')
-      .filter((item) => item.modeKey === 'zenless:separate-period-mode')).toHaveLength(0)
+      .filter((item) => item.modeKey === 'zenless:separate-period-mode')).toHaveLength(2)
   })
 
   it.skip('旧融合流程：个人活动按中文名和时间回填公开排期', () => {
@@ -1671,12 +1675,15 @@ describe('AppDatabase', () => {
     const gameIds = ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const
 
     for (const gameId of gameIds) {
-      const result = database.mergeSyncedItems(gameId, 'personal_sync', [{
+      const result = database.replacePersonalSnapshot(gameId, 'events', `test:${'a'.repeat(64)}`, [{
         remoteKey: `event:personal:untimed:${gameId}`,
         category: 'limited_event',
         title: `${gameId} 无时间功能条目`,
-        completed: true
-      }])
+        completed: true,
+        sourceIdentity: {
+          provider: 'test-provider', endpoint: 'events', externalId: `untimed:${gameId}`
+        }
+      }], 'test-personal-v1')
 
       expect(result).toEqual({ added: 0, updated: 0, preserved: 1 })
       expect(database.listChecklistItems(gameId)
@@ -1684,7 +1691,7 @@ describe('AppDatabase', () => {
     }
   })
 
-  it('底层合并器不按历史挑战名称替 Codex 决定分类', () => {
+  it('个人快照不按历史挑战名称创建或改分类', () => {
     database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const cases = [
       ['genshin', '幽境危战·本期'],
@@ -1694,18 +1701,21 @@ describe('AppDatabase', () => {
     ] as const
 
     for (const [gameId, title] of cases) {
-      const result = database.mergeSyncedItems(gameId, 'personal_sync', [{
+      const result = database.replacePersonalSnapshot(gameId, 'events', `test:${'b'.repeat(64)}`, [{
         remoteKey: `event:personal:misclassified:${gameId}`,
         category: 'limited_event',
         title,
         startsAt: '2026-07-20T02:00:00.000Z',
         endsAt: '2026-07-27T01:59:59.000Z',
-        completed: true
-      }])
+        completed: true,
+        sourceIdentity: {
+          provider: 'test-provider', endpoint: 'events', externalId: `misclassified:${gameId}`
+        }
+      }], 'test-personal-v1')
 
-      expect(result).toEqual({ added: 1, updated: 0, preserved: 0 })
+      expect(result).toEqual({ added: 0, updated: 0, preserved: 1 })
       expect(database.listChecklistItems(gameId)
-        .filter((item) => item.category === 'limited_event')).toHaveLength(1)
+        .filter((item) => item.category === 'limited_event')).toHaveLength(0)
     }
   })
 
@@ -1714,15 +1724,22 @@ describe('AppDatabase', () => {
     const gameIds = ['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const
 
     for (const gameId of gameIds) {
-      database.mergeSyncedItems(gameId, 'personal_sync', [{
+      database.mergeSyncedItems(gameId, 'public_schedule', [{
         remoteKey: `event:future:${gameId}`,
         category: 'limited_event',
         title: `${gameId} 未来活动`,
         startsAt: '2026-08-01T10:00:00+08:00',
-        endsAt: '2026-08-10T03:59:00+08:00',
-        completed: true,
-        progressPercent: 100
+        endsAt: '2026-08-10T03:59:00+08:00'
       }], '2026-07-23T12:00:00.000Z')
+      database.replacePersonalSnapshot(gameId, 'events', `test:${'c'.repeat(64)}`, [{
+        remoteKey: `personal:event:future:${gameId}`,
+        category: 'limited_event',
+        title: `${gameId} 未来活动`,
+        completed: true,
+        sourceIdentity: {
+          provider: 'test-provider', endpoint: 'events', externalId: `future:${gameId}`
+        }
+      }], 'test-personal-v1', new Date('2026-07-23T12:00:00.000Z'))
 
       expect(database.listChecklistItems(gameId)
         .find((item) => item.remoteKey === `event:future:${gameId}`)).toMatchObject({
@@ -2109,7 +2126,7 @@ describe('AppDatabase', () => {
     ]))
   })
 
-  it('个人地图同步后立即按完整二级目录重算一级进度', () => {
+  it('个人地图同步优先保留一级接口值并在重启后继续保留', () => {
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-personal-map-rollup-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
     database = new AppDatabase(databasePath, { seedBundledBaselines: false })
@@ -2162,6 +2179,90 @@ describe('AppDatabase', () => {
               externalId: `${gameId}-region`
             }
           },
+          {
+            remoteKey: `personal:${gameId}:a`,
+            category: 'exploration',
+            title: `${gameId} 子地区 A`,
+            mapNodeKind: 'subregion',
+            progressPercent: 20,
+            sourceIdentity: {
+              provider,
+              endpoint: 'personal-map-progress',
+              externalId: `${gameId}-a`
+            }
+          },
+          {
+            remoteKey: `personal:${gameId}:b`,
+            category: 'exploration',
+            title: `${gameId} 子地区 B`,
+            mapNodeKind: 'subregion',
+            progressPercent: 48,
+            sourceIdentity: {
+              provider,
+              endpoint: 'personal-map-progress',
+              externalId: `${gameId}-b`
+            }
+          }
+        ],
+        `${gameId}-personal-v1`,
+        reference
+      )
+
+      expect(database.listChecklistItems(gameId).find(
+        (item) => item.remoteKey === regionKey
+      )).toMatchObject({ progressPercent: 14, completed: false })
+    }
+
+    database.close()
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
+    for (const [gameId] of cases) {
+      expect(database.listChecklistItems(gameId).find(
+        (item) => item.remoteKey === `map:${gameId}:region`
+      )).toMatchObject({ progressPercent: 14, completed: false })
+    }
+  })
+
+  it('个人地图未提供一级进度时才按二级目录平均，并在重启后保持派生值', () => {
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-personal-map-derived-region-'))
+    const databasePath = join(temporaryDirectory, 'test.sqlite')
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
+    const cases = [
+      ['genshin', 'miyoushe', 'a'],
+      ['zenless', 'miyoushe', 'b'],
+      ['wuthering-waves', 'kuro-community', 'c']
+    ] as const
+    const reference = new Date('2026-08-23T12:00:00.000Z')
+
+    for (const [gameId, provider, scopeCharacter] of cases) {
+      const regionKey = `map:${gameId}:region`
+      database.mergeSyncedItems(gameId, 'public_schedule', [
+        {
+          remoteKey: regionKey,
+          category: 'exploration',
+          title: `${gameId} 主地区`,
+          mapNodeKind: 'region'
+        },
+        {
+          remoteKey: `map:${gameId}:a`,
+          category: 'exploration',
+          title: `${gameId} 子地区 A`,
+          mapNodeKind: 'subregion',
+          parentRemoteKey: regionKey
+        },
+        {
+          remoteKey: `map:${gameId}:b`,
+          category: 'exploration',
+          title: `${gameId} 子地区 B`,
+          mapNodeKind: 'subregion',
+          parentRemoteKey: regionKey
+        }
+      ], reference.toISOString())
+
+      database.replacePersonalSnapshot(
+        gameId,
+        'exploration',
+        `test:${scopeCharacter.repeat(64)}`,
+        [
           {
             remoteKey: `personal:${gameId}:a`,
             category: 'exploration',

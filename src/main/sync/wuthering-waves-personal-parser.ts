@@ -127,8 +127,7 @@ export function parseWutheringWavesTower(value: unknown): NormalizedSyncItem {
   return endgameItem(
     'tower-of-adversity',
     '逆境深塔',
-    completed,
-    optionalUnixIso(root.seasonEndTime)
+    completed
   )
 }
 
@@ -157,8 +156,7 @@ export function parseWutheringWavesSlash(value: unknown): NormalizedSyncItem {
   return endgameItem(
     'whimpering-wastes',
     '冥歌海墟',
-    completed,
-    optionalUnixIso(root.seasonEndTime)
+    completed
   )
 }
 
@@ -167,41 +165,29 @@ export function parseWutheringWavesMatrix(value: unknown): NormalizedSyncItem {
   const modes = recordArray(root.modeDetails)
   const completed = hasChallengeRecordEvidence({
     explicitFlags: [root.hasRecord, ...modes.map((mode) => mode.hasRecord)],
-    positiveValues: modes.flatMap((mode) => [mode.score, mode.passBoss])
+    // `passBoss` is the quick-pass/result flag. It does not prove that the
+    // player manually entered a challenge, so it must never count here.
+    positiveValues: modes.map((mode) => mode.score)
   })
   return endgameItem(
     'endstate-matrix',
     '终焉矩阵',
-    completed,
-    optionalUnixIso(root.endTime)
+    completed
   )
 }
 
 function endgameItem(
   modeKey: string,
   title: string,
-  completed: boolean,
-  endsAt: string | null
+  completed: boolean
 ): NormalizedSyncItem {
   return {
     remoteKey: `endgame:${modeKey}`,
     category: 'endgame',
     title,
     completed,
-    startsAt: null,
-    endsAt,
-    periodKey: `wuthering-waves:${modeKey}:${endsAt ?? 'current'}`,
-    scheduleKind: 'remote_schedule',
     modeKey
   }
-}
-
-function optionalUnixIso(value: unknown): string | null {
-  const number = finiteNumber(value)
-  if (number === null || number <= 0) return null
-  const milliseconds = number >= 1e12 ? number : number * 1000
-  const date = new Date(milliseconds)
-  return Number.isNaN(date.getTime()) ? null : date.toISOString()
 }
 
 function percentage(value: unknown, field: string): number {

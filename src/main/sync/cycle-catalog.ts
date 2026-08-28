@@ -1,4 +1,4 @@
-import type { ChecklistItem, ChecklistSource, GameId } from '../../shared/contracts'
+import type { ChecklistItem, GameId } from '../../shared/contracts'
 import type { NormalizedSyncItem } from './types'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -378,26 +378,21 @@ function latestObservedWindow(
     : undefined
 }
 
-export function completeCycleCatalog(
+export function completePublicCycleCatalog(
   gameId: GameId,
   items: NormalizedSyncItem[],
   existingItems: ChecklistItem[],
-  source: Extract<ChecklistSource, 'public_schedule' | 'personal_sync'>,
   reference = new Date(),
   versionWindow?: CycleVersionWindow | null
 ): NormalizedSyncItem[] {
-  // A provider may keep returning the previous period until the player enters
-  // the newly opened challenge.  Preserve that expired observation long
-  // enough for the snapshot layer to tombstone its official identity, but do
-  // not let it count as the current catalog member. Future provider rows are
-  // discarded; during an intentional gap, the stable built-in rule may add
-  // exactly the next canonical window so the mode never duplicates.
+  // This function owns only the bundled public recurring catalog. Personal
+  // progress never enters this path.
   const normalized = items.map((item) => {
     if (item.category !== 'endgame') return item
     const definition = findCycleMode(gameId, item)
     if (!definition) return item
     const existing = existingItems.find((candidate) =>
-      candidate.category === 'endgame' && candidate.source === source &&
+      candidate.category === 'endgame' && candidate.source === 'public_schedule' &&
       (candidate.modeKey === definition.modeKey || candidate.remoteKey === definition.remoteKey)
     )
     return normalizedKnownItem(
@@ -406,6 +401,7 @@ export function completeCycleCatalog(
       predictCycleWindow(definition, reference, existing, versionWindow)
     )
   }).filter((item) => item.category !== 'endgame' || !isFutureCycleItem(item, reference))
+
   const presentModes = new Set(normalized
     .filter((item) => item.category === 'endgame' && isCurrentCycleItem(item, reference))
     .map((item) => item.modeKey)
@@ -413,7 +409,7 @@ export function completeCycleCatalog(
   const additions = listCycleModes(gameId).flatMap((definition) => {
     if (presentModes.has(definition.modeKey)) return []
     const existing = existingItems.find((item) =>
-      item.category === 'endgame' && item.source === source &&
+      item.category === 'endgame' && item.source === 'public_schedule' &&
       (item.modeKey === definition.modeKey || item.remoteKey === definition.remoteKey)
     )
     const observedWindow = latestObservedWindow(definition, normalized, existingItems)
@@ -436,13 +432,6 @@ export function completeCycleCatalog(
       scheduleKind: 'remote_schedule',
       modeKey: definition.modeKey,
       resetRule: null
-    }
-    if (source === 'personal_sync') {
-      placeholder.sourceIdentity = {
-        provider: 'gtask-cycle-catalog',
-        endpoint: 'predicted-cycle-window',
-        externalId: `${definition.modeKey}|${periodKey}`
-      }
     }
     return [placeholder]
   })

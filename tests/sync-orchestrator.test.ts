@@ -7,6 +7,7 @@ let database: AppDatabase | null = null
 const accountScope = `miyoushe:${'8'.repeat(64)}`
 
 afterEach(() => {
+  vi.useRealTimers()
   database?.close()
   database = null
 })
@@ -125,6 +126,159 @@ describe('SyncOrchestrator personal progress', () => {
     expect(cycles.every((item) => item.source === 'public_schedule')).toBe(true)
   })
 
+  it('accepts an expired Wuthering Waves observation without corrupting the current window', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-28T10:00:00.000Z'))
+    database = new AppDatabase(':memory:')
+    database.replacePersonalSnapshot(
+      'wuthering-waves',
+      'cycles',
+      `kuro-community:${'8'.repeat(64)}`,
+      [{
+        remoteKey: 'endgame:endstate-matrix',
+        category: 'endgame',
+        title: '终焉矩阵',
+        completed: true,
+        startsAt: '2026-08-26T20:00:00.000Z',
+        endsAt: '2026-09-29T20:00:00.000Z',
+        periodKey: 'wuthering-waves:endstate-matrix:current',
+        scheduleKind: 'remote_schedule',
+        modeKey: 'endstate-matrix',
+        sourceIdentity: {
+          provider: 'kuro-community',
+          endpoint: 'aki/roleBox/akiBox/newTowerDetail',
+          externalId: 'endgame:endstate-matrix|period:current'
+        }
+      }],
+      'wuthering-waves-personal-v1',
+      new Date('2026-08-28T09:00:00.000Z')
+    )
+    const orchestrator = new SyncOrchestrator(database, {
+      publicSchedule: {},
+      personalData: {
+        'wuthering-waves': {
+          sync: async () => ({
+            items: [{
+              remoteKey: 'endgame:endstate-matrix',
+              category: 'endgame' as const,
+              title: '终焉矩阵',
+              completed: true,
+              startsAt: null,
+              endsAt: '2026-08-19T23:59:59.000Z',
+              periodKey: 'wuthering-waves:endstate-matrix:expired',
+              scheduleKind: 'remote_schedule' as const,
+              modeKey: 'endstate-matrix',
+              sourceIdentity: {
+                provider: 'kuro-community',
+                endpoint: 'aki/roleBox/akiBox/newTowerDetail',
+                externalId: 'endgame:endstate-matrix|period:expired'
+              }
+            }],
+            scheduleObservations: [{
+              target: 'cycles' as const,
+              provider: 'kuro-community' as const,
+              endpoint: 'aki/roleBox/akiBox/newTowerDetail',
+              remoteKey: 'endgame:endstate-matrix',
+              title: '终焉矩阵',
+              modeKey: 'endstate-matrix',
+              periodKey: 'wuthering-waves:endstate-matrix:expired',
+              startsAt: null,
+              endsAt: '2026-08-19T23:59:59.000Z'
+            }],
+            accountScope: `kuro-community:${'8'.repeat(64)}`,
+            snapshotCompleteness: 'complete' as const,
+            adapterVersion: 'wuthering-waves-personal-v1',
+            message: '鸣潮周期挑战记录已同步'
+          })
+        }
+      }
+    })
+
+    await expect(orchestrator.syncPersonalOnly('wuthering-waves', 'cycles'))
+      .resolves.toMatchObject({ status: 'success' })
+    expect(database.getSyncTargetStates('wuthering-waves').find(
+      (state) => state.target === 'cycles'
+    )).toMatchObject({ status: 'success' })
+    expect(database.listChecklistItems('wuthering-waves').find(
+      (item) => item.modeKey === 'endstate-matrix'
+    )).toMatchObject({
+      completed: true,
+      startsAt: '2026-08-26T20:00:00.000Z',
+      endsAt: '2026-09-29T20:00:00.000Z'
+    })
+  })
+
+  it('rejects local cycle predictions as personal completion evidence', () => {
+    database = new AppDatabase(':memory:')
+    expect(() => database!.replacePersonalSnapshot(
+      'wuthering-waves',
+      'cycles',
+      `kuro-community:${'8'.repeat(64)}`,
+      [{
+        remoteKey: 'endgame:endstate-matrix',
+        category: 'endgame',
+        title: '终焉矩阵',
+        completed: false,
+        modeKey: 'endstate-matrix',
+        sourceIdentity: {
+          provider: 'gtask-cycle-catalog',
+          endpoint: 'predicted-cycle-window',
+          externalId: 'endstate-matrix|predicted'
+        }
+      }],
+      'test-v1'
+    )).toThrow('个人进度不能使用本地预测周期代替官方完成记录')
+  })
+
+  it('applies Wuthering Waves manual records without treating numeric fields as schedule time', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-28T11:00:00.000Z'))
+    database = new AppDatabase(':memory:')
+    const orchestrator = new SyncOrchestrator(database, {
+      publicSchedule: {},
+      personalData: {
+        'wuthering-waves': {
+          sync: async () => ({
+            items: [
+              ['tower-of-adversity', '逆境深塔'],
+              ['whimpering-wastes', '冥歌海墟'],
+              ['endstate-matrix', '终焉矩阵']
+            ].map(([modeKey, title]) => ({
+              remoteKey: `endgame:${modeKey}`,
+              category: 'endgame' as const,
+              title,
+              completed: true,
+              startsAt: null,
+              endsAt: null,
+              periodKey: `wuthering-waves:${modeKey}:current`,
+              scheduleKind: 'remote_schedule' as const,
+              modeKey,
+              sourceIdentity: {
+                provider: 'kuro-community',
+                endpoint: `challenge/${modeKey}`,
+                externalId: `endgame:${modeKey}|period:current`
+              }
+            })),
+            accountScope: `kuro-community:${'8'.repeat(64)}`,
+            snapshotCompleteness: 'complete' as const,
+            adapterVersion: 'wuthering-waves-personal-v1',
+            message: '鸣潮周期挑战记录已同步'
+          })
+        }
+      }
+    })
+
+    await expect(orchestrator.syncPersonalOnly('wuthering-waves', 'cycles'))
+      .resolves.toMatchObject({ status: 'success' })
+    const cycles = database.listChecklistItems('wuthering-waves').filter(
+      (item) => item.category === 'endgame'
+    )
+    expect(cycles).toHaveLength(3)
+    expect(cycles.every((item) => item.completed)).toBe(true)
+    expect(cycles.every((item) => item.source === 'public_schedule')).toBe(true)
+    expect(cycles.every((item) => item.startsAt && item.endsAt)).toBe(true)
+  })
+
   it('preserves the prior baseline when the provider returns a partial snapshot', async () => {
     database = new AppDatabase(':memory:')
     const orchestrator = new SyncOrchestrator(database, {
@@ -163,7 +317,8 @@ describe('SyncOrchestrator personal progress', () => {
     expect(progress).toHaveBeenCalledWith(expect.objectContaining({
       source: 'personal_data',
       status: 'verification_required',
-      phase: 'verification'
+      phase: 'verification',
+      message: '请验证'
     }))
   })
 })

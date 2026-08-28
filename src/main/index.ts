@@ -208,6 +208,7 @@ function maintainChecklistTimeState(): void {
     // behind are expired one-off entries and are permanently removed.
     const changes =
       appDatabase.rolloverDueCycleItems() +
+      appDatabase.rolloverExpiredVersionWindows() +
       appDatabase.pruneExpiredSystemItems() +
       appDatabase.markStaleSyncStates()
     if (changes > 0 && mainWindow && !mainWindow.isDestroyed()) {
@@ -1336,9 +1337,12 @@ function createAppSyncOrchestrator(database: AppDatabase): SyncOrchestrator {
       status: progress.status,
       retryKind: progress.retryKind,
       current: progress.current,
-      total: progress.total
+      total: progress.total,
+      message: progress.message
     })
-    mainWindow?.webContents.send('sync:progress', progress)
+    // Keep adapter diagnostics in the local log while the product UI derives
+    // its wording from source/target/phase/count.
+    mainWindow?.webContents.send('sync:progress', { ...progress, message: '' })
   }
   if (!credentialVault) {
     return new SyncOrchestrator(database, undefined, reportProgress)
