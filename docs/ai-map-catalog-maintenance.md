@@ -44,6 +44,8 @@ The catalog has exactly two levels:
 
 There is no third level and no special “independent map” type. Underground areas, isolated spaces, special entrances, and instance-like explorable maps still appear as `subregion` under their verified first-level main region.
 
+Catalog eligibility requires independent exploration progress. A scene or dungeon does not qualify merely because it contains chests, achievements, or a repeatable entrance. In particular, Wuthering Waves “玄元境” has no independent exploration percentage and must not be added to this catalog (user clarification, 2026-09-05).
+
 Examples:
 
 - 原神：`璃月` is a `region`; `沉玉谷` and `层岩巨渊·地下矿区` are its `subregion` entries.

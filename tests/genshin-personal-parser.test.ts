@@ -121,6 +121,42 @@ describe('Genshin personal parsing', () => {
     ]))
   })
 
+  it('换期后剧诗优先使用最新空记录，不继承上期已完成战绩', () => {
+    const items = parseGenshinPersonalData({
+      imaginariumTheater: {
+        is_unlock: true,
+        data: [
+          {
+            has_data: true,
+            schedule: {
+              schedule_id: 28,
+              start_time: '2026-08-01 04:00:00',
+              end_time: '2026-09-01 03:59:59'
+            },
+            stat: { max_round_id: 10, get_medal_round_list: [true, true, true] }
+          },
+          {
+            has_data: false,
+            schedule: {
+              schedule_id: 29,
+              start_time: '2026-09-01 04:00:00',
+              end_time: '2026-10-01 03:59:59'
+            },
+            stat: { max_round_id: 0, get_medal_round_list: [false, false, false] }
+          }
+        ]
+      }
+    })
+
+    expect(items).toEqual([expect.objectContaining({
+      modeKey: 'imaginarium-theater',
+      periodKey: 'genshin:imaginarium-theater:29',
+      completed: false,
+      startsAt: '2026-08-31T20:00:00.000Z',
+      endsAt: '2026-09-30T19:59:59.000Z'
+    })])
+  })
+
   it('按 parent_id 建立地图父子关系，并只在全部子区域满探索时修正零值父项', () => {
     const items = parseGenshinPersonalData({
       profile: {

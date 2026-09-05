@@ -86,7 +86,7 @@ describe('remote catalog update', () => {
         expect(game.upserts).toEqual(expect.arrayContaining([
           expect.objectContaining({ title: '砺行修远', category: 'limited_event' }),
           expect.objectContaining({ title: '新芽相助·初探雪原', category: 'limited_event' }),
-          expect.objectContaining({ title: '险境征者争锋大赛', category: 'limited_event' }),
+          expect.objectContaining({ title: '险境征者竞锋大赛', category: 'limited_event' }),
           expect.objectContaining({ title: '至冬', mapNodeKind: 'region' }),
           expect.objectContaining({
             title: '古兽冰原',
@@ -101,24 +101,29 @@ describe('remote catalog update', () => {
           })
         ])
       } else if (game.gameId === 'zenless') {
-        expect(game.upserts).toEqual([
+        expect(game.upserts).toHaveLength(6)
+        expect(game.upserts).toEqual(expect.arrayContaining([
           expect.objectContaining({
             remoteKey: 'event:3.1:return-to-ridu',
             title: '回归丽都：羽落重逢'
           })
-        ])
+        ]))
       } else if (game.gameId === 'wuthering-waves') {
-        expect(game.upserts).toHaveLength(6)
+        expect(game.upserts).toHaveLength(8)
         expect(game.upserts.map((item) => item.title)).toEqual([
           '群声共振模拟域',
           '第二索拉・诡影迷踪',
           '清弦纪流年',
           '若梦仍有回声',
           '潮汐觅闻',
-          '烟云赠礼'
+          '烟云赠礼',
+          '回音盈域',
+          '声弦涤荡'
         ])
       } else {
-        expect(game.upserts).toEqual([])
+        expect(game.upserts).toHaveLength(7)
+        expect(game.upserts.filter((item) => item.category === 'endgame').map((item) => item.remoteKey))
+          .toEqual(['endgame:anomaly-arbitration', 'endgame:apocalyptic-shadow', 'endgame:memory-of-chaos'])
       }
     }
     expect(archivedKeys.size).toBe(14)

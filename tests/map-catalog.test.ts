@@ -37,6 +37,9 @@ describe('bundled map catalog', () => {
   })
 
   it('keeps stable machine identities between reads', () => {
+    // 玄元境 is an instance without independent exploration progress.
+    expect(getBundledMapCatalog('wuthering-waves').some((item) => item.title === '玄元境'))
+      .toBe(false)
     for (const gameId of SUPPORTED_GAME_IDS) {
       expect(getBundledMapCatalog(gameId)).toEqual(getBundledMapCatalog(gameId))
       expect(Number.isNaN(Date.parse(getBundledMapCatalogVerifiedAt(gameId)))).toBe(false)

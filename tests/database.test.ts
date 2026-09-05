@@ -2432,6 +2432,70 @@ describe('AppDatabase', () => {
     })
   })
 
+  it('启动时修复旧版用上期战绩误勾选的当期挑战', () => {
+    temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-stale-cycle-progress-'))
+    const databasePath = join(temporaryDirectory, 'test.sqlite')
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
+    const currentStart = '2026-08-31T20:00:00.000Z'
+    const currentEnd = '2026-09-30T20:00:00.000Z'
+    database.mergeSyncedItems('genshin', 'public_schedule', [{
+      remoteKey: 'endgame:imaginarium-theater',
+      category: 'endgame',
+      title: '幻想真境剧诗',
+      startsAt: currentStart,
+      endsAt: currentEnd,
+      periodKey: 'predicted:genshin:imaginarium-theater:2026-08-31T20:00:00.000Z',
+      modeKey: 'imaginarium-theater',
+      scheduleKind: 'remote_schedule'
+    }], '2026-09-01T12:00:00.000Z')
+    const theater = database.listChecklistItems('genshin').find(
+      (item) => item.modeKey === 'imaginarium-theater'
+    )!
+    database.close()
+    database = null
+
+    const raw = new DatabaseSync(databasePath)
+    raw.prepare(`
+      INSERT INTO personal_sync_snapshots(
+        id, game_id, target, account_scope, adapter_version,
+        item_count, activated_at, created_at
+      ) VALUES ('stale-snapshot', 'genshin', 'cycles', ?, 'genshin-personal-v1', 1, ?, ?)
+    `).run(`miyoushe:${'a'.repeat(64)}`, '2026-09-01T12:09:34.038Z', '2026-09-01T12:09:34.038Z')
+    raw.prepare(`
+      UPDATE checklist_items
+      SET completed = 1, completed_at = ?, last_synced_at = ?, source_snapshot_id = ?
+      WHERE id = ?
+    `).run(
+      '2026-09-01T12:09:34.038Z',
+      '2026-09-01T12:09:34.038Z',
+      'stale-snapshot',
+      theater.id
+    )
+    raw.prepare(`
+      INSERT INTO schedule_observations(
+        id, game_id, target, provider, endpoint, remote_key, title,
+        mode_key, period_key, starts_at, ends_at, observed_at
+      ) VALUES (
+        'stale-observation', 'genshin', 'cycles', 'miyoushe',
+        'miyoushe-genshin-imaginarium-theater', 'endgame:imaginarium-theater',
+        '幻想真境剧诗', 'imaginarium-theater', 'genshin:imaginarium-theater:28',
+        '2026-07-31T20:00:00.000Z', '2026-08-31T19:59:59.000Z',
+        '2026-09-01T12:09:34.045Z'
+      )
+    `).run()
+    raw.close()
+
+    database = new AppDatabase(databasePath, { seedBundledBaselines: false })
+    expect(database.listChecklistItems('genshin').find(
+      (item) => item.modeKey === 'imaginarium-theater'
+    )).toMatchObject({
+      completed: false,
+      completedAt: null,
+      startsAt: currentStart,
+      endsAt: currentEnd
+    })
+  })
+
   it.skip('旧融合流程：个人战绩匹配公开挑战周期', () => {
     database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.mergeSyncedItems('zenless', 'public_schedule', [

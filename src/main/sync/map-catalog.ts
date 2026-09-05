@@ -11,7 +11,7 @@ const MAP_CATALOG_VERIFIED_AT: Record<GameId, string> = {
   genshin: '2026-08-12T18:20:00+08:00',
   'star-rail': '2026-08-09T12:30:00+08:00',
   zenless: '2026-08-09T12:30:00+08:00',
-  'wuthering-waves': '2026-08-09T12:30:00+08:00'
+  'wuthering-waves': '2026-09-05T19:40:00+08:00'
 }
 
 /**

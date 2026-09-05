@@ -23,6 +23,7 @@ Gtask 是一款面向 Windows 的本地游戏任务清单，技术栈为 Electro
 - 数据库 schema：v5，支持 v1 → v2 → v3 → v4 → v5 安全迁移。
 - GitHub 权威仓库：`https://github.com/BaiQue3rL/Gtask`。
 - 当前 Git 主分支：`main`；最近一次已推送提交以 `git log -1 --oneline origin/main` 为准。
+- 本次交接时已推送代码基线为 `ed6eb2f`（`refactor sync ownership and maintenance boundaries`）；本窗口新增的交接记录尚未提交，下一窗口开始时应先查看 `git status`。
 - GitHub Release：`v1.0.0` 已发布；Gitee 作为免费中国区镜像与默认下载/更新源。
 - 本机正式安装目录：`D:\Git\Gtask`；当前 EXE 产品版本为 `1.1.1.0`，SHA-256 为 `BD98E1CB1A9C71CB30918E3D07544AD212518BD42969E088F85D600B2628A26E`。
 - 当前远程清单 revision：`2026-08-13.genshin-cycle-identity-correction`；已由本机通过 Gitee 镜像成功手动应用。
@@ -142,7 +143,7 @@ Gtask 是一款面向 Windows 的本地游戏任务清单，技术栈为 Electro
 
 禁止删除、重建或重置数据库、凭据、备份、Release 产物和无关研究目录，除非用户明确要求。测试必须使用临时数据库或正式数据库的完整副本。
 
-用户要求：完成代码修改并验证后，可以直接更新 `D:\Git\Gtask` 供其人工复核，安装目录保持不动。推荐流程是先关闭 Gtask，运行 `pnpm package:dir`，再把 `release\win-unpacked` 覆盖复制到安装目录。不要使用 `/MIR`，否则会删除安装器保留的 `Uninstall Gtask.exe`、`resources\app-update.yml` 和 `resources\elevate.exe`。仅在精确比对后删除已经确认废弃的哈希 chunk。
+部署约束：完成代码修改并验证后，可更新 `D:\Git\Gtask` 供人工复核；正式数据库、凭据和备份不在该目录。推荐先关闭 Gtask、运行 `pnpm package:dir`，再覆盖复制 `release\win-unpacked`。默认不要使用 `/MIR`，以保留安装器专属文件；只有目标明确是可重建的便携/解包目录、且用户明确要求完整替换时才使用 `/MIR`。本轮按用户要求做过一次完整镜像，已清理旧目录独有的 `Uninstall Gtask.exe`、`resources\app-update.yml`、`resources\elevate.exe` 和旧 MCP chunk；这些安装目录残留可由重新运行安装器/重新打包恢复，用户数据未删除。
 
 ## 8. 下一步与长期维护
 
@@ -177,3 +178,29 @@ pnpm exec vitest run tests/map-catalog.test.ts tests/map-catalog-freshness.test.
 ```
 
 涉及安装包时运行 `pnpm package:dir`，必要时再运行便携版/安装版构建与对应 verify。后续版本继续按 SemVer 判断 MAJOR/MINOR/PATCH，未经用户明确授权不得自行发布标签或 Release。
+
+## 10. 本次窗口交接记录
+
+- 用户确认当前模式边界没有问题：MCP 仍是本机 Codex 管理员能力；基准维护和软件维护是两个显式模式，不能在基准任务中隐式切换。
+- `sync-gtask-schedules` Skill、仓库说明、本地插件副本和 Codex 缓存副本已同步；Skill 校验通过。
+- 本轮验证：`pnpm test` 为 393 项通过、11 项按条件跳过；`pnpm package:dir` 的类型检查、生产构建和解包目录打包均通过。
+- 本机 `D:\Git\Gtask\Gtask.exe` 为 `1.1.1.0`，SHA-256 为 `BD98E1CB1A9C71CB30918E3D07544AD212518BD42969E088F85D600B2628A26E`。
+- 当前没有已知阻塞性待办；下一窗口先阅读 `AGENTS.md` 和本文，再接收用户新需求。未经用户明确授权，不要改版本号、创建标签或发布 Release。
+
+## 11. 审计跟踪项（本轮未阻塞交付）
+
+以下是上一轮架构审计发现、尚未在本次模式边界调整中处理的风险。若后续修改同步或启动逻辑，应先补回归再决定是否修复：
+
+- 启动时内置种子、活动/地图/周期合并与远程基准的优先级仍需复核，避免较旧包数据覆盖较新的 MCP/远程数据；硬删除基准项目前没有 tombstone，需防止旧包重新带回。
+- 周期个人进度匹配仍应增加“旧期记录不能命中当前期”的负向回归，确保稳定 `remoteKey`/`modeKey` 回退不会跨期误判。
+- `claim_gtask_schedule_job` 的参数契约仍需复核是否强制指定精确 `jobId`，避免基准任务领取到非目标任务。
+- `sourceObservationId` 的证据校验、个人快照与档期观察的事务一致性仍值得补充回归；这些不属于本次 MCP 权限模式调整。
+
+## 12. 2026-09-05 基准维护与跨期进度修正
+
+- 四款游戏全部版块已通过本地 MCP 核查，最终新增 5 项、修正 13 项；对应公开差异已合入 `updates/catalog.json`，revision 为 `2026-09-05.all-games-baseline-maintenance`。保留此前公开增量及归档键，便于尚未接收旧更新的客户端累计应用。
+- 原神补入盛材移涌，修正险境征者竞锋大赛名称/玩法及铸境研炼时间；星铁补入巡星之礼、位面分裂，校准两项活动结束时间及三个挑战窗口；绝区零修正云端礼赠、两项玩法标签和两个错开一周的周期锚点；鸣潮补入两项双倍活动、修正第二索拉玩法。
+- 用户确认玄元境是没有独立探索度的副本地图，不能进入探索清单。本地误新增项已归档；内置目录和公开清单均不加入该节点，并增加排除回归。
+- 现有软件修改防止旧期个人战绩勾选当前周期，剧诗优先解析最新档期，并修复有明确跨期观察证据的旧版误勾选；对应解析器和数据库回归已通过。
+- 待办：星铁 9 月 14 日开始的虚构叙事开放五周，当前接口不能预存未来例外，不覆盖仍有效的当前窗口；到期后须校准，或在后续明确的软件维护中支持未来例外。依据：[4.5 公告转载](https://news.4399.com/bhxqtd/zixun/m/1014938.html)。鸣潮 3.6 结束仍保留 9 月 30 日 04:00 的暂定基准。
+- 验证：地图专项 9 项通过；类型检查通过；全量测试 395 项通过、11 项跳过。未更改应用版本、创建标签或制作发布包。

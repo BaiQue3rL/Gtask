@@ -263,7 +263,7 @@ export function parseImaginariumTheater(value: unknown): NormalizedSyncItem | nu
   const root = requiredRecord(value, '幻想真境剧诗')
   if (root.is_unlock === false) return null
   const records = Array.isArray(root.data) ? root.data.filter(isRecord) : []
-  const data = records.find((record) => record.has_data === true) ?? records[0]
+  const data = latestImaginariumTheaterRecord(records)
   if (!data) return null
   const schedule = requiredRecord(data.schedule, '幻想真境剧诗 schedule')
   const stats = requiredRecord(data.stat, '幻想真境剧诗 stat')
@@ -286,6 +286,33 @@ export function parseImaginariumTheater(value: unknown): NormalizedSyncItem | nu
     periodKey: `genshin:imaginarium-theater:${scheduleId}`,
     scheduleKind: 'remote_schedule',
     modeKey: 'imaginarium-theater'
+  }
+}
+
+function latestImaginariumTheaterRecord(
+  records: Array<Record<string, unknown>>
+): Record<string, unknown> | undefined {
+  let latest: { record: Record<string, unknown>; timestamp: number } | undefined
+  for (const record of records) {
+    const schedule = isRecord(record.schedule) ? record.schedule : null
+    if (!schedule) continue
+    const timestamp = optionalDateTimestamp(
+      schedule.start_time ?? schedule.start_date_time
+    ) ?? optionalDateTimestamp(schedule.end_time ?? schedule.end_date_time)
+    if (timestamp === null) continue
+    if (!latest || timestamp > latest.timestamp) latest = { record, timestamp }
+  }
+  // Around a reset, the API may retain the completed previous period next to
+  // an empty current period. Period recency, not has_data, decides which row is
+  // allowed to describe current progress.
+  return latest?.record ?? records.find((record) => record.has_data === true) ?? records[0]
+}
+
+function optionalDateTimestamp(value: unknown): number | null {
+  try {
+    return Date.parse(toIsoDate(value, '幻想真境剧诗档期'))
+  } catch {
+    return null
   }
 }
 

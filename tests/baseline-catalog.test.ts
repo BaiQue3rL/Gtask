@@ -252,7 +252,7 @@ describe('bundled baseline catalog', () => {
     })
   })
 
-  it('personal cycle timing cannot replace the current public window', () => {
+  it('expired personal cycle records cannot complete or replace the current public period', () => {
     vi.useFakeTimers()
     const reference = new Date('2026-08-11T12:00:00.000Z')
     vi.setSystemTime(reference)
@@ -301,8 +301,7 @@ describe('bundled baseline catalog', () => {
       )
       expect(currentCycles).toHaveLength(definitions.length)
       for (const item of currentCycles) {
-        const started = !item.startsAt || Date.parse(item.startsAt) <= reference.getTime()
-        expect(item.completed).toBe(started)
+        expect(item.completed).toBe(false)
         expect({
           startsAt: item.startsAt,
           endsAt: item.endsAt,

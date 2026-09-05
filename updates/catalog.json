@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "revision": "2026-08-20.wuwa-3.6-zenless-3.1-refresh",
-  "publishedAt": "2026-08-20T18:40:00+08:00",
+  "revision": "2026-09-05.all-games-baseline-maintenance",
+  "publishedAt": "2026-09-05T11:46:28.531Z",
   "games": [
     {
       "gameId": "genshin",
@@ -39,8 +39,8 @@
           "remoteKey": "event:7.0:forge-realm-strategic-battle",
           "category": "limited_event",
           "title": "铸境研炼·奕思巧战",
-          "startsAt": "2026-08-12T11:00:00+08:00",
-          "endsAt": "2026-09-23T05:59:00+08:00",
+          "startsAt": "2026-08-11T23:00:00Z",
+          "endsAt": "2026-09-22T23:00:00Z",
           "activityTags": [
             "card",
             "challenge"
@@ -52,18 +52,18 @@
         {
           "remoteKey": "event:7.0:frontier-challenger-championship",
           "category": "limited_event",
-          "title": "险境征者争锋大赛",
+          "title": "险境征者竞锋大赛",
           "startsAt": "2026-08-28T10:00:00+08:00",
           "endsAt": "2026-09-14T03:59:59+08:00",
           "activityTags": [
             "racing",
-            "shooting",
             "combat",
-            "challenge"
+            "puzzle",
+            "shooting"
           ],
           "scheduleKind": "fixed_window",
           "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165630"
+          "sourceUrl": "https://wiki.biligame.com/ys/「险境征者竞锋大赛」"
         },
         {
           "remoteKey": "web-event:7.0:snezhnaya-travel-handbook",
@@ -142,6 +142,19 @@
           "parentRemoteKey": "map-catalog:genshin:region:414719b0efe139ee12c9",
           "parentTitle": "至冬",
           "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165682"
+        },
+        {
+          "remoteKey": "event:7.0:overflowing-abundance",
+          "category": "limited_event",
+          "title": "盛材移涌",
+          "startsAt": "2026-09-14T04:00:00+08:00",
+          "endsAt": "2026-09-21T03:59:59+08:00",
+          "activityTags": [
+            "double-drop"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://wiki.biligame.com/ys/「盛材移涌」"
         }
       ],
       "archives": [
@@ -154,7 +167,98 @@
     },
     {
       "gameId": "star-rail",
-      "upserts": [],
+      "upserts": [
+        {
+          "remoteKey": "event:4.5:minuscule-great-adventure",
+          "category": "limited_event",
+          "title": "方寸大冒险",
+          "startsAt": "2026-09-12T12:00:00+08:00",
+          "endsAt": "2026-09-28T03:59:59+08:00",
+          "activityTags": [
+            "combat",
+            "challenge"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/841375445998898274"
+        },
+        {
+          "remoteKey": "event:4.5:overdrive-whirlwind-grand-prix",
+          "category": "limited_event",
+          "title": "超限：狂飙大奖赛",
+          "startsAt": "2026-08-26T11:00:00+08:00",
+          "endsAt": "2026-09-28T03:59:59+08:00",
+          "activityTags": [
+            "racing",
+            "management"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/841375445998898274"
+        },
+        {
+          "remoteKey": "event:4.5:gift-of-odyssey",
+          "category": "limited_event",
+          "title": "巡星之礼",
+          "startsAt": "2026-08-26T11:00:00+08:00",
+          "endsAt": "2026-09-28T03:59:59+08:00",
+          "activityTags": [
+            "sign-in"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://wiki.biligame.com/sr/「巡星之礼」第二十六期"
+        },
+        {
+          "remoteKey": "event:4.5:planar-fissure",
+          "category": "limited_event",
+          "title": "位面分裂",
+          "startsAt": "2026-09-07T04:00:00+08:00",
+          "endsAt": "2026-09-21T03:59:59+08:00",
+          "activityTags": [
+            "double-drop"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/838381735841369581"
+        },
+        {
+          "remoteKey": "endgame:anomaly-arbitration",
+          "category": "endgame",
+          "title": "异相仲裁",
+          "startsAt": "2026-08-25T23:00:00.000Z",
+          "endsAt": "2026-09-27T22:00:00.000Z",
+          "modeKey": "anomaly-arbitration",
+          "periodKey": "predicted:star-rail:anomaly-arbitration:2026-08-25T22:00:00.000Z",
+          "scheduleKind": "remote_schedule",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://news.4399.com/bhxqtd/zixun/m/1014938.html"
+        },
+        {
+          "remoteKey": "endgame:apocalyptic-shadow",
+          "category": "endgame",
+          "title": "末日幻影",
+          "startsAt": "2026-08-30T20:00:00.000Z",
+          "endsAt": "2026-10-04T20:00:00.000Z",
+          "modeKey": "apocalyptic-shadow",
+          "periodKey": "predicted:star-rail:apocalyptic-shadow:2026-08-30T20:00:00.000Z",
+          "scheduleKind": "remote_schedule",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://news.4399.com/bhxqtd/zixun/m/1014938.html"
+        },
+        {
+          "remoteKey": "endgame:memory-of-chaos",
+          "category": "endgame",
+          "title": "混沌回忆",
+          "startsAt": "2026-08-16T20:00:00.000Z",
+          "endsAt": "2026-09-28T11:00:00.000Z",
+          "modeKey": "memory-of-chaos",
+          "periodKey": "predicted:star-rail:memory-of-chaos:2026-08-16T20:00:00.000Z",
+          "scheduleKind": "remote_schedule",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://news.4399.com/bhxqtd/zixun/m/1014938.html"
+        }
+      ],
       "archives": [
         "hot-update-test:star-rail:events:v1",
         "hot-update-test:star-rail:cycles:v1",
@@ -176,6 +280,70 @@
           "scheduleKind": "fixed_window",
           "timeZone": "Asia/Shanghai",
           "sourceUrl": "https://zzz.mihoyo.com/news/165267?category=278"
+        },
+        {
+          "remoteKey": "event:3.1:cloud-gift",
+          "category": "limited_event",
+          "title": "云端礼赠",
+          "startsAt": "2026-07-29T11:00:00+08:00",
+          "endsAt": "2026-09-08T03:59:59+08:00",
+          "activityTags": [
+            "sign-in"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://wiki.biligame.com/zzz/「云端礼赠」"
+        },
+        {
+          "remoteKey": "event:3.1:crispy-meal-plan",
+          "category": "limited_event",
+          "title": "咔滋酥脆出餐计划",
+          "startsAt": "2026-08-19T10:00:00+08:00",
+          "endsAt": "2026-09-07T03:59:59+08:00",
+          "activityTags": [
+            "management"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.sina.cn/news/detail/5332647255477173.html"
+        },
+        {
+          "remoteKey": "event:3.1:combat-training-triple",
+          "category": "limited_event",
+          "title": "实战特训-三倍悬赏",
+          "startsAt": "2026-09-02T04:00:00+08:00",
+          "endsAt": "2026-09-07T03:59:59+08:00",
+          "activityTags": [
+            "combat",
+            "material-reward"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.sina.cn/news/detail/5337945315479062.html"
+        },
+        {
+          "remoteKey": "endgame:shiyu-defense",
+          "category": "endgame",
+          "title": "式舆防卫战",
+          "startsAt": "2026-09-04T04:00:00+08:00",
+          "endsAt": "2026-09-18T04:00:00+08:00",
+          "modeKey": "shiyu-defense",
+          "periodKey": "zenless:shiyu-defense:2026-09-04",
+          "scheduleKind": "remote_schedule",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://wikiwiki.jp/zenless/式輿防衛戦"
+        },
+        {
+          "remoteKey": "endgame:deadly-assault",
+          "category": "endgame",
+          "title": "危局强袭战",
+          "startsAt": "2026-08-28T04:00:00+08:00",
+          "endsAt": "2026-09-11T04:00:00+08:00",
+          "modeKey": "deadly-assault",
+          "periodKey": "zenless:deadly-assault:2026-08-28",
+          "scheduleKind": "remote_schedule",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://wikiwiki.jp/zenless/危局強襲戦"
         }
       ],
       "archives": [
@@ -208,12 +376,13 @@
           "startsAt": "2026-08-27T04:00:00+08:00",
           "endsAt": "2026-09-14T03:59:59+08:00",
           "activityTags": [
-            "quest",
-            "collection"
+            "puzzle",
+            "photography",
+            "exploration"
           ],
           "scheduleKind": "fixed_window",
           "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://www.taptap.cn/moment/839214754839921356?group_id=330015"
+          "sourceUrl": "https://www.taptap.cn/moment/841418821855084797"
         },
         {
           "remoteKey": "ww:event:3.6:qingxian-ji-liunian",
@@ -272,6 +441,34 @@
           "scheduleKind": "fixed_window",
           "timeZone": "Asia/Shanghai",
           "sourceUrl": "https://www.taptap.cn/moment/839214754839921356?group_id=330015"
+        },
+        {
+          "remoteKey": "ww:event:3.6:echoing-realm",
+          "category": "limited_event",
+          "title": "回音盈域",
+          "startsAt": "2026-09-03T04:00:00+08:00",
+          "endsAt": "2026-09-10T03:59:59+08:00",
+          "activityTags": [
+            "double-drop",
+            "material-reward"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://wuwa.huijiwiki.com/wiki/首页"
+        },
+        {
+          "remoteKey": "ww:event:3.6:tacet-field-double-drop",
+          "category": "limited_event",
+          "title": "声弦涤荡",
+          "startsAt": "2026-09-22T04:00:00+08:00",
+          "endsAt": "2026-09-29T03:59:59+08:00",
+          "activityTags": [
+            "double-drop",
+            "material-reward"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://wiki.biligame.com/wutheringwaves/首页/活动日历"
         }
       ],
       "archives": [

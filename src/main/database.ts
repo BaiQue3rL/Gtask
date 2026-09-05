@@ -209,6 +209,33 @@ function itemTimeWindowOverlapsPayload(
   return observedStartsAt < itemEndsAt && itemStartsAt < observedEndsAt
 }
 
+function personalCycleMatchesBaselineWindow(
+  item: NormalizedSyncItem,
+  baseline: ChecklistItem,
+  reference: Date
+): boolean {
+  if (item.category !== 'endgame') return true
+  const observedStart = item.startsAt ? Date.parse(item.startsAt) : Number.NaN
+  const observedEnd = item.endsAt ? Date.parse(item.endsAt) : Number.NaN
+  const baselineStart = baseline.startsAt ? Date.parse(baseline.startsAt) : Number.NaN
+  const baselineEnd = baseline.endsAt ? Date.parse(baseline.endsAt) : Number.NaN
+
+  // Official and predicted period keys use different namespaces, so compare
+  // their absolute windows. Partial providers may omit one or both boundaries;
+  // reject only when the available timestamps prove the periods are disjoint.
+  if (!Number.isNaN(observedEnd) && observedEnd <= reference.getTime() &&
+    !Number.isNaN(baselineEnd) && baselineEnd > reference.getTime()) {
+    return false
+  }
+  if (!Number.isNaN(observedEnd) && !Number.isNaN(baselineStart) && observedEnd <= baselineStart) {
+    return false
+  }
+  if (!Number.isNaN(observedStart) && !Number.isNaN(baselineEnd) && observedStart >= baselineEnd) {
+    return false
+  }
+  return true
+}
+
 function normalizeSourceTitle(value: string): string {
   return value.normalize('NFKC').toLocaleLowerCase('zh-CN').replace(/[\s\p{P}\p{S}]+/gu, '')
 }
@@ -2592,7 +2619,8 @@ export class AppDatabase {
       const matchedBaselineIds = new Set<string>()
       for (const item of items) {
         const baseline = this.findBaselineItemForPersonalProgress(gameId, item)
-        if (!baseline?.remoteKey || baseline.category !== item.category) {
+        if (!baseline?.remoteKey || baseline.category !== item.category ||
+          !personalCycleMatchesBaselineWindow(item, baseline, reference)) {
           result.preserved += 1
           continue
         }
@@ -4366,6 +4394,32 @@ export class AppDatabase {
         AND starts_at IS NOT NULL
         AND julianday(starts_at) > julianday(?)
     `).run(now, now)
+    this.database.prepare(`
+      UPDATE checklist_items AS checklist
+      SET completed = 0, completed_at = NULL, source_snapshot_id = NULL, updated_at = ?
+      WHERE checklist.category = 'endgame'
+        AND checklist.source = 'public_schedule'
+        AND checklist.archived = 0
+        AND checklist.manual_completion_locked = 0
+        AND checklist.completed = 1
+        AND checklist.source_snapshot_id IS NOT NULL
+        AND checklist.starts_at IS NOT NULL
+        AND checklist.ends_at IS NOT NULL
+        AND EXISTS (
+          SELECT 1
+          FROM schedule_observations observation
+          WHERE observation.game_id = checklist.game_id
+            AND observation.target = 'cycles'
+            AND observation.mode_key = checklist.mode_key
+            AND observation.starts_at IS NOT NULL
+            AND observation.ends_at IS NOT NULL
+            AND observation.observed_at >= checklist.last_synced_at
+            AND (
+              julianday(observation.ends_at) <= julianday(checklist.starts_at)
+              OR julianday(observation.starts_at) >= julianday(checklist.ends_at)
+            )
+        )
+    `).run(now)
     this.database.prepare(`
       UPDATE checklist_items
       SET progress_percent = NULL, updated_at = ?
