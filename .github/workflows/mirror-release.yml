@@ -1,0 +1,101 @@
+name: Retry Gitee mirror release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing GitHub release tag to mirror (for example v1.1.1)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  mirror-release:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Download and verify published GitHub assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:RELEASE_TAG -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') {
+            throw 'An existing stable release tag is required'
+          }
+          $version = $env:RELEASE_TAG.Substring(1)
+          $release = gh release view $env:RELEASE_TAG --json isDraft,isPrerelease,tagName | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $release.isDraft -or $release.isPrerelease -or $release.tagName -ne $env:RELEASE_TAG) {
+            throw 'The requested GitHub release is not published and stable'
+          }
+          $assetDirectory = Join-Path $env:RUNNER_TEMP 'gtask-mirror-assets'
+          New-Item -ItemType Directory -Path $assetDirectory -Force | Out-Null
+          gh release download $env:RELEASE_TAG --dir $assetDirectory `
+            --pattern "Gtask-$version-setup.exe" `
+            --pattern "Gtask-$version-portable.exe" `
+            --pattern 'SHA256SUMS.txt'
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub asset download failed' }
+          $checksums = Get-Content -LiteralPath (Join-Path $assetDirectory 'SHA256SUMS.txt')
+          foreach ($name in @("Gtask-$version-setup.exe", "Gtask-$version-portable.exe")) {
+            $lines = @($checksums | Where-Object { $_ -cmatch ('^[0-9a-f]{64}  ' + [regex]::Escape($name) + '$') })
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $assetDirectory $name)).Hash.ToLowerInvariant()
+            if ($lines.Count -ne 1 -or $lines[0].Substring(0, 64) -cne $hash) {
+              throw "GitHub checksum mismatch: $name"
+            }
+            Write-Output "Verified GitHub asset: $name ($hash)"
+          }
+
+      - name: Upload missing mirror attachments
+        shell: pwsh
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ([string]::IsNullOrWhiteSpace($env:GITEE_TOKEN)) {
+            throw 'Repository secret GITEE_TOKEN is required'
+          }
+          $version = $env:RELEASE_TAG.Substring(1)
+          $apiBase = 'https://gitee.com/api/v5/repos/l3rui/Gtask'
+          $release = Invoke-RestMethod -Uri "$apiBase/releases/tags/$env:RELEASE_TAG" -TimeoutSec 30
+          if ($null -eq $release -or [string]$release.id -notmatch '^[1-9][0-9]*$') {
+            throw 'Create the matching Gitee release with the Release workflow first'
+          }
+          if ($release.tag_name -ne $env:RELEASE_TAG) { throw 'Gitee release tag mismatch' }
+          $attachmentUrl = "$apiBase/releases/$($release.id)/attach_files"
+          $assetDirectory = Join-Path $env:RUNNER_TEMP 'gtask-mirror-assets'
+          $names = @("Gtask-$version-setup.exe", "Gtask-$version-portable.exe", 'SHA256SUMS.txt')
+          foreach ($name in $names) {
+            $path = Join-Path $assetDirectory $name
+            $attachments = Invoke-RestMethod -Uri "${attachmentUrl}?per_page=100" -TimeoutSec 30
+            $existing = @($attachments | Where-Object name -eq $name)
+            if ($existing.Count -gt 0) {
+              if ($existing.Count -ne 1 -or $existing[0].size -ne (Get-Item -LiteralPath $path).Length) {
+                throw "An existing mirror attachment differs; preserve it for review: $name"
+              }
+              Write-Output "Mirror attachment already present: $name"
+              continue
+            }
+            $responsePath = Join-Path $env:RUNNER_TEMP 'gtask-mirror-upload-response.json'
+            # curl uses a separate HTTP stack from the standard Node fetch uploader.
+            # Do not retry a POST blindly: a timed-out upload may have completed.
+            curl.exe --http1.1 --silent --show-error --fail-with-body `
+              --connect-timeout 30 --max-time 180 --output $responsePath `
+              --form "access_token=$env:GITEE_TOKEN" --form "file=@$path" $attachmentUrl
+            if ($LASTEXITCODE -ne 0) { throw "Gitee attachment upload failed: $name" }
+            $uploaded = Get-Content -Raw -LiteralPath $responsePath | ConvertFrom-Json
+            if ([string]$uploaded.id -notmatch '^[1-9][0-9]*$') { throw "Gitee returned no attachment ID: $name" }
+            Write-Output "Uploaded mirror attachment: $name"
+          }
+          $listed = Invoke-RestMethod -Uri "${attachmentUrl}?per_page=100" -TimeoutSec 30
+          foreach ($name in $names) {
+            $matches = @($listed | Where-Object name -eq $name)
+            if ($matches.Count -ne 1 -or $matches[0].size -ne (Get-Item -LiteralPath (Join-Path $assetDirectory $name)).Length) {
+              throw "Mirror attachment verification failed: $name"
+            }
+          }
+          Write-Output "Gitee mirror attachments verified for $env:RELEASE_TAG"
