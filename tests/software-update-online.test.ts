@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   JsonFeedUpdateProvider,
@@ -7,10 +8,13 @@ import {
 const onlineIt = process.env.GTASK_ONLINE_RELEASE_TEST === '1' ? it : it.skip
 const giteeFeedUrl = 'https://gitee.com/l3rui/Gtask/raw/main/updates/latest.json'
 const githubFeedUrl = 'https://raw.githubusercontent.com/BaiQue3rL/Gtask/main/updates/latest.json'
+const { version } = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8')
+) as { version: string }
 
 describe('published software update feed', () => {
   onlineIt('prefers Gitee and falls back to the authoritative GitHub feed', async () => {
-    const current = await new SoftwareUpdateService('1.0.0', [
+    const current = await new SoftwareUpdateService(version, [
       new JsonFeedUpdateProvider('gitee', giteeFeedUrl),
       new JsonFeedUpdateProvider('github', githubFeedUrl)
     ]).check(new Date('2026-08-10T15:20:00.000Z'))
@@ -25,17 +29,17 @@ describe('published software update feed', () => {
 
     expect(current).toMatchObject({
       outcome: 'up_to_date',
-      latestVersion: '1.0.0'
+      latestVersion: version
     })
     expect(older).toMatchObject({
       outcome: 'update_available',
-      latestVersion: '1.0.0',
-      releaseUrl: 'https://gitee.com/l3rui/Gtask/releases/tag/v1.0.0'
+      latestVersion: version,
+      releaseUrl: `https://gitee.com/l3rui/Gtask/releases/tag/v${version}`
     })
     expect(fallback).toMatchObject({
       outcome: 'update_available',
-      latestVersion: '1.0.0',
-      releaseUrl: 'https://github.com/BaiQue3rL/Gtask/releases/tag/v1.0.0'
+      latestVersion: version,
+      releaseUrl: `https://github.com/BaiQue3rL/Gtask/releases/tag/v${version}`
     })
   }, 30_000)
 })
