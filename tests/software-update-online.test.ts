@@ -11,6 +11,9 @@ const githubFeedUrl = 'https://raw.githubusercontent.com/BaiQue3rL/Gtask/main/up
 const { version } = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8')
 ) as { version: string }
+const { releaseUrls } = JSON.parse(
+  readFileSync(new URL('../updates/latest.json', import.meta.url), 'utf8')
+) as { releaseUrls: { gitee: string; github: string } }
 
 describe('published software update feed', () => {
   onlineIt('prefers Gitee and falls back to the authoritative GitHub feed', async () => {
@@ -34,12 +37,12 @@ describe('published software update feed', () => {
     expect(older).toMatchObject({
       outcome: 'update_available',
       latestVersion: version,
-      releaseUrl: `https://gitee.com/l3rui/Gtask/releases/tag/v${version}`
+      releaseUrl: releaseUrls.gitee
     })
     expect(fallback).toMatchObject({
       outcome: 'update_available',
       latestVersion: version,
-      releaseUrl: `https://github.com/BaiQue3rL/Gtask/releases/tag/v${version}`
+      releaseUrl: releaseUrls.github
     })
   }, 30_000)
 })

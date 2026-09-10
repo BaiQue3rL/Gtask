@@ -16,7 +16,9 @@
 - Gitee 仓库使用 Pull 镜像从 `BaiQue3rL/Gtask` 自动同步提交、分支和标签。
 - GitHub Actions 的 `Release` 工作流仍只构建一次；GitHub Release 成功后，使用仓库 Secret `GITEE_TOKEN` 调用 Gitee OpenAPI 创建同版本 Release，并上传安装版、便携版和 `SHA256SUMS.txt`。
 - GitHub 与 Gitee Release 发布均可安全重跑：已有 GitHub 附件会原名覆盖，Gitee 会更新同标签 Release 并仅替换本版本的三个同名附件。
+- GitHub 发布成功但 Gitee 附件上传超时时，可手动运行 `Retry Gitee mirror release`，指定已发布标签（例如 `gh workflow run mirror-release.yml -f tag=v1.1.1`）。它下载并校验 GitHub 已发布的同一批文件，再用 curl 补传缺失附件，不重新构建；同名附件大小不符时保留现场并停止。
 - `updates/latest.json` 同时保存 Gitee 与 GitHub Release 地址。应用默认按 `Gitee → GitHub` 顺序检查，成功读取哪个源就打开对应的下载页。
+- 2026-09-10 发布 `1.1.1` 时，Gitee 附件经标准上传与 curl 重试均超时；源码与标签已镜像。两个更新源的下载地址暂统一指向 GitHub `v1.1.1`，只有镜像附件补齐并校验后才恢复 Gitee 下载地址。
 - `GITEE_TOKEN` 只保存在 GitHub Actions 加密 Secret 中，不写入仓库、安装包、日志或用户配置。
 - `updates/catalog.json` 是公共清单热更新入口。客户端启动时按用户的软件更新来源设置读取 Gitee/GitHub，自动模式同时校验两个源并以 GitHub 作为冲突时的权威结果；下载失败或内容无效时保留上一次本地基准。
 - 后台 MCP 负责核验官方资料；只有通过协议、稳定键、时间窗、活动标签和两级地图检查的结果才允许写入远程清单。远程清单合并只触及系统基准，用户完成状态和探索进度在同稳定键更新时保留。

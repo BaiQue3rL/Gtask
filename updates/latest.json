@@ -1,8 +1,8 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.1",
   "releaseUrl": "https://github.com/BaiQue3rL/Gtask/releases/latest",
   "releaseUrls": {
-    "gitee": "https://gitee.com/l3rui/Gtask/releases/tag/v1.0.0",
-    "github": "https://github.com/BaiQue3rL/Gtask/releases/tag/v1.0.0"
+    "gitee": "https://github.com/BaiQue3rL/Gtask/releases/tag/v1.1.1",
+    "github": "https://github.com/BaiQue3rL/Gtask/releases/tag/v1.1.1"
   }
 }
