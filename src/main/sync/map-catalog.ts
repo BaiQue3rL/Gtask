@@ -10,7 +10,7 @@ interface MapRegionDefinition {
 const MAP_CATALOG_VERIFIED_AT: Record<GameId, string> = {
   genshin: '2026-08-12T18:20:00+08:00',
   'star-rail': '2026-08-09T12:30:00+08:00',
-  zenless: '2026-08-09T12:30:00+08:00',
+  zenless: '2026-09-14T21:59:40+08:00',
   'wuthering-waves': '2026-09-05T19:40:00+08:00'
 }
 
@@ -223,7 +223,13 @@ const MAP_CATALOGS: Record<GameId, readonly MapRegionDefinition[]> = {
   zenless: [
     {
       title: '罗斯凯利法',
-      subregions: ['布亚斯特城区', '[管制区]算枢局', '[管制区]能源区']
+      subregions: [
+        '布亚斯特城区',
+        '[管制区]算枢局',
+        '[管制区]能源区',
+        '[管制区]辉金研究所',
+        '[管制区]隐礁中转站'
+      ]
     },
     { title: '斯卡莫空洞', subregions: ['[空洞]沉没回廊'] },
     { title: '卫非地', subregions: ['澄辉坪'] },

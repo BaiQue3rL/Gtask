@@ -118,10 +118,24 @@ describe('bundled map catalog', () => {
 
     const zenless = getBundledMapCatalog('zenless')
     expect(zenless).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        title: '[管制区]辉金研究所',
+        parentTitle: '罗斯凯利法',
+        mapNodeKind: 'subregion',
+        parentRemoteKey: 'map-catalog:zenless:region:e27477172b3cccb95766'
+      }),
+      expect.objectContaining({
+        title: '[管制区]隐礁中转站',
+        parentTitle: '罗斯凯利法',
+        mapNodeKind: 'subregion',
+        parentRemoteKey: 'map-catalog:zenless:region:e27477172b3cccb95766'
+      }),
       expect.objectContaining({ title: '[空洞]港口工厂旧址', parentTitle: '莱姆尼安空洞' }),
       expect.objectContaining({ title: '[空洞]辉岭石矿场', parentTitle: '莱姆尼安空洞' }),
       expect.objectContaining({ title: '厄匹斯港', parentTitle: '雅努斯区' })
     ]))
+    // The new city is announced, but independent exploration progress is unverified.
+    expect(zenless.some((item) => item.title === '维尔乌姆城区')).toBe(false)
   })
 
   it('corrects 虚海望 without changing its released stable key', () => {

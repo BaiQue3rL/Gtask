@@ -105,6 +105,30 @@ describe('cycle catalog', () => {
     })
   })
 
+  it.each([
+    ['shiyu-defense', '2026-09-04T04:00:00+08:00', '2026-09-18T04:00:00+08:00'],
+    ['deadly-assault', '2026-09-11T04:00:00+08:00', '2026-09-25T04:00:00+08:00']
+  ])('绝区零 %s 换期保持已核实的双周错峰锚点', (modeKey, startsAt, endsAt) => {
+    const definition = listCycleModes('zenless').find((item) => item.modeKey === modeKey)!
+    const previous = {
+      remoteKey: definition.remoteKey,
+      modeKey,
+      title: definition.title,
+      startsAt: '2026-08-01T04:00:00+08:00',
+      endsAt: '2026-08-15T04:00:00+08:00'
+    } as ChecklistItem
+    const current = nextCyclePeriod('zenless', previous, new Date('2026-09-14T12:00:00+08:00'))
+    expect(current).toMatchObject({
+      startsAt: new Date(startsAt).toISOString(),
+      endsAt: new Date(endsAt).toISOString()
+    })
+    const next = nextCyclePeriod('zenless', { ...previous, startsAt, endsAt }, new Date(endsAt))
+    expect(next).toMatchObject({
+      startsAt: new Date(endsAt).toISOString(),
+      endsAt: new Date(Date.parse(endsAt) + 14 * 24 * 60 * 60 * 1000).toISOString()
+    })
+  })
+
   it('带空档的周期不会拿上一期持续时间首尾相接', () => {
     const previous = {
       modeKey: 'stygian-onslaught',

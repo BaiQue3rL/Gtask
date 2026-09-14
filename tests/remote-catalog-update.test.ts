@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppDatabase } from '../src/main/database'
+import { getBundledActivityCatalog } from '../src/main/sync/baseline-catalog'
+import { getBundledMapCatalog } from '../src/main/sync/map-catalog'
 import {
   RemoteCatalogUpdateService,
   createDefaultRemoteCatalogProviders,
@@ -101,7 +103,7 @@ describe('remote catalog update', () => {
           })
         ])
       } else if (game.gameId === 'zenless') {
-        expect(game.upserts).toHaveLength(6)
+        expect(game.upserts).toHaveLength(16)
         expect(game.upserts).toEqual(expect.arrayContaining([
           expect.objectContaining({
             remoteKey: 'event:3.1:return-to-ridu',
@@ -127,6 +129,54 @@ describe('remote catalog update', () => {
       }
     }
     expect(archivedKeys.size).toBe(14)
+  })
+
+  it('applies the verified Zenless additions to an older catalog without replacing existing identities or completion', () => {
+    const checkedIn = parseRemoteCatalogFeed(JSON.parse(
+      readFileSync(join(process.cwd(), 'updates', 'catalog.json'), 'utf8')
+    ))
+    const zenless = checkedIn.games.find((game) => game.gameId === 'zenless')!
+    const newMaps = ['[管制区]辉金研究所', '[管制区]隐礁中转站']
+    const newEvents = zenless.upserts.filter((item) => item.remoteKey.startsWith('event:3.2:'))
+    expect(newEvents).toHaveLength(8)
+    for (const event of newEvents) {
+      const seed = getBundledActivityCatalog('zenless').find((item) => item.remoteKey === event.remoteKey)
+      expect(seed).toMatchObject({
+        title: event.title, startsAt: event.startsAt, endsAt: event.endsAt,
+        activityTags: event.category === 'limited_event' ? event.activityTags : undefined
+      })
+    }
+    expect(zenless.upserts.filter((item) => item.category === 'exploration')).toHaveLength(2)
+    // Keep the earlier anchor corrections; do not publish ordinary new period rows.
+    expect(zenless.upserts.filter((item) => item.category === 'endgame').map((item) => item.startsAt))
+      .toEqual(['2026-09-04T04:00:00+08:00', '2026-08-28T04:00:00+08:00'])
+
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
+    database.mergeSyncedItems('zenless', 'public_schedule', getBundledMapCatalog('zenless')
+      .filter((item) => !newMaps.includes(item.title)))
+    const oldMap = database.listChecklistItems('zenless').find((item) => item.title === '[管制区]算枢局')!
+    database.setChecklistCompletion(oldMap.id, true)
+    const custom = database.createChecklistItem({ gameId: 'zenless', category: 'custom', title: '保留的自定义项目' })
+    const reference = new Date('2026-09-14T14:05:00.000Z')
+    database.applyRemoteCatalogFeed({ ...checkedIn, games: [zenless] }, reference)
+    const added = database.listChecklistItems('zenless').filter((item) => newMaps.includes(item.title))
+    expect(added).toHaveLength(2)
+    for (const item of added) {
+      const seed = getBundledMapCatalog('zenless').find((candidate) => candidate.title === item.title)!
+      expect(item).toMatchObject({
+        remoteKey: seed.remoteKey, parentRemoteKey: seed.parentRemoteKey,
+        mapNodeKind: 'subregion', parentTitle: '罗斯凯利法', source: 'public_schedule'
+      })
+    }
+    expect(database.listChecklistItems('zenless').filter((item) => item.remoteKey?.startsWith('event:3.2:')))
+      .toHaveLength(8)
+    database.applyRemoteCatalogFeed({ ...checkedIn, games: [zenless] }, reference)
+    expect(database.listChecklistItems('zenless').filter((item) => newMaps.includes(item.title)).map((item) => item.id))
+      .toEqual(added.map((item) => item.id))
+    expect(database.getChecklistItem(oldMap.id)).toMatchObject({
+      remoteKey: oldMap.remoteKey, completed: true, manualCompletionLocked: true
+    })
+    expect(database.getChecklistItem(custom.id)).toMatchObject({ category: 'custom', source: 'manual' })
   })
 
   it('rejects period-scoped keys and duplicate rows for a known recurring mode', () => {

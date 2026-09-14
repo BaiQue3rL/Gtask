@@ -58,6 +58,7 @@ const GENSHIN_70_WEB_EVENT = 'https://ys.mihoyo.com/main/news/detail/165696'
 const STAR_RAIL_NEWS = 'https://sr.mihoyo.com/news?nav=news&type=activity'
 const ZENLESS_NEWS = 'https://zenless.hoyoverse.com/zh-cn/news'
 const ZENLESS_RETURN_TO_RIDU = 'https://zzz.mihoyo.com/news/165267?category=278'
+const ZENLESS_32_UPDATE = 'https://zenless.hoyoverse.com/m/zh-cn/news/166000'
 const WUTHERING_WAVES_36 = 'https://www.taptap.cn/moment/839214754839921356?group_id=330015'
 
 const ACTIVITIES: Record<GameId, readonly ActivitySeed[]> = {
@@ -77,6 +78,16 @@ const ACTIVITIES: Record<GameId, readonly ActivitySeed[]> = {
     { remoteKey: 'event:4.4:garden-of-plenty', title: '花藏繁生', activityTags: ['combat', 'double-reward', 'material-reward'], startsAt: '2026-08-14T04:00:00+08:00', endsAt: '2026-08-24T03:59:59+08:00', sourceUrl: STAR_RAIL_NEWS }
   ],
   zenless: [
+    // 3.2 entries with explicit server-time windows. See the September audit
+    // for maintenance-relative starts that still need exact-time evidence.
+    { remoteKey: 'event:3.2:pinball-knight', title: '「弹球勇者」哐哐当！', activityTags: ['combat', 'challenge'], startsAt: '2026-09-10T10:00:00+08:00', endsAt: '2026-10-19T03:59:00+08:00', sourceUrl: ZENLESS_32_UPDATE },
+    { remoteKey: 'event:3.2:shadow-chase-showdown', title: '虚境逐影争锋', activityTags: ['combat', 'challenge'], startsAt: '2026-09-16T10:00:00+08:00', endsAt: '2026-10-05T03:59:00+08:00', sourceUrl: ZENLESS_32_UPDATE },
+    { remoteKey: 'event:3.2:surprise-screening-plan', title: '惊喜放映企划', activityTags: ['sign-in'], startsAt: '2026-09-23T10:00:00+08:00', endsAt: '2026-10-20T03:59:00+08:00', sourceUrl: ZENLESS_32_UPDATE },
+    { remoteKey: 'event:3.2:regional-patrol-bounty', title: '先遣赏金-区域巡防', activityTags: ['combat', 'double-reward'], startsAt: '2026-09-23T04:00:00+08:00', endsAt: '2026-09-28T03:59:00+08:00', sourceUrl: ZENLESS_32_UPDATE },
+    { remoteKey: 'event:3.2:orbie-parent-diary', title: '锵锵！球仔成长日记', activityTags: ['management'], startsAt: '2026-09-30T10:00:00+08:00', endsAt: '2026-10-19T03:59:00+08:00', sourceUrl: ZENLESS_32_UPDATE },
+    { remoteKey: 'event:3.2:boopons-from-above', title: '「嗯呢」从天降', activityTags: ['sign-in'], startsAt: '2026-09-30T10:00:00+08:00', endsAt: '2026-10-20T03:59:00+08:00', sourceUrl: ZENLESS_32_UPDATE },
+    { remoteKey: 'event:3.2:hobbling-crow-chronicles', title: '跛脚乌鸦奇探录', activityTags: ['puzzle', 'quest'], startsAt: '2026-10-03T10:00:00+08:00', endsAt: '2026-10-19T03:59:00+08:00', sourceUrl: ZENLESS_32_UPDATE },
+    { remoteKey: 'event:3.2:combat-simulation-bounty', title: '数据悬赏-实战模拟', activityTags: ['combat', 'double-reward'], startsAt: '2026-10-14T04:00:00+08:00', endsAt: '2026-10-19T03:59:00+08:00', sourceUrl: ZENLESS_32_UPDATE },
     { remoteKey: 'event:3.1:summer-waves', title: '恰浪花逐夏而至', activityTags: ['management', 'collection', 'story'], startsAt: '2026-07-29T11:00:00+08:00', endsAt: '2026-09-07T03:59:59+08:00', sourceUrl: ZENLESS_NEWS },
     { remoteKey: 'event:3.1:phaethon-yearbook', title: '法厄同年度大揭秘', activityTags: ['story'], startsAt: '2026-07-29T11:00:00+08:00', endsAt: '2026-09-09T05:59:59+08:00', sourceUrl: ZENLESS_NEWS },
     { remoteKey: 'event:3.1:marcel-anniversary', title: '玛瑟尔周年馈礼', activityTags: ['sign-in'], startsAt: '2026-07-29T11:00:00+08:00', endsAt: '2026-09-09T05:59:59+08:00', sourceUrl: ZENLESS_NEWS },

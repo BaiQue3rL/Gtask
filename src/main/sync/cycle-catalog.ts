@@ -123,7 +123,8 @@ export const CYCLE_MODE_CATALOG: readonly CycleModeDefinition[] = [
     aliases: ['式舆防卫战', '式舆防卫战·剧变节点', '剧变节点'],
     prediction: {
       kind: 'interval',
-      anchorStartsAt: '2025-01-03T04:00:00+08:00',
+      // The reviewed June 26 boundary rolls to September 4, as published in the feed.
+      anchorStartsAt: '2026-06-26T04:00:00+08:00',
       cadenceDays: 14,
       durationDays: 14
     }
@@ -136,7 +137,8 @@ export const CYCLE_MODE_CATALOG: readonly CycleModeDefinition[] = [
     aliases: ['危局强袭战'],
     prediction: {
       kind: 'interval',
-      anchorStartsAt: '2025-01-10T04:00:00+08:00',
+      // Equivalent to the verified August 28 anchor, four fortnightly periods earlier.
+      anchorStartsAt: '2026-07-03T04:00:00+08:00',
       cadenceDays: 14,
       durationDays: 14
     }

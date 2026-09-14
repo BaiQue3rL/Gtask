@@ -44,6 +44,7 @@ function applyVersionWindow(
 }
 
 afterEach(() => {
+  vi.useRealTimers()
   database?.close()
   database = null
   if (temporaryDirectory) rmSync(temporaryDirectory, { recursive: true, force: true })
@@ -109,8 +110,11 @@ describe('AppDatabase', () => {
   })
 
   it('个人接口档期观察只暴露结构差异且可以校正既有事项时间', () => {
-    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const reference = new Date('2026-08-27T12:00:00.000Z')
+    // Job snapshots also read Date.now(); keep the historical observation active.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(reference)
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.mergeSyncedItems('zenless', 'public_schedule', [{
       remoteKey: 'event:official:calendar-test',
       category: 'limited_event',
@@ -1148,6 +1152,9 @@ describe('AppDatabase', () => {
   })
 
   it('启动时迁移封闭测试期任务时间并移除旧任务事项', () => {
+    // Test migration before this fixture expires, independently of today's date.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-08-05T00:00:00.000Z'))
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-version-window-migration-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
     database = new AppDatabase(databasePath, { seedBundledBaselines: false })

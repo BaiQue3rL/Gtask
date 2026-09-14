@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "revision": "2026-09-05.all-games-baseline-maintenance",
-  "publishedAt": "2026-09-05T11:46:28.531Z",
+  "revision": "2026-09-14.zenless-3.2-baseline-maintenance",
+  "publishedAt": "2026-09-14T14:01:49.648Z",
   "games": [
     {
       "gameId": "genshin",
@@ -344,6 +344,133 @@
           "scheduleKind": "remote_schedule",
           "timeZone": "Asia/Shanghai",
           "sourceUrl": "https://wikiwiki.jp/zenless/危局強襲戦"
+        },
+        {
+          "remoteKey": "event:3.2:pinball-knight",
+          "category": "limited_event",
+          "title": "「弹球勇者」哐哐当！",
+          "startsAt": "2026-09-10T10:00:00+08:00",
+          "endsAt": "2026-10-19T03:59:00+08:00",
+          "activityTags": [
+            "combat",
+            "challenge"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000"
+        },
+        {
+          "remoteKey": "event:3.2:shadow-chase-showdown",
+          "category": "limited_event",
+          "title": "虚境逐影争锋",
+          "startsAt": "2026-09-16T10:00:00+08:00",
+          "endsAt": "2026-10-05T03:59:00+08:00",
+          "activityTags": [
+            "combat",
+            "challenge"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000"
+        },
+        {
+          "remoteKey": "event:3.2:surprise-screening-plan",
+          "category": "limited_event",
+          "title": "惊喜放映企划",
+          "startsAt": "2026-09-23T10:00:00+08:00",
+          "endsAt": "2026-10-20T03:59:00+08:00",
+          "activityTags": [
+            "sign-in"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000"
+        },
+        {
+          "remoteKey": "event:3.2:regional-patrol-bounty",
+          "category": "limited_event",
+          "title": "先遣赏金-区域巡防",
+          "startsAt": "2026-09-23T04:00:00+08:00",
+          "endsAt": "2026-09-28T03:59:00+08:00",
+          "activityTags": [
+            "combat",
+            "double-reward"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000"
+        },
+        {
+          "remoteKey": "event:3.2:orbie-parent-diary",
+          "category": "limited_event",
+          "title": "锵锵！球仔成长日记",
+          "startsAt": "2026-09-30T10:00:00+08:00",
+          "endsAt": "2026-10-19T03:59:00+08:00",
+          "activityTags": [
+            "management"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000"
+        },
+        {
+          "remoteKey": "event:3.2:boopons-from-above",
+          "category": "limited_event",
+          "title": "「嗯呢」从天降",
+          "startsAt": "2026-09-30T10:00:00+08:00",
+          "endsAt": "2026-10-20T03:59:00+08:00",
+          "activityTags": [
+            "sign-in"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000"
+        },
+        {
+          "remoteKey": "event:3.2:hobbling-crow-chronicles",
+          "category": "limited_event",
+          "title": "跛脚乌鸦奇探录",
+          "startsAt": "2026-10-03T10:00:00+08:00",
+          "endsAt": "2026-10-19T03:59:00+08:00",
+          "activityTags": [
+            "puzzle",
+            "quest"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000"
+        },
+        {
+          "remoteKey": "event:3.2:combat-simulation-bounty",
+          "category": "limited_event",
+          "title": "数据悬赏-实战模拟",
+          "startsAt": "2026-10-14T04:00:00+08:00",
+          "endsAt": "2026-10-19T03:59:00+08:00",
+          "activityTags": [
+            "combat",
+            "double-reward"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000"
+        },
+        {
+          "remoteKey": "map-catalog:zenless:subregion:7372102af1cb93aa3443",
+          "category": "exploration",
+          "title": "[管制区]辉金研究所",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:zenless:region:e27477172b3cccb95766",
+          "parentTitle": "罗斯凯利法",
+          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000"
+        },
+        {
+          "remoteKey": "map-catalog:zenless:subregion:db10be5016e1854c34a7",
+          "category": "exploration",
+          "title": "[管制区]隐礁中转站",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:zenless:region:e27477172b3cccb95766",
+          "parentTitle": "罗斯凯利法",
+          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000"
         }
       ],
       "archives": [

@@ -1,4 +1,4 @@
-﻿import { afterEach, describe, expect, it } from 'vitest'
+﻿import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -16,6 +16,7 @@ let client: Client | null = null
 let temporaryDirectory: string | null = null
 
 afterEach(async () => {
+  vi.useRealTimers()
   await client?.close()
   await server?.close()
   database?.close()
@@ -562,8 +563,11 @@ describe('本地 MCP server', () => {
   })
 
   it('MCP 允许用当前任务的第一方档期观察校正既有事项', async () => {
-    const connected = await connect()
     const reference = new Date('2026-08-27T12:00:00.000Z')
+    // Freeze Date only, leaving the MCP transport's timers running normally.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(reference)
+    const connected = await connect()
     database!.mergeSyncedItems('zenless', 'public_schedule', [{
       remoteKey: 'event:first-party-proof',
       category: 'limited_event',
