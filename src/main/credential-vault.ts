@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { writeFileAtomically } from './atomic-file'
 import { join, resolve } from 'node:path'
 import {
   CREDENTIAL_PROVIDERS,
@@ -37,17 +38,9 @@ export class CredentialVault {
   store(provider: CredentialProvider, payload: CredentialPayload): CredentialStatus {
     if (!this.protector.isAvailable()) throw new Error('Windows 暂时无法安全保存登录信息')
     if (!payload.value) throw new Error('登录信息为空，请重新登录')
-    mkdirSync(this.directory, { recursive: true })
     const path = this.pathFor(provider)
-    const temporaryPath = `${path}.tmp`
     const encrypted = this.protector.protect(JSON.stringify(payload))
-    try {
-      writeFileSync(temporaryPath, encrypted, { mode: 0o600 })
-      renameSync(temporaryPath, path)
-    } catch (error) {
-      if (existsSync(temporaryPath)) rmSync(temporaryPath)
-      throw error
-    }
+    writeFileAtomically(path, encrypted)
     return this.status(provider)
   }
 

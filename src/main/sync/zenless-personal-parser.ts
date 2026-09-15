@@ -180,7 +180,7 @@ export function parseZenlessShiyuDefense(value: unknown): NormalizedSyncItem {
   const brief = isRecord(data.brief_info) ? data.brief_info : {}
   const score = finiteNumber(brief.score)
   const hasChallengeRecord = hasChallengeRecordEvidence({
-    explicitFlags: [data.passed_fifth_floor],
+    explicitFlags: [data.passed_fifth_floor === true ? true : undefined],
     positiveValues: [score]
   })
 
@@ -201,13 +201,14 @@ export function parseZenlessDeadlyAssault(value: unknown): NormalizedSyncItem {
   const data = requiredRecord(value, '危局强袭战')
   const scheduleId = requiredIdentifier(data.id, '危局强袭战 id')
   const challenges = Array.isArray(data.challenges) ? data.challenges.filter(isRecord) : []
-  const earnedStars = finiteNumber(data.total_star) ?? 0
+  const earnedStars = finiteNumber(data.total_star)
   const completed = hasChallengeRecordEvidence({
     explicitFlags: [data.has_data, ...challenges.map((challenge) => challenge.has_data)],
     positiveValues: [
       earnedStars,
       ...challenges.flatMap((challenge) => [challenge.star, challenge.score])
-    ]
+    ],
+    knownEmpty: Array.isArray(data.challenges) && data.challenges.length === 0
   })
 
   return {

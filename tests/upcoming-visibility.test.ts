@@ -18,6 +18,11 @@ function item(
 }
 
 describe('upcoming baseline visibility', () => {
+  it('周期空窗仍显示下一期，未开始活动继续按设置隐藏', () => {
+    const cycle = { ...item('public_schedule', '2026-08-23T12:00:00.000Z'), category: 'endgame' as const }
+    const event = { ...cycle, category: 'limited_event' as const }
+    expect(filterUpcomingBaselineItems([cycle, event], now, false)).toEqual([cycle])
+  })
   it('hides only public baseline items that have not started', () => {
     const futureBaseline = item('public_schedule', '2026-08-23T12:00:00.000Z')
     expect(isUpcomingBaselineItem(futureBaseline, now)).toBe(true)

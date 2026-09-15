@@ -157,7 +157,7 @@ describe('Genshin personal parsing', () => {
     })])
   })
 
-  it('按 parent_id 建立地图父子关系，并只在全部子区域满探索时修正零值父项', () => {
+  it('按 parent_id 建立地图父子关系，保留接口明确返回的零值父项', () => {
     const items = parseGenshinPersonalData({
       profile: {
         world_explorations: [
@@ -181,8 +181,8 @@ describe('Genshin personal parsing', () => {
       expect.objectContaining({
         remoteKey: 'exploration:world:10',
         title: '沉玉谷',
-        progressPercent: 100,
-        completed: true,
+        progressPercent: 0,
+        completed: false,
         mapNodeKind: 'region',
         parentTitle: null
       }),
@@ -258,7 +258,7 @@ describe('Genshin personal parsing', () => {
     })
 
     expect(items.find((item) => item.remoteKey === 'exploration:world:20')).toMatchObject({
-      progressPercent: null,
+      progressPercent: 0,
       completed: false
     })
   })

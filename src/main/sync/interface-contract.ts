@@ -49,8 +49,7 @@ const eventsContract: SyncSectionContract = {
       'remoteKey',
       'category',
       'title',
-      'startsAt',
-      'endsAt',
+      'startsAt+endsAt|deadlineReview',
       'activityTags',
       'titleSourceUrl|sourceObservationId',
       'sourceUrl|sourceObservationId',
@@ -70,7 +69,8 @@ const eventsContract: SyncSectionContract = {
     '限时活动正例：具有独立官方活动名称、整体开始时间和整体结束时间的限时签到、限时玩法或限时剧情活动。',
     '限时活动反例：活动内部的每日阶段、单个关卡、剧情任务、活动商店、奖励档位、版本前瞻、维护公告、兑换码和角色或武器卡池；这些不能作为新的活动清单项。',
     '同一活动的预告页、规则页、玩法页和奖励页只是同一活动的不同资料，不得分别建项；标题应使用活动容器的官方本地化总名称。',
-    '限时活动必须同时具有准确 startsAt 和 endsAt；开始后界面自动由“距离开始”切换为“剩余”。',
+    '先区分限时资格与时间完整性；常驻、长期一次性或限时资格未知的内容不加入清单。正常活动提供 startsAt 和 endsAt；确已证实限时且当前开放、检查主要公告和规则仍未取得可靠时限时，提交 deadlineReview 与空 endsAt，界面显示“截止时间待确认”，不能捏造时间。',
+    'deadlineReview 必须含限时和当前开放的 HTTPS 证据、checkedSources、checkedAt、reviewAt 与 missingReason。每次覆盖该游戏时优先复核 job.deadlineReviews；版本切换必须复核。复核节点不是活动结束时间，客户端不会据此自动删除。确认结束或常驻才发布退役；开放依据失效又无法确认继续开放时发布移出主清单决定，并在维护记录保留待核实状态。',
     `玩法标签是活动必填字段。提交 ${MIN_AI_ACTIVITY_TAGS} 至 ${MAX_AI_ACTIVITY_TAGS} 个符合 requestContext.outputLocale 的准确标签；不能同义重复、用泛化词凑数或为了覆盖词表而硬贴。`,
     '提交标签前应阅读能够直接说明玩法规则的资料；只有排期图、活动标题或奖励列表不足以证明玩法。现有标签目录无法准确表达明确的新玩法时应注册 custom.* 标签后再提交。',
     '同一活动只能保留一个语义记录；名称或标点不同但实际相同时使用 matchItemId。',
@@ -183,7 +183,7 @@ export function getPublicSyncContract(
   sectionTargets?: Exclude<SyncTarget, 'all'>[]
 ): PublicSyncContract {
   return {
-    schemaVersion: 15,
+    schemaVersion: 16,
     jobKind: 'public_catalog',
     authority: 'interface_contract',
     decisionAuthority: 'codex',

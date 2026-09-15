@@ -1,8 +1,11 @@
+import { SingleFlight } from './single-flight'
+import { persistUpdateCache } from './update-cache'
+import bundledCatalogPublication from '../../updates/catalog.json'
 import { appendFileSync, cpSync, existsSync, mkdirSync } from 'node:fs'
 import { arch, cpus, release, totalmem } from 'node:os'
 import { dirname, join } from 'node:path'
-import { app, BrowserWindow, dialog, ipcMain, net, powerMonitor, safeStorage, screen, shell } from 'electron'
-import { terminateApplicationProcess } from './application-exit'
+import { app, BrowserWindow, dialog, ipcMain, net, powerMonitor, safeStorage, screen, session, shell } from 'electron'
+import { scheduleForcedExitFallback } from './application-exit'
 import { ApplicationLogger } from './application-logger'
 import {
   calculatePortraitWindowSize,
@@ -62,6 +65,7 @@ import {
 } from './software-update'
 import {
   RemoteCatalogUpdateService,
+  parseRemoteCatalogFeed,
   createDefaultRemoteCatalogProviders,
   readRemoteCatalogUpdateState,
   writeRemoteCatalogUpdateState,
@@ -74,7 +78,8 @@ import {
 } from './remote-check-cooldown'
 import { migrateLegacyAppDataPaths } from './data-paths'
 import {
-  getBundledMapCatalog
+  getBundledMapCatalog,
+  getBundledMapCatalogVerifiedAt
 } from './sync/map-catalog'
 import {
   getPersonalSyncTargets,
@@ -219,6 +224,16 @@ function maintainChecklistTimeState(): void {
   }
 }
 
+let forcedExitTimer: ReturnType<typeof setTimeout> | null = null
+
+function prepareApplicationExit(): void {
+  if (!forcedExitTimer) forcedExitTimer = scheduleForcedExitFallback()
+  try { if (app.isReady()) session.defaultSession.flushStorageData() } catch (error) {
+    applicationLogger?.error('storage_flush_failed', { error })
+  }
+  shutdownApplicationRuntime()
+}
+
 function shutdownApplicationRuntime(): void {
   if (isShuttingDown) return
   isShuttingDown = true
@@ -301,6 +316,14 @@ function configureSoftwareUpdateService(): void {
 }
 
 function getRemoteCatalogUpdateStatus(reference = new Date()): RemoteCatalogUpdateStatus {
+  if (appDatabase) {
+    const receipt = appDatabase.getRemoteCatalogReceipt()
+    // A restored backup restores its applied revision as well. The settings
+    // file is only a cooldown cache, never proof of database content.
+    remoteCatalogUpdateState = { ...remoteCatalogUpdateState,
+      revision: receipt?.revision ?? null, publishedAt: receipt?.publishedAt ?? null,
+      contentHash: receipt?.contentHash ?? null }
+  }
   const remaining = remoteCheckCooldownRemaining(
     remoteCatalogUpdateState.lastSuccessfulManualCheckAt,
     reference,
@@ -314,9 +337,28 @@ function getRemoteCatalogUpdateStatus(reference = new Date()): RemoteCatalogUpda
   }
 }
 
+function cacheRemoteCatalogState(state: RemoteCatalogUpdateState): RemoteCatalogUpdateState {
+  return persistUpdateCache(state, (value) => writeRemoteCatalogUpdateState(remoteCatalogStatePath, value),
+    (error) => reportBackgroundError('保存清单检查时间', error))
+}
+
+const remoteCatalogFlight = new SingleFlight<RemoteCatalogCheckResult>()
 async function checkForRemoteCatalogUpdate(automatic: boolean): Promise<RemoteCatalogCheckResult> {
+  const result = await remoteCatalogFlight.run(() => performRemoteCatalogUpdate(automatic))
+  if (!automatic && result.outcome !== 'cooldown' &&
+    (!remoteCatalogUpdateState.lastSuccessfulManualCheckAt ||
+      Date.parse(remoteCatalogUpdateState.lastSuccessfulManualCheckAt) < Date.parse(result.checkedAt))) {
+    remoteCatalogUpdateState = cacheRemoteCatalogState({ ...remoteCatalogUpdateState,
+      lastSuccessfulManualCheckAt: new Date().toISOString() })
+    return { ...result, manualRetryAt: getRemoteCatalogUpdateStatus().manualRetryAt }
+  }
+  return result
+}
+
+async function performRemoteCatalogUpdate(automatic: boolean): Promise<RemoteCatalogCheckResult> {
   if (!remoteCatalogUpdateService || !appDatabase) throw new Error('公共清单更新服务尚未初始化')
   const reference = new Date()
+  getRemoteCatalogUpdateStatus(reference)
   if (!automatic) {
     const status = getRemoteCatalogUpdateStatus(reference)
     if (status.manualRetryAt) {
@@ -335,7 +377,7 @@ async function checkForRemoteCatalogUpdate(automatic: boolean): Promise<RemoteCa
     }
   }
   if (automatic) {
-    remoteCatalogUpdateState = writeRemoteCatalogUpdateState(remoteCatalogStatePath, {
+    remoteCatalogUpdateState = cacheRemoteCatalogState({
       ...remoteCatalogUpdateState,
       lastAutomaticCheckAt: reference.toISOString()
     })
@@ -343,7 +385,7 @@ async function checkForRemoteCatalogUpdate(automatic: boolean): Promise<RemoteCa
   const update = await remoteCatalogUpdateService.check(remoteCatalogUpdateState, reference)
   if (!update) {
     if (!automatic) {
-      remoteCatalogUpdateState = writeRemoteCatalogUpdateState(remoteCatalogStatePath, {
+      remoteCatalogUpdateState = cacheRemoteCatalogState({
         ...remoteCatalogUpdateState,
         lastSuccessfulManualCheckAt: reference.toISOString()
       })
@@ -363,9 +405,8 @@ async function checkForRemoteCatalogUpdate(automatic: boolean): Promise<RemoteCa
   }
   if (!appDatabase || isShuttingDown) throw new Error('应用正在退出')
   const merge = appDatabase.applyRemoteCatalogFeed(update.feed)
-  remoteCatalogUpdateState = writeRemoteCatalogUpdateState(remoteCatalogStatePath, {
-    revision: update.feed.revision,
-    publishedAt: update.feed.publishedAt,
+  remoteCatalogUpdateState = cacheRemoteCatalogState({
+    ...appDatabase.getRemoteCatalogReceipt()!,
     providerId: update.providerId,
     lastAutomaticCheckAt: remoteCatalogUpdateState.lastAutomaticCheckAt,
     lastSuccessfulManualCheckAt: automatic
@@ -373,7 +414,7 @@ async function checkForRemoteCatalogUpdate(automatic: boolean): Promise<RemoteCa
       : reference.toISOString()
   })
   applicationLogger?.info('remote_catalog_updated', {
-    revision: update.feed.revision,
+    revision: remoteCatalogUpdateState.revision,
     publishedAt: update.feed.publishedAt,
     providerId: update.providerId,
     merge
@@ -383,7 +424,7 @@ async function checkForRemoteCatalogUpdate(automatic: boolean): Promise<RemoteCa
   }
   return {
     outcome: 'updated',
-    revision: update.feed.revision,
+    revision: remoteCatalogUpdateState.revision,
     checkedAt: reference.toISOString(),
     ...merge,
     message: `活动和任务已更新：新增 ${merge.added}，修改 ${merge.updated}，下线 ${merge.archived}`,
@@ -391,18 +432,23 @@ async function checkForRemoteCatalogUpdate(automatic: boolean): Promise<RemoteCa
   }
 }
 
+function cacheSoftwareUpdateState(state: SoftwareUpdateSettings): SoftwareUpdateSettings {
+  return persistUpdateCache(state, (value) => writeSoftwareUpdateSettings(softwareUpdateConfigPath, value),
+    (error) => reportBackgroundError('保存软件检查时间', error))
+}
+
 async function checkForSoftwareUpdate(automatic: boolean): Promise<SoftwareUpdateCheckResult> {
   if (!softwareUpdateService) throw new Error('更新服务尚未初始化')
   const reference = new Date()
   if (automatic) {
-    softwareUpdateSettings = writeSoftwareUpdateSettings(softwareUpdateConfigPath, {
+    softwareUpdateSettings = cacheSoftwareUpdateState({
       ...softwareUpdateSettings,
       lastAutomaticCheckAt: reference.toISOString()
     })
   }
   const result = await softwareUpdateService.check(reference)
   if (result.checkedAt) {
-    softwareUpdateSettings = writeSoftwareUpdateSettings(softwareUpdateConfigPath, {
+    softwareUpdateSettings = cacheSoftwareUpdateState({
       ...softwareUpdateSettings,
       lastSuccessfulCheckAt: result.checkedAt
     })
@@ -792,14 +838,10 @@ function createWindow(): void {
   mainWindow.on('ready-to-show', () => mainWindow?.show())
   mainWindow.on('focus', maintainChecklistTimeState)
   mainWindow.on('close', () => {
-    shutdownApplicationRuntime()
+    prepareApplicationExit()
   })
   mainWindow.on('closed', () => {
     mainWindow = null
-    // Runtime resources were closed synchronously in the close handler. On Windows,
-    // Electron's graceful exit can still leave a headless UI thread and lock the app
-    // directory, so the final process boundary must be deterministic.
-    terminateApplicationProcess(0)
   })
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -860,7 +902,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle('software-update:get-settings', () => softwareUpdateSettings)
   ipcMain.handle('software-update:update-settings', (_event, value: unknown) => {
     const preferences = parseSoftwareUpdatePreferences(value)
-    softwareUpdateSettings = writeSoftwareUpdateSettings(softwareUpdateConfigPath, {
+    softwareUpdateSettings = cacheSoftwareUpdateState({
       ...softwareUpdateSettings,
       ...preferences
     })
@@ -1224,6 +1266,7 @@ if (!app.requestSingleInstanceLock()) {
     }
     try {
       appDatabase = new AppDatabase(databasePath)
+      appDatabase.applyRemoteCatalogFeed(parseRemoteCatalogFeed(bundledCatalogPublication))
       for (const gameId of SUPPORTED_GAME_IDS) {
         const explorationState = appDatabase.getSyncTargetStates(gameId).find(
           (state) => state.target === 'exploration'
@@ -1312,12 +1355,12 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 app.on('window-all-closed', () => {
-  shutdownApplicationRuntime()
-  terminateApplicationProcess(0)
+  prepareApplicationExit()
+  app.quit()
 })
 
 app.on('before-quit', () => {
-  shutdownApplicationRuntime()
+  prepareApplicationExit()
 })
 
 function parseQrLoginSessionId(value: unknown): string {
@@ -1427,8 +1470,8 @@ function maintainBundledMapCatalog(
     gameId,
     'exploration',
     getBundledMapCatalog(gameId),
-    reference.toISOString(),
-    { identityPolicy: 'remote-key-only', preserveActiveSourceState }
+    getBundledMapCatalogVerifiedAt(gameId),
+    { identityPolicy: 'remote-key-only', preserveActiveSourceState, bundled: true }
   )
   database.recordCatalogCoverage(gameId, 'exploration', 'public_schedule', 'complete')
   if (recordSuccess) database.recordSyncTargetSuccess(gameId, 'exploration', reference)

@@ -52,6 +52,9 @@ jobs:
       - name: Verify portable edition
         run: pnpm release:verify
 
+      - name: Verify public catalog
+        run: pnpm catalog:check
+
       - name: Build installer edition
         run: pnpm package:installer
 
@@ -97,6 +100,9 @@ jobs:
           }
 
       - name: Publish Gitee mirror release
+        id: gitee-mirror
+        continue-on-error: true
+        timeout-minutes: 8
         shell: pwsh
         env:
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
@@ -107,3 +113,10 @@ jobs:
             throw "Repository secret GITEE_TOKEN is required for mirrored releases"
           }
           node scripts/publish-gitee-release.mjs
+
+      - name: Report mirror fallback
+        if: steps.gitee-mirror.outcome == 'failure'
+        shell: pwsh
+        run: |
+          Write-Output '::warning::Gitee mirror upload failed. GitHub artifacts remain the verified download source; do not advertise Gitee binary downloads.'
+          'Gitee mirror upload failed. Use the verified GitHub release and Retry Gitee mirror release if needed.' >> $env:GITHUB_STEP_SUMMARY

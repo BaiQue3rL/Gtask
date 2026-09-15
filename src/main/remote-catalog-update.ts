@@ -1,9 +1,12 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { readFileSync } from 'node:fs'
+import { writeFileAtomically } from './atomic-file'
+import { readBoundedJson, type BoundedResponse } from './bounded-response'
+import { createHash } from 'node:crypto'
 import { z } from 'zod'
 import { activityTagsMeetQualityContract } from './activity-tags'
 import type { SoftwareUpdateSource } from '../shared/contracts'
 import { findCycleMode } from './sync/cycle-catalog'
+import { deadlineReviewSchema, publishedScheduleSchema, scheduleArchiveSchema } from './published-schedules'
 
 export const REMOTE_CATALOG_SCHEMA_VERSION = 1
 export const DEFAULT_REMOTE_CATALOG_TIMEOUT_MS = 5_000
@@ -35,8 +38,9 @@ const commonItemFields = {
 const eventItemSchema = z.object({
   ...commonItemFields,
   category: z.literal('limited_event'),
-  startsAt: timestampSchema,
-  endsAt: timestampSchema,
+  startsAt: timestampSchema.nullable().optional(),
+  endsAt: timestampSchema.nullable().optional(),
+  deadlineReview: deadlineReviewSchema.optional(),
   activityTags: z.array(z.string().trim().min(1)).min(1).max(5),
   scheduleKind: z.literal('fixed_window').optional(),
   timeZone: z.string().trim().min(1).max(100).optional()
@@ -104,8 +108,39 @@ const gameUpdateSchema = z.object({
   gameId: z.enum(['genshin', 'star-rail', 'zenless', 'wuthering-waves']),
   versionWindow: versionWindowSchema.optional(),
   upserts: z.array(remoteCatalogItemSchema).max(2_000).default([]),
-  archives: z.array(stableKeySchema).max(2_000).default([])
+  archives: z.array(stableKeySchema).max(2_000).default([]),
+  scheduleUpdates: z.array(publishedScheduleSchema).max(200).optional(),
+  scheduleArchives: z.array(scheduleArchiveSchema).max(200).optional()
 }).strict().superRefine((game, context) => {
+  const timeKeys = new Set<string>()
+  for (const record of [...(game.scheduleUpdates ?? []), ...(game.scheduleArchives ?? [])]) {
+    const identity = `${record.kind}:${record.key}`
+    if (timeKeys.has(identity)) context.addIssue({ code: 'custom', message: `排期记录重复：${identity}` })
+    timeKeys.add(identity)
+  }
+  for (const record of game.scheduleUpdates ?? []) {
+    if ('effectiveFrom' in record) {
+      const identity = `${record.kind}:${'modeKey' in record ? record.modeKey : ''}:${Date.parse(record.effectiveFrom)}`
+      if (timeKeys.has(identity)) context.addIssue({ code: 'custom', message: '相同生效边界不能发布多个相互竞争的规则' })
+      timeKeys.add(identity)
+    }
+    if ('remoteKey' in record) {
+      const definition = findCycleMode(game.gameId, { ...record, title: 'title' in record ? record.title : '' })
+      if (definition && (definition.remoteKey !== record.remoteKey || definition.modeKey !== record.modeKey)) {
+        context.addIssue({ code: 'custom', message: '排期必须沿用模式的稳定身份' })
+      }
+    }
+  }
+  const windows = (game.scheduleUpdates ?? []).filter((record) => record.kind === 'cycle_window' || record.kind === 'version_window')
+  for (let index = 0; index < windows.length; index++) {
+    for (const other of windows.slice(index + 1)) {
+      const window = windows[index]
+      if (window.kind === other.kind && ('remoteKey' in window ? window.remoteKey : '') === ('remoteKey' in other ? other.remoteKey : '') &&
+        Date.parse(window.startsAt) < Date.parse(other.endsAt) && Date.parse(other.startsAt) < Date.parse(window.endsAt)) {
+        context.addIssue({ code: 'custom', message: '同一玩法或版本的例外窗口不能重叠' })
+      }
+    }
+  }
   const seen = new Set<string>()
   const seenCycleModes = new Set<string>()
   for (const item of game.upserts) {
@@ -136,13 +171,27 @@ const gameUpdateSchema = z.object({
 })
 
 const remoteCatalogFeedSchema = z.object({
-  schemaVersion: z.literal(REMOTE_CATALOG_SCHEMA_VERSION),
+  schemaVersion: z.union([z.literal(1), z.literal(2)]),
   revision: z.string().trim().regex(/^[A-Za-z0-9._:-]{1,100}$/),
   publishedAt: timestampSchema,
   games: z.array(gameUpdateSchema).min(1).max(4)
 }).strict().superRefine((feed, context) => {
   const gameIds = new Set<string>()
   for (const game of feed.games) {
+    if (feed.schemaVersion === 1 && (game.scheduleUpdates || game.scheduleArchives)) {
+      context.addIssue({ code: 'custom', message: '排期规则和例外需要清单协议 v2' })
+    }
+    for (const item of game.upserts) {
+      if (item.category !== 'limited_event') continue
+      if (item.deadlineReview) {
+        if (feed.schemaVersion !== 2 || item.endsAt || (item.startsAt && Date.parse(item.startsAt) > Date.parse(item.deadlineReview.checkedAt)) ||
+          Date.parse(item.deadlineReview.checkedAt) > Date.parse(feed.publishedAt)) {
+          context.addIssue({ code: 'custom', message: '缺截止时间例外必须使用 v2，并提供限时、当前开放和已完成核查证据' })
+        }
+      } else if (!item.startsAt || !item.endsAt) {
+        context.addIssue({ code: 'custom', message: '限时活动必须提供完整时间或经核验的缺截止时间例外' })
+      }
+    }
     if (gameIds.has(game.gameId)) {
       context.addIssue({ code: 'custom', message: `游戏重复出现：${game.gameId}` })
     }
@@ -155,6 +204,7 @@ export type RemoteCatalogGameUpdate = RemoteCatalogFeed['games'][number]
 export type RemoteCatalogItem = RemoteCatalogGameUpdate['upserts'][number]
 
 export interface RemoteCatalogUpdateState {
+  contentHash?: string | null
   revision: string | null
   publishedAt: string | null
   providerId: string | null
@@ -179,6 +229,7 @@ export function readRemoteCatalogUpdateState(filePath: string): RemoteCatalogUpd
     const value = JSON.parse(readFileSync(filePath, 'utf8')) as Record<string, unknown>
     return {
       revision: typeof value.revision === 'string' ? value.revision : null,
+      ...(typeof value.contentHash === 'string' ? { contentHash: value.contentHash } : {}),
       publishedAt: typeof value.publishedAt === 'string' && Number.isFinite(Date.parse(value.publishedAt))
         ? new Date(value.publishedAt).toISOString()
         : null,
@@ -202,6 +253,7 @@ export function writeRemoteCatalogUpdateState(
   state: RemoteCatalogUpdateState
 ): RemoteCatalogUpdateState {
   const normalized: RemoteCatalogUpdateState = {
+    ...(state.contentHash ? { contentHash: state.contentHash } : {}),
     revision: state.revision?.trim() || null,
     publishedAt: state.publishedAt && Number.isFinite(Date.parse(state.publishedAt))
       ? new Date(state.publishedAt).toISOString()
@@ -216,15 +268,14 @@ export function writeRemoteCatalogUpdateState(
       ? new Date(state.lastSuccessfulManualCheckAt).toISOString()
       : null
   }
-  mkdirSync(dirname(filePath), { recursive: true })
-  writeFileSync(filePath, `${JSON.stringify(normalized, null, 2)}\n`, 'utf8')
+  writeFileAtomically(filePath, `${JSON.stringify(normalized, null, 2)}\n`)
   return normalized
 }
 
 type CatalogFetchLike = (
   input: string | Request,
   init?: RequestInit
-) => Promise<Pick<Response, 'ok' | 'status' | 'text'>>
+) => Promise<BoundedResponse>
 
 export interface RemoteCatalogProvider {
   readonly id: string
@@ -253,11 +304,7 @@ export class JsonRemoteCatalogProvider implements RemoteCatalogProvider {
       signal
     })
     if (!response.ok) throw new Error(`远程清单源返回 HTTP ${response.status}`)
-    const text = await response.text()
-    if (Buffer.byteLength(text, 'utf8') > MAX_REMOTE_CATALOG_BYTES) {
-      throw new Error('远程清单超过大小限制')
-    }
-    return parseRemoteCatalogFeed(JSON.parse(text))
+    return parseRemoteCatalogFeed(await readBoundedJson(response, MAX_REMOTE_CATALOG_BYTES, signal))
   }
 }
 
@@ -340,7 +387,7 @@ export class RemoteCatalogUpdateService {
     valid.sort((left, right) => Date.parse(right.feed.publishedAt) - Date.parse(left.feed.publishedAt))
     const github = valid.find((candidate) => candidate.providerId === 'github')
     const mirrorConflict = github && valid.some((candidate) =>
-      candidate.providerId !== 'override' && candidate.feed.revision !== github.feed.revision
+      candidate.providerId !== 'override' && JSON.stringify(candidate.feed) !== JSON.stringify(github.feed)
     )
     // GitHub is the authority. Gitee is preferred only when it mirrors the
     // same revision or GitHub is unreachable; a divergent mirror must never
@@ -354,7 +401,9 @@ export class RemoteCatalogUpdateService {
     }
     if (
       state.revision === selected.feed.revision &&
-      state.publishedAt === new Date(selected.feed.publishedAt).toISOString()
+      state.publishedAt === new Date(selected.feed.publishedAt).toISOString() &&
+      (!state.contentHash || state.contentHash === createHash('sha256')
+        .update(JSON.stringify(selected.feed)).digest('hex'))
     ) {
       return null
     }

@@ -13,6 +13,7 @@ import {
   type GameId
 } from '../shared/contracts'
 import type { AppDatabase } from './database'
+import { deadlineReviewSchema } from './published-schedules'
 import {
   ACTIVITY_TAG_DIMENSIONS,
   ACTIVITY_TAG_TAXONOMY_VERSION,
@@ -91,9 +92,10 @@ const publicScheduleItemSchema = z.object({
   mapNodeKind: mapNodeKindSchema.nullable().optional(),
   parentRemoteKey: z.string().max(200).nullable().optional(),
   startsAt: isoDateSchema.nullable().optional()
-    .describe('绝对开始时间；限时活动必须提供'),
+    .describe('绝对开始时间；缺时间例外按 deadlineReview 证明当前开放'),
   endsAt: isoDateSchema.nullable().optional()
-    .describe('绝对结束时间；限时活动必须提供'),
+    .describe('绝对结束时间；可靠时限未找到时必须提供 deadlineReview'),
+  deadlineReview: deadlineReviewSchema.optional(),
   resetRule: z.string().max(200).nullable().optional(),
   periodKey: z.string().max(200).nullable().optional(),
   scheduleKind: scheduleKindSchema.nullable().optional(),
@@ -396,10 +398,10 @@ export function createLocalMcpServer(
     'claim_gtask_schedule_job',
     {
       title: '领取基准表维护任务',
-      description: '领取最早的后台基准表维护任务。先读取 job.contract、当前基准与脱敏第一方档期观察；只有字段缺失或冲突时再联网补查。无任务时返回 null。',
+      description: '按精确 jobId 领取或恢复维护任务。返回 claimOutcome 区分领取、恢复、他人执行、结束或不存在；空结果不表示核查成功。',
       inputSchema: {
         agentId: z.string().min(1).max(100),
-        jobId: z.string().uuid().optional(),
+        jobId: z.string().uuid(),
         model: z.enum(CODEX_WORKER_MODELS).optional(),
         reasoningEffort: z.enum(CODEX_REASONING_EFFORTS).optional()
       },
@@ -407,14 +409,21 @@ export function createLocalMcpServer(
     },
     async ({ agentId, jobId, model, reasoningEffort }) => {
       try {
+        const claimed = database.claimAiScheduleJob(agentId, new Date(), jobId,
+          model && reasoningEffort ? { model, reasoningEffort } : undefined)
+        let current = claimed
+        if (!current) {
+          try { current = database.getAiScheduleJobById(jobId) } catch { /* Missing exact job. */ }
+        }
+        const resumable = current?.status === 'claimed' && current.agentId === agentId
         return toolResult({
           command: 'claim_schedule_job',
-          job: database.claimAiScheduleJob(
-            agentId,
-            new Date(),
-            jobId,
-            model && reasoningEffort ? { model, reasoningEffort } : undefined
-          )
+          claimOutcome: claimed ? 'claimed' : resumable ? 'resumed'
+            : current?.status === 'claimed' ? 'claimed_by_another_agent'
+            : current?.status ?? 'not_found',
+          job: claimed ?? (resumable ? current : null),
+          currentStatus: current?.status ?? null,
+          message: current?.message ?? '指定任务不存在'
         })
       } catch (error) {
         return toolError(error)

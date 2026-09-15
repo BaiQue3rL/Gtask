@@ -41,11 +41,7 @@ describe('software update service', () => {
   })
 
   it('returns an available release from any configured provider', async () => {
-    const fetcher = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      json: async () => ({ version: '1.1.0', releaseUrl: 'https://example.com/gtask' })
-    }))
+    const fetcher = vi.fn(async () => Response.json({ version: '1.1.0', releaseUrl: 'https://example.com/gtask' }))
     const service = new SoftwareUpdateService('1.0.0', [
       new JsonFeedUpdateProvider('primary', 'https://example.com/releases.json', fetcher)
     ])
@@ -61,17 +57,13 @@ describe('software update service', () => {
   })
 
   it('uses the release page matching the successful mirror', async () => {
-    const fetcher = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      json: async () => ({
+    const fetcher = vi.fn(async () => Response.json({
         version: '1.1.0',
         releaseUrl: 'https://github.com/BaiQue3rL/Gtask/releases/latest',
         releaseUrls: {
           gitee: 'https://gitee.com/l3rui/Gtask/releases/tag/v1.1.0',
           github: 'https://github.com/BaiQue3rL/Gtask/releases/tag/v1.1.0'
         }
-      })
     }))
 
     await expect(new JsonFeedUpdateProvider(
@@ -89,12 +81,8 @@ describe('software update service', () => {
     const fetcher = vi.fn(async (input: string | Request) => {
       const url = input.toString()
       requestedUrls.push(url)
-      if (url.includes('gitee.com')) return { ok: false, status: 503, json: async () => ({}) }
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({ version: '1.0.1', releaseUrl: 'https://github.com/BaiQue3rL/Gtask/releases/latest' })
-      }
+      if (url.includes('gitee.com')) return new Response('', { status: 503 })
+      return Response.json({ version: '1.0.1', releaseUrl: 'https://github.com/BaiQue3rL/Gtask/releases/latest' })
     })
     const service = new SoftwareUpdateService('1.0.0', createDefaultSoftwareUpdateProviders({
       fetcher

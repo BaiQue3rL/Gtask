@@ -224,8 +224,8 @@ function monthlyWindow(
     year,
     month,
     policy.startDay,
-    policy.hour - policy.timeZoneOffsetHours
-  )
+    policy.hour
+  ) - policy.timeZoneOffsetHours * 60 * 60 * 1000
   if (candidate > reference.getTime()) {
     month -= 1
     if (month < 0) {
@@ -237,14 +237,14 @@ function monthlyWindow(
     year,
     month,
     policy.startDay,
-    policy.hour - policy.timeZoneOffsetHours
-  ))
+    policy.hour
+  ) - policy.timeZoneOffsetHours * 60 * 60 * 1000)
   const endsAt = new Date(Date.UTC(
     year,
     month + 1,
     policy.startDay,
-    policy.hour - policy.timeZoneOffsetHours
-  ))
+    policy.hour
+  ) - policy.timeZoneOffsetHours * 60 * 60 * 1000)
   return { startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString() }
 }
 
@@ -278,8 +278,8 @@ function versionRelativeWindow(
     shifted.getUTCFullYear(),
     shifted.getUTCMonth(),
     shifted.getUTCDate() + policy.startDayOffset,
-    policy.hour - policy.timeZoneOffsetHours
-  )
+    policy.hour
+  ) - policy.timeZoneOffsetHours * 60 * 60 * 1000
   if (startsAt >= versionEnd) return null
   return {
     startsAt: new Date(startsAt).toISOString(),

@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, shallowRef, watch } from 'vue'
+import ChecklistRows from './ChecklistRows.vue'
+import { nextChecklistClockUpdate } from './checklist-clock'
 import type {
   AppInfo,
   BackupSummary,
@@ -122,7 +124,7 @@ const gameIcons: Record<GameId, string> = {
 }
 const hiddenGameIds = ref<GameId[]>(readHiddenGameIds(window.localStorage))
 const panelOrders = ref(readPanelOrders(window.localStorage))
-const items = ref<ChecklistItem[]>([])
+const items = shallowRef<ChecklistItem[]>([])
 const archivedItems = ref<ChecklistItem[]>([])
 const appInfo = ref<AppInfo | null>(null)
 const loading = ref(true)
@@ -320,8 +322,14 @@ const removeSyncProgressListener = window.gtask.onSyncProgress((progress) => {
     return
   }
 })
+const nextClockRenderAt = computed(() => nextChecklistClockUpdate([
+  ...items.value.flatMap((item) => [item.startsAt, item.endsAt]),
+  ...gameVersionSummaries.value.map((game) => game.endsAt),
+  remoteCatalogManualRetryAt.value
+], clockNow.value))
 const clockTimer = window.setInterval(() => {
-  clockNow.value = Date.now()
+  const now = Date.now()
+  if (now >= nextClockRenderAt.value || now < clockNow.value) clockNow.value = now
 }, 1_000)
 onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
@@ -557,10 +565,12 @@ async function restoreChecklistScroll(snapshot: ChecklistScrollSnapshot): Promis
   restore()
 }
 
+let itemsLoadGeneration = 0
 async function loadItems(
   options: { showLoading?: boolean; preserveScroll?: boolean } = {}
 ): Promise<void> {
   const gameId = selectedGameId.value
+  const generation = ++itemsLoadGeneration
   const showLoading = options.showLoading ?? false
   const preserveScroll = options.preserveScroll ?? true
   const scrollSnapshot = preserveScroll ? captureChecklistScroll() : null
@@ -568,7 +578,7 @@ async function loadItems(
   errorMessage.value = ''
   try {
     const loadedItems = await window.gtask.listChecklistItems(gameId)
-    if (selectedGameId.value === gameId) {
+    if (selectedGameId.value === gameId && generation === itemsLoadGeneration) {
       items.value = loadedItems
       const mapItems = loadedItems.filter((item) => item.category === 'exploration')
       const currentBranchKeys = collectMapBranchKeys(mapItems)
@@ -584,9 +594,9 @@ async function loadItems(
       if (scrollSnapshot) await restoreChecklistScroll(scrollSnapshot)
     }
   } catch (error) {
-    if (selectedGameId.value === gameId) showError(error)
+    if (selectedGameId.value === gameId && generation === itemsLoadGeneration) showError(error)
   } finally {
-    if (showLoading && selectedGameId.value === gameId) loading.value = false
+    if (selectedGameId.value === gameId && generation === itemsLoadGeneration) loading.value = false
   }
 }
 
@@ -757,13 +767,15 @@ function syncStateClass(state: SyncTargetState | undefined): string {
   return state?.status ?? 'idle'
 }
 
+let archivedLoadGeneration = 0
 async function loadArchivedItems(): Promise<void> {
   const gameId = selectedGameId.value
+  const generation = ++archivedLoadGeneration
   try {
     const loadedItems = await window.gtask.listArchivedChecklistItems(gameId)
-    if (selectedGameId.value === gameId) archivedItems.value = loadedItems
+    if (selectedGameId.value === gameId && generation === archivedLoadGeneration) archivedItems.value = loadedItems
   } catch (error) {
-    if (selectedGameId.value === gameId) showError(error)
+    if (selectedGameId.value === gameId && generation === archivedLoadGeneration) showError(error)
   }
 }
 
@@ -1253,7 +1265,7 @@ function itemsFor(categories: ChecklistCategory[]): ChecklistItem[] {
   ).sort((left, right) => compareChecklistItems(left, right, clockNow.value))
 }
 
-function panelItems(panel: ChecklistPanel): ChecklistTreeRow[] {
+function buildPanelItems(panel: ChecklistPanel): ChecklistTreeRow[] {
   const visible = itemsFor(panel.categories)
   if (panel.section !== 'exploration') {
     return visible.map((item) => ({
@@ -1272,10 +1284,8 @@ function panelItems(panel: ChecklistPanel): ChecklistTreeRow[] {
   return showIncompleteOnly.value ? filterIncompleteMapTreeRows(rows) : rows
 }
 
-function panelItemColumns(panel: ChecklistPanel): ChecklistTreeRow[][] {
-  const rows = panelItems(panel)
-  return rows.length === 0 ? [] : [rows]
-}
+const panelRows = computed(() => new Map(panels.map((panel) => [panel.section, buildPanelItems(panel)])))
+function panelItems(panel: ChecklistPanel): ChecklistTreeRow[] { return panelRows.value.get(panel.section) ?? [] }
 
 function toggleMapBranch(item: ChecklistItem): void {
   const key = item.remoteKey ?? item.id
@@ -1338,9 +1348,10 @@ async function saveItem(): Promise<void> {
       ? await window.gtask.updateChecklistItem({ id: editingItem.value.id, ...common })
       : await window.gtask.createChecklistItem({ gameId: selectedGameId.value, ...common })
 
+    if (saved.gameId !== selectedGameId.value) { editorOpen.value = false; return }
     const index = items.value.findIndex((item) => item.id === saved.id)
-    if (index >= 0) items.value[index] = saved
-    else items.value.push(saved)
+    items.value = index >= 0 ? items.value.map((item, position) => position === index ? saved : item) : [...items.value, saved]
+    void loadItems()
     editorOpen.value = false
   } catch (error) {
     showError(error)
@@ -1354,11 +1365,11 @@ async function toggleCompleted(item: ChecklistItem): Promise<void> {
   const scrollLeft = workspaceElement.value?.scrollLeft ?? 0
   try {
     const updatedItems = await window.gtask.setChecklistCompletion(item.id, !item.completed)
+    if (item.gameId !== selectedGameId.value) return
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
-    for (const updated of updatedItems) {
-      const index = items.value.findIndex((candidate) => candidate.id === updated.id)
-      if (index >= 0) items.value[index] = updated
-    }
+    const updates = new Map(updatedItems.map((updated) => [updated.id, updated]))
+    items.value = items.value.map((candidate) => updates.get(candidate.id) ?? candidate)
+    void loadItems({ preserveScroll: false })
     await nextTick()
     const restoreScrollPosition = (): void => {
       workspaceElement.value?.scrollTo({
@@ -1386,9 +1397,12 @@ function archiveItem(item: ChecklistItem): void {
     confirmLabel: '删除',
     onConfirm: async () => {
       await window.gtask.archiveChecklistItem(item.id)
+      if (item.gameId !== selectedGameId.value) return
       items.value = items.value.filter((candidate) => candidate.id !== item.id)
       archivedItems.value.unshift(item)
       editorOpen.value = false
+      void loadItems()
+      void loadArchivedItems()
     }
   })
 }
@@ -1419,8 +1433,12 @@ function archiveCompletedSection(
 async function restoreItem(item: ChecklistItem): Promise<void> {
   try {
     const restored = await window.gtask.restoreChecklistItem(item.id)
+    if (restored.gameId !== selectedGameId.value) return
     archivedItems.value = archivedItems.value.filter((candidate) => candidate.id !== item.id)
-    items.value.push(restored)
+    const index = items.value.findIndex((candidate) => candidate.id === restored.id)
+    items.value = index >= 0 ? items.value.map((item, position) => position === index ? restored : item) : [...items.value, restored]
+    void loadItems()
+    void loadArchivedItems()
   } catch (error) {
     showError(error)
   }
@@ -1438,7 +1456,10 @@ function emptyRecycleBin(): void {
     confirmLabel: '永久删除',
     onConfirm: async () => {
       const deleted = await window.gtask.emptyRecycleBin(gameId)
-      if (deleted > 0) archivedItems.value = []
+      if (deleted > 0 && gameId === selectedGameId.value) {
+        archivedItems.value = []
+        void loadArchivedItems()
+      }
     }
   })
 }
@@ -1687,17 +1708,9 @@ function showError(error: unknown): void {
                 </div>
               </div>
               <div class="item-list panel-item-columns">
-                <TransitionGroup
-                  v-for="(itemColumn, itemColumnIndex) in panelItemColumns(panel)"
-                  :key="itemColumnIndex"
-                  name="checklist-flow"
-                  tag="div"
-                  class="item-list-column"
-                  :class="{ 'motion-suppressed': globalSyncBusy }"
-                >
+                <ChecklistRows :rows="panelItems(panel)" :scroll-container="workspaceElement" v-slot="{ row }"
+                  :class="{ 'motion-suppressed': globalSyncBusy }">
                   <div
-                    v-for="row in itemColumn"
-                    :key="row.item.id"
                     class="checklist-row"
                     :class="{
                       completed: row.item.completed,
@@ -1731,6 +1744,7 @@ function showError(error: unknown): void {
                     @click="activateChecklistItem(row.item, panel.section, row.hasChildren)"
                   >
                     <span class="item-identity">
+                      <span v-if="row.parentContext" class="item-parent-context">{{ row.parentContext }} /</span>
                       <span class="item-title">{{ row.item.title }}</span>
                       <span
                         v-for="tag in row.item.activityTags"
@@ -1747,10 +1761,11 @@ function showError(error: unknown): void {
                       class="item-timing deadline"
                       :class="isExpired(row.item.endsAt) ? 'expired' : deadlineTone(row.item.endsAt)"
                     >{{ countdown(row.item.endsAt) }}</span>
+                    <span v-else-if="row.item.category === 'limited_event'" class="item-timing">截止时间待确认</span>
                   </button>
                     <button v-if="panel.section === 'custom'" class="more-button" type="button" aria-label="编辑" @click="openEdit(row.item)">⋮</button>
                   </div>
-                </TransitionGroup>
+                </ChecklistRows>
                 <p v-if="panelItems(panel).length === 0" class="empty-text">这里还没有事项</p>
               </div>
               <button v-if="panel.allowCreate === true" class="add-button" type="button" @click="openCreate(panel.defaultCategory)">
@@ -1889,18 +1904,18 @@ function showError(error: unknown): void {
               </div>
 
               <div class="settings-section-block">
-                <h3 class="settings-heading">显示还没开始的事项</h3>
+                <h3 class="settings-heading">显示还没开始的活动</h3>
                 <div class="settings-box">
                   <label class="software-update-toggle">
                     <span>
                       <strong>提前显示</strong>
-                      <small>默认等活动和任务开始后再显示，减少不必要的等待感。</small>
+                      <small>默认等限时活动开始后再显示；周期挑战在空窗期仍显示下期开启时间。</small>
                     </span>
                     <input
                       class="toggle-switch-input"
                       type="checkbox"
                       :checked="showUpcomingBaselineItems"
-                      aria-label="显示还没开始的事项"
+                      aria-label="显示还没开始的活动"
                       @change="saveUpcomingBaselineVisibility(($event.target as HTMLInputElement).checked)"
                     >
                     <span class="toggle-switch" aria-hidden="true"><span class="toggle-switch-thumb"></span></span>

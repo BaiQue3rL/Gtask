@@ -134,7 +134,7 @@ describe('鸣潮个人进度解析', () => {
     expect(parseWutheringWavesTower({
       isUnlock: true,
       seasonEndTime: 1787183999,
-      difficultyList: [{ towerAreaList: [{ star: 0, floorList: [{ floor: 1, star: 0 }] }] }]
+      difficultyList: [{ difficultyName: '深境区', towerAreaList: [{ star: 0, floorList: [{ floor: 1, star: 0 }] }] }]
     })).toMatchObject({ completed: false })
     expect(parseWutheringWavesSlash({
       isUnlock: true,

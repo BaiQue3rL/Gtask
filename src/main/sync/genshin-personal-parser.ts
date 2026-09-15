@@ -90,26 +90,18 @@ export function parseExplorations(value: unknown): NormalizedSyncItem[] {
     const areas = Array.isArray(exploration.area_exploration_list)
       ? exploration.area_exploration_list.filter(isRecord)
       : []
-    return { id, title, rawProgress, parentId, areas }
+    return { id, title, rawProgress, parentId, areas, type: exploration.type }
   })
   const byId = new Map(parsed.map((exploration) => [exploration.id, exploration]))
-  const childrenByParent = new Map<string, typeof parsed>()
-  for (const exploration of parsed) {
-    if (!exploration.parentId || !byId.has(exploration.parentId)) continue
-    const children = childrenByParent.get(exploration.parentId) ?? []
-    children.push(exploration)
-    childrenByParent.set(exploration.parentId, children)
-  }
 
   const items = parsed.map((exploration): NormalizedSyncItem => {
-    const children = childrenByParent.get(exploration.id) ?? []
-    const progressPercent = resolveExplorationProgress(exploration.rawProgress, children)
+    const { progressPercent, completed } = resolveExplorationProgress(exploration, parsed)
     const parent = exploration.parentId ? byId.get(exploration.parentId) : undefined
     return {
       remoteKey: `exploration:world:${exploration.id}`,
       category: 'exploration',
       title: exploration.title,
-      completed: progressPercent === 100,
+      completed,
       progressPercent,
       parentTitle: parent?.title ?? null,
       mapNodeKind: parent ? 'subregion' : 'region',
@@ -158,9 +150,8 @@ export function extractGenshinExplorationProgressCandidates(
   const parsed = explorations.map((exploration) => ({
     id: requiredIdentifier(exploration.id, '探索区域 id'),
     title: requiredString(exploration.name, '探索区域名称'),
-    observedProgress: clampPercentage(
-      requiredNumber(exploration.exploration_percentage, '探索度') / 10
-    ),
+    rawProgress: requiredNumber(exploration.exploration_percentage, '探索度'),
+    type: exploration.type,
     parentId: optionalIdentifier(exploration.parent_id),
     areas: Array.isArray(exploration.area_exploration_list)
       ? exploration.area_exploration_list.filter(isRecord)
@@ -172,7 +163,7 @@ export function extractGenshinExplorationProgressCandidates(
     .filter((entry) => entry.parentId)
     .map((entry) => `${entry.parentId}:${normalizeExplorationTitle(entry.title)}`))
   for (const exploration of parsed) {
-    const children = parsed.filter((candidate) => candidate.parentId === exploration.id)
+    const { progressPercent, completed } = resolveExplorationProgress(exploration, parsed)
     drafts.push({
       target: 'exploration',
       kind: 'personal-map-progress',
@@ -180,10 +171,8 @@ export function extractGenshinExplorationProgressCandidates(
         provider: 'miyoushe',
         officialId: exploration.id,
         officialTitle: exploration.title,
-        observedProgress: resolveExplorationProgress(
-          exploration.observedProgress * 10,
-          children.map((child) => ({ rawProgress: child.observedProgress * 10 }))
-        ),
+        observedProgress: progressPercent,
+        ...(progressPercent === null && completed !== undefined ? { observedCompleted: completed } : {}),
         observedNodeKind: exploration.parentId ? 'subregion' : 'region',
         observedParentId: exploration.parentId,
         observedParentTitle: exploration.parentId
@@ -218,15 +207,39 @@ export function extractGenshinExplorationProgressCandidates(
   return drafts
 }
 
+interface GenshinExplorationProgress {
+  id: string
+  parentId: string | null
+  rawProgress: number
+  type: unknown
+}
+
 function resolveExplorationProgress(
-  rawProgress: number,
-  children: Array<{ rawProgress: number }>
-): number | null {
-  const directProgress = clampPercentage(rawProgress / 10)
-  if (directProgress > 0 || children.length === 0) return directProgress
-  if (children.every((child) => clampPercentage(child.rawProgress / 10) === 100)) return 100
-  if (children.some((child) => clampPercentage(child.rawProgress / 10) > 0)) return null
-  return 0
+  exploration: GenshinExplorationProgress,
+  all: GenshinExplorationProgress[]
+): { progressPercent: number | null; completed: boolean | undefined } {
+  // Verified against the 2026-09-15 personal endpoint: Offering 10 is the
+  // Chenyu aggregate, whose zero is a placeholder beside areas 11, 12, 13.
+  // This exception must never reinterpret a country's real total (including
+  // zero), or infer a new denominator from whatever children happen to arrive.
+  if (exploration.id !== '10' || exploration.type !== 'Offering' ||
+    exploration.parentId || exploration.rawProgress !== 0) {
+    const progressPercent = clampPercentage(exploration.rawProgress / 10)
+    return { progressPercent, completed: progressPercent === 100 }
+  }
+  const children = all.filter(item => item.parentId === exploration.id)
+  const expected = ['11', '12', '13']
+  const completeCoverage = children.length === expected.length && expected.every(id =>
+    children.filter(child => child.id === id).length === 1
+  )
+  if (completeCoverage && children.every(child => child.rawProgress >= 1000)) {
+    return { progressPercent: 100, completed: true }
+  }
+  const hasIncompleteChild = children.some(child => expected.includes(child.id) &&
+    child.rawProgress >= 0 && child.rawProgress < 1000)
+  // Partial exploration proves incompletion, but does not establish an
+  // aggregate percentage. Missing/changed coverage alone proves neither.
+  return { progressPercent: null, completed: hasIncompleteChild ? false : undefined }
 }
 
 function normalizeExplorationTitle(value: string): string {
@@ -244,7 +257,12 @@ export function parseSpiralAbyss(value: unknown): NormalizedSyncItem {
     ))
   })
   const hasChallengeRecord = hasChallengeRecordEvidence({
-    positiveValues: [data.total_battle_times, battles.length]
+    positiveValues: [data.total_battle_times, battles.length > 0 ? battles.length : undefined],
+    knownEmpty: Array.isArray(data.floors) && data.floors.every((floor) =>
+      isRecord(floor) && Array.isArray(floor.levels) && floor.levels.every((level) =>
+        isRecord(level) && Array.isArray(level.battles) && level.battles.length === 0
+      )
+    )
   })
   return {
     remoteKey: 'endgame:spiral-abyss',
@@ -268,7 +286,7 @@ export function parseImaginariumTheater(value: unknown): NormalizedSyncItem | nu
   const schedule = requiredRecord(data.schedule, '幻想真境剧诗 schedule')
   const stats = requiredRecord(data.stat, '幻想真境剧诗 stat')
   const scheduleId = requiredIdentifier(schedule.schedule_id, '幻想真境剧诗 schedule_id')
-  const bestRecord = finiteNumber(stats.max_round_id) ?? 0
+  const bestRecord = finiteNumber(stats.max_round_id)
   const medalStates = Array.isArray(stats.get_medal_round_list)
     ? stats.get_medal_round_list.filter((value): value is boolean => typeof value === 'boolean')
     : []
@@ -325,7 +343,7 @@ export function parseStygianOnslaught(value: unknown): NormalizedSyncItem | null
   const schedule = requiredRecord(data.schedule, '幽境危战 schedule')
   const single = requiredRecord(data.single, '幽境危战 single')
   const best = isRecord(single.best) ? single.best : null
-  const difficulty = best ? finiteNumber(best.difficulty) ?? 0 : 0
+  const difficulty = best ? finiteNumber(best.difficulty) : undefined
   const scheduleId = requiredIdentifier(schedule.schedule_id, '幽境危战 schedule_id')
   return {
     remoteKey: 'endgame:stygian-onslaught',

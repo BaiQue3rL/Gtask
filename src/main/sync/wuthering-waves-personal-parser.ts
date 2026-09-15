@@ -113,8 +113,8 @@ export function parseWutheringWavesTower(value: unknown): NormalizedSyncItem {
   const difficulties = recordArray(root.difficultyList).filter(isRecurringTowerDifficulty)
   const manualFloors = difficulties.flatMap((difficulty) => {
     const areas = recordArray(difficulty.towerAreaList)
-    return areas.flatMap((area, areaIndex) => {
-      const isCentralArea = isCentralTowerArea(area, areaIndex, areas.length)
+    return areas.flatMap((area) => {
+      const isCentralArea = isCentralTowerArea(area)
       return recordArray(area.floorList).filter((floor) => (
         isCentralArea || (finiteNumber(floor.floor) ?? 0) >= 4
       ))
@@ -122,7 +122,11 @@ export function parseWutheringWavesTower(value: unknown): NormalizedSyncItem {
   })
   const completed = hasChallengeRecordEvidence({
     explicitFlags: manualFloors.map((floor) => floor.hasRecord),
-    positiveValues: manualFloors.flatMap((floor) => [floor.star, floor.score])
+    positiveValues: manualFloors.flatMap((floor) => [floor.star, floor.score]),
+    knownEmpty: isRecordArray(root.difficultyList) && root.difficultyList.every((difficulty) =>
+      Boolean(normalizedTitle(difficulty.difficultyName ?? difficulty.name)) &&
+      isRecordArray(difficulty.towerAreaList) && difficulty.towerAreaList.every((area) =>
+        isRecordArray(area.floorList))) && manualFloors.length === 0
   })
   return endgameItem(
     'tower-of-adversity',
@@ -151,7 +155,9 @@ export function parseWutheringWavesSlash(value: unknown): NormalizedSyncItem {
     positiveValues: [
       ...challenges.map((challenge) => challenge.score),
       ...halves.map((half) => half.score)
-    ]
+    ],
+    knownEmpty: isRecordArray(root.difficultyList) && difficulties.every((difficulty) =>
+      isRecordArray(difficulty.challengeList)) && challenges.length === 0
   })
   return endgameItem(
     'whimpering-wastes',
@@ -167,7 +173,8 @@ export function parseWutheringWavesMatrix(value: unknown): NormalizedSyncItem {
     explicitFlags: [root.hasRecord, ...modes.map((mode) => mode.hasRecord)],
     // `passBoss` is the quick-pass/result flag. It does not prove that the
     // player manually entered a challenge, so it must never count here.
-    positiveValues: modes.map((mode) => mode.score)
+    positiveValues: modes.map((mode) => mode.score),
+    knownEmpty: isRecordArray(root.modeDetails) && modes.length === 0
   })
   return endgameItem(
     'endstate-matrix',
@@ -179,7 +186,7 @@ export function parseWutheringWavesMatrix(value: unknown): NormalizedSyncItem {
 function endgameItem(
   modeKey: string,
   title: string,
-  completed: boolean
+  completed: boolean | undefined
 ): NormalizedSyncItem {
   return {
     remoteKey: `endgame:${modeKey}`,
@@ -205,14 +212,13 @@ function isRecurringTowerDifficulty(difficulty: Record<string, unknown>): boolea
   return name.includes('深境区') || /hazard\s*zone|deep\s*zone/iu.test(name)
 }
 
-function isCentralTowerArea(
-  area: Record<string, unknown>,
-  index: number,
-  areaCount: number
-): boolean {
+function isCentralTowerArea(area: Record<string, unknown>): boolean {
   const name = normalizedTitle(area.areaName ?? area.name)
-  if (name.includes('深境之塔') || /hazard\s*tower|deep\s*tower/iu.test(name)) return true
-  return areaCount >= 3 && index > 0 && index < areaCount - 1
+  return name.includes('深境之塔') || /hazard\s*tower|deep\s*tower/iu.test(name)
+}
+
+function isRecordArray(value: unknown): value is Record<string, unknown>[] {
+  return Array.isArray(value) && value.every(isRecord)
 }
 
 function normalizedTitle(value: unknown): string {

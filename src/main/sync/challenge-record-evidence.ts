@@ -3,6 +3,8 @@ import { finiteNumber } from './numbers'
 export interface ChallengeRecordEvidence {
   explicitFlags?: readonly unknown[]
   positiveValues?: readonly unknown[]
+  /** An endpoint returned a complete, empty list of eligible manual records. */
+  knownEmpty?: boolean
 }
 
 /**
@@ -12,9 +14,14 @@ export interface ChallengeRecordEvidence {
  */
 export function hasChallengeRecordEvidence(
   evidence: ChallengeRecordEvidence
-): boolean {
-  return Boolean(
+): boolean | undefined {
+  if (
     evidence.explicitFlags?.some((value) => value === true) ||
     evidence.positiveValues?.some((value) => (finiteNumber(value) ?? 0) > 0)
-  )
+  ) return true
+  if (evidence.knownEmpty ||
+    evidence.explicitFlags?.some((value) => value === false) ||
+    evidence.positiveValues?.some((value) => finiteNumber(value) === 0)) return false
+  // Missing/invalid fields are not an observation that the player did nothing.
+  return undefined
 }

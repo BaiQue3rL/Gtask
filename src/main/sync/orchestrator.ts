@@ -48,8 +48,10 @@ export class SyncOrchestrator {
     }
   ): Promise<SyncResult> {
     const startedAt = new Date().toISOString()
-    this.database.recordPersonalSyncAttempt(gameId)
-    this.database.recordSyncTargetAttempt(gameId, target)
+    if (!this.shuttingDown) {
+      this.database.recordPersonalSyncAttempt(gameId)
+      this.database.recordSyncTargetAttempt(gameId, target)
+    }
     const personal = await this.syncPersonalData(gameId, target, requestContext)
     if (this.shuttingDown) {
       return {
@@ -114,7 +116,11 @@ export class SyncOrchestrator {
       userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
     }
   ): Promise<SyncSourceResult> {
-    const key = `${gameId}:${target}:${requestContext.outputLocale}:${requestContext.userTimeZone}`
+    if (this.shuttingDown) return Promise.resolve({
+      source: 'personal_data', status: 'cancelled', message: '应用已退出，任务已取消',
+      added: 0, updated: 0, preserved: 0
+    })
+    const key = `${gameId}:${target}:personal`
     const existing = this.personalInFlight.get(key)
     if (existing) return existing.operation
     const controller = new AbortController()
@@ -222,13 +228,9 @@ export class SyncOrchestrator {
         normalizedItems,
         result.adapterVersion ?? 'personal-adapter-v1',
         new Date(),
-        requestContext
-      )
-      this.database.replaceScheduleObservations(
-        gameId,
-        target,
-        result.scheduleObservations ?? [],
-        new Date()
+        requestContext,
+        true,
+        result.scheduleObservations ?? []
       )
       merge.added += replaced.added
       merge.updated += replaced.updated
@@ -299,7 +301,7 @@ export class SyncOrchestrator {
     target: PersonalSyncTarget,
     progress: SyncAdapterProgress
   ): void {
-    this.onProgress?.({
+    try { this.onProgress?.({
       gameId,
       target,
       source: 'personal_data',
@@ -310,6 +312,9 @@ export class SyncOrchestrator {
       current: progress.current ?? null,
       total: progress.total ?? null,
       updatedAt: new Date().toISOString()
-    })
+    }) } catch {
+      // Progress delivery is observability, never part of the data transaction.
+      // A closed renderer must not turn a successful commit into a failed sync.
+    }
   }
 }

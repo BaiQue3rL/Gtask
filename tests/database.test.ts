@@ -1,4 +1,4 @@
-﻿import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -2868,7 +2868,7 @@ describe('AppDatabase', () => {
         userTimeZone: 'America/Los_Angeles'
       },
       contract: {
-        schemaVersion: 15,
+        schemaVersion: 16,
         decisionAuthority: 'codex',
         executorPolicy: 'mechanical_validation_only'
       }

@@ -30,12 +30,12 @@ export function isUpcomingBaselineItem(
   return Number.isFinite(startsAt) && startsAt > referenceTime
 }
 
-export function filterUpcomingBaselineItems<Item extends Pick<ChecklistItem, 'source' | 'startsAt'>>(
+export function filterUpcomingBaselineItems<Item extends Pick<ChecklistItem, 'source' | 'startsAt'> & Partial<Pick<ChecklistItem, 'category'>>>(
   items: readonly Item[],
   referenceTime: number,
   showUpcoming: boolean
 ): Item[] {
   return showUpcoming
     ? [...items]
-    : items.filter((item) => !isUpcomingBaselineItem(item, referenceTime))
+    : items.filter((item) => item.category === 'endgame' || !isUpcomingBaselineItem(item, referenceTime))
 }

@@ -19,6 +19,17 @@ afterEach(() => {
 })
 
 describe('application logger', () => {
+  it('redacts entire bearer and cookie headers and handles circular arrays', () => {
+    const logger = new ApplicationLogger(temporaryDirectory())
+    logger.error('headers', { message: 'Authorization: Bearer sensitive-bearer\nCookie: a=one; cookie_token_v2=sensitive-cookie' })
+    const circular: unknown[] = []
+    circular.push(circular)
+    logger.info('circular', circular)
+    const log = readFileSync(logger.filePath, 'utf8')
+    expect(log).not.toContain('sensitive-bearer')
+    expect(log).not.toContain('sensitive-cookie')
+    expect(log).toContain('[circular]')
+  })
   it('stores structured logs and redacts sensitive values', () => {
     const directory = temporaryDirectory()
     const logger = new ApplicationLogger(directory, {

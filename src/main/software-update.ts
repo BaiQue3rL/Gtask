@@ -1,5 +1,6 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { readFileSync } from 'node:fs'
+import { writeFileAtomically } from './atomic-file'
+import { readBoundedJson, type BoundedResponse } from './bounded-response'
 import type {
   SoftwareUpdateCheckResult,
   SoftwareUpdateSettings,
@@ -33,7 +34,7 @@ export interface UpdateProvider {
 type FetchLike = (
   input: string | Request,
   init?: RequestInit
-) => Promise<Pick<Response, 'ok' | 'status' | 'json'>>
+) => Promise<BoundedResponse>
 
 export interface DefaultSoftwareUpdateProviderOptions {
   feedOverride?: string
@@ -75,8 +76,7 @@ export function writeSoftwareUpdateSettings(
   settings: SoftwareUpdateSettings
 ): SoftwareUpdateSettings {
   const normalized = parseSoftwareUpdateSettings(settings)
-  mkdirSync(dirname(filePath), { recursive: true })
-  writeFileSync(filePath, `${JSON.stringify(normalized, null, 2)}\n`, 'utf8')
+  writeFileAtomically(filePath, `${JSON.stringify(normalized, null, 2)}\n`)
   return normalized
 }
 
@@ -147,7 +147,8 @@ export class JsonFeedUpdateProvider implements UpdateProvider {
       signal
     })
     if (!response.ok) throw new Error(`更新源返回 HTTP ${response.status}`)
-    const payload = await response.json() as Record<string, unknown>
+    const payload = await readBoundedJson(response, 64_000, signal) as Record<string, unknown>
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('更新数据格式不正确')
     if (typeof payload.version !== 'string' || !numericVersionParts(payload.version)) {
       throw new Error('更新源未返回有效版本号')
     }
@@ -203,7 +204,7 @@ export class SoftwareUpdateService {
       }
     }
 
-    for (const provider of providers) {
+    const results = await Promise.all(providers.map(async (provider) => {
       const controller = new AbortController()
       let timeout: ReturnType<typeof setTimeout> | null = null
       try {
@@ -216,29 +217,31 @@ export class SoftwareUpdateService {
             }, this.timeoutMs)
           })
         ])
-        const checkedAt = reference.toISOString()
-        if (!update || compareSoftwareVersions(update.version, this.currentVersion) <= 0) {
-          return {
-            outcome: 'up_to_date',
-            currentVersion: this.currentVersion,
-            latestVersion: update?.version ?? this.currentVersion,
-            releaseUrl: update?.releaseUrl ?? null,
-            checkedAt,
-            message: '当前已是最新版本'
-          }
-        }
-        return {
-          outcome: 'update_available',
-          currentVersion: this.currentVersion,
-          latestVersion: update.version,
-          releaseUrl: update.releaseUrl,
-          checkedAt,
-          message: `发现新版本 ${update.version}`
-        }
+        if (update) compareSoftwareVersions(update.version, this.currentVersion)
+        return { providerId: provider.id, update }
       } catch {
-        // A repository mirror is best-effort. Try the next configured source.
+        return null
       } finally {
         if (timeout) clearTimeout(timeout)
+      }
+    }))
+    const valid = results.filter((result) => result !== null)
+    const github = valid.find((result) => result.providerId === 'github')
+    const override = valid.find((result) => result.providerId === 'override')
+    const first = valid[0]
+    const selected = override ?? (github && first &&
+      github.update?.version !== first.update?.version ? github : first)
+    if (selected) {
+      const update = selected.update
+      const available = update && compareSoftwareVersions(update.version, this.currentVersion) > 0
+      return {
+        outcome: available ? 'update_available' : 'up_to_date',
+        currentVersion: this.currentVersion,
+        latestVersion: update?.version ?? this.currentVersion,
+        releaseUrl: update?.releaseUrl ?? (github?.update?.version === update?.version
+          ? github?.update?.releaseUrl ?? null : null),
+        checkedAt: reference.toISOString(),
+        message: available ? `发现新版本 ${update.version}` : '当前已是最新版本'
       }
     }
 

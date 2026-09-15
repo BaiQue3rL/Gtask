@@ -106,11 +106,15 @@ export function personalMapsFromCandidates(
       ? draft.payload.officialTitle.trim()
       : ''
     const progress = draft.payload.observedProgress
+    const explicitCompletion = draft.payload.observedCompleted
     const nodeKind = draft.payload.observedNodeKind
-    if (!id || !title || typeof progress !== 'number' || !Number.isFinite(progress) ||
-      progress < 0 || progress > 100) {
+    if (!id || !title || (progress !== null && (typeof progress !== 'number' || !Number.isFinite(progress) ||
+      progress < 0 || progress > 100))) {
       throw new Error('官方地图进度缺少稳定标识、名称或进度')
     }
+    // A grouping row can lack a numeric total. Keep known completion evidence
+    // without inventing a percentage; skip wholly unknown observations.
+    if (progress === null && typeof explicitCompletion !== 'boolean') continue
     const parentId = readIdentifier(draft.payload.observedParentId)
     const parentRemoteKey = parentId ? remoteKeyByOfficialId.get(parentId) ?? null : null
     const validNodeKind = nodeKind === 'region' || nodeKind === 'subregion' ? nodeKind : null
@@ -118,7 +122,7 @@ export function personalMapsFromCandidates(
       remoteKey: remoteKeyByOfficialId.get(id)!,
       category: 'exploration',
       title,
-      completed: progress === 100,
+      completed: progress === null ? explicitCompletion as boolean : progress === 100,
       progressPercent: progress,
       parentTitle: typeof draft.payload.observedParentTitle === 'string'
         ? draft.payload.observedParentTitle.trim() || null

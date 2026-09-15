@@ -1,4 +1,4 @@
-﻿import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -39,6 +39,23 @@ async function connect(): Promise<Client> {
 }
 
 describe('本地 MCP server', () => {
+  it('要求精确任务 ID，并明确区分恢复和不存在，不能领取无关任务', async () => {
+    const connected = await connect()
+    await connected.callTool({ name: 'register_gtask_schedule_agent', arguments: {
+      agentId: 'audit-agent', name: 'Audit', webSearch: true
+    } })
+    const queued = database!.createAiScheduleJob('genshin', 'public_schedule')
+    const missingId = await connected.callTool({ name: 'claim_gtask_schedule_job', arguments: { agentId: 'audit-agent' } })
+    expect(missingId.isError).toBe(true)
+    expect(database!.getAiScheduleJobById(queued.id).status).toBe('pending')
+    const request = { name: 'claim_gtask_schedule_job', arguments: { agentId: 'audit-agent', jobId: queued.id } }
+    expect((await connected.callTool(request)).structuredContent).toMatchObject({ claimOutcome: 'claimed' })
+    expect((await connected.callTool(request)).structuredContent).toMatchObject({ claimOutcome: 'resumed', job: { id: queued.id } })
+    const absent = await connected.callTool({ name: 'claim_gtask_schedule_job', arguments: {
+      agentId: 'audit-agent', jobId: '00000000-0000-4000-8000-000000000000'
+    } })
+    expect(absent.structuredContent).toMatchObject({ claimOutcome: 'not_found', job: null })
+  })
   it('公布读写工具并通过协议读取四游戏清单', async () => {
     const connected = await connect()
     const tools = await connected.listTools()
@@ -164,7 +181,7 @@ describe('本地 MCP server', () => {
     ).id).toBe(queued.id)
     const claimed = await connected.callTool({
       name: 'claim_gtask_schedule_job',
-      arguments: { agentId: 'test-agent' }
+      arguments: { agentId: 'test-agent', jobId: queued.id }
     })
     expect(claimed.structuredContent).toMatchObject({
       command: 'claim_schedule_job',
@@ -174,7 +191,7 @@ describe('本地 MCP server', () => {
         status: 'claimed',
         progressPhase: 'searching',
         contract: {
-          schemaVersion: 15,
+          schemaVersion: 16,
           authority: 'interface_contract',
           target: 'events',
           requestContext: {
@@ -196,8 +213,7 @@ describe('本地 MCP server', () => {
                 categories: ['limited_event'],
                 requiredFields: expect.arrayContaining([
                   'title',
-                  'startsAt',
-                  'endsAt'
+                  'startsAt+endsAt|deadlineReview'
                 ])
               })
             ])
@@ -433,7 +449,7 @@ describe('本地 MCP server', () => {
     )
     await connected.callTool({
       name: 'claim_gtask_schedule_job',
-      arguments: { agentId: 'custom-tag-agent' }
+      arguments: { agentId: 'custom-tag-agent', jobId: queued.id }
     })
 
     const unregistered = await connected.callTool({
@@ -531,7 +547,7 @@ describe('本地 MCP server', () => {
     const queued = database!.createAiScheduleJob('genshin', 'public_schedule')
     await connected.callTool({
       name: 'claim_gtask_schedule_job',
-      arguments: { agentId: 'timezone-agent' }
+      arguments: { agentId: 'timezone-agent', jobId: queued.id }
     })
     const result = await connected.callTool({
       name: 'apply_gtask_public_schedule',
@@ -675,7 +691,7 @@ describe('本地 MCP server', () => {
     )
     const claimed = await connected.callTool({
       name: 'claim_gtask_schedule_job',
-      arguments: { agentId: 'tag-mcp-agent' }
+      arguments: { agentId: 'tag-mcp-agent', jobId: queued.id }
     })
     const target = (
       claimed.structuredContent as {
@@ -726,7 +742,7 @@ describe('本地 MCP server', () => {
     )
     const tagClaimed = await connected.callTool({
       name: 'claim_gtask_schedule_job',
-      arguments: { agentId: 'tag-mcp-agent' }
+      arguments: { agentId: 'tag-mcp-agent', jobId: tagJob.id }
     })
     const tagTarget = (
       tagClaimed.structuredContent as {
@@ -783,7 +799,7 @@ describe('本地 MCP server', () => {
     )
     await connected.callTool({
       name: 'claim_gtask_schedule_job',
-      arguments: { agentId: 'map-agent' }
+      arguments: { agentId: 'map-agent', jobId: queued.id }
     })
     const sourceUrl = 'https://example.com/genshin-map-cn'
     const result = await connected.callTool({
@@ -863,7 +879,7 @@ describe('本地 MCP server', () => {
     )
     await connected.callTool({
       name: 'claim_gtask_schedule_job',
-      arguments: { agentId: 'version-agent' }
+      arguments: { agentId: 'version-agent', jobId: queued.id }
     })
     const now = Date.now()
     const startsAt = new Date(now - 24 * 60 * 60 * 1_000).toISOString()

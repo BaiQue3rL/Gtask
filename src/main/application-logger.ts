@@ -23,8 +23,9 @@ const SENSITIVE_KEY = /(?:authorization|cookie|credential|password|phone|secret|
 function sanitizeText(value: string): string {
   return value
     .replace(/\b1\d{10}\b/g, '[redacted-phone]')
+    .replace(/((?:authorization|cookie)\s*:\s*)[^\r\n]+/gi, '$1[redacted]')
     .replace(
-      /((?:authorization|cookie|password|secret|token|ticket)\s*[:=]\s*)[^\s,;]+/gi,
+      /([\w-]*(?:authorization|cookie|password|secret|token|ticket)[\w-]*\s*[:=]\s*)(?:Bearer\s+)?[^\s,;]+/gi,
       '$1[redacted]'
     )
 }
@@ -39,10 +40,10 @@ function sanitizeValue(value: unknown, key = '', seen = new WeakSet<object>()): 
       stack: value.stack ? sanitizeText(value.stack) : undefined
     }
   }
-  if (Array.isArray(value)) return value.map((entry) => sanitizeValue(entry, '', seen))
   if (!value || typeof value !== 'object') return value
   if (seen.has(value)) return '[circular]'
   seen.add(value)
+  if (Array.isArray(value)) return value.map((entry) => sanitizeValue(entry, '', seen))
   return Object.fromEntries(
     Object.entries(value as Record<string, unknown>)
       .map(([entryKey, entryValue]) => [entryKey, sanitizeValue(entryValue, entryKey, seen)])

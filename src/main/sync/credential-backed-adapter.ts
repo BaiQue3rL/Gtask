@@ -3,6 +3,7 @@ import type { GameId, SyncTarget } from '../../shared/contracts'
 import type { CredentialPayload } from '../credential-vault'
 import type { CredentialProvider } from '../../shared/contracts'
 import {
+  SyncCancelledError,
   SyncVerificationRequiredError,
   type SyncAdapter,
   type SyncAdapterOutput,
@@ -47,6 +48,12 @@ export class CredentialBackedAdapter implements SyncAdapter {
     }
     const adapter = this.createAdapter(credential, reportProgress, signal)
     const output = await adapter.sync(gameId, target, reportProgress, signal)
+    signal?.throwIfAborted()
+    const currentCredential = this.credentials.read(this.provider)
+    if (!currentCredential || currentCredential.kind !== credential.kind ||
+      currentCredential.value !== credential.value) {
+      throw new SyncCancelledError('登录信息已变化，旧账号同步结果已丢弃')
+    }
     return {
       ...output,
       accountScope: createPersonalAccountScope(this.provider, gameId, credential)

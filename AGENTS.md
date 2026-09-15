@@ -16,6 +16,7 @@ This file is an AI entry point. It is intentionally concise; users are not expec
 - Published hot catalog updates use `updates/catalog.json` and may mutate only `public_schedule` structure through the validated atomic remote-catalog path. They must never contain completion/progress, credentials, or `custom` items; GitHub is authoritative when a mirror diverges.
 - Public baseline research is a background MCP maintenance concern, not a product dependency or user-facing workflow. Do not expose Codex/plugin/Agent controls, public-data sync, or onboarding in the renderer.
 - Read `docs/sync-architecture-redesign.md` before changing synchronization architecture. Read `docs/next-session.md` for the latest handoff state.
+- Current public maintenance and publication follow `docs/catalog-maintenance.md`. New facts are compiled into `updates/catalog.json`, which is also embedded in the application. Historical TypeScript seeds are compatibility inputs, not a second place to repeat each catalog edit. Protocol v2 adds verified missing-deadline exceptions and typed published schedule rules/windows; verify client capability before publishing them.
 - Never change the product version, create a version tag, or publish a release unless the user explicitly approves that specific version release. Ordinary fixes and release-pipeline tests do not justify a version bump.
 - Preserve unrelated user changes and untracked research directories. Never reset or delete the database, credentials, backups, release artifacts, or test references unless the user explicitly requests it.
 

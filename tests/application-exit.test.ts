@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { terminateApplicationProcess, type ApplicationExitRuntime } from '../src/main/application-exit'
+import { scheduleForcedExitFallback, terminateApplicationProcess, type ApplicationExitRuntime } from '../src/main/application-exit'
 
 function runtime(platform: NodeJS.Platform): {
   value: ApplicationExitRuntime
@@ -18,6 +18,17 @@ function runtime(platform: NodeJS.Platform): {
 }
 
 describe('application process termination', () => {
+  it('allows graceful shutdown and only force-exits when the watchdog expires', () => {
+    vi.useFakeTimers()
+    try {
+      const fixture = runtime('win32')
+      scheduleForcedExitFallback(5_000, fixture.value)
+      vi.advanceTimersByTime(4_999)
+      expect(fixture.kill).not.toHaveBeenCalled()
+      expect(() => vi.advanceTimersByTime(1)).toThrow('exit')
+      expect(fixture.kill).toHaveBeenCalledWith(321, 'SIGKILL')
+    } finally { vi.useRealTimers() }
+  })
   it('force-terminates the Windows process after runtime cleanup', () => {
     const fixture = runtime('win32')
     expect(() => terminateApplicationProcess(0, fixture.value)).toThrow('exit')

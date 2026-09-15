@@ -462,6 +462,7 @@ h3 { margin: 0; font-size: 16px; font-weight: 650; }
   cursor: pointer;
 }
 .item-identity { display: flex; min-width: 0; align-items: center; flex-wrap: wrap; gap: 5px 7px; }
+.item-parent-context { color: var(--color-neutral-foreground-3); font-size: 12px; }
 .item-title { min-width: 0; color: var(--color-neutral-foreground-2); line-height: 1.4; overflow-wrap: anywhere; }
 .completed .item-title { color: var(--color-neutral-foreground-4); text-decoration: line-through; text-decoration-thickness: 1px; }
 .activity-tag {
@@ -834,9 +835,10 @@ h3 { margin: 0; font-size: 16px; font-weight: 650; }
     text-align: center;
   }
   .workspace { padding: 18px 14px; }
-  .topbar { gap: 12px; }
+  .topbar { gap: 12px; flex-wrap: wrap; }
   .page-game-icon { width: 36px; height: 36px; }
-  .page-version-remaining { display: none; }
+  .page-title-line { flex-direction: column; align-items: flex-start; gap: 3px; }
+  .topbar-actions { margin-left: auto; }
   .incomplete-filter-control { padding-right: 8px; padding-left: 10px; }
   .incomplete-filter-label { font-size: 12px; }
   .section-header { grid-template-columns: 30px minmax(0, 1fr) auto; gap: 6px; }
@@ -859,3 +861,4 @@ h3 { margin: 0; font-size: 16px; font-weight: 650; }
   .toggle-switch-input:checked + .toggle-switch { border-color: Highlight; background: Highlight; }
   .completed .check-button { border-color: Highlight; background: Highlight; }
 }
+.checklist-row-shell + .checklist-row-shell { border-top: 1px solid var(--color-neutral-stroke-subtle); }

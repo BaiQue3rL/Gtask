@@ -9,6 +9,15 @@ import {
 } from '../src/main/sync/cycle-catalog'
 
 describe('cycle catalog', () => {
+  it('preserves fractional server timezone offsets in monthly and version-relative rules', () => {
+    const mode = { gameId: 'genshin' as const, modeKey: 'test-offset', remoteKey: 'test-offset', title: '时区样本', aliases: [] }
+    expect(predictCycleWindow({ ...mode, prediction: { kind: 'monthly', startDay: 16, hour: 4, timeZoneOffsetHours: 5.5 } },
+      new Date('2026-01-16T00:30:00Z'))).toEqual({ startsAt: '2026-01-15T22:30:00.000Z', endsAt: '2026-02-15T22:30:00.000Z' })
+    expect(predictCycleWindow({ ...mode, prediction: { kind: 'version-relative', startDayOffset: 7, hour: 4, timeZoneOffsetHours: 5.5,
+      fallback: { kind: 'interval', anchorStartsAt: '2026-01-01T00:00:00Z', cadenceDays: 42, durationDays: 34 } } },
+      new Date('2026-01-10T00:00:00Z'), undefined, { startsAt: '2026-01-01T04:00:00Z', endsAt: '2026-02-01T00:00:00Z' }))
+      .toEqual({ startsAt: '2026-01-07T22:30:00.000Z', endsAt: '2026-02-01T00:00:00.000Z' })
+  })
   it.each([
     ['genshin', ['深境螺旋', '幻想真境剧诗', '幽境危战']],
     ['star-rail', ['混沌回忆', '虚构叙事', '末日幻影', '异相仲裁']],

@@ -23,11 +23,11 @@ describe('同步接口契约', () => {
       'events',
       'cycles'
     ])
-    expect(contract.schemaVersion).toBe(15)
+    expect(contract.schemaVersion).toBe(16)
     expect(contract.fieldSemantics.sourcePriority).toContain('字段缺失')
   })
 
-  it('活动契约只接受具有完整时间窗的限时活动', () => {
+  it('活动契约分开核验限时资格与时间完整性', () => {
     const [events] = getPublicSyncContract('events').sections
     const limited = events.itemShapes.find((shape) =>
       shape.categories.includes('limited_event')
@@ -35,7 +35,7 @@ describe('同步接口契约', () => {
 
     expect(events.itemShapes).toHaveLength(1)
     expect(limited.requiredFields).toEqual(expect.arrayContaining([
-      'startsAt', 'endsAt', 'activityTags'
+      'startsAt+endsAt|deadlineReview', 'activityTags'
     ]))
     const criteria = events.completionCriteria.join('；')
     expect(criteria).toContain('限时签到')

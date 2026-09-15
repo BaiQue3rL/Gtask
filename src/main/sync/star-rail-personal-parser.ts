@@ -109,7 +109,11 @@ function parseChallengeMode(definition: ChallengeModeDefinition): NormalizedSync
     `${definition.label} schedule_id`
   )
   const floors = Array.isArray(root.all_floor_detail) ? root.all_floor_detail.filter(isRecord) : []
-  const completed = floors.some(hasManualChallengeFloorRecord)
+  const evidence = floors.map(hasManualChallengeFloorRecord)
+  const completed = evidence.some((value) => value === true) ? true
+    : Array.isArray(root.all_floor_detail) && root.all_floor_detail.every(isRecord) &&
+      evidence.every((value) => value === false)
+      ? false : undefined
   const startsAt = toIsoDate(root.begin_time ?? season?.begin_time, `${definition.label}开始时间`)
   const endsAt = toIsoDate(root.end_time ?? season?.end_time, `${definition.label}结束时间`)
   return {
@@ -139,8 +143,8 @@ function parseAnomalyArbitration(value: unknown): NormalizedSyncItem | null {
   const groupId = requiredIdentifier(group.group_id, '异相仲裁 group_id')
   const bossRecord = isRecord(record.boss_record) ? record.boss_record : null
   const miniBossRecords = Array.isArray(record.mob_records) ? record.mob_records.filter(isRecord) : []
-  const bossStars = Math.max(0, finiteNumber(record.boss_stars) ?? 0)
-  const miniBossStars = Math.max(0, finiteNumber(record.mob_stars) ?? 0)
+  const bossStars = finiteNumber(record.boss_stars)
+  const miniBossStars = finiteNumber(record.mob_stars)
   const hasData = hasChallengeRecordEvidence({
     explicitFlags: [
       record.has_challenge_record,
@@ -162,7 +166,7 @@ function parseAnomalyArbitration(value: unknown): NormalizedSyncItem | null {
   }
 }
 
-function hasManualChallengeFloorRecord(floor: Record<string, unknown>): boolean {
+function hasManualChallengeFloorRecord(floor: Record<string, unknown>): boolean | undefined {
   if (floor.is_fast === true) return false
   const nodes = [floor.node_1, floor.node_2].filter(isRecord)
   return hasChallengeRecordEvidence({
@@ -184,11 +188,13 @@ function hasManualChallengeFloorRecord(floor: Record<string, unknown>): boolean 
   })
 }
 
-function challengeTimeEvidence(value: unknown): number {
+function challengeTimeEvidence(value: unknown): number | undefined {
   const direct = finiteNumber(value)
   if (direct !== null) return direct
-  if (!isRecord(value)) return 0
-  return Object.values(value).some((part) => (finiteNumber(part) ?? 0) > 0) ? 1 : 0
+  if (!isRecord(value)) return undefined
+  const parts = Object.values(value).map(finiteNumber).filter((part) => part !== null)
+  if (parts.some((part) => part > 0)) return 1
+  return parts.length > 0 && parts.every((part) => part === 0) ? 0 : undefined
 }
 
 function toIsoDate(value: unknown, field: string): string {

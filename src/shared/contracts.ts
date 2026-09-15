@@ -296,7 +296,7 @@ export interface ActivityTagContractEntry {
 }
 
 export interface PublicSyncContract {
-  schemaVersion: 15
+  schemaVersion: 16
   jobKind: 'public_catalog'
   authority: 'interface_contract'
   decisionAuthority: 'codex'
@@ -320,6 +320,7 @@ export interface PublicSyncContract {
 }
 
 export interface AiScheduleJob {
+  deadlineReviews?: Array<{ remoteKey: string; checkedAt: string; reviewAt: string; missingReason: string }>
   id: string
   jobKind: AiScheduleJobKind
   gameId: GameId

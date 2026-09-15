@@ -7,6 +7,7 @@ export interface ChecklistTreeRow {
   depth: number
   hasChildren: boolean
   displayProgressPercent: number | null
+  parentContext?: string
 }
 
 export function collectMapBranchKeys(items: ChecklistItem[]): Set<string> {
@@ -114,7 +115,10 @@ export function buildMapTreeRows(
       item,
       depth,
       hasChildren: visibleDescendants.length > 0,
-      displayProgressPercent: resolveProgress(item)
+      displayProgressPercent: resolveProgress(item),
+      ...(depth === 0 && parentKeyOf(item) && !renderKeys.has(parentKeyOf(item)!)
+        ? { parentContext: byKey.get(parentKeyOf(item)!)?.title }
+        : {})
     })
     if (collapsedKeys.has(key)) return
     for (const child of visibleDescendants) visit(child, depth + 1)

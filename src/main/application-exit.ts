@@ -12,6 +12,16 @@ const defaultRuntime: ApplicationExitRuntime = {
   exit: process.exit
 }
 
+/** Normal Electron shutdown must first flush Chromium preferences and storage. */
+export function scheduleForcedExitFallback(
+  delayMs = 5_000,
+  runtime: ApplicationExitRuntime = defaultRuntime
+): ReturnType<typeof setTimeout> {
+  const timer = setTimeout(() => terminateApplicationProcess(0, runtime), delayMs)
+  timer.unref()
+  return timer
+}
+
 export function terminateApplicationProcess(
   exitCode = 0,
   runtime: ApplicationExitRuntime = defaultRuntime

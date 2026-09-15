@@ -1,6 +1,6 @@
 {
   "name": "gtask",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Windows desktop checklist for game schedules, tasks, and progress",
   "main": "./out/main/index.js",
   "author": "Gtask contributors",
@@ -26,6 +26,7 @@
     "build": "pnpm typecheck && electron-vite build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && vue-tsc --noEmit -p tsconfig.web.json",
+    "catalog:check": "node out/main/catalog-maintenance-cli.js",
     "licenses:generate": "node scripts/generate-third-party-notices.mjs",
     "local:command": "node out/main/local-command-cli.js",
     "local:mcp": "node out/main/local-mcp-server-cli.js",

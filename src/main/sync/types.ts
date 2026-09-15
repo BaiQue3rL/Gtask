@@ -10,6 +10,7 @@ import type {
   SyncTarget,
   ScheduleObservationTarget
 } from '../../shared/contracts'
+import type { DeadlineReview } from '../published-schedules'
 
 export interface NormalizedSyncItem {
   remoteKey: string
@@ -24,6 +25,7 @@ export interface NormalizedSyncItem {
   parentRemoteKey?: string | null
   startsAt?: string | null
   endsAt?: string | null
+  deadlineReview?: DeadlineReview
   resetRule?: string | null
   periodKey?: string | null
   scheduleKind?: ScheduleKind | null

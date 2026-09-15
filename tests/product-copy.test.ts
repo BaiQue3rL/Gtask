@@ -112,7 +112,7 @@ describe('product copy and built-in section boundaries', () => {
   it('combines per-game preferences before the global item visibility setting', () => {
     const preferencesIndex = app.indexOf('<div class="game-preference-table">')
     const visibilityColumnIndex = app.indexOf('<span>游戏</span><span>显示</span><span>自动同步</span>')
-    const itemVisibilityIndex = app.indexOf('<h3 class="settings-heading">显示还没开始的事项</h3>')
+    const itemVisibilityIndex = app.indexOf('<h3 class="settings-heading">显示还没开始的活动</h3>')
     const layoutIndex = app.indexOf('<h3 class="settings-heading">版块顺序</h3>')
 
     expect(preferencesIndex).toBeLessThan(visibilityColumnIndex)
@@ -139,7 +139,7 @@ describe('product copy and built-in section boundaries', () => {
   })
 
   it('keeps user-facing copy conversational and free of maintenance terms', () => {
-    expect(app).toContain('显示还没开始的事项')
+    expect(app).toContain('显示还没开始的活动')
     expect(app).toContain('登录信息')
     expect(app).toContain('还没有备份')
     expect(app).toContain('>清除凭据</button>')

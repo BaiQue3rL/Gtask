@@ -1,5 +1,5 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { readFileSync } from 'node:fs'
+import { writeFileAtomically } from './atomic-file'
 import type { RenderingMode } from '../shared/contracts'
 
 export const DEFAULT_RENDERING_MODE: RenderingMode = 'compatibility'
@@ -21,7 +21,6 @@ export function readRenderingMode(filePath: string): RenderingMode {
 
 export function writeRenderingMode(filePath: string, mode: RenderingMode): RenderingMode {
   const parsedMode = parseRenderingMode(mode)
-  mkdirSync(dirname(filePath), { recursive: true })
-  writeFileSync(filePath, `${JSON.stringify({ mode: parsedMode }, null, 2)}\n`, 'utf8')
+  writeFileAtomically(filePath, `${JSON.stringify({ mode: parsedMode }, null, 2)}\n`)
   return parsedMode
 }

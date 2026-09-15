@@ -317,13 +317,9 @@ describe('remote catalog update', () => {
   it('uses authoritative GitHub on mirror divergence and refuses to regress local state', async () => {
     const giteeFeed = feed('gitee-divergent', '2026-08-11T12:10:00.000Z')
     const githubFeed = feed('github-current', '2026-08-11T12:00:00.000Z')
-    const fetcher = vi.fn(async (input: string | Request) => ({
-      ok: true,
-      status: 200,
-      text: async () => JSON.stringify(
+    const fetcher = vi.fn(async (input: string | Request) => Response.json(
         input.toString().includes('gitee.com') ? giteeFeed : githubFeed
-      )
-    }))
+    ))
     const service = new RemoteCatalogUpdateService(
       createDefaultRemoteCatalogProviders({ fetcher })
     )
@@ -410,7 +406,7 @@ describe('remote catalog update', () => {
     expect(created).toBeDefined()
     database.setChecklistCompletion(created!.id, true)
 
-    const renamed = feed('test-2', '2026-08-11T12:20:00.000Z', [{
+    const renamed = feed('test-2', '2026-08-11T12:40:00.000Z', [{
       gameId: 'genshin',
       upserts: [{ ...event(), title: '测试（更新）' }],
       archives: []
