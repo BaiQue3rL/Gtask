@@ -22,6 +22,17 @@
 
 ## 远端发布
 
-发布工作流和实际下载附件验证结果在发布完成后补记。原始 tag 对象为 `3e00bd96e0b45c06766bc555b2f203e797bd176a`、旧源码为 `54249d72277457a5bf64f47e688efc3d6d136f25`，用于限定本次授权替换，避免覆盖并发更新。
+- 发布源码：`d7b9c35a7926e01c5ab20ed916f4be835b272f45`。`main` 与 `v1.2.0` 以原 tag 对象 `3e00bd96e0b45c06766bc555b2f203e797bd176a` 为精确 lease 原子推送，新 tag 对象为 `7cc669c7506eccb04fe216be5705f64b69fed7ee`。Gitee 的分支和标签已核对一致。
+- [Verify 34973043314](https://github.com/BaiQue3rL/Gtask/actions/runs/34973043314) 已完成且成功。
+- [Release 34973043402](https://github.com/BaiQue3rL/Gtask/actions/runs/34973043402) 的测试、便携包构建与验证、安装包构建与验证、公共清单检查、校验文件和 GitHub 发布步骤均成功；Gitee 附加镜像步骤的最终结果可在该运行页查看。
+- 21:12 已从公开 GitHub Release 实际下载下面三个新附件。大小、SHA-256 与远端资产 digest 一致，两种程序也与 `SHA256SUMS.txt` 一致，且三个摘要都与首次 1.2.0 发布不同。
 
-在线更新元数据保持 1.2.0，两个下载入口继续指向 GitHub Release。相同版本不会触发已有 1.2.0 客户端的版本变化提示，发布说明明确要求重新下载；本机已直接覆盖。
+| 文件 | 字节 | SHA-256 |
+| --- | ---: | --- |
+| `Gtask-1.2.0-setup.exe` | 92557302 | `f2c501ae629a0261c818d86cea786a9634dad8892aeec99bb5a3c644d26444dd` |
+| `Gtask-1.2.0-portable.exe` | 83063576 | `87f560ddf4e6de8d18cfdd8b54fb3a71dd2e6cc3003ded064867fcca74f2906d` |
+| `SHA256SUMS.txt` | 181 | `ca83e6221b547575aaa36dc51c656803e4b63f08c427b42ec197a416bb174e8f` |
+
+21:12 检查 Gitee Release 仍只有源码归档，没有可验证的安装版或便携版附件。下载地址继续使用 GitHub。实际下载记录保存在 `tmp/release-republished-1.2.0-verification.json`，不混用 CI 附件摘要与本机构建的 app.asar 摘要。
+
+在线更新元数据保持 1.2.0，两个下载入口继续指向 GitHub Release；启用 `GTASK_ONLINE_RELEASE_TEST=1` 的在线更新验证通过，包括旧客户端发现更新和镜像不可达时回退。相同版本不会触发已有 1.2.0 客户端的版本变化提示，发布说明明确要求重新下载；本机已直接覆盖。
