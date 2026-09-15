@@ -382,6 +382,8 @@ export interface ChecklistItem {
   activityTags: string[]
   completed: boolean
   progressPercent: number | null
+  /** Proven personal progress; null for unobserved or locally derived values. */
+  reportedProgressPercent?: number | null
   parentTitle: string | null
   mapNodeKind: MapNodeKind | null
   parentRemoteKey: string | null

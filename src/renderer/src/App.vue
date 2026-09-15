@@ -53,9 +53,9 @@ import {
   buildMapTreeRows,
   collectMapBranchKeys,
   filterIncompleteMapTreeRows,
+  isChecklistRowComplete,
   type ChecklistTreeRow
 } from './map-tree'
-import { filterChecklistPanels } from './panel-visibility'
 import {
   applyPersonalProgressUpdate,
   isTerminalPersonalProgress,
@@ -1209,14 +1209,9 @@ const globalSyncBusy = computed(() =>
   hasActivePersonalSync.value
 )
 
-const visiblePanels = computed(() => filterChecklistPanels(
-  orderedPanels.value,
-  displayItems.value.map((item) => ({
-    category: item.category,
-    completed: isChecklistItemComplete(item)
-  })),
-  showIncompleteOnly.value
-))
+const visiblePanels = computed(() => showIncompleteOnly.value
+  ? orderedPanels.value.filter(panel => (panelRows.value.get(panel.section)?.length ?? 0) > 0)
+  : orderedPanels.value)
 
 async function runPersonalSync(
   target: PersonalSyncTarget,
@@ -1276,10 +1271,10 @@ function buildPanelItems(panel: ChecklistPanel): ChecklistTreeRow[] {
     }))
   }
   const rows = buildMapTreeRows(
-    visible,
+    displayItems.value.filter((item) => item.category === 'exploration'),
     collapsedMapKeys.value,
     displayItems.value.filter((item) => item.category === 'exploration'),
-    !showIncompleteOnly.value
+    clockNow.value
   )
   return showIncompleteOnly.value ? filterIncompleteMapTreeRows(rows) : rows
 }
@@ -1360,11 +1355,11 @@ async function saveItem(): Promise<void> {
   }
 }
 
-async function toggleCompleted(item: ChecklistItem): Promise<void> {
+async function toggleCompleted(item: ChecklistItem, currentlyComplete = isChecklistItemComplete(item)): Promise<void> {
   const scrollTop = workspaceElement.value?.scrollTop ?? 0
   const scrollLeft = workspaceElement.value?.scrollLeft ?? 0
   try {
-    const updatedItems = await window.gtask.setChecklistCompletion(item.id, !item.completed)
+    const updatedItems = await window.gtask.setChecklistCompletion(item.id, !currentlyComplete)
     if (item.gameId !== selectedGameId.value) return
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
     const updates = new Map(updatedItems.map((updated) => [updated.id, updated]))
@@ -1713,8 +1708,9 @@ function showError(error: unknown): void {
                   <div
                     class="checklist-row"
                     :class="{
-                      completed: row.item.completed,
+                      completed: isChecklistRowComplete(row),
                       'map-tree-row': panel.section === 'exploration',
+                      'map-summary-row': Boolean(row.mapSummary),
                       'has-item-menu': panel.section === 'custom'
                     }"
                     :style="panel.section === 'exploration' ? { '--tree-depth': row.depth } : undefined"
@@ -1728,13 +1724,15 @@ function showError(error: unknown): void {
                   >{{ collapsedMapKeys.has(row.item.remoteKey ?? row.item.id) ? '›' : '⌄' }}</button>
                   <span v-else-if="panel.section === 'exploration'" class="map-tree-spacer"></span>
                   <button
+                    v-if="!row.mapSummary"
                     class="check-button"
                     type="button"
-                    :aria-label="row.item.completed ? '标为未完成' : '标为完成'"
-                    @click="toggleCompleted(row.item)"
+                    :aria-label="isChecklistRowComplete(row) ? '标为未完成' : '标为完成'"
+                    @click="toggleCompleted(row.item, isChecklistRowComplete(row))"
                   >
-                    {{ row.item.completed ? '✓' : '' }}
+                    {{ isChecklistRowComplete(row) ? '✓' : '' }}
                   </button>
+                  <span v-else class="map-summary-status" :aria-label="isChecklistRowComplete(row) ? '子区域全部完成' : '子区域尚未全部完成'">{{ isChecklistRowComplete(row) ? '✓' : '·' }}</span>
                   <button
                     class="item-main"
                     type="button"
@@ -1744,16 +1742,19 @@ function showError(error: unknown): void {
                     @click="activateChecklistItem(row.item, panel.section, row.hasChildren)"
                   >
                     <span class="item-identity">
-                      <span v-if="row.parentContext" class="item-parent-context">{{ row.parentContext }} /</span>
                       <span class="item-title">{{ row.item.title }}</span>
                       <span
                         v-for="tag in row.item.activityTags"
                         :key="tag"
                         class="activity-tag"
                       >{{ tag }}</span>
-                      <span v-if="row.item.category === 'exploration' && row.displayProgressPercent !== null" class="item-progress">
+                      <span v-if="row.mapSummary" class="item-map-summary"
+                        :title="`已完成区域 / 已收录且已开放区域${row.mapSummary.unknown ? `；${row.mapSummary.unknown} 项进度待确认` : ''}${row.item.reportedProgressPercent != null ? `；官方总探索度 ${row.item.reportedProgressPercent}%` : ''}`"
+                      >{{ row.mapSummary.completed }}/{{ row.mapSummary.total }}</span>
+                      <span v-else-if="row.item.category === 'exploration' && row.displayProgressPercent !== null" class="item-progress">
                         {{ row.displayProgressPercent }}%
                       </span>
+                      <span v-else-if="row.item.category === 'exploration' && !isChecklistRowComplete(row)" class="item-map-reference">进度待确认</span>
                     </span>
                     <span v-if="row.item.startsAt && isUpcoming(row.item.startsAt)" class="item-timing deadline upcoming">{{ countdown(row.item.startsAt, '距离开始') }}</span>
                     <span

@@ -2011,7 +2011,7 @@ describe('AppDatabase', () => {
     ])).toThrow('上级必须是一级主地区')
   })
 
-  it('一级地图完成状态原子级联到全部二级地区', () => {
+  it('一级地图分组拒绝整组完成写入，不修改子地图进度', () => {
     database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     database.mergeSyncedItems('genshin', 'public_schedule', [
       {
@@ -2039,15 +2039,10 @@ describe('AppDatabase', () => {
       (item) => item.remoteKey === 'map:liyue'
     )!
 
-    expect(database.setChecklistCompletion(region.id, true)).toHaveLength(3)
-    expect(database.listChecklistItems('genshin').filter(
-      (item) => item.remoteKey?.startsWith('map:liyue')
-    ).every((item) => item.completed)).toBe(true)
-
-    expect(database.setChecklistCompletion(region.id, false)).toHaveLength(3)
-    expect(database.listChecklistItems('genshin').filter(
-      (item) => item.remoteKey?.startsWith('map:liyue')
-    ).every((item) => !item.completed)).toBe(true)
+    const before = database.listChecklistItems('genshin')
+    expect(() => database!.setChecklistCompletion(region.id, true)).toThrow('按子区域汇总')
+    expect(() => database!.setChecklistCompletion(region.id, false)).toThrow('按子区域汇总')
+    expect(database.listChecklistItems('genshin')).toEqual(before)
   })
 
   it('公开地图一级进度随二级地区修改、同步增删实时派生', () => {

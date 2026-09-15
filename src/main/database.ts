@@ -128,6 +128,25 @@ const CHECKLIST_REVISION_FIELDS = [
   'source', 'remote_key', 'source_url', 'manual_completion_locked', 'completed_at',
   'created_at', 'updated_at', 'archived'
 ]
+// Parent percentages may have been locally averaged after a later snapshot
+// omitted the parent. Only the active snapshot proves a parent's reported value.
+// Leaf evidence (including regions without catalog children) remains valid when
+// a later response omits it. Recalculation clears provenance on derived values.
+const REPORTED_MAP_PROGRESS_SQL = `CASE
+  WHEN category = 'exploration' AND manual_completion_locked = 0
+    AND source_snapshot_id IS NOT NULL
+    AND (map_node_kind = 'subregion' OR NOT EXISTS (
+      SELECT 1 FROM checklist_items child
+      WHERE child.game_id = checklist_items.game_id AND child.category = 'exploration'
+        AND child.map_node_kind = 'subregion' AND child.archived = 0
+        AND ((checklist_items.remote_key IS NOT NULL AND child.parent_remote_key = checklist_items.remote_key)
+          OR (child.parent_remote_key IS NULL AND child.parent_title = checklist_items.title))
+    ) OR EXISTS (
+      SELECT 1 FROM sync_target_states s
+      WHERE s.game_id = checklist_items.game_id AND s.target = 'exploration'
+        AND s.active_snapshot_id = checklist_items.source_snapshot_id
+    ))
+  THEN progress_percent ELSE NULL END AS reportedProgressPercent`
 const PERFORMANCE_SCHEMA_SQL = `
   CREATE INDEX IF NOT EXISTS checklist_game_visible
     ON checklist_items(game_id, archived, source, category);
@@ -2212,6 +2231,7 @@ export class AppDatabase {
           activity_tags_json AS activityTagsJson,
           completed,
           progress_percent AS progressPercent,
+          ${REPORTED_MAP_PROGRESS_SQL},
           parent_title AS parentTitle,
           map_node_kind AS mapNodeKind,
           parent_remote_key AS parentRemoteKey,
@@ -2284,6 +2304,7 @@ export class AppDatabase {
           activity_tags_json AS activityTagsJson,
           completed,
           progress_percent AS progressPercent,
+          ${REPORTED_MAP_PROGRESS_SQL},
           parent_title AS parentTitle,
           map_node_kind AS mapNodeKind,
           parent_remote_key AS parentRemoteKey,
@@ -2495,7 +2516,9 @@ export class AppDatabase {
         item.remoteKey,
         item.title
       ) as Array<{ id: string }>
-      affectedIds.push(...children.map((child) => child.id))
+      if (children.length > 0) {
+        throw new Error('一级地区按子区域汇总，请在具体子区域上标记完成状态')
+      }
     }
     this.updateChecklistItems(affectedIds.map((affectedId) => ({
       id: affectedId,
@@ -4766,6 +4789,7 @@ export class AppDatabase {
           activity_tags_json AS activityTagsJson,
           completed,
           progress_percent AS progressPercent,
+          ${REPORTED_MAP_PROGRESS_SQL},
           parent_title AS parentTitle,
           map_node_kind AS mapNodeKind,
           parent_remote_key AS parentRemoteKey,
@@ -4873,12 +4897,14 @@ export class AppDatabase {
             ELSE NULL
           END,
           manual_completion_locked = 0,
+          source_snapshot_id = NULL,
           updated_at = ?
       WHERE id = ?
         AND (
           progress_percent IS NOT ?
           OR completed <> ?
           OR manual_completion_locked <> 0
+          OR source_snapshot_id IS NOT NULL
         )
     `)
     const now = reference.toISOString()

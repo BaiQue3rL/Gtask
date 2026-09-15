@@ -72,11 +72,12 @@ describe('Genshin map acceptance regressions', () => {
       expect(isChecklistItemComplete(get('沉玉谷'))).toBe(false)
       const maps = database.listChecklistItems('genshin', { category: 'exploration' })
       const rows = filterIncompleteMapTreeRows(buildMapTreeRows(
-        maps.filter(item => !isChecklistItemComplete(item)), new Set(), maps, false
+        maps, new Set(), maps
       ))
-      expect(rows.find(row => row.item.title === '沉玉谷')).toMatchObject({ parentContext: '璃月' })
+      expect(rows.find(row => row.item.title === '沉玉谷')).toMatchObject({ depth: 1 })
+      expect(rows.find(row => row.item.title === '璃月')).toMatchObject({ depth: 0 })
       expect(rows.some(row => row.item.parentTitle === '至冬')).toBe(false)
-      expect(rows.find(row => row.item.title === '至冬')?.displayProgressPercent).toBe(52)
+      expect(rows.some(row => row.item.title === '至冬')).toBe(false)
 
       apply(profile())
       expect(get('沉玉谷')).toMatchObject({ completed: true, progressPercent: 100 })

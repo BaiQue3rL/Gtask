@@ -5,7 +5,7 @@
 ## 发布原则
 
 - GitHub 是唯一权威仓库；标签、提交和发布说明以 GitHub 为准。
-- 当前源码、公开 GitHub Release、本机安装及在线更新元数据版本为 `1.2.0`；用户已授权本次递增与发布，验证记录见 `release-verification-1.2.0.md`。不能仅因普通源码推送自动创建 Release。
+- 当前版本为 `1.2.0`；用户明确授权本次地图修正使用相同版本覆盖本机并替换远端标签和附件，验证记录见 `release-verification-map-summary-1.2.0.md`。首次发布历史保留在 `release-verification-1.2.0.md`。普通源码推送不自动创建 Release，也不授权后续移动标签。
 - Gitee 是免费的只读镜像和中国区默认更新入口；镜像不可用时自动回退 GitHub。
 - 不购买对象存储、CDN、云服务器或付费域名，不由个人发布者承担持续流量成本。
 - 软件更新默认先读取 Gitee 镜像中的小型 JSON 文件，再回退 GitHub；用户也可在设置中固定使用 Gitee 或 GitHub。网络失败时静默降级，不影响本地清单使用。

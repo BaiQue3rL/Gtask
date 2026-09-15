@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, TransitionGroup, watch } from 'vue'
-import type { ChecklistTreeRow } from './map-tree'
+import { checklistRowKey, type ChecklistTreeRow } from './map-tree'
 
 const props = defineProps<{ rows: ChecklistTreeRow[]; scrollContainer: HTMLElement | null }>()
 const root = ref<HTMLElement | null>(null)
@@ -12,7 +12,7 @@ const viewportHeight = ref(800)
 const offsets = computed(() => {
   void measurementRevision.value
   const result = [0]
-  for (const row of props.rows) result.push(result[result.length - 1] + (measured.get(row.item.id) ?? 49))
+  for (const row of props.rows) result.push(result[result.length - 1] + (measured.get(checklistRowKey(row)) ?? 49))
   return result
 })
 function indexAt(offset: number): number {
@@ -57,7 +57,7 @@ watch(() => props.scrollContainer, (container) => {
   scheduleViewport()
 })
 watch(() => props.rows, () => {
-  const liveIds = new Set(props.rows.map((row) => row.item.id))
+  const liveIds = new Set(props.rows.map(checklistRowKey))
   for (const key of measured.keys()) if (!liveIds.has(key)) measured.delete(key)
   scheduleViewport()
 }, { flush: 'post' })
@@ -113,8 +113,8 @@ async function onKeydown(event: KeyboardEvent): Promise<void> {
   <div ref="root" @keydown="onKeydown">
     <component :is="virtual ? 'div' : TransitionGroup" name="checklist-flow" tag="div" class="item-list-column" role="list">
       <div v-if="virtual" key="top-space" aria-hidden="true" :style="{ height: `${offsets[range.start]}px` }"></div>
-      <div v-for="(row, offset) in visible" :key="row.item.id" class="checklist-row-shell"
-        :data-row-id="row.item.id" :data-row-index="range.start + offset" role="listitem"
+      <div v-for="(row, offset) in visible" :key="checklistRowKey(row)" class="checklist-row-shell"
+        :data-row-id="checklistRowKey(row)" :data-row-index="range.start + offset" role="listitem"
         :aria-posinset="range.start + offset + 1" :aria-setsize="rows.length">
         <slot :row="row"></slot>
       </div>

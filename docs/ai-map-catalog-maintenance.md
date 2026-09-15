@@ -4,7 +4,7 @@ The current workflow is defined in `docs/catalog-maintenance.md`. This guide add
 
 ## Public ownership and source
 
-Maps contain official names, stable identities, and hierarchy only. Personal interfaces may update progress on uniquely matched public rows; they cannot create or rename nodes, change parents, or override the catalog. A current personal region value remains authoritative over a calculated subregion average.
+Maps contain official names, stable identities, and hierarchy only. Personal interfaces may update progress on uniquely matched public rows; they cannot create or rename nodes, change parents, or override the catalog. Region groups display completed/open-catalog child counts, not an averaged exploration percentage. Personal region percentages remain separate reference data; they never override the group's child-based completion or filtering. Missing progress blocks completion, and newly published open children reopen the group without resetting previous child progress.
 
 New map additions, corrections, and retirements go through verified deltas compiled into `updates/catalog.json`. The application embeds that exact publication, and remote updates consume it too. Do not edit a player's SQLite database or duplicate every change in TypeScript.
 
@@ -25,6 +25,8 @@ There are exactly two levels:
 - `subregion`: exactly one verified region parent, specified by parentRemoteKey.
 
 There is no third level or independent-map node type. A scene, dungeon, chest, achievement, or repeatable entrance does not by itself prove independent exploration progress. 鸣潮“玄元境” has no independent exploration percentage and must stay out (user clarification, 2026-09-05).
+
+For a region with no catalog children, the renderer shows a same-name second-level self row, backed by the original region's progress and completion action. This is a view projection, not an additional public map: never publish a duplicate row merely to reproduce it. The region shows `0/1` or `1/1`; a later publication of real children replaces the self row. This applies to every game, including 原神“空之神殿”.
 
 Examples: 璃月 → 沉玉谷/层岩巨渊·地下矿区; 匹诺康尼 → 黄金的时刻/筑梦边境; 瑝珑 → 今州城/云陵谷. If reliable sources do not establish the parent or independent progress eligibility, retain the candidate in research records without guessing.
 
