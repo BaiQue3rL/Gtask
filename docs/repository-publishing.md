@@ -5,7 +5,7 @@
 ## 发布原则
 
 - GitHub 是唯一权威仓库；标签、提交和发布说明以 GitHub 为准。
-- 当前源码版本为 `1.2.0`，用户已授权按语义化版本规则递增并发布。公开下载与本机部署仍以实际已发布、已安装版本为准；不能仅因普通源码推送自动创建 Release。
+- 当前源码、公开 GitHub Release、本机安装及在线更新元数据版本为 `1.2.0`；用户已授权本次递增与发布，验证记录见 `release-verification-1.2.0.md`。不能仅因普通源码推送自动创建 Release。
 - Gitee 是免费的只读镜像和中国区默认更新入口；镜像不可用时自动回退 GitHub。
 - 不购买对象存储、CDN、云服务器或付费域名，不由个人发布者承担持续流量成本。
 - 软件更新默认先读取 Gitee 镜像中的小型 JSON 文件，再回退 GitHub；用户也可在设置中固定使用 Gitee 或 GitHub。网络失败时静默降级，不影响本地清单使用。
@@ -18,9 +18,9 @@
 - GitHub 与 Gitee Release 发布均可安全重跑：已有 GitHub 附件会原名覆盖，Gitee 会更新同标签 Release 并仅替换本版本的三个同名附件。
 - GitHub 构建、测试、附件校验或发布失败时工作流失败。Gitee 附件镜像作为有时间上限的附加步骤，失败会明确告警但不撤销已经成功的 GitHub 发布；更新入口继续指向已验证可用的 GitHub 下载页。
 - 软件版本和标签先发布，安装版、便携版及校验文件实际可用后才推进 `updates/latest.json`，避免用户提前收到尚无下载文件的升级提示。
-- GitHub 发布成功但 Gitee 附件上传超时时，可手动运行 `Retry Gitee mirror release`，指定已发布标签（例如 `gh workflow run mirror-release.yml -f tag=v1.1.1`）。它下载并校验 GitHub 已发布的同一批文件，再用 curl 补传缺失附件，不重新构建；同名附件大小不符时保留现场并停止。
-- `updates/latest.json` 同时保存 Gitee 与 GitHub Release 地址。应用默认按 `Gitee → GitHub` 顺序检查，成功读取哪个源就打开对应的下载页。
-- 2026-09-10 发布 `1.1.1` 时，Gitee 附件经标准上传与 curl 重试均超时；源码与标签已镜像。两个更新源的下载地址暂统一指向 GitHub `v1.1.1`，只有镜像附件补齐并校验后才恢复 Gitee 下载地址。
+- GitHub 发布成功但 Gitee 附件上传超时时，可手动运行 `Retry Gitee mirror release`，指定已发布标签（例如 `gh workflow run mirror-release.yml -f tag=v1.2.0`）。它下载并校验 GitHub 已发布的同一批文件，再用 curl 补传缺失附件，不重新构建；同名附件大小不符时保留现场并停止。
+- `updates/latest.json` 同时保存 Gitee 与 GitHub Release 地址。自动模式检查两个来源，选择版本较新的有效结果，同版本优先 Gitee；下载页使用所选来源的地址，避免落后镜像掩盖新版本。
+- 2026-09-10 发布 `1.1.1` 时，Gitee 附件经标准上传与 curl 重试均超时；源码与标签已镜像。1.2.0 的 GitHub 附件已下载校验，两个更新源的下载地址继续统一指向 GitHub `v1.2.0`，只有镜像附件补齐并校验后才恢复 Gitee 下载地址。
 - `GITEE_TOKEN` 只保存在 GitHub Actions 加密 Secret 中，不写入仓库、安装包、日志或用户配置。
 - `updates/catalog.json` 是公共清单热更新入口。客户端启动时按用户的软件更新来源设置读取 Gitee/GitHub，自动模式同时校验两个源并以 GitHub 作为冲突时的权威结果；下载失败或内容无效时保留上一次本地基准。
 - 后台 MCP 负责核验官方资料；只有通过协议、稳定键、时间窗、活动标签和两级地图检查的结果才允许写入远程清单。远程清单合并只触及系统基准，用户完成状态和探索进度在同稳定键更新时保留。

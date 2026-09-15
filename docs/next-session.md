@@ -8,9 +8,10 @@
 
 - 用户已完成本机人工验收，并授权按常用规则增版、提交、推送和发布。本轮源码版本升至 `1.2.0`（兼容新增功能，递增次版本）；数据库 schema 为 `8`，MCP 公共维护契约为 `16`。
 - 远程清单消费兼容 v1/v2。当前实际 `updates/catalog.json` 仍为 v1，revision 为 `2026-09-14.zenless-3.2-baseline-maintenance`；没有为了软件审计捏造或发布新的游戏排期。
-- 1.2.0 发布准备中；先完成源码与标签发布，确认 Release 附件后再推进在线更新元数据。用户另要求清理本机旧版本：仅清理旧程序、旧安装包及旧测试包，保留个人数据、凭据、数据库备份和研究记录。
-- 2026-09-15 18:13 按用户要求，将已验收的最新程序替换至正式安装 `D:\Git\Gtask` 并启动供人工核验。正式数据库由 schema 5 升级至 8，完整性检查通过，自定义清单及登录凭据核对保留。已安装 Codex 插件缓存未另行覆盖；本机仍标识为 1.1.1，不代表线上 1.1.1 已含这些修复。
-- 18:26 又按人工验收反馈部署地图修复：沉玉谷特殊汇总零值不再覆盖已确认完成；筛选提升显示的子区带所属地区。实际同步已确认沉玉谷 100% 且仍属于璃月、至冬保持 52%。最新验收、备份与包校验值见 `map-progress-fix-2026-09-15.md`，覆盖下文 18:13 部署的当前包状态。
+- 源码提交 `54249d7` 与标签 `v1.2.0` 已推送；GitHub 安装版、便携版和校验文件均已实际下载，并与发布资产摘要核对一致。附件验证后将在线更新元数据推进至 `1.2.0`；镜像下载入口继续使用已验证的 GitHub Release。证据见 `release-verification-1.2.0.md`。
+- 正式安装 `D:\Git\Gtask` 已于 18:42 更新至 `1.2.0` 并启动；正式数据库 schema 为 8，完整性检查通过，自定义清单及登录凭据核对保留。工作区内置插件版本为 1.2.0；已安装 Codex 插件缓存未另行覆盖。
+- 18:26 地图修复验收已确认沉玉谷 100% 且仍属于璃月、至冬保持 52%；这些修复已包含在 1.2.0。`map-progress-fix-2026-09-15.md` 记录此前人工验收，当前部署以 1.2.0 发布验证记录为准。
+- 按用户要求于 18:44 将 10 处旧程序、安装包及测试包移入回收站（约 3.41 GiB）。三个部署备份中的旧 `program` 目录也已清理；个人数据、凭据、数据库备份、部署回执及研究记录均保留。不能再将历史 `program` 路径当作仍可直接使用的回退包。
 - 先查看 `git status`，保留原来的 `docs/proposals/baseline-maintenance-v2.md` 和其他研究资料。
 
 ## 必须保留的产品边界
@@ -46,6 +47,6 @@ Gtask 是 Windows Electron/Vue/TypeScript/SQLite 清单工具，当前包含原�
 
 性能：设置 `GTASK_PERFORMANCE_TEST=1` 后运行 `tests/performance-benchmark.test.ts`；Electron 脚本是 `scripts/audit-startup-performance.mjs`、`scripts/audit-ui-performance.mjs` 和 `scripts/audit-ui-smoke.mjs`，可用 `--playwright-module` 指定现有运行时。测试数据、截图和打包产物只在各脚本创建的临时目录及仓库 `tmp/`。
 
-正式数据：`D:\Users\Administrator\Documents\Gtask\data\gtask.sqlite`；凭据：`C:\Users\Administrator\AppData\Roaming\gtask\credentials`。不得删除或重建这些数据、备份、发布产物。发布具体新版本仍须用户明确授权，不得将本轮同版本测试包冒充线上升级。
+正式数据：`D:\Users\Administrator\Documents\Gtask\data\gtask.sqlite`；凭据：`C:\Users\Administrator\AppData\Roaming\gtask\credentials`。不得删除或重建这些数据、备份、发布产物；本轮旧程序清理是用户单独授权的例外，不授权后续自动清理。后续新版本发布仍须用户明确授权。
 
-本次人工验收部署备份：`D:\Git\Gtask-backups\20260915-181213`。`program` 为替换前完整程序，`gtask-before-update.sqlite` 为 SQLite 在线备份并通过完整性检查，`userData` 为原设置及加密凭据副本。部署校验 35 个程序文件，安装后 app.asar SHA-256 为 `8ef86cdd5d45859fea7be37d2db8dae293fe0810df9385e9b53b00732aff6ed0`；回执见该备份目录的 `deployment.json`、`pre-deployment.json`、`post-deployment.json`。回退时需要考虑数据库已升级，不能直接让旧程序打开新版数据库；不得擅自覆盖用户人工核验期间新增的数据。
+当前部署备份：`D:\Git\Gtask-backups\20260915-184227-pre-1.2.0`。`gtask-before-update.sqlite` 为通过完整性检查的 SQLite 在线备份，`userData` 保留原设置及加密凭据副本；旧 `program` 已按上述授权移入回收站。部署校验 35 个程序文件，安装后 app.asar SHA-256 为 `574a50cf25a6ddd39434d41b7b6964adbd2de7d36ccf8709a63223650c703185`；回执见该目录的 `deployment.json` 和 `pre-deployment.json`。18:13 与 18:26 的数据库、凭据备份也保留。回退需考虑数据库 schema 8，不能直接让旧程序打开新版数据库；不得擅自覆盖人工核验期间新增的数据。
