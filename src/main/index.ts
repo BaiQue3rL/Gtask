@@ -1,7 +1,7 @@
 import { SingleFlight } from './single-flight'
 import { persistUpdateCache } from './update-cache'
 import bundledCatalogPublication from '../../updates/catalog.json'
-import { appendFileSync, cpSync, existsSync, mkdirSync } from 'node:fs'
+import { appendFileSync, cpSync, mkdirSync } from 'node:fs'
 import { arch, cpus, release, totalmem } from 'node:os'
 import { dirname, join } from 'node:path'
 import { app, BrowserWindow, dialog, ipcMain, net, powerMonitor, safeStorage, screen, session, shell } from 'electron'

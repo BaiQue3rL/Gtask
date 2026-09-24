@@ -8,7 +8,6 @@ import type { SoftwareUpdateSource } from '../shared/contracts'
 import { findCycleMode } from './sync/cycle-catalog'
 import { deadlineReviewSchema, publishedScheduleSchema, scheduleArchiveSchema } from './published-schedules'
 
-export const REMOTE_CATALOG_SCHEMA_VERSION = 1
 export const DEFAULT_REMOTE_CATALOG_TIMEOUT_MS = 5_000
 export const MAX_REMOTE_CATALOG_BYTES = 1_000_000
 export const DEFAULT_GITEE_CATALOG_FEED_URL =
@@ -85,7 +84,7 @@ const remoteCatalogItemSchema = z.discriminatedUnion('category', [
   }
   if (
     item.category === 'limited_event' &&
-    !activityTagsMeetQualityContract(item.activityTags, 'zh-CN')
+    !activityTagsMeetQualityContract(item.activityTags)
   ) {
     context.addIssue({ code: 'custom', message: '活动必须包含有效玩法标签' })
   }
@@ -201,7 +200,6 @@ const remoteCatalogFeedSchema = z.object({
 
 export type RemoteCatalogFeed = z.infer<typeof remoteCatalogFeedSchema>
 export type RemoteCatalogGameUpdate = RemoteCatalogFeed['games'][number]
-export type RemoteCatalogItem = RemoteCatalogGameUpdate['upserts'][number]
 
 export interface RemoteCatalogUpdateState {
   contentHash?: string | null

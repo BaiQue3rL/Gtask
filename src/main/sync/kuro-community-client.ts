@@ -280,10 +280,6 @@ function delay(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
 function decodeKuroEnvelopeData(value: unknown): unknown {
   if (typeof value !== 'string') return value
   const normalized = value.trim()

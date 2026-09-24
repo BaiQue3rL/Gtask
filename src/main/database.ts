@@ -174,7 +174,6 @@ interface SyncMergeOptions {
   bundled?: boolean
   codexReviewed?: boolean
   identityPolicy?: 'heuristic' | 'remote-key-only'
-  outputLocale?: string
 }
 
 export interface RemoteCatalogApplyResult extends SyncMergeResult {
@@ -184,17 +183,6 @@ export interface RemoteCatalogApplyResult extends SyncMergeResult {
 
 interface PublicCatalogReplacementOptions extends SyncMergeOptions {
   preserveActiveSourceState?: boolean
-}
-
-function stableJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`
-  if (value && typeof value === 'object') {
-    return `{${Object.entries(value as Record<string, unknown>)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, entry]) => `${JSON.stringify(key)}:${stableJson(entry)}`)
-      .join(',')}}`
-  }
-  return JSON.stringify(value) ?? 'null'
 }
 
 function assertAccountScope(value: string): void {
@@ -308,19 +296,6 @@ function personalCycleMatchesBaselineWindow(
 
 function normalizeSourceTitle(value: string): string {
   return value.normalize('NFKC').toLocaleLowerCase('zh-CN').replace(/[\s\p{P}\p{S}]+/gu, '')
-}
-
-function readObservedTitle(payload: Record<string, unknown>): string | null {
-  const value = payload.officialTitle ?? payload.title ?? payload.observedTitle
-  return typeof value === 'string' && value.trim() ? value.trim() : null
-}
-
-function readObservedMapNodeKind(
-  payload: Record<string, unknown>
-): Extract<ChecklistItem['mapNodeKind'], 'region' | 'subregion'> | null {
-  return payload.observedNodeKind === 'region' || payload.observedNodeKind === 'subregion'
-    ? payload.observedNodeKind
-    : null
 }
 
 function activityTagsNeedReview(tags: string[]): boolean {
@@ -1538,13 +1513,13 @@ export class AppDatabase {
         submittedIds.add(update.itemId)
         if (update.title !== target.title) throw new Error(`活动标签回写目标“${update.title}”已经变化`)
         if (!Array.isArray(update.activityTags) ||
-          !activityTagsMeetQualityContract(update.activityTags, job.requestContext.outputLocale)) {
+          !activityTagsMeetQualityContract(update.activityTags)) {
           throw new Error(
             `活动“${update.title}”必须提供 ${MIN_AI_ACTIVITY_TAGS} 到 ${MAX_AI_ACTIVITY_TAGS} 个有证据、含核心玩法的标签`
           )
         }
-        const tags = normalizeActivityTags(update.activityTags, job.requestContext.outputLocale)
-        if (!activityTagsMeetQualityContract(tags, job.requestContext.outputLocale)) {
+        const tags = normalizeActivityTags(update.activityTags)
+        if (!activityTagsMeetQualityContract(tags)) {
           throw new Error(`活动“${update.title}”的玩法标签格式不正确`)
         }
         if (!Number.isFinite(update.confidence) || update.confidence < 0 || update.confidence > 1) {
@@ -1606,8 +1581,7 @@ export class AppDatabase {
         false,
         {
           codexReviewed: true,
-          identityPolicy: 'remote-key-only',
-          outputLocale: job.requestContext.outputLocale
+          identityPolicy: 'remote-key-only'
         }
       )
       const updateTags = this.database.prepare(`
@@ -1622,10 +1596,7 @@ export class AppDatabase {
       `)
       for (const update of activityTagUpdates) {
         const result = updateTags.run(
-          JSON.stringify(normalizeActivityTags(
-            update.activityTags,
-            job.requestContext.outputLocale
-          )),
+          JSON.stringify(normalizeActivityTags(update.activityTags)),
           update.sourceUrl,
           now,
           now,
@@ -1653,11 +1624,7 @@ export class AppDatabase {
       return { merge: result, archived }
     })
     const unresolvedActivityCount = (activeTarget === 'events' || activeTarget === 'all')
-      ? this.listActivityTagEnrichmentTargets(
-          job.gameId,
-          now,
-          job.requestContext.outputLocale
-        ).length
+      ? this.listActivityTagEnrichmentTargets(job.gameId, now).length
       : 0
     const targetNames: Record<Exclude<SyncTarget, 'all'>, string> = {
       tasks: '版本时间',
@@ -2028,7 +1995,7 @@ export class AppDatabase {
     const activityTagTargets = row.jobKind === 'public_catalog' && (
       row.status === 'pending' || row.status === 'claimed'
     ) && contractSectionTargets.includes('events')
-      ? this.listActivityTagEnrichmentTargets(row.gameId, row.requestedAt, row.outputLocale)
+      ? this.listActivityTagEnrichmentTargets(row.gameId, row.requestedAt)
       : []
     const targetCategories: Record<SyncTarget, ChecklistCategory[]> = {
       tasks: [],
@@ -2051,7 +2018,7 @@ export class AppDatabase {
         itemId: item.id,
         category: item.category,
         title: item.title,
-        activityTags: normalizeActivityTags(item.activityTags, row.outputLocale),
+        activityTags: normalizeActivityTags(item.activityTags),
         source: item.source,
         remoteKey: item.remoteKey,
         sourceUrl: item.sourceUrl,
@@ -2153,8 +2120,7 @@ export class AppDatabase {
 
   private listActivityTagEnrichmentTargets(
     gameId: GameId,
-    reference: string,
-    outputLocale: string
+    reference: string
   ): ActivityTagEnrichmentTarget[] {
     const rows = this.database.prepare(`
       SELECT id AS itemId, title, activity_tags_json AS activityTagsJson,
@@ -2180,7 +2146,7 @@ export class AppDatabase {
       } catch {
         // Invalid stored values are deliberately treated as requiring review.
       }
-      const normalizedTags = normalizeActivityTags(tags, outputLocale)
+      const normalizedTags = normalizeActivityTags(tags)
       return activityTagsNeedReview(normalizedTags)
         ? [{ ...row, currentTags: normalizedTags }]
         : []
@@ -3029,8 +2995,7 @@ export class AppDatabase {
             false,
             {
               codexReviewed: true,
-              identityPolicy: 'remote-key-only',
-              outputLocale: 'zh-CN'
+              identityPolicy: 'remote-key-only'
             }
           )
           result.added += merged.added
@@ -3162,10 +3127,7 @@ export class AppDatabase {
     for (const item of items) {
       if (item.category === 'limited_event') {
         if (item.deadlineReview) item.endsAt = null
-        item.activityTags = normalizeActivityTags(
-          item.activityTags ?? [],
-          options.outputLocale ?? 'zh-CN'
-        )
+        item.activityTags = normalizeActivityTags(item.activityTags ?? [])
       }
     }
     this.assertPublicCycleStableIdentities(gameId, items)
@@ -3265,10 +3227,7 @@ export class AppDatabase {
               item.title,
               JSON.stringify(
                 item.category === 'limited_event'
-            ? normalizeActivityTags(
-                item.activityTags ?? [],
-                options.outputLocale ?? 'zh-CN'
-              )
+                  ? normalizeActivityTags(item.activityTags ?? [])
                   : []
               ),
               0,
@@ -3301,10 +3260,7 @@ export class AppDatabase {
         const resolvedActivityTags = item.category === 'limited_event'
           ? item.activityTags === undefined
             ? current.activityTags
-            : normalizeActivityTags(
-                item.activityTags,
-                options.outputLocale ?? 'zh-CN'
-              )
+            : normalizeActivityTags(item.activityTags)
           : []
         const startsAt = item.startsAt === undefined ? current.startsAt : item.startsAt
         const endsAt = item.endsAt === undefined ? current.endsAt : item.endsAt
@@ -3884,27 +3840,6 @@ export class AppDatabase {
 
   async backupTo(destinationPath: string): Promise<number> {
     return backup(this.database, destinationPath)
-  }
-
-  private findActiveChecklistItem(itemId: string, gameId: GameId): ChecklistItem | null {
-    const row = this.database.prepare(`
-      SELECT id FROM checklist_items
-      WHERE id = ? AND game_id = ? AND archived = 0
-    `).get(itemId, gameId) as { id: string } | undefined
-    return row ? this.getChecklistItem(row.id) : null
-  }
-
-  private findActiveChecklistItemByRemoteKey(
-    gameId: GameId,
-    remoteKey: string
-  ): ChecklistItem | null {
-    const row = this.database.prepare(`
-      SELECT id FROM checklist_items
-      WHERE game_id = ? AND remote_key = ? AND archived = 0
-      ORDER BY updated_at DESC
-      LIMIT 1
-    `).get(gameId, remoteKey) as { id: string } | undefined
-    return row ? this.getChecklistItem(row.id) : null
   }
 
   private migrate(): void {
@@ -5036,32 +4971,6 @@ export class AppDatabase {
         if (parent?.mapNodeKind !== 'region') {
           throw new Error(`二级地区“${item.title}”的上级必须是一级主地区`)
         }
-      }
-    }
-  }
-
-  private assertStandaloneMapStructure(items: NormalizedSyncItem[]): void {
-    const maps = items.filter((item) => item.category === 'exploration')
-    if (maps.length === 0) return
-    const byKey = new Map<string, NormalizedSyncItem>()
-    for (const item of maps) {
-      if (byKey.has(item.remoteKey)) {
-        throw new Error(`个人地图快照包含重复标识：${item.remoteKey}`)
-      }
-      byKey.set(item.remoteKey, item)
-      if (item.parentRemoteKey === item.remoteKey) throw new Error('地图节点不能以自身为上级')
-      if (item.mapNodeKind === 'region' && item.parentRemoteKey) {
-        throw new Error(`一级主地区“${item.title}”不能包含上级地区`)
-      }
-      if (item.mapNodeKind === 'subregion' && !item.parentRemoteKey) {
-        throw new Error(`二级地区“${item.title}”必须指定一级主地区`)
-      }
-    }
-    for (const item of maps) {
-      if (!item.parentRemoteKey) continue
-      const parent = byKey.get(item.parentRemoteKey)
-      if (!parent || parent.mapNodeKind !== 'region') {
-        throw new Error(`二级地区“${item.title}”的上级必须是同一快照中的一级主地区`)
       }
     }
   }

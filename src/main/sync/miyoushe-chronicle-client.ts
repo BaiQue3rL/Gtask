@@ -86,7 +86,7 @@ class MiyousheChronicleClient {
     private readonly cookie: string,
     private readonly fetcher: typeof fetch,
     private readonly solveGeetest?: MiyousheGeetestSolver,
-    private readonly reuseLoginDevice = false,
+    reuseLoginDevice = false,
     private readonly reportProgress?: SyncProgressReporter,
     private readonly externalSignal?: AbortSignal
   ) {

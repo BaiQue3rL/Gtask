@@ -118,7 +118,7 @@ export function getActivityTagQualityRole(id: string): ActivityTagQualityRole {
   return 'primary'
 }
 
-export function normalizeActivityTags(values: string[], outputLocale = 'zh-CN'): string[] {
+export function normalizeActivityTags(values: string[]): string[] {
   const definitions = listActivityTagDefinitions()
   const lookup = new Map<string, string>()
   for (const definition of definitions) {
@@ -146,11 +146,8 @@ export function localizeActivityTags(ids: string[], outputLocale = 'zh-CN'): str
   }))]
 }
 
-export function activityTagsMeetQualityContract(
-  values: string[],
-  outputLocale = 'zh-CN'
-): boolean {
-  const normalized = normalizeActivityTags(values, outputLocale)
+export function activityTagsMeetQualityContract(values: string[]): boolean {
+  const normalized = normalizeActivityTags(values)
   return normalized.length >= MIN_AI_ACTIVITY_TAGS &&
     normalized.length <= MAX_AI_ACTIVITY_TAGS &&
     !normalized.includes('unknown')

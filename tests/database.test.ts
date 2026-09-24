@@ -4,7 +4,6 @@ import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppDatabase, CURRENT_SCHEMA_VERSION } from '../src/main/database'
-import { getBundledMapCatalog } from '../src/main/sync/map-catalog'
 import { SUPPORTED_GAME_IDS, type GameId } from '../src/shared/contracts'
 
 let database: AppDatabase | null = null

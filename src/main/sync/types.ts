@@ -6,7 +6,6 @@ import type {
   ScheduleKind,
   SyncProgressPhase,
   SyncProgressStatus,
-  SyncSourceResult,
   SyncTarget,
   ScheduleObservationTarget
 } from '../../shared/contracts'
@@ -167,5 +166,3 @@ export function isSyncCancelledError(error: unknown): boolean {
   return error instanceof SyncCancelledError ||
     (error instanceof Error && error.name === 'SyncCancelledError')
 }
-
-export type CompletedSourceResult = SyncSourceResult

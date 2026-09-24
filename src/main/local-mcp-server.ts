@@ -9,7 +9,6 @@ import {
   SYNC_PROGRESS_PHASES,
   SUPPORTED_GAME_IDS,
   type ChecklistCategory,
-  type ChecklistItem,
   type GameId
 } from '../shared/contracts'
 import type { AppDatabase } from './database'

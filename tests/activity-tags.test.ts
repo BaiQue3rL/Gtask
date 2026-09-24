@@ -22,8 +22,8 @@ describe('活动玩法标签中文规范化', () => {
       .toEqual(['unknown', 'combat'])
   })
 
-  it('英语界面保留 Codex 按契约提交的英语标签', () => {
-    expect(normalizeActivityTags(['shooting', 'puzzle'], 'en-US'))
+  it('规范化保留按契约提交的稳定英文 ID', () => {
+    expect(normalizeActivityTags(['shooting', 'puzzle']))
       .toEqual(['shooting', 'puzzle'])
   })
 
@@ -45,14 +45,14 @@ describe('活动玩法标签中文规范化', () => {
     ])).toEqual(['combat'])
   })
 
-  it('英语界面同样移除结构标签而不改写玩法标签', () => {
+  it('英文结构标签同样被移除，保留实际玩法标签', () => {
     expect(normalizeActivityTags([
       'limited_event',
       'shooting',
       'personal data',
       'event gameplay',
       'puzzle'
-    ], 'en-US')).toEqual(['shooting', 'puzzle'])
+    ])).toEqual(['shooting', 'puzzle'])
   })
 
   it('稳定 ID 按界面语言本地化展示', () => {
