@@ -19,6 +19,7 @@ This file is an AI entry point. It is intentionally concise; users are not expec
 - Current public maintenance and publication follow `docs/catalog-maintenance.md`. New facts are compiled into `updates/catalog.json`, which is also embedded in the application. Historical TypeScript seeds are compatibility inputs, not a second place to repeat each catalog edit. Protocol v2 adds verified missing-deadline exceptions and typed published schedule rules/windows; verify client capability before publishing them.
 - Never change the product version, create a version tag, or publish a release unless the user explicitly approves that specific version release. Ordinary fixes and release-pipeline tests do not justify a version bump.
 - Preserve unrelated user changes and untracked research directories. Never reset or delete the database, credentials, backups, release artifacts, or test references unless the user explicitly requests it.
+- Local software updates must not create backups by default (user preference, 2026-09-24). Create a program/data/settings/credential backup only when the user explicitly requests one; do not create rollback copies or holding directories as a substitute. Verify the built program and preserve the existing data, credentials, and settings in place. This overrides older deployment checklists that automatically back up before every update; it does not authorize deleting existing backups or disabling the application's own data-backup features.
 
 ## Canonical map catalog maintenance
 
