@@ -4,6 +4,10 @@
 
 ## 当前工作
 
+2026-09-24 23:23 卫生改动已提交为 `761e4d4` 并按授权覆盖本机 `D:\Git\Gtask`，版本仍为 1.2.0。35 个程序文件与验收包逐一一致；清理并核验回收站中的 9 个旧 MCP 代码分块，安装目录文件清单现与新包完全一致。唤起旧窗口后正常退出，未强制终止进程。数据库完整性 `ok`、schema 8，手动保护状态、凭据、设置保留，替换阶段原个人文件摘要一致，未创建备份。app.asar SHA-256：`c117c5537aa7f47a4d80a0c1b36615ce4f281b9054ced9b1ccb0661f979b690c`。部署与验收元数据位于 `C:\Users\Administrator\AppData\Local\Codex\task-receipts\gtask-hygiene-deployment-20260924.json` 和同目录 `gtask-hygiene-acceptance-20260924.json`。本段部署记录提交后推送远端，未创建或移动版本标签。
+
+本轮临时产物清理受阻：自动审批对清理命令仅返回 `blocked by policy`，未给出具体原因，整批命令未执行且未换工具重试。`tmp/hygiene-audit-20260924`、`tmp/local-update-package/audit-manifest.json`、两个旧 `tmp/update-local-no-backup.*` 脚本，以及系统临时目录下的 `gtask-ui-audit-eaJf0K`、`gtask-hygiene-20260924` 均仍保留；准确路径与存在性已记录在上述验收回执中。既有研究、发布和验收资料保留。
+
 2026-09-24 23:14 用户授权清理已不用的备份：已将 `D:\Git\Gtask-backups` 下 5 个 2026-09-15 部署备份、清空后的父目录，以及 `tmp/` 中对应的 4 个 `*-deployment-backup-path.txt` 路径记录移入回收站，共 10 个目标、4,766,799,997 字节。逐项核验原路径消失且回收站原路径元数据和内容均存在；未清空回收站。正式程序、数据库、凭据及应用管理的每日/迁移备份保留，清理前正式数据库和当天自动备份均通过完整性检查（schema 8）。回执：`C:\Users\Administrator\AppData\Local\Codex\task-receipts\gtask-backup-cleanup-20260924-231433.json`。下方 9 月 15 日部署备份路径均仅为历史记录，已不在原位置。
 
 2026-09-24 项目卫生与复查：移除无调用的数据库辅助方法、闲置导入、库街区类型判断函数和 3 个无调用导出；去掉活动标签规范化链路中不生效的语言参数，保留展示层本地化及维护任务的语言契约。主进程与渲染层类型检查均启用 `noUnusedLocals` / `noUnusedParameters`，现有 CI 构建一并执行。完整测试 467 项通过、12 项按原配置跳过，类型检查、生产构建与清单消费校验通过；隔离打包 UI 验收通过四游戏、增删改、地图折叠、设置、重启及提前显示，打包 MCP 返回 15 个工具和四游戏清单。文档本地链接与差异检查通过。用户已授权本轮提交、无备份本机更新及最后推送远端，版本保持 1.2.0，不发布 Release 或移动标签。
