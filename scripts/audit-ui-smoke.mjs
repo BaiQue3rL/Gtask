@@ -125,11 +125,62 @@ try {
         deadlineReview: { eligibility: 'confirmed_limited', openState: 'confirmed_open', limitedSourceUrl: sourceUrl,
           openSourceUrl: sourceUrl, checkedSources: [sourceUrl], checkedAt: now,
           reviewAt: new Date(Date.now() + 86400000).toISOString(), missingReason: '隔离测试的缺时间样本' } }] }] })
+    for (const game of games) {
+      database.mergeSyncedItems(game.id, 'public_schedule',
+        ['limited_event', 'endgame', 'exploration'].flatMap((category) => (category === 'exploration' ? [false] : [false, true]).map((future) => ({
+          remoteKey: `ui-audit:${category}:${future}`,
+          category,
+          title: `显示测试-${game.id}-${category}-${future ? '未来' : '已开启'}`,
+          startsAt: new Date(Date.now() + (future ? 86400000 : -86400000)).toISOString(),
+          endsAt: new Date(Date.now() + 7 * 86400000).toISOString(),
+          scheduleKind: 'fixed_window',
+          ...(category === 'endgame' ? { modeKey: `ui-audit-${future}`, periodKey: `ui-audit-${future}` } : {}),
+          ...(category === 'limited_event' ? { activityTags: ['combat'] } : {}),
+          ...(category === 'exploration' ? { mapNodeKind: 'region' } : {})
+        }))))
+      database.createChecklistItem({ gameId: game.id, category: 'custom', title: `显示测试-${game.id}-自定义`,
+        startsAt: new Date(Date.now() + 86400000).toISOString() })
+    }
   } finally { database.close() }
   await page.reload()
   await page.locator('.checklist-row').filter({ hasText: '审计限时例外' }).getByText('截止时间待确认', { exact: true }).waitFor()
   checks.push('published v2 missing deadline renders without a fabricated countdown')
   await page.screenshot({ path: join(root, 'deadline-exception.png'), fullPage: true })
+  const fixtureState = () => page.evaluate(async () => {
+    const games = await window.gtask.listGames()
+    return Promise.all(games.map(async (game) => (await window.gtask.listChecklistItems(game.id))
+      .filter((item) => item.title.startsWith('显示测试-'))))
+  })
+  const beforeVisibility = await fixtureState()
+  async function assertVisibility(enabled) {
+    for (const game of games) {
+      await page.locator('.game-button').filter({ hasText: game.name }).click()
+      await page.waitForFunction(({ enabled, gameId }) => {
+        const titles = [...document.querySelectorAll('.checklist-row .item-title')].map((item) => item.textContent)
+        return ['limited_event', 'endgame'].every((category) =>
+          titles.includes(`显示测试-${gameId}-${category}-未来`) === enabled &&
+          titles.includes(`显示测试-${gameId}-${category}-已开启`)) &&
+          titles.includes(`显示测试-${gameId}-exploration-已开启`) && titles.includes(`显示测试-${gameId}-自定义`)
+      }, { enabled, gameId: game.id })
+    }
+  }
+  for (const enabled of [false, true, false]) {
+    await page.getByTitle('设置', { exact: true }).click()
+    await page.getByRole('button', { name: '游戏与同步', exact: true }).click()
+    const preference = page.getByRole('checkbox', { name: '显示还没开始的活动', exact: true })
+    await preference.locator('..').click()
+    assert.equal(await preference.isChecked(), enabled)
+    await page.getByRole('button', { name: '关闭设置' }).click()
+    await assertVisibility(enabled)
+  }
+  assert.deepEqual(await fixtureState(), beforeVisibility)
+  checks.push('four games: future events/cycles follow off-on-off; open events/cycles/maps and custom rows stay; stored data unchanged')
+  await app.close()
+  app = undefined
+  page = await launch()
+  assert.equal(await page.evaluate(() => localStorage.getItem('gtask.show-upcoming-baseline-items.v1')), 'false')
+  await assertVisibility(false)
+  checks.push('restart retains disabled upcoming preference and hides future cycles in all four games')
   assert.deepEqual(pageErrors, [])
   const result = { ok: true, root, checks, pageErrors }
   writeFileSync(join(root, 'result.json'), JSON.stringify(result, null, 2))

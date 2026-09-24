@@ -62,6 +62,32 @@ function feed(
 }
 
 describe('remote catalog update', () => {
+  it('applies the compatible Genshin 7.1 events without duplicating locally maintained rows or resetting progress', () => {
+    const checkedIn = parseRemoteCatalogFeed(JSON.parse(
+      readFileSync(join(process.cwd(), 'updates', 'catalog.json'), 'utf8')
+    ))
+    const events = checkedIn.games.find((game) => game.gameId === 'genshin')!.upserts
+      .filter((item) => item.category === 'limited_event' && item.remoteKey.startsWith('event:7.1:'))
+    expect(events.map((item) => item.remoteKey)).toEqual([
+      'event:7.1:moonchase-festival', 'event:7.1:forging-realm', 'event:7.1:anniversary-login'
+    ])
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
+    const reference = new Date('2026-09-24T15:00:00Z')
+    database.mergeSyncedItems('genshin', 'public_schedule', events, '2026-09-24T14:13:00Z')
+    const before = database.listChecklistItems('genshin')
+    database.setChecklistCompletion(before[0].id, true)
+    const custom = database.createChecklistItem({ gameId: 'genshin', category: 'custom', title: '保留的手动事项' })
+    const genshinFeed = { ...checkedIn, games: checkedIn.games.filter((game) => game.gameId === 'genshin') }
+    database.applyRemoteCatalogFeed(genshinFeed, reference)
+    database.applyRemoteCatalogFeed(genshinFeed, reference)
+    for (const item of before) {
+      expect(database.getChecklistItem(item.id)).toMatchObject({ remoteKey: item.remoteKey, startsAt: item.startsAt, endsAt: item.endsAt })
+    }
+    expect(database.getChecklistItem(before[0].id)?.completed).toBe(true)
+    expect(database.getChecklistItem(custom.id)).toMatchObject({ source: 'manual', title: custom.title })
+    expect(database.listChecklistItems('genshin').filter((item) => item.remoteKey?.startsWith('event:7.1:'))).toHaveLength(3)
+  })
+
   it('publishes only the verified cross-game deltas and retracts invalid period-scoped cycle cards', () => {
     const checkedIn = parseRemoteCatalogFeed(JSON.parse(
       readFileSync(join(process.cwd(), 'updates', 'catalog.json'), 'utf8')

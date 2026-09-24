@@ -1271,9 +1271,9 @@ function buildPanelItems(panel: ChecklistPanel): ChecklistTreeRow[] {
     }))
   }
   const rows = buildMapTreeRows(
-    displayItems.value.filter((item) => item.category === 'exploration'),
+    items.value.filter((item) => item.category === 'exploration'),
     collapsedMapKeys.value,
-    displayItems.value.filter((item) => item.category === 'exploration'),
+    items.value.filter((item) => item.category === 'exploration'),
     clockNow.value
   )
   return showIncompleteOnly.value ? filterIncompleteMapTreeRows(rows) : rows
@@ -1910,7 +1910,7 @@ function showError(error: unknown): void {
                   <label class="software-update-toggle">
                     <span>
                       <strong>提前显示</strong>
-                      <small>默认等限时活动开始后再显示；周期挑战在空窗期仍显示下期开启时间。</small>
+                      <small>开启后提前显示尚未开始的限时活动和周期挑战；关闭后等到开始时再显示。</small>
                     </span>
                     <input
                       class="toggle-switch-input"

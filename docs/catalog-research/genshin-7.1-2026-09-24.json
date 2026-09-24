@@ -1,0 +1,122 @@
+{
+  "verifiedAt": "2026-09-24T14:26:41Z",
+  "gameId": "genshin",
+  "maintenanceJobId": "a752faf3-460f-49d2-8b12-4ebad1dc19bb",
+  "localAppliedItems": [
+    {
+      "remoteKey": "event:7.1:moonchase-festival",
+      "title": "银翎溯月，玄鸟结璘",
+      "category": "limited_event",
+      "activityTags": [
+        "combat",
+        "shooting",
+        "collection",
+        "festival"
+      ],
+      "startsAt": "2026-09-24T02:00:00.000Z",
+      "endsAt": "2026-10-11T19:59:59.000Z",
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://www.taptap.cn/moment/851171335571768168"
+    },
+    {
+      "remoteKey": "event:7.1:forging-realm",
+      "title": "铸境研炼·巧策进斗",
+      "category": "limited_event",
+      "activityTags": [
+        "card",
+        "challenge"
+      ],
+      "startsAt": "2026-09-22T23:00:00.000Z",
+      "endsAt": "2026-11-03T23:00:00.000Z",
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://www.taptap.cn/moment/850785708992889226"
+    },
+    {
+      "remoteKey": "event:7.1:anniversary-login",
+      "title": "耀星烁熠·累计登录",
+      "category": "limited_event",
+      "activityTags": [
+        "sign-in"
+      ],
+      "startsAt": "2026-10-01T04:00:00+08:00",
+      "endsAt": "2026-10-19T03:59:00+08:00",
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://www.taptap.cn/moment/850784339179343138"
+    },
+    {
+      "remoteKey": "event:7.1:outcome-prediction",
+      "title": "判测胜券本征",
+      "category": "limited_event",
+      "activityTags": [
+        "custom.outcome-prediction"
+      ],
+      "startsAt": "2026-10-12T10:00:00+08:00",
+      "endsAt": "2026-10-23T09:59:00+08:00",
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://www.taptap.cn/moment/850790336472025502"
+    },
+    {
+      "remoteKey": "event:7.1:standard-character-invitation",
+      "title": "巡历雪境，凝铸锋锐",
+      "category": "limited_event",
+      "activityTags": [
+        "custom.character-invitation"
+      ],
+      "startsAt": "2026-09-22T23:00:00.000Z",
+      "endsAt": "2026-11-03T06:59:59.000Z",
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://www.taptap.cn/moment/850788740455467399"
+    },
+    {
+      "remoteKey": "event:7.1:limited-character-invitation",
+      "title": "桌上剧团·冒险的前夜会",
+      "category": "limited_event",
+      "activityTags": [
+        "custom.character-invitation"
+      ],
+      "startsAt": "2026-09-22T23:00:00.000Z",
+      "endsAt": "2026-11-03T06:59:59.000Z",
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://www.taptap.cn/moment/850789386164372042"
+    }
+  ],
+  "publishedRemoteKeys": [
+    "event:7.1:moonchase-festival",
+    "event:7.1:forging-realm",
+    "event:7.1:anniversary-login"
+  ],
+  "deferredPublication": [
+    {
+      "remoteKey": "event:7.1:outcome-prediction",
+      "reason": "本机注册的 custom.* 标签不能通过现有公共清单协议分发。未注册该标签的 1.2.0 客户端会拒收整批；等待兼容的标签分发支持，不能用无关标签替代。"
+    },
+    {
+      "remoteKey": "event:7.1:standard-character-invitation",
+      "reason": "本机注册的 custom.* 标签不能通过现有公共清单协议分发。未注册该标签的 1.2.0 客户端会拒收整批；等待兼容的标签分发支持，不能用无关标签替代。"
+    },
+    {
+      "remoteKey": "event:7.1:limited-character-invitation",
+      "reason": "本机注册的 custom.* 标签不能通过现有公共清单协议分发。未注册该标签的 1.2.0 客户端会拒收整批；等待兼容的标签分发支持，不能用无关标签替代。"
+    }
+  ],
+  "unresolved": [
+    {
+      "title": "绮星盛会",
+      "sourceUrl": "https://www.taptap.cn/moment/851174639563443486",
+      "endsAt": "2026-11-03T04:00:00+08:00",
+      "reason": "开始时间仅为版本更新后，缺少可独立核验的精确边界；未写入本机或公共清单。"
+    },
+    {
+      "title": "绮衣珍赏·晴暖",
+      "sourceUrl": "https://www.taptap.cn/moment/851174279427917260",
+      "endsAt": "2026-11-04T05:59:00+08:00",
+      "reason": "开始时间仅为版本更新后，缺少可独立核验的精确边界；未写入本机或公共清单。"
+    }
+  ]
+}
