@@ -35,6 +35,8 @@ Do not rebuild the map catalog from personal progress and do not invent a third 
 
 ## Routine verification
 
+- Default delivery order (user preference, 2026-09-28): after changes, first synchronize the installed local client and verify the result, then push to the remote. Deploy program changes locally; apply baseline-only changes through the supported catalog maintenance/update path. Preserve data, settings, and credentials in place and follow the no-backup preference above.
+
 - Targeted map checks: `pnpm exec vitest run tests/map-catalog.test.ts tests/map-catalog-freshness.test.ts`
 - Full tests: `pnpm test`
 - Types: `pnpm typecheck`

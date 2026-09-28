@@ -153,7 +153,7 @@ describe('remote catalog update', () => {
           '声弦涤荡'
         ])
       } else {
-        expect(game.upserts).toHaveLength(11)
+        expect(game.upserts).toHaveLength(16)
         expect(game.upserts.filter((item) => item.category === 'endgame').map((item) => item.remoteKey))
           .toEqual(['endgame:anomaly-arbitration', 'endgame:apocalyptic-shadow'])
         expect(game.scheduleUpdates).toHaveLength(7)

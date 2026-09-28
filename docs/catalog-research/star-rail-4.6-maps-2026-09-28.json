@@ -1,0 +1,44 @@
+{
+  "gameId": "star-rail",
+  "verifiedAt": "2026-09-28T11:25:37.994Z",
+  "scope": "完整地图目录增量复核，延续 star-rail-4.6-2026-09-28.json；本记录解决此前千星城地图的证据缺口。",
+  "sources": [
+    {
+      "title": "千星城",
+      "url": "https://webstatic.mihoyo.com/sr/app/interactive-map/index.html#/map/943"
+    },
+    {
+      "title": "千星城中心城区",
+      "url": "https://webstatic.mihoyo.com/sr/app/interactive-map/index.html#/map/943"
+    },
+    {
+      "title": "指针塔",
+      "url": "https://webstatic.mihoyo.com/sr/app/interactive-map/index.html#/map/946"
+    },
+    {
+      "title": "空声院",
+      "url": "https://webstatic.mihoyo.com/sr/app/interactive-map/index.html#/map/948"
+    },
+    {
+      "title": "生研院",
+      "url": "https://webstatic.mihoyo.com/sr/app/interactive-map/index.html#/map/1014"
+    }
+  ],
+  "evidence": "官方互动地图实测导航：千星城独立四个子地图及各自战利品图层。楼层不单独建节点。二相乐园十二个入口与已有基准一致，无可靠改名或父级修正。",
+  "localDelta": "本机原有千星城及三个4.5子地图，沿用已发布的稳定键；MCP 仅新增生研院，返回 added=1 updated=0 archived=0，exploration completed。",
+  "publicationDelta": "公共累计清单缺失千星城整组，因此发布一个region和四个subregion，共五行；其他游戏、周期规则和活动不变。",
+  "unresolved": [
+    {
+      "title": "真珠的画室",
+      "reason": "官方二相乐园导航没有独立入口；仅新增场景公告不足以证明独立探索资格，继续保留候选，不猜测收录。"
+    }
+  ],
+  "localFirst": "在远端推送前通过本机维护接口完成清单应用，未修改程序版本、数据配置或凭据。",
+  "verification": [
+    "地图与发布针对性回归25项通过",
+    "全量测试470项通过、12项跳过",
+    "pnpm build含类型检查通过",
+    "pnpm catalog:check和git diff --check通过"
+  ],
+  "clientReceipt": "本地维护任务完成后读取清单确认生研院存在；客户端界面显示千星城3/4，原有三个子区完成状态保留。"
+}

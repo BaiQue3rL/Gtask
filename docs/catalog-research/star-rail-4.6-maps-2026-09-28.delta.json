@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 2,
+  "revision": "2026-09-28.star-rail-4.6-maps",
+  "publishedAt": "2026-09-28T11:25:37.994Z",
+  "games": [
+    {
+      "gameId": "star-rail",
+      "upserts": [
+        {
+          "remoteKey": "map-catalog:star-rail:region:astropolis",
+          "category": "exploration",
+          "title": "千星城",
+          "mapNodeKind": "region",
+          "sourceUrl": "https://webstatic.mihoyo.com/sr/app/interactive-map/index.html#/map/943"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:astropolis-central-district",
+          "category": "exploration",
+          "title": "千星城中心城区",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:astropolis",
+          "parentTitle": "千星城",
+          "sourceUrl": "https://webstatic.mihoyo.com/sr/app/interactive-map/index.html#/map/943"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:lodestar-tower",
+          "category": "exploration",
+          "title": "指针塔",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:astropolis",
+          "parentTitle": "千星城",
+          "sourceUrl": "https://webstatic.mihoyo.com/sr/app/interactive-map/index.html#/map/946"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:skycall-aery",
+          "category": "exploration",
+          "title": "空声院",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:astropolis",
+          "parentTitle": "千星城",
+          "sourceUrl": "https://webstatic.mihoyo.com/sr/app/interactive-map/index.html#/map/948"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:life-sciences-institute",
+          "category": "exploration",
+          "title": "生研院",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:astropolis",
+          "parentTitle": "千星城",
+          "sourceUrl": "https://webstatic.mihoyo.com/sr/app/interactive-map/index.html#/map/1014"
+        }
+      ],
+      "archives": []
+    }
+  ]
+}
