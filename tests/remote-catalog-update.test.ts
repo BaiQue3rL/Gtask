@@ -95,7 +95,11 @@ describe('remote catalog update', () => {
     expect(checkedIn.games).toHaveLength(4)
     const archivedKeys = new Set<string>()
     for (const game of checkedIn.games) {
-      expect(game.versionWindow).toBeUndefined()
+      if (game.gameId === 'star-rail') {
+        expect(game.versionWindow).toMatchObject({ endsAt: '2026-11-11T06:00:00+08:00', confidence: 1 })
+      } else {
+        expect(game.versionWindow).toBeUndefined()
+      }
       const expectedArchives = [
         `hot-update-test:${game.gameId}:events:v1`,
         `hot-update-test:${game.gameId}:cycles:v1`,
@@ -149,9 +153,10 @@ describe('remote catalog update', () => {
           '声弦涤荡'
         ])
       } else {
-        expect(game.upserts).toHaveLength(7)
+        expect(game.upserts).toHaveLength(11)
         expect(game.upserts.filter((item) => item.category === 'endgame').map((item) => item.remoteKey))
-          .toEqual(['endgame:anomaly-arbitration', 'endgame:apocalyptic-shadow', 'endgame:memory-of-chaos'])
+          .toEqual(['endgame:anomaly-arbitration', 'endgame:apocalyptic-shadow'])
+        expect(game.scheduleUpdates).toHaveLength(7)
       }
     }
     expect(archivedKeys.size).toBe(14)

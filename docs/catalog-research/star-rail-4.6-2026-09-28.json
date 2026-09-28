@@ -1,0 +1,227 @@
+{
+  "gameId": "star-rail",
+  "verifiedAt": "2026-09-28T11:10:00Z",
+  "maintenanceJob": {
+    "id": "7d0404f8-c7ee-4c9e-a78a-afe1474a47a7",
+    "status": "failed",
+    "reason": "应用退出，原任务取消；改按 docs/catalog-maintenance.md 离线仓库流程完成研究和发布。未声称应用内提交成功。"
+  },
+  "publicationRevision": "2026-09-28.star-rail-4.6-baseline-maintenance",
+  "minimumClientVersion": "1.2.0",
+  "coverage": {
+    "tasks": "核查当前 4.6 全版本窗口；保留当前 periodKey，以维护开始作为版本基准边界，结束改为 11 月 11 日 06:00；44 天例外，不改永久 42 天 cadence。",
+    "cycles": "核查现有四个稳定模式。4.5 缩短的虚构窗口、4.6 混沌窗口及仲裁窗口作为例外；三种逐光捡金模式重新锚定仍为 42 天的后续自动周期。仲裁改为已公布的随版本刷新规则，06:00 为维护边界而非保证可登录的开服时刻；当前具体窗口由第一方观察覆盖为 07:00。",
+    "events": "逐项核查现有跨版本活动、全部七条日历差异、4.6 更新说明的独立活动容器及4.5剩余活动。新增四项、校正命运契约截止时间。4.5活动均已结束，由既有到期清理处理。",
+    "exploration": "已比对隔离公共目录的七个一级地区及二相乐园现有十二个子区，与4.4、4.5、4.6新增场景清单交叉检查。发现千星城及新场景候选；官方地图接口失败，未取得独立探索进度结构的可靠证据，因此本次地图覆盖有待核实项，不宣称无变化或完整核验。"
+  },
+  "supersededUpserts": [
+    {
+      "remoteKey": "endgame:memory-of-chaos",
+      "action": "仅移除累计 upserts 中已过时且错误的历史窗口，不归档或删除稳定模式。",
+      "reason": "旧记录 2026-09-28 19:00 错误；4.4 官方说明为 06:00。新协议窗口和内置模式定义已接管。直接重写历史 upsert 为06:00会覆盖已自动进入04:00新周期的客户端并丢失该期完成状态。发布时间已晚于旧错误截止19:00，旧行可正常换期；已换期行按 nominalStartsAt 校时并保留状态。",
+      "sourceUrl": "https://sr.mihoyo.com/news/165210?type=activity"
+    }
+  ],
+  "timestampPolicy": "逐光捡金用第一方排期的次日04:00作为排他边界；公告03:59是最后显示分钟。限时活动保留日历秒精度。未把预计维护时长五小时推算成精确活动开始时刻。",
+  "sourceObservations": [
+    {
+      "observationId": "12165da9-0e19-44a6-b17f-1802c8bea28b",
+      "provider": "miyoushe",
+      "endpoint": "miyoushe-star-rail-anomaly-arbitration",
+      "title": "异相仲裁",
+      "modeKey": "anomaly-arbitration",
+      "periodKey": "star-rail:anomaly-arbitration:10",
+      "startsAt": "2026-09-27T23:00:00.000Z",
+      "endsAt": "2026-11-10T22:00:00.000Z",
+      "observedAt": "2026-09-28T10:52:06.500Z"
+    },
+    {
+      "observationId": "7e277322-9bf3-402c-8c0a-9f797dda1801",
+      "provider": "miyoushe",
+      "endpoint": "miyoushe-star-rail-memory-of-chaos",
+      "title": "混沌回忆",
+      "modeKey": "memory-of-chaos",
+      "periodKey": "star-rail:memory-of-chaos:1035",
+      "startsAt": "2026-09-27T22:00:00.000Z",
+      "endsAt": "2026-11-01T20:00:00.000Z",
+      "observedAt": "2026-09-28T10:52:06.500Z"
+    },
+    {
+      "observationId": "da5ed791-911a-4d35-9a64-a81247592f47",
+      "provider": "miyoushe",
+      "endpoint": "miyoushe-star-rail-pure-fiction",
+      "title": "虚构叙事",
+      "modeKey": "pure-fiction",
+      "periodKey": "star-rail:pure-fiction:2026",
+      "startsAt": "2026-09-13T20:00:00.000Z",
+      "endsAt": "2026-10-18T20:00:00.000Z",
+      "observedAt": "2026-09-28T10:52:06.500Z"
+    },
+    {
+      "observationId": "f6df5c4c-e00e-47f7-850e-0e4fa844d59f",
+      "provider": "miyoushe",
+      "endpoint": "miyoushe-star-rail-event-calendar",
+      "title": "「星际幻宠」乐园",
+      "modeKey": "official-event-282",
+      "periodKey": null,
+      "startsAt": "2026-09-24T20:00:00.000Z",
+      "endsAt": "2026-11-10T22:00:00.000Z",
+      "observedAt": "2026-09-28T10:51:44.175Z"
+    },
+    {
+      "observationId": "1ab8223f-aefa-4a6b-a425-4d44a3acec2f",
+      "provider": "miyoushe",
+      "endpoint": "miyoushe-star-rail-event-calendar",
+      "title": "位面分裂",
+      "modeKey": "official-event-284",
+      "periodKey": null,
+      "startsAt": "2026-10-11T20:00:00.000Z",
+      "endsAt": "2026-10-24T19:59:59.000Z",
+      "observedAt": "2026-09-28T10:51:44.175Z"
+    },
+    {
+      "observationId": "68992745-9a9d-45b6-8acd-dada114fcd35",
+      "provider": "miyoushe",
+      "endpoint": "miyoushe-star-rail-event-calendar",
+      "title": "巡星之礼",
+      "modeKey": "official-event-287",
+      "periodKey": null,
+      "startsAt": "2026-09-26T20:00:00.000Z",
+      "endsAt": "2026-11-09T19:59:59.000Z",
+      "observedAt": "2026-09-28T10:51:44.175Z"
+    },
+    {
+      "observationId": "ebe14fe3-023f-4636-92eb-4b0feae51624",
+      "provider": "miyoushe",
+      "endpoint": "miyoushe-star-rail-event-calendar",
+      "title": "星际和平盛典：一镜到底",
+      "modeKey": "official-event-285",
+      "periodKey": null,
+      "startsAt": "2026-10-21T04:00:00.000Z",
+      "endsAt": "2026-11-10T19:59:59.000Z",
+      "observedAt": "2026-09-28T10:51:44.175Z"
+    },
+    {
+      "observationId": "04f48545-bd6f-413e-9805-51bd51e7eaab",
+      "provider": "miyoushe",
+      "endpoint": "miyoushe-star-rail-event-calendar",
+      "title": "爱，幽灵与机器人",
+      "modeKey": "official-event-288",
+      "periodKey": null,
+      "startsAt": "2026-09-24T20:00:00.000Z",
+      "endsAt": "2026-11-10T19:59:59.000Z",
+      "observedAt": "2026-09-28T10:51:44.175Z"
+    },
+    {
+      "observationId": "3edfa276-c31b-45c3-801f-6d63c4282516",
+      "provider": "miyoushe",
+      "endpoint": "miyoushe-star-rail-event-calendar",
+      "title": "花藏繁生",
+      "modeKey": "official-event-283",
+      "periodKey": null,
+      "startsAt": "2026-10-29T20:00:00.000Z",
+      "endsAt": "2026-11-10T19:59:59.000Z",
+      "observedAt": "2026-09-28T10:51:44.175Z"
+    },
+    {
+      "observationId": "8f1db992-ba0e-4905-8a7d-bed61a1da5a5",
+      "provider": "miyoushe",
+      "endpoint": "miyoushe-star-rail-event-calendar",
+      "title": "镇伏「贪饕」，汇聚愿力",
+      "modeKey": "official-event-286",
+      "periodKey": null,
+      "startsAt": "2026-09-27T23:00:00.000Z",
+      "endsAt": "2026-11-10T22:00:00.000Z",
+      "observedAt": "2026-09-28T10:51:44.175Z"
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://hsr.hoyoverse.com/de-de/news/166468",
+      "use": "官方4.6更新说明；精确版本结束、周期排期、活动玩法和限时资格。页面直读失败但搜索索引返回完整公告，与下述游戏内公告存档交叉核对。"
+    },
+    {
+      "url": "https://github.com/KQM-git/HSRNews/blob/master/archive/1437.md",
+      "use": "游戏内英文4.6公告的公开存档，只作官方公告交叉核验。"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/852146581372145510?group_id=311675",
+      "use": "官方维护开始，非开服结束时刻。"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/841375445998898274",
+      "use": "官方4.5公告，虚构与末日缩短为五周，以及千星城场景名称。"
+    },
+    {
+      "url": "https://weibo.com/ttarticle/p/show?id=2309405320837623840933",
+      "use": "命运契约•再启持续至4.6版本结束，沿用稳定键与登录领取标签。"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/850763057205346351",
+      "use": "镇伏「贪饕」，汇聚愿力的独立限时活动资格和战斗玩法；时间来自脱敏第一方日历。07:00属于日历窗口元数据，非推算开服时间。"
+    },
+    {
+      "url": "https://www.taptap.cn/game-event/12947",
+      "use": "4.6官方活动集合与中文名称；位面分裂、花藏繁生的精确排期使用第一方日历。"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/836654182617321258",
+      "use": "同名花藏繁生玩法规则佐证双倍掉落标签，不用旧期时间。"
+    },
+    {
+      "url": "https://www.taptap.cn/forum/g311675?page=4&type=official",
+      "use": "官方位面分裂规则佐证双倍掉落标签，不用旧期时间。"
+    },
+    {
+      "url": "https://wiki.biligame.com/sr/版本新增内容",
+      "use": "中文新增场景及父级交叉核查；场景存在不等于独立探索资格。"
+    },
+    {
+      "url": "https://www.bilibili.com/video/BV1ZE8d6aEvf/",
+      "use": "千星城收集路线分区佐证；未把攻略宝箱数直接当作官方探索结构。"
+    },
+    {
+      "url": "https://www.9game.cn/bhxqtd/12072613.html",
+      "use": "空声院收集资料；仍未足以确认独立探索进度资格。"
+    }
+  ],
+  "withheld": [
+    {
+      "title": "爱，幽灵与机器人",
+      "reason": "已确认限时经营玩法及11月11日截止，但日历开始9月25日04:00与官方4.6更新后冲突。开始时间无法精确表达；不能伪造11:00开服，也不能将已知截止伪装为缺截止例外。",
+      "sourceUrl": "https://www.miyoushe.com/sr/article/78445058"
+    },
+    {
+      "title": "巡星之礼",
+      "reason": "签到玩法已确认；日历开始9月27日04:00早于4.6维护，缺少可消除冲突的直接规则页，暂不发布。"
+    },
+    {
+      "title": "千星城、千星城中心城区、指针塔、空声院、生研院；二相乐园的真珠的画室",
+      "reason": "候选名称和新增版本可核查，独立探索进度/导航结构未取得可靠证据。官方地图静态API三次均返回retcode -502；地图页无可提取正文。保留待核实，不猜测层级或增建第三层。"
+    }
+  ],
+  "excluded": [
+    {
+      "title": "「星际幻宠」乐园",
+      "reason": "公告容器包含常驻宠物玩法、幻宠抽取和登录奖励节点；不把抽取池、永久玩法或内部领奖节点建为独立限时清单。"
+    },
+    {
+      "title": "星际碰碰好搭档！",
+      "reason": "只公告更新后开放，社区列为永久；没有独立限时资格，不因缺结束时间而登记例外。"
+    },
+    {
+      "title": "货币战争赛季、无名勋礼、商店折扣、角色和光锥跃迁、补偿邮件",
+      "reason": "本次未核实为新增主要终局挑战；赛季奖励轨、通行证、商店、卡池和奖励节点不作为新增清单模式或活动。"
+    }
+  ],
+  "publicationMethod": "以旧累计清单移除上述被替代的混沌历史 upsert 为基准，使用同目录 delta.json 经 catalog-maintenance-cli 编译为 updates/catalog.json。其他游戏及既有退役项完全保留。未变更程序、版本号或历史种子。",
+  "verification": [
+    "真实消费器隔离内存库校验通过；清单协议v2，7条排期记录",
+    "换期与状态保留回归3项通过，通用排期回归6项通过",
+    "pnpm test：75个测试文件通过、2个跳过；470项通过、12项跳过",
+    "pnpm build通过（含pnpm typecheck）",
+    "pnpm catalog:check通过；git diff --check通过",
+    "与原清单逐游戏语义对比：其他三个游戏、既有退役列表均不变"
+  ],
+  "clientReceipt": "未取得。应用已退出，本次仓库发布不等于客户端已接收。"
+}

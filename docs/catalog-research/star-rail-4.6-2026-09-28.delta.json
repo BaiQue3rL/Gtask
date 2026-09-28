@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 2,
+  "revision": "2026-09-28.star-rail-4.6-baseline-maintenance",
+  "publishedAt": "2026-09-28T11:08:14.768Z",
+  "games": [
+    {
+      "gameId": "star-rail",
+      "versionWindow": {
+        "periodKey": "predicted:star-rail:version:2026-09-27T22:00:00.000Z",
+        "startsAt": "2026-09-28T06:00:00+08:00",
+        "endsAt": "2026-11-11T06:00:00+08:00",
+        "timeZone": "Asia/Shanghai",
+        "sourceUrl": "https://hsr.hoyoverse.com/de-de/news/166468",
+        "confidence": 1
+      },
+      "upserts": [
+        {
+          "remoteKey": "event:4.4:fate-contract",
+          "category": "limited_event",
+          "title": "命运契约•再启",
+          "startsAt": "2026-07-24T12:00:00+08:00",
+          "endsAt": "2026-11-11T06:00:00+08:00",
+          "activityTags": [
+            "sign-in"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://weibo.com/ttarticle/p/show?id=2309405320837623840933"
+        },
+        {
+          "remoteKey": "event:4.6:planar-fissure",
+          "category": "limited_event",
+          "title": "位面分裂",
+          "startsAt": "2026-10-12T04:00:00+08:00",
+          "endsAt": "2026-10-25T03:59:59+08:00",
+          "activityTags": [
+            "double-drop"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/game-event/12947"
+        },
+        {
+          "remoteKey": "event:4.6:garden-of-plenty",
+          "category": "limited_event",
+          "title": "花藏繁生",
+          "startsAt": "2026-10-30T04:00:00+08:00",
+          "endsAt": "2026-11-11T03:59:59+08:00",
+          "activityTags": [
+            "double-drop"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/game-event/12947"
+        },
+        {
+          "remoteKey": "event:4.6:interastral-peace-gala",
+          "category": "limited_event",
+          "title": "星际和平盛典：一镜到底",
+          "startsAt": "2026-10-21T12:00:00+08:00",
+          "endsAt": "2026-11-11T03:59:59+08:00",
+          "activityTags": [
+            "combat"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://hsr.hoyoverse.com/de-de/news/166468"
+        },
+        {
+          "remoteKey": "event:4.6:wishpower",
+          "category": "limited_event",
+          "title": "镇伏「贪饕」，汇聚愿力",
+          "startsAt": "2026-09-28T07:00:00+08:00",
+          "endsAt": "2026-11-11T06:00:00+08:00",
+          "activityTags": [
+            "combat"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/850763057205346351"
+        }
+      ],
+      "archives": [],
+      "scheduleUpdates": [
+        {
+          "kind": "cycle_window",
+          "key": "star-rail:memory-of-chaos:star-rail:memory-of-chaos:1035",
+          "remoteKey": "endgame:memory-of-chaos",
+          "modeKey": "memory-of-chaos",
+          "periodKey": "star-rail:memory-of-chaos:1035",
+          "nominalStartsAt": "2026-09-28T04:00:00+08:00",
+          "startsAt": "2026-09-28T06:00:00+08:00",
+          "endsAt": "2026-11-02T04:00:00+08:00",
+          "sourceUrl": "https://hsr.hoyoverse.com/de-de/news/166468"
+        },
+        {
+          "kind": "cycle_window",
+          "key": "star-rail:pure-fiction:predicted:star-rail:pure-fiction:2026-09-13T20:00:00.000Z",
+          "remoteKey": "endgame:pure-fiction",
+          "modeKey": "pure-fiction",
+          "periodKey": "predicted:star-rail:pure-fiction:2026-09-13T20:00:00.000Z",
+          "nominalStartsAt": "2026-09-14T04:00:00+08:00",
+          "startsAt": "2026-09-14T04:00:00+08:00",
+          "endsAt": "2026-10-19T04:00:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/841375445998898274"
+        },
+        {
+          "kind": "cycle_window",
+          "key": "star-rail:anomaly-arbitration:star-rail:anomaly-arbitration:10",
+          "remoteKey": "endgame:anomaly-arbitration",
+          "modeKey": "anomaly-arbitration",
+          "periodKey": "star-rail:anomaly-arbitration:10",
+          "nominalStartsAt": "2026-09-28T06:00:00+08:00",
+          "startsAt": "2026-09-28T07:00:00+08:00",
+          "endsAt": "2026-11-11T06:00:00+08:00",
+          "sourceUrl": "https://hsr.hoyoverse.com/de-de/news/166468"
+        },
+        {
+          "kind": "cycle_rule",
+          "key": "star-rail:memory-of-chaos:4.6-anchor",
+          "remoteKey": "endgame:memory-of-chaos",
+          "modeKey": "memory-of-chaos",
+          "title": "混沌回忆",
+          "effectiveFrom": "2026-11-02T04:00:00+08:00",
+          "policy": {
+            "kind": "interval",
+            "anchorStartsAt": "2026-11-02T04:00:00+08:00",
+            "cadenceDays": 42,
+            "durationDays": 42
+          },
+          "sourceUrl": "https://hsr.hoyoverse.com/de-de/news/166468"
+        },
+        {
+          "kind": "cycle_rule",
+          "key": "star-rail:pure-fiction:4.6-anchor",
+          "remoteKey": "endgame:pure-fiction",
+          "modeKey": "pure-fiction",
+          "title": "虚构叙事",
+          "effectiveFrom": "2026-10-19T04:00:00+08:00",
+          "policy": {
+            "kind": "interval",
+            "anchorStartsAt": "2026-10-19T04:00:00+08:00",
+            "cadenceDays": 42,
+            "durationDays": 42
+          },
+          "sourceUrl": "https://hsr.hoyoverse.com/de-de/news/166468"
+        },
+        {
+          "kind": "cycle_rule",
+          "key": "star-rail:apocalyptic-shadow:4.6-anchor",
+          "remoteKey": "endgame:apocalyptic-shadow",
+          "modeKey": "apocalyptic-shadow",
+          "title": "末日幻影",
+          "effectiveFrom": "2026-10-05T04:00:00+08:00",
+          "policy": {
+            "kind": "interval",
+            "anchorStartsAt": "2026-10-05T04:00:00+08:00",
+            "cadenceDays": 42,
+            "durationDays": 42
+          },
+          "sourceUrl": "https://hsr.hoyoverse.com/de-de/news/166468"
+        },
+        {
+          "kind": "cycle_rule",
+          "key": "star-rail:anomaly-arbitration:4.6-anchor",
+          "remoteKey": "endgame:anomaly-arbitration",
+          "modeKey": "anomaly-arbitration",
+          "title": "异相仲裁",
+          "effectiveFrom": "2026-09-28T06:00:00+08:00",
+          "policy": {
+            "kind": "version-relative",
+            "startDayOffset": 0,
+            "hour": 6,
+            "timeZoneOffsetHours": 8,
+            "fallback": {
+              "kind": "interval",
+              "anchorStartsAt": "2026-11-11T06:00:00+08:00",
+              "cadenceDays": 42,
+              "durationDays": 42
+            }
+          },
+          "sourceUrl": "https://hsr.hoyoverse.com/de-de/news/166468"
+        }
+      ]
+    }
+  ]
+}
