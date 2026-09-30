@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 2,
+  "revision": "2026-09-30.wuthering-waves-3.7-baseline-maintenance",
+  "publishedAt": "2026-09-30T10:12:56Z",
+  "games": [
+    {
+      "gameId": "wuthering-waves",
+      "versionWindow": {
+        "periodKey": "predicted:wuthering-waves:version:2026-09-29T20:00:00.000Z",
+        "startsAt": "2026-09-30T11:00:00+08:00",
+        "endsAt": "2026-11-12T04:00:00+08:00",
+        "timeZone": "Asia/Shanghai",
+        "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+        "confidence": 0.85
+      },
+      "upserts": [
+        {
+          "remoteKey": "ww:event:3.7:tuantuan-yongzhe-daluandou",
+          "category": "limited_event",
+          "title": "团团勇者大乱斗",
+          "startsAt": "2026-09-30T11:00:00+08:00",
+          "endsAt": "2026-11-11T11:59:59+08:00",
+          "activityTags": [
+            "combat",
+            "challenge"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015"
+        },
+        {
+          "remoteKey": "ww:event:3.7:menggou-xiazhong",
+          "category": "limited_event",
+          "title": "梦构匣中",
+          "startsAt": "2026-09-30T11:00:00+08:00",
+          "endsAt": "2026-11-11T03:59:59+08:00",
+          "activityTags": [
+            "exploration",
+            "puzzle",
+            "combat",
+            "challenge",
+            "collection"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015"
+        },
+        {
+          "remoteKey": "ww:event:3.7:chaoyue-zengli",
+          "category": "limited_event",
+          "title": "朝月赠礼",
+          "startsAt": "2026-09-30T11:00:00+08:00",
+          "endsAt": "2026-11-11T03:59:59+08:00",
+          "activityTags": [
+            "sign-in"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015"
+        },
+        {
+          "remoteKey": "ww:event:3.7:solaris-return-invitation",
+          "category": "limited_event",
+          "title": "索拉里斯回归邀约",
+          "startsAt": "2026-09-30T11:00:00+08:00",
+          "endsAt": "2026-11-11T23:59:59+08:00",
+          "activityTags": [
+            "web-event",
+            "quest"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015"
+        },
+        {
+          "remoteKey": "ww:event:3.7:tiangong-xunwu",
+          "category": "limited_event",
+          "title": "天工寻物",
+          "startsAt": "2026-10-08T04:00:00+08:00",
+          "endsAt": "2026-10-26T03:59:59+08:00",
+          "activityTags": [
+            "combat",
+            "challenge"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015"
+        },
+        {
+          "remoteKey": "ww:event:3.7:chaoyue-yuyong",
+          "category": "limited_event",
+          "title": "朝月鱼涌",
+          "startsAt": "2026-10-15T10:00:00+08:00",
+          "endsAt": "2026-11-01T09:59:59+08:00",
+          "activityTags": [
+            "web-event",
+            "collection",
+            "challenge"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015"
+        },
+        {
+          "remoteKey": "ww:event:3.7:echoing-realm",
+          "category": "limited_event",
+          "title": "回音盈域",
+          "startsAt": "2026-10-15T04:00:00+08:00",
+          "endsAt": "2026-10-22T03:59:59+08:00",
+          "activityTags": [
+            "double-drop",
+            "material-reward"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015"
+        },
+        {
+          "remoteKey": "ww:event:3.7:wuyin-xiaochu",
+          "category": "limited_event",
+          "title": "无音消除",
+          "startsAt": "2026-10-22T10:00:00+08:00",
+          "endsAt": "2026-11-09T03:59:59+08:00",
+          "activityTags": [
+            "puzzle",
+            "challenge"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015"
+        },
+        {
+          "remoteKey": "ww:event:3.7:pinglan-tingyu-zhili",
+          "category": "limited_event",
+          "title": "凭栏听雨之礼",
+          "startsAt": "2026-10-22T10:00:00+08:00",
+          "endsAt": "2026-11-11T03:59:59+08:00",
+          "activityTags": [
+            "sign-in"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015"
+        },
+        {
+          "remoteKey": "ww:event:3.7:tachao-tanli-xuanfang-dijie",
+          "category": "limited_event",
+          "title": "踏潮探历・玄方地界",
+          "startsAt": "2026-10-29T04:00:00+08:00",
+          "endsAt": "2026-11-11T03:59:59+08:00",
+          "activityTags": [
+            "exploration",
+            "quest"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015"
+        },
+        {
+          "remoteKey": "ww:event:3.7:tacet-field-double-drop",
+          "category": "limited_event",
+          "title": "声弦涤荡",
+          "startsAt": "2026-11-04T04:00:00+08:00",
+          "endsAt": "2026-11-11T03:59:59+08:00",
+          "activityTags": [
+            "double-drop",
+            "material-reward"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:1aa2be50a8f6bec9153b",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "title": "梦枢天罗",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:46d939ba62197e5a32ca",
+          "parentTitle": "瑝珑",
+          "sourceUrl": "https://www.kurobbs.com/mc/map/"
+        }
+      ],
+      "archives": []
+    }
+  ]
+}

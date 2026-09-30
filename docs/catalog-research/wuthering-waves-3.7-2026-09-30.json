@@ -1,0 +1,421 @@
+{
+  "gameId": "wuthering-waves",
+  "verifiedAt": "2026-09-30T10:24:35Z",
+  "outputLocale": "zh-CN",
+  "userTimeZone": "Asia/Shanghai",
+  "scope": "当前正式3.7版本、全部有效与已公告限时活动、主要周期模式以及完整地图目录的公开差异审计",
+  "sources": [
+    {
+      "title": "官方3.7维护公告",
+      "url": "https://www.taptap.cn/moment/851764842783049481?group_id=330015",
+      "official": true
+    },
+    {
+      "title": "官方3.7版本资讯与完整活动笔记",
+      "url": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+      "official": true,
+      "detailImage": "https://img2-tc.tapimg.com/moment/etag/lqlfoUy06ICJBhWHmmtPycJTSFhE_20260928144127.jpg/_tap_ugc.jpg",
+      "calendarImage": "https://img2-tc.tapimg.com/moment/etag/lpJnw3863W7WH0PyL_0cjG0EQJuT_20260928174320.png/_tap_ugc.jpg"
+    },
+    {
+      "title": "官方3.7内容说明",
+      "url": "https://www.taptap.cn/moment/854139064348051537",
+      "official": true
+    },
+    {
+      "title": "团团勇者大乱斗官方玩法预告",
+      "url": "https://www.taptap.cn/moment/853954425138447733?group_id=330015",
+      "official": true,
+      "detailImage": "https://img2-tc.tapimg.com/moment/etag/ll3JCLCJiMkRfBasn9kseMKWwsWw_20260929110426.png/_tap_ugc.jpg"
+    },
+    {
+      "title": "库街区官方公开地图导航",
+      "url": "https://www.kurobbs.com/mc/map/",
+      "official": true
+    },
+    {
+      "title": "官方地图完整地区结构",
+      "url": "https://web-static.kurobbs.com/mcmap/country/13CCF182D6AF491CA1AC2A02754E5345/country.json",
+      "official": true
+    },
+    {
+      "title": "梦枢天罗官方公开独立收集目标",
+      "url": "https://web-static.kurobbs.com/mcmap/position/912/position.json",
+      "official": true
+    },
+    {
+      "title": "梦枢天罗公开实机探索度界面（00:15–00:16）",
+      "url": "https://www.bilibili.com/video/BV1A2aR6GEi2/",
+      "official": false,
+      "publisher": "阿柴_abc",
+      "publishedAt": "2026-09-30T15:48:57+08:00"
+    },
+    {
+      "title": "官方全球3.7完整内容说明（矩阵仅修复信息）",
+      "url": "https://wutheringwaves.kurogames.com/en/main/news/detail/5571",
+      "official": true
+    },
+    {
+      "title": "官方历史矩阵阶段开放时刻",
+      "url": "https://www.taptap.cn/moment/826407231594433678",
+      "official": true
+    },
+    {
+      "title": "当前10月公开日历（矩阵只有日期）",
+      "url": "https://www.taptap.cn/moment/854024447772854776",
+      "official": false
+    }
+  ],
+  "version": {
+    "periodKey": "predicted:wuthering-waves:version:2026-09-29T20:00:00.000Z",
+    "startsAt": "2026-09-30T11:00:00+08:00",
+    "endsAt": "2026-11-12T04:00:00+08:00",
+    "timeZone": "Asia/Shanghai",
+    "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+    "confidence": 0.85,
+    "endsAtPrecision": "官方全版本日历明确11月12日；04:00暂定，来自相邻3.5、3.6与3.7固定维护开始时刻的交叉核验，尚非下一次精确维护公告。",
+    "startsAtPrecision": "沿用鸣潮既有可游玩起点约定；官方公告计划维护结束为9月30日11:00（UTC+8）。",
+    "cadence": "保留42天永久规则；本次43天版本仅发布当前窗口例外，不改长期节奏。"
+  },
+  "events": [
+    {
+      "remoteKey": "ww:event:3.7:tuantuan-yongzhe-daluandou",
+      "category": "limited_event",
+      "title": "团团勇者大乱斗",
+      "startsAt": "2026-09-30T11:00:00+08:00",
+      "endsAt": "2026-11-11T11:59:59+08:00",
+      "activityTags": [
+        "combat",
+        "challenge"
+      ],
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+      "gameplayEvidence": "购买、摆放和合成道具强化故事书，商店与战斗阶段交替推进挑战。",
+      "gameplaySourceUrl": "https://www.taptap.cn/moment/853954425138447733?group_id=330015",
+      "sourceEndsAtPrecision": "公告精确至分钟；沿用清单既有包含该末分钟的:59秒归一化。",
+      "sourceStartsAtPrecision": "官方为3.7版本更新后，按官方计划维护结束11:00及既有起点约定归一化。"
+    },
+    {
+      "remoteKey": "ww:event:3.7:menggou-xiazhong",
+      "category": "limited_event",
+      "title": "梦构匣中",
+      "startsAt": "2026-09-30T11:00:00+08:00",
+      "endsAt": "2026-11-11T03:59:59+08:00",
+      "activityTags": [
+        "exploration",
+        "puzzle",
+        "combat",
+        "challenge",
+        "collection"
+      ],
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+      "gameplayEvidence": "四阶段包含探索解谜、战斗挑战和收集任务，依据稷廷密锁收集进度领取奖励。",
+      "gameplaySourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+      "sourceEndsAtPrecision": "公告精确至分钟；沿用清单既有包含该末分钟的:59秒归一化。",
+      "sourceStartsAtPrecision": "官方为3.7版本更新后，按官方计划维护结束11:00及既有起点约定归一化。"
+    },
+    {
+      "remoteKey": "ww:event:3.7:chaoyue-zengli",
+      "category": "limited_event",
+      "title": "朝月赠礼",
+      "startsAt": "2026-09-30T11:00:00+08:00",
+      "endsAt": "2026-11-11T03:59:59+08:00",
+      "activityTags": [
+        "sign-in"
+      ],
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+      "gameplayEvidence": "七日登录签到。",
+      "gameplaySourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+      "sourceEndsAtPrecision": "公告精确至分钟；沿用清单既有包含该末分钟的:59秒归一化。",
+      "sourceStartsAtPrecision": "官方为3.7版本更新后，按官方计划维护结束11:00及既有起点约定归一化。"
+    },
+    {
+      "remoteKey": "ww:event:3.7:solaris-return-invitation",
+      "category": "limited_event",
+      "title": "索拉里斯回归邀约",
+      "startsAt": "2026-09-30T11:00:00+08:00",
+      "endsAt": "2026-11-11T23:59:59+08:00",
+      "activityTags": [
+        "web-event",
+        "quest"
+      ],
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+      "gameplayEvidence": "网页分享邀约码绑定回归漂泊者，完成指定游戏任务领取奖励。",
+      "gameplaySourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+      "sourceEndsAtPrecision": "公告精确至分钟；沿用清单既有包含该末分钟的:59秒归一化。",
+      "sourceStartsAtPrecision": "官方为3.7版本更新后，按官方计划维护结束11:00及既有起点约定归一化。"
+    },
+    {
+      "remoteKey": "ww:event:3.7:tiangong-xunwu",
+      "category": "limited_event",
+      "title": "天工寻物",
+      "startsAt": "2026-10-08T04:00:00+08:00",
+      "endsAt": "2026-10-26T03:59:59+08:00",
+      "activityTags": [
+        "combat",
+        "challenge"
+      ],
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+      "gameplayEvidence": "特殊领域内限时连续击败多波敌人，逐波解锁增益并按表现计分。",
+      "gameplaySourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+      "sourceEndsAtPrecision": "公告精确至分钟；沿用清单既有包含该末分钟的:59秒归一化。",
+      "sourceStartsAtPrecision": "官方服务器时间，按中国服UTC+8换算。"
+    },
+    {
+      "remoteKey": "ww:event:3.7:chaoyue-yuyong",
+      "category": "limited_event",
+      "title": "朝月鱼涌",
+      "startsAt": "2026-10-15T10:00:00+08:00",
+      "endsAt": "2026-11-01T09:59:59+08:00",
+      "activityTags": [
+        "web-event",
+        "collection",
+        "challenge"
+      ],
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+      "gameplayEvidence": "网页钓鱼挑战并解锁鱼群图鉴。",
+      "gameplaySourceUrl": "https://www.taptap.cn/moment/854139064348051537",
+      "sourceEndsAtPrecision": "公告精确至分钟；沿用清单既有包含该末分钟的:59秒归一化。",
+      "sourceStartsAtPrecision": "官方服务器时间，按中国服UTC+8换算。"
+    },
+    {
+      "remoteKey": "ww:event:3.7:echoing-realm",
+      "category": "limited_event",
+      "title": "回音盈域",
+      "startsAt": "2026-10-15T04:00:00+08:00",
+      "endsAt": "2026-10-22T03:59:59+08:00",
+      "activityTags": [
+        "double-drop",
+        "material-reward"
+      ],
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+      "gameplayEvidence": "模拟领域和凝素领域消耗结晶波片可获取双倍奖励。",
+      "gameplaySourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+      "sourceEndsAtPrecision": "公告精确至分钟；沿用清单既有包含该末分钟的:59秒归一化。",
+      "sourceStartsAtPrecision": "官方服务器时间，按中国服UTC+8换算。"
+    },
+    {
+      "remoteKey": "ww:event:3.7:wuyin-xiaochu",
+      "category": "limited_event",
+      "title": "无音消除",
+      "startsAt": "2026-10-22T10:00:00+08:00",
+      "endsAt": "2026-11-09T03:59:59+08:00",
+      "activityTags": [
+        "puzzle",
+        "challenge"
+      ],
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+      "gameplayEvidence": "点触消除声骸棋子，逐日开放简单和困难关卡，达成挑战目标领取奖励。",
+      "gameplaySourceUrl": "https://www.taptap.cn/moment/854139064348051537",
+      "sourceEndsAtPrecision": "公告精确至分钟；沿用清单既有包含该末分钟的:59秒归一化。",
+      "sourceStartsAtPrecision": "官方服务器时间，按中国服UTC+8换算。"
+    },
+    {
+      "remoteKey": "ww:event:3.7:pinglan-tingyu-zhili",
+      "category": "limited_event",
+      "title": "凭栏听雨之礼",
+      "startsAt": "2026-10-22T10:00:00+08:00",
+      "endsAt": "2026-11-11T03:59:59+08:00",
+      "activityTags": [
+        "sign-in"
+      ],
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+      "gameplayEvidence": "累计登录达到一日、三日要求领取奖励。",
+      "gameplaySourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+      "sourceEndsAtPrecision": "公告精确至分钟；沿用清单既有包含该末分钟的:59秒归一化。",
+      "sourceStartsAtPrecision": "官方服务器时间，按中国服UTC+8换算。"
+    },
+    {
+      "remoteKey": "ww:event:3.7:tachao-tanli-xuanfang-dijie",
+      "category": "limited_event",
+      "title": "踏潮探历・玄方地界",
+      "startsAt": "2026-10-29T04:00:00+08:00",
+      "endsAt": "2026-11-11T03:59:59+08:00",
+      "activityTags": [
+        "exploration",
+        "quest"
+      ],
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+      "gameplayEvidence": "完成每日探索委托目标领取探历札记，消耗札记获得补给。",
+      "gameplaySourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+      "sourceEndsAtPrecision": "公告精确至分钟；沿用清单既有包含该末分钟的:59秒归一化。",
+      "sourceStartsAtPrecision": "官方服务器时间，按中国服UTC+8换算。"
+    },
+    {
+      "remoteKey": "ww:event:3.7:tacet-field-double-drop",
+      "category": "limited_event",
+      "title": "声弦涤荡",
+      "startsAt": "2026-11-04T04:00:00+08:00",
+      "endsAt": "2026-11-11T03:59:59+08:00",
+      "activityTags": [
+        "double-drop",
+        "material-reward"
+      ],
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+      "gameplayEvidence": "完成无音清剿消耗结晶波片可获取双倍奖励。",
+      "gameplaySourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+      "sourceEndsAtPrecision": "公告精确至分钟；沿用清单既有包含该末分钟的:59秒归一化。",
+      "sourceStartsAtPrecision": "官方服务器时间，按中国服UTC+8换算。"
+    }
+  ],
+  "excluded": [
+    {
+      "title": "故梦寻契",
+      "reason": "官方明确永久开放。"
+    },
+    {
+      "title": "心影映花",
+      "reason": "官方明确为全新常驻玩法。"
+    },
+    {
+      "title": "凝月辉途",
+      "reason": "商城累计消费奖励，不属于清单独立参与玩法。"
+    },
+    {
+      "title": "梦枢心相由心生、璇心如月寄尘情、匣中奇谭・苍狐记、朝朝何年月",
+      "reason": "常驻剧情/奇谭/危行任务，不是限时活动。"
+    },
+    {
+      "title": "呜呜物流",
+      "reason": "社区预告称呼；实际官方独立活动为踏潮探历・玄方地界，避免重复建项。"
+    },
+    {
+      "title": "角色/武器唤取、角色试用、联名周边及线下展会",
+      "reason": "卡池、绑定卡池的试用或游戏外商业/社交信息，不加入游戏基准参与清单。"
+    }
+  ],
+  "coverage": {
+    "tasks": "verified_exception",
+    "events": "11项；以完整官方版本笔记及日历交叉核验，文字公告漏列的回音盈域、声弦涤荡已补齐。",
+    "cycles": "partial：三模式目录审计完成，深塔和冥歌规则无差异；矩阵本期日期例外精确时分未决，保留原基准等待详细来源。",
+    "exploration": "完整官方目录增量审计完成：新增瑝珑→梦枢天罗1项；保留全部既有稳定键和父级；时隙废都没有足够独立资格证据而排除。"
+  },
+  "verification": [
+    "pnpm exec vitest run tests/map-catalog.test.ts tests/map-catalog-freshness.test.ts：9项通过。",
+    "tests/remote-catalog-update.test.ts：14项通过；新地图真实消费器回归确认旧ID、完成/手动保护和自定义事项保留，新子区唯一、父级重开、重复应用幂等。",
+    "pnpm test：471项通过、12项按既有配置跳过。",
+    "pnpm typecheck：主进程与渲染层通过。",
+    "pnpm build：生产构建及内含类型检查通过。",
+    "pnpm catalog:check：真实隔离消费器接受累计发布，revision和内容摘要核验。",
+    "git diff --check通过；其他三个游戏的完整JSON对象和历史退役键均与提交前一致。"
+  ],
+  "delivery": {
+    "applicationVersion": "1.2.0",
+    "localFirst": true,
+    "release": false,
+    "programReplaced": false,
+    "localMaintenanceReceipt": {
+      "jobId": "eab1b8a4-36fa-48ac-96a3-80a11988ba94",
+      "appliedAt": "2026-09-30T10:25:59.269Z",
+      "added": 12,
+      "updated": 0,
+      "archived": 0,
+      "completedTargets": [
+        "tasks",
+        "events",
+        "exploration"
+      ],
+      "remainingTargets": [
+        "cycles"
+      ],
+      "jobStatus": "failed",
+      "meaning": "tasks/events/exploration结果已安全持久化；cycles精确时分未决使该全范围任务明确以partial/failed结束，不撤销已保存结果。"
+    },
+    "publication": {
+      "feedPath": "updates/catalog.json",
+      "revision": "2026-09-30.wuthering-waves-3.7-baseline-maintenance"
+    },
+    "temporaryCompileInput": "仅从Git生成的公开基准编译输入已移入Windows回收站，原路径消失且对应回收站目录存在。"
+  },
+  "maps": {
+    "verifiedAt": "2026-09-30T10:24:35Z",
+    "inventory": "官方公开目录4个一级与52个二级；相对于既有4个一级和50个二级，仅新增有独立探索收集资格的梦枢天罗。",
+    "addition": {
+      "remoteKey": "map-catalog:wuthering-waves:subregion:1aa2be50a8f6bec9153b",
+      "category": "exploration",
+      "mapNodeKind": "subregion",
+      "title": "梦枢天罗",
+      "parentRemoteKey": "map-catalog:wuthering-waves:region:46d939ba62197e5a32ca",
+      "parentTitle": "瑝珑",
+      "sourceUrl": "https://www.kurobbs.com/mc/map/"
+    },
+    "parentEvidence": "官方地区country.json的level1为瑝珑(countryId=1)，梦州属于其中的展示分区；level2为梦枢天罗(stateId=912)。现有玄方城、方擎西峰、落渊南丘、玄幽东岳稳定键和父级均一致，保留。",
+    "eligibilityEvidence": "独立912收集图层含朴素/基准/精密/危锁奇藏箱、金色潮汐之遗、小型与中枢信标、复合异象区、梦构狐像/心傀等，并非仅常驻心影映花玩法进度。官方3.7公告已确认当前开放。 公开实机视频00:15–00:16直接显示名为梦枢天罗的探索度面板及阶段奖励；只确认公共UI结构，不记录或发布视频中的个人数值。",
+    "preservedStableKeys": true,
+    "excluded": [
+      {
+        "title": "心相迷宫、烬心域、凄心域、怡心域、沉心域、墟心域、相心域",
+        "reason": "官方导航为level3内部场景；没有独立二级探索进度资格，不另建第三层或同名重复行。"
+      },
+      {
+        "title": "时隙废都",
+        "reason": "官方黑海岸导航有level2入口，但公开910图层只有作战准备、梦魇敌人/聚落、香草和中枢信标，未见奇藏/潮汐之遗等独立探索收集目标；导航层级本身不足以证明独立探索度，继续排除并保留资格未决。",
+        "sourceUrl": "https://web-static.kurobbs.com/mcmap/position/910/position.json"
+      },
+      {
+        "title": "玄元境",
+        "reason": "既有明确排除决定仍适用，没有独立探索百分比。"
+      }
+    ]
+  },
+  "cycles": {
+    "modes": [
+      "逆境深塔",
+      "冥歌海墟",
+      "终焉矩阵"
+    ],
+    "unchangedModes": [
+      {
+        "title": "逆境深塔",
+        "reason": "官方09/14–10/12、10/12–11/09、11/09–12/07与已有28天锚点一致，未新增、移除或改名。"
+      },
+      {
+        "title": "冥歌海墟",
+        "reason": "官方09/28–10/26、10/26–11/23与已有28天锚点一致，未新增、移除或改名。"
+      }
+    ],
+    "unresolved": [
+      {
+        "title": "终焉矩阵：险境强袭",
+        "remoteKey": "endgame:endstate-matrix",
+        "officialDateWindow": {
+          "startsOn": "2026-10-08",
+          "endsOn": "2026-11-12"
+        },
+        "currentPredictionStartsOn": "2026-10-07",
+        "reason": "官方全版本日历已证实本期日期例外，但未给精确开始/结束时分。历史阶段04:00不等于本期精确公告；日期精度不可伪装时刻，所以保持原行与规则，记录待详细排期校准。",
+        "checkedSources": [
+          "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+          "https://www.taptap.cn/moment/854139064348051537",
+          "https://wutheringwaves.kurogames.com/en/main/news/detail/5571",
+          "https://www.taptap.cn/moment/854024447772854776",
+          "https://www.taptap.cn/moment/826407231594433678",
+          "https://forum.gamer.com.tw/Co.php?bsn=74934&sn=141382"
+        ],
+        "decision": "不发布普通周期实例，不将长期版本+7规则擅自改为+8，不将cycles标记无变化。"
+      }
+    ]
+  },
+  "testFixtureCorrection": "历史种子的播种单元测试未执行新版发布导入，真实时间已越过3.6活动末期限；仅将该测试固定到2026-08-27T12:30:00Z，保留原覆盖断言，不改变运行时业务。"
+}

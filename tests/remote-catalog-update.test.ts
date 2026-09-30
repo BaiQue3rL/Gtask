@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppDatabase } from '../src/main/database'
 import { getBundledActivityCatalog } from '../src/main/sync/baseline-catalog'
 import { getBundledMapCatalog } from '../src/main/sync/map-catalog'
+import { buildMapTreeRows, filterIncompleteMapTreeRows, isChecklistRowComplete } from '../src/renderer/src/map-tree'
 import {
   RemoteCatalogUpdateService,
   createDefaultRemoteCatalogProviders,
@@ -97,6 +98,12 @@ describe('remote catalog update', () => {
     for (const game of checkedIn.games) {
       if (game.gameId === 'star-rail') {
         expect(game.versionWindow).toMatchObject({ endsAt: '2026-11-11T06:00:00+08:00', confidence: 1 })
+      } else if (game.gameId === 'wuthering-waves') {
+        expect(game.versionWindow).toMatchObject({
+          startsAt: '2026-09-30T11:00:00+08:00',
+          endsAt: '2026-11-12T04:00:00+08:00',
+          confidence: 0.85
+        })
       } else {
         expect(game.versionWindow).toBeUndefined()
       }
@@ -141,8 +148,9 @@ describe('remote catalog update', () => {
           })
         ]))
       } else if (game.gameId === 'wuthering-waves') {
-        expect(game.upserts).toHaveLength(8)
-        expect(game.upserts.map((item) => item.title)).toEqual([
+        expect(game.upserts).toHaveLength(20)
+        expect(game.upserts.filter((item) => item.remoteKey.startsWith('ww:event:3.6:'))
+          .map((item) => item.title)).toEqual([
           '群声共振模拟域',
           '第二索拉・诡影迷踪',
           '清弦纪流年',
@@ -151,6 +159,23 @@ describe('remote catalog update', () => {
           '烟云赠礼',
           '回音盈域',
           '声弦涤荡'
+        ])
+        const currentEvents = game.upserts.filter((item) => item.remoteKey.startsWith('ww:event:3.7:'))
+        expect(currentEvents).toHaveLength(11)
+        expect(currentEvents.map((item) => item.title).sort()).toEqual([
+          '团团勇者大乱斗', '梦构匣中', '朝月赠礼', '索拉里斯回归邀约', '天工寻物',
+          '朝月鱼涌', '回音盈域', '无音消除', '凭栏听雨之礼', '踏潮探历・玄方地界', '声弦涤荡'
+        ].sort())
+        expect(game.upserts.filter((item) => item.category === 'limited_event')).toHaveLength(19)
+        expect(game.upserts.filter((item) => item.category === 'endgame')).toEqual([])
+        expect(game.upserts.filter((item) => item.category === 'exploration')).toEqual([
+          expect.objectContaining({
+            remoteKey: 'map-catalog:wuthering-waves:subregion:1aa2be50a8f6bec9153b',
+            title: '梦枢天罗',
+            mapNodeKind: 'subregion',
+            parentRemoteKey: 'map-catalog:wuthering-waves:region:46d939ba62197e5a32ca',
+            parentTitle: '瑝珑'
+          })
         ])
       } else {
         expect(game.upserts).toHaveLength(16)
@@ -208,6 +233,73 @@ describe('remote catalog update', () => {
       remoteKey: oldMap.remoteKey, completed: true, manualCompletionLocked: true
     })
     expect(database.getChecklistItem(custom.id)).toMatchObject({ category: 'custom', source: 'manual' })
+  })
+
+  it('applies the published Wuthering Waves map addition while preserving old leaves and reopening their completed parent', () => {
+    const checkedIn = parseRemoteCatalogFeed(JSON.parse(
+      readFileSync(join(process.cwd(), 'updates', 'catalog.json'), 'utf8')
+    ))
+    const wutheringWaves = checkedIn.games.find((game) => game.gameId === 'wuthering-waves')!
+    const parentKey = 'map-catalog:wuthering-waves:region:46d939ba62197e5a32ca'
+    const newMapKey = 'map-catalog:wuthering-waves:subregion:1aa2be50a8f6bec9153b'
+    const reference = new Date('2026-09-30T12:00:00Z')
+    database = new AppDatabase(':memory:', { seedBundledBaselines: false })
+    database.mergeSyncedItems('wuthering-waves', 'public_schedule', getBundledMapCatalog('wuthering-waves')
+      .filter((item) => item.remoteKey !== newMapKey), '2026-09-29T12:00:00Z')
+    const maps = () => database!.listChecklistItems('wuthering-waves', { category: 'exploration' })
+    const rows = () => buildMapTreeRows(maps(), new Set(), maps(), reference.getTime())
+    const parent = maps().find((item) => item.remoteKey === parentKey)!
+    const oldChildren = maps().filter((item) => item.parentRemoteKey === parentKey)
+    expect(oldChildren.length).toBeGreaterThan(0)
+    for (const child of oldChildren) database.setChecklistCompletion(child.id, true)
+    const before = maps()
+    const beforeParent = rows().find((row) => row.item.id === parent.id)!
+    expect(beforeParent.mapSummary).toEqual({ completed: oldChildren.length, total: oldChildren.length, unknown: 0 })
+    expect(isChecklistRowComplete(beforeParent)).toBe(true)
+    const custom = database.createChecklistItem({
+      gameId: 'wuthering-waves', category: 'custom', title: '保留的鸣潮自定义事项'
+    })
+    database.setChecklistCompletion(custom.id, true)
+    const customBefore = database.getChecklistItem(custom.id)
+    const published = { ...checkedIn, games: [wutheringWaves] }
+
+    database.applyRemoteCatalogFeed(published, reference)
+    const added = maps().filter((item) => item.remoteKey === newMapKey)
+    expect(added).toHaveLength(1)
+    expect(maps()).toHaveLength(before.length + 1)
+    expect(added[0]).toMatchObject({
+      title: '梦枢天罗', source: 'public_schedule', mapNodeKind: 'subregion',
+      parentRemoteKey: parentKey, parentTitle: '瑝珑', completed: false, manualCompletionLocked: false
+    })
+    for (const item of before) {
+      expect(database.getChecklistItem(item.id)).toMatchObject({
+        remoteKey: item.remoteKey, title: item.title,
+        mapNodeKind: item.mapNodeKind, parentRemoteKey: item.parentRemoteKey,
+        ...(item.id === parent.id ? {} : {
+          completed: item.completed, progressPercent: item.progressPercent,
+          manualCompletionLocked: item.manualCompletionLocked, completedAt: item.completedAt
+        })
+      })
+    }
+    expect(database.getChecklistItem(parent.id).completed).toBe(false)
+    const reopenedParent = rows().find((row) => row.item.id === parent.id)!
+    expect(reopenedParent.mapSummary).toEqual({
+      completed: oldChildren.length, total: oldChildren.length + 1, unknown: 1
+    })
+    expect(isChecklistRowComplete(reopenedParent)).toBe(false)
+    expect(filterIncompleteMapTreeRows(rows()).filter((row) =>
+      row.item.id === parent.id || row.item.id === added[0].id
+    ).map((row) => ({ id: row.item.id, depth: row.depth }))).toEqual([
+      { id: parent.id, depth: 0 }, { id: added[0].id, depth: 1 }
+    ])
+    expect(database.getChecklistItem(custom.id)).toEqual(customBefore)
+
+    const after = maps()
+    expect(database.applyRemoteCatalogFeed(published, reference)).toMatchObject({
+      added: 0, updated: 0, archived: 0, expiredRemoved: 0
+    })
+    expect(maps()).toEqual(after)
+    expect(database.getChecklistItem(custom.id)).toEqual(customBefore)
   })
 
   it('rejects period-scoped keys and duplicate rows for a known recurring mode', () => {

@@ -29,6 +29,9 @@ afterEach(() => {
 
 describe('bundled baseline catalog', () => {
   it('seeds every built-in section for every supported game', () => {
+    // Exercise the historical compatibility seeds before their published deadlines.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-27T12:30:00.000Z'))
     database = new AppDatabase(':memory:')
     for (const gameId of SUPPORTED_GAME_IDS) {
       const items = database.listChecklistItems(gameId)
