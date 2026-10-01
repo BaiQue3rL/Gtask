@@ -2434,6 +2434,8 @@ describe('AppDatabase', () => {
   })
 
   it('启动时修复旧版用上期战绩误勾选的当期挑战', () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-01T12:30:00.000Z'))
     temporaryDirectory = mkdtempSync(join(tmpdir(), 'gtask-stale-cycle-progress-'))
     const databasePath = join(temporaryDirectory, 'test.sqlite')
     database = new AppDatabase(databasePath, { seedBundledBaselines: false })

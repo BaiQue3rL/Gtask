@@ -1,0 +1,265 @@
+{
+  "gameId": "star-rail",
+  "verifiedAt": "2026-10-01T13:07:31.500Z",
+  "outputLocale": "zh-CN",
+  "timeZone": "Asia/Shanghai",
+  "scope": "4.6当前版本窗口、现行及已公告限时活动、稳定周期模式、完整地图基准的当前版本增量核查。",
+  "inventory": {
+    "eventsBefore": 5,
+    "eventsAfter": 8,
+    "cycleModes": [
+      "末日幻影",
+      "虚构叙事",
+      "混沌回忆",
+      "异相仲裁"
+    ],
+    "mapRegions": 8,
+    "mapSubregions": 82,
+    "deadlineReviews": 0
+  },
+  "changed": [
+    {
+      "action": "create",
+      "remoteKey": "event:4.6:aha-outwits-hoyoverse",
+      "category": "limited_event",
+      "title": "乐子神智取米哈游",
+      "startsAt": "2026-09-28T10:00:00+08:00",
+      "endsAt": "2026-11-11T06:00:00+08:00",
+      "activityTags": [
+        "web-event"
+      ],
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://www.taptap.cn/moment/853596636167801477"
+    },
+    {
+      "action": "create",
+      "remoteKey": "event:4.6:gift-of-odyssey",
+      "category": "limited_event",
+      "title": "巡星之礼",
+      "startsAt": "2026-09-28T11:00:00+08:00",
+      "endsAt": "2026-11-10T03:59:59+08:00",
+      "activityTags": [
+        "sign-in"
+      ],
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://prtimes.jp/main/html/rd/p/000000451.000096124.html"
+    },
+    {
+      "action": "create",
+      "remoteKey": "event:4.6:love-ghosts-robots",
+      "category": "limited_event",
+      "title": "爱，幽灵与机器人",
+      "startsAt": "2026-09-28T11:00:00+08:00",
+      "endsAt": "2026-11-11T03:59:59+08:00",
+      "activityTags": [
+        "management",
+        "story"
+      ],
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://hsr.hoyoverse.com/zh-cn/news/166468"
+    },
+    {
+      "action": "update",
+      "remoteKey": "event:4.6:wishpower",
+      "category": "limited_event",
+      "title": "镇伏「贪饕」，汇聚愿力",
+      "startsAt": "2026-09-28T11:00:00+08:00",
+      "endsAt": "2026-11-11T06:00:00+08:00",
+      "activityTags": [
+        "combat"
+      ],
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://hsr.hoyoverse.com/zh-cn/news/166468"
+    }
+  ],
+  "unchanged": {
+    "tasks": "官方4.6更新时间及版本结束边界与持久基准一致：2026-09-28 06:00至2026-11-11 06:00 UTC+8。不重复提交版本窗口或改变现有来源。",
+    "events": [
+      "位面分裂",
+      "星际和平盛典：一镜到底",
+      "花藏繁生",
+      "命运契约•再启"
+    ],
+    "cycles": "四个模式无新增、移除、改名或官方规则变化；既有7条规则和例外保留，不发布普通换期实例。",
+    "exploration": "matchCandidates为90节点已核验基准；当前4.6新增生研院已经收录。官方千星城导航仍为中心城区、指针塔、空声院、生研院四个二级地图，无当前版本新增根地区、可靠改名或父级修正。旧目录复用此前完整核验，未重新提交。",
+    "stableIdentities": "保留全部既有remoteKey、地图父子关系、退役、版本、周期规则及其他游戏；仅校准贪饕活动开始边界和来源。"
+  },
+  "withheld": [],
+  "excluded": [
+    {
+      "title": "「星际幻宠」乐园、星际潮玩、游园伴手礼",
+      "reason": "常驻宠物玩法、抽取池与活动内部领奖节点，不拆成独立限时参与项。"
+    },
+    {
+      "title": "星际碰碰好搭档！",
+      "reason": "未发现独立限时资格；当前资料列为常驻，不用缺结束时间例外伪装限时。"
+    },
+    {
+      "title": "卡池、商店、补偿邮件、货币战争奖励轨、社区创作征集",
+      "reason": "不作为本次独立游戏玩法/签到事项；社区创作征集亦仅公告日期精度的开始边界，未伪造精确时刻。"
+    },
+    {
+      "title": "真珠的画室",
+      "reason": "复用9月28日已核验结论：没有独立官方地图入口证据，不把场景或楼层建成新地图。"
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://hsr.hoyoverse.com/zh-cn/news/166468",
+      "official": true,
+      "use": "当前4.6版本、全部游戏内活动与周期模式；官网动态正文不可直读，以搜索索引及官方TapTap和规则存档交叉核对。"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/853596636167801477",
+      "official": true,
+      "use": "新增网页活动名称、精确窗口、玩法规则。"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/853592474952665210",
+      "official": true,
+      "use": "官方当前开放公告，核对签到与经营活动资格、玩法。"
+    },
+    {
+      "url": "https://www.taptap.cn/game-event/12947",
+      "official": true,
+      "use": "当前版本完整活动容器枚举，沿用已核验档期。"
+    },
+    {
+      "url": "https://a.4399.cn/gl/54231267_359324.html",
+      "official": false,
+      "use": "经营活动规则存档，核对名称、玩法、限时资格及截止边界。"
+    },
+    {
+      "url": "https://wiki.biligame.com/sr/活动一览",
+      "official": false,
+      "use": "活动全范围交叉核查；不采用与官方不一致的时间。"
+    },
+    {
+      "url": "https://webstatic.mihoyo.com/sr/app/interactive-map/index.html#/map/943",
+      "official": true,
+      "use": "当前千星城官方导航与四个二级地图名。"
+    },
+    {
+      "url": "https://webstatic.mihoyo.com/sr/app/interactive-map/index.html#/map/1014",
+      "official": true,
+      "use": "生研院官方导航入口；只使用导航层级，不把楼层或收集物当作节点。"
+    },
+    {
+      "url": "https://prtimes.jp/main/html/rd/p/000000451.000096124.html",
+      "official": true,
+      "use": "发行方COGNOSPHERE 9月28日新闻稿原站；连接失败，通过PR TIMES提供的原文镜像核验。"
+    },
+    {
+      "url": "https://www.inside-games.jp/release/prtimes/20260928/309441.html",
+      "official": true,
+      "use": "发行方9月28日13:00 JST新闻稿原文镜像，巡星之礼更新后至11月10日03:59服务器时间，经营活动至11月11日03:59北京时间。"
+    },
+    {
+      "url": "https://gamewith.jp/houkaistarrail/article/show/396226",
+      "official": false,
+      "use": "交叉核对宠物整体玩法及碰碰玩法常驻；不使用该页残留的上版本签到窗口。"
+    }
+  ],
+  "researchLimitations": [
+    "11:00为官方预计维护结束的开服基准，不是实际提前开服观测；开始日期及截止边界以现行官方规则为准。",
+    "米游社规则页与未认证公告API不可访问，PR TIMES原站连接失败；使用官方版本说明、TapTap和发行方新闻稿原文镜像核验。未读取账号、个人进度、Cookie或凭据。"
+  ],
+  "localMaintenance": {
+    "status": "completed",
+    "finalEvents": 8,
+    "netAdded": 3,
+    "updated": 1,
+    "jobs": [
+      {
+        "jobId": "461ea2ac-950d-4533-8156-7c6f04f384b9",
+        "completedTargets": [
+          "tasks",
+          "events",
+          "cycles",
+          "exploration"
+        ],
+        "added": 1,
+        "updated": 0,
+        "archived": 0
+      },
+      {
+        "jobId": "4b09740c-9233-428f-bd54-c5b3d017036f",
+        "completedTargets": [
+          "events"
+        ],
+        "executor": "existing Gtask background worker",
+        "added": 3,
+        "updated": 1,
+        "archived": 0,
+        "verification": "精确jobId返回completed、新增3更新1；随后专用维护契约matchCandidates核对已写入公共行。"
+      },
+      {
+        "jobId": "622f797d-b5e7-4dcf-860e-d78ecb9460cd",
+        "completedTargets": [
+          "events"
+        ],
+        "added": 0,
+        "updated": 0,
+        "archived": 1,
+        "reason": "复核后归档误收的星际幻宠常驻容器，公开清单不分发此错误项。"
+      }
+    ],
+    "verification": "专用维护契约核对新增项及校时，归档事务结果确认；本机维护写入完成，不是远程catalog接收回执。未访问个人数据。"
+  },
+  "publication": {
+    "revision": "2026-10-01.star-rail-4.6-official-schedules",
+    "delta": "star-rail-4.6-2026-10-01.delta.json",
+    "feed": "../../updates/catalog.json",
+    "method": "使用catalog-maintenance-cli编译已核验差异，经真实消费器的隔离内存库校验。保留原字段顺序与URL写法，并断言与编译结果解析语义相同，避免重排其他游戏。",
+    "softwareVersion": "1.2.0",
+    "deliveryOrder": "先完成本机专用公共维护写入和结果复核，再提交及发布公共清单；未重新部署程序、创建备份、移动标签或发布Release。",
+    "publishedAt": "2026-10-01T13:01:43.222Z",
+    "publicDelta": {
+      "added": 3,
+      "updated": 1,
+      "archived": 0
+    }
+  },
+  "verification": [
+    "pnpm test通过：75个测试文件通过、2个跳过；471项通过、12项跳过，包含地图目录和新鲜度专项。",
+    "pnpm build通过，包含主进程及Vue渲染层类型检查。",
+    "pnpm catalog:check通过；真实消费器隔离回执contentHash=7861ffb9b41b44ded09e97d950db4cc22eff8e6e6638bf33a504e97906bdadac。",
+    "语义断言通过：新增三个星铁活动，校准一个既有活动；其他游戏、地图、周期规则、版本及退役列表均原样保留。",
+    "仅固定旧版挑战测试Date时钟和调整公开目录数量断言，未修改产品代码。",
+    "git diff --check通过。"
+  ],
+  "sourceResolution": {
+    "policy": "同一活动现行官方规则优先于相冲突的旧日历；后续官方更正覆盖原值，不因可以判定的新旧差异遗漏活动。转载日期本身不证明规则变更。",
+    "adoptedStartText": "2026年9月28日4.6版本更新后",
+    "normalizedStartsAt": "2026-09-28T11:00:00+08:00",
+    "normalizationBasis": "官方06:00开始、预计维护五小时，当前开放公告确认更新已完成。11:00是公告预计维护结束的开服基准，未宣称测得实际提前开服时刻；依据用户要求采用较新官方公告修正旧日历。",
+    "differences": [
+      {
+        "title": "爱，幽灵与机器人",
+        "observationId": "87c2e10f-ef9b-421d-90dc-4de54f6c869c",
+        "oldStartsAt": "2026-09-25T04:00:00+08:00",
+        "nominalDifferenceHours": 79,
+        "nominalDifference": "3天7小时"
+      },
+      {
+        "title": "巡星之礼",
+        "observationId": "d0f42e04-e80a-4d1b-9187-606d9d725ff7",
+        "oldStartsAt": "2026-09-27T04:00:00+08:00",
+        "nominalDifferenceHours": 31,
+        "nominalDifference": "1天7小时"
+      },
+      {
+        "title": "镇伏「贪饕」，汇聚愿力",
+        "observationId": "0399034a-8778-475b-98c0-14f9f571a766",
+        "oldStartsAt": "2026-09-28T07:00:00+08:00",
+        "nominalDifferenceHours": 4,
+        "nominalDifference": "4小时"
+      }
+    ],
+    "endPrecision": "官方03:59截止沿用既有目录约定，归一化至该分钟结束03:59:59。"
+  }
+}

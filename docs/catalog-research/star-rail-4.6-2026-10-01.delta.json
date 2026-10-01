@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 2,
+  "revision": "2026-10-01.star-rail-4.6-official-schedules",
+  "publishedAt": "2026-10-01T13:01:43.222Z",
+  "games": [
+    {
+      "gameId": "star-rail",
+      "upserts": [
+        {
+          "remoteKey": "event:4.6:aha-outwits-hoyoverse",
+          "category": "limited_event",
+          "title": "乐子神智取米哈游",
+          "startsAt": "2026-09-28T10:00:00+08:00",
+          "endsAt": "2026-11-11T06:00:00+08:00",
+          "activityTags": [
+            "web-event"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/853596636167801477"
+        },
+        {
+          "remoteKey": "event:4.6:gift-of-odyssey",
+          "category": "limited_event",
+          "title": "巡星之礼",
+          "startsAt": "2026-09-28T11:00:00+08:00",
+          "endsAt": "2026-11-10T03:59:59+08:00",
+          "activityTags": [
+            "sign-in"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://prtimes.jp/main/html/rd/p/000000451.000096124.html"
+        },
+        {
+          "remoteKey": "event:4.6:love-ghosts-robots",
+          "category": "limited_event",
+          "title": "爱，幽灵与机器人",
+          "startsAt": "2026-09-28T11:00:00+08:00",
+          "endsAt": "2026-11-11T03:59:59+08:00",
+          "activityTags": [
+            "management",
+            "story"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://hsr.hoyoverse.com/zh-cn/news/166468"
+        },
+        {
+          "remoteKey": "event:4.6:wishpower",
+          "category": "limited_event",
+          "title": "镇伏「贪饕」，汇聚愿力",
+          "startsAt": "2026-09-28T11:00:00+08:00",
+          "endsAt": "2026-11-11T06:00:00+08:00",
+          "activityTags": [
+            "combat"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://hsr.hoyoverse.com/zh-cn/news/166468"
+        }
+      ],
+      "archives": []
+    }
+  ]
+}

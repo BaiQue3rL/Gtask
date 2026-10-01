@@ -178,7 +178,7 @@ describe('remote catalog update', () => {
           })
         ])
       } else {
-        expect(game.upserts).toHaveLength(16)
+        expect(game.upserts).toHaveLength(19)
         expect(game.upserts.filter((item) => item.category === 'endgame').map((item) => item.remoteKey))
           .toEqual(['endgame:anomaly-arbitration', 'endgame:apocalyptic-shadow'])
         expect(game.scheduleUpdates).toHaveLength(7)
