@@ -21,6 +21,12 @@ This file is an AI entry point. It is intentionally concise; users are not expec
 - Preserve unrelated user changes and untracked research directories. Never reset or delete the database, credentials, backups, release artifacts, or test references unless the user explicitly requests it.
 - Local software updates must not create backups by default (user preference, 2026-09-24). Create a program/data/settings/credential backup only when the user explicitly requests one; do not create rollback copies or holding directories as a substitute. Verify the built program and preserve the existing data, credentials, and settings in place. This overrides older deployment checklists that automatically back up before every update; it does not authorize deleting existing backups or disabling the application's own data-backup features.
 
+## Public baseline conflict resolution
+
+- For the same item, version, and server/timezone, later official corrections and current detailed official rules supersede earlier announcements and stale calendar/cache values for the fields they revise. Apply the correction under the same stable identity. A conflict whose source precedence is established must not cause an eligible item to be omitted, remain indefinitely pending, or require redundant user confirmation.
+- Compare the official publication/update order and the actual statements, not just retrieval times or repost dates. Retain the old value, adopted value, source links, and reason in the research record. A newer unrelated page or a page for another server/period does not supersede the applicable rule. Source selection and catalog decisions remain Agent responsibilities, never runtime inference from personal progress.
+- Resolve source precedence separately from time precision. Preserve the official wording and distinguish a published schedule baseline from a measured opening time. For an event confirmed open that starts after a version update, when the official maintenance start and expected duration are explicit, the Agent may normalize its start to the announced expected maintenance-completion time; document that basis as nominal, not as an observed actual opening. Do not invent an unsupported time or retain a superseded date merely because the announcement uses conditional wording.
+
 ## Canonical map catalog maintenance
 
 When the user asks to add, correct, audit, calibrate, or update a built-in map baseline, read **all of** `docs/ai-map-catalog-maintenance.md` before editing anything. That document defines:
