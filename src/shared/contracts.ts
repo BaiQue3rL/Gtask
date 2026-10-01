@@ -296,6 +296,7 @@ export interface ActivityTagContractEntry {
 }
 
 export interface PublicSyncContract {
+  maintenancePolicy?: { version: string; rules: string[] }
   schemaVersion: 16
   jobKind: 'public_catalog'
   authority: 'interface_contract'
@@ -320,6 +321,7 @@ export interface PublicSyncContract {
 }
 
 export interface AiScheduleJob {
+  researchDecisions?: AiScheduleResearchDecision[]
   deadlineReviews?: Array<{ remoteKey: string; checkedAt: string; reviewAt: string; missingReason: string }>
   id: string
   jobKind: AiScheduleJobKind
@@ -353,6 +355,39 @@ export interface AiScheduleJob {
   currentVersionWindow: AiScheduleVersionCandidate | null
   sourceObservations: AiScheduleSourceObservation[]
   contract: PublicSyncContract
+}
+
+export interface AiScheduleResearchDecision {
+  key: string
+  target: Exclude<SyncTarget, 'all'>
+  status: 'resolved' | 'pending' | 'excluded'
+  previousValue?: string | null
+  adoptedValue?: string | null
+  timeBasis?: 'exact' | 'nominal_maintenance' | 'date_only' | 'unknown'
+  reason: string
+  correctionReason?: string
+  sources: Array<{
+    url: string
+    publishedAt?: string
+    statement: string
+  }>
+}
+
+export type AiScheduleJobSummary = Pick<AiScheduleJob,
+  'id' | 'gameId' | 'target' | 'status' | 'agentId' | 'message' |
+  'requestedAt' | 'claimedAt' | 'completedAt' | 'progressPhase' |
+  'progressCurrent' | 'progressTotal' | 'progressUpdatedAt' |
+  'completedTargets' | 'remainingTargets' | 'researchDecisions'> & {
+  auditComplete: boolean | null
+  unresolvedDecisionCount: number
+}
+
+export interface AiScheduleJobClaim {
+  jobId: string
+  claimOutcome: 'claimed' | 'resumed' | 'claimed_by_another_agent' | AiScheduleJobStatus | 'not_found'
+  currentStatus: AiScheduleJobStatus | null
+  job: AiScheduleJob | null
+  message: string
 }
 
 export interface GameSummary {

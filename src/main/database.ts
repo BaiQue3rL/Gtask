@@ -9,6 +9,9 @@ import type {
   ActivityTagEnrichmentTarget,
   AiScheduleAgentStatus,
   AiScheduleJob,
+  AiScheduleJobClaim,
+  AiScheduleJobSummary,
+  AiScheduleResearchDecision,
   AiScheduleJobKind,
   AiScheduleSourceObservation,
   AiScheduleVersionCandidate,
@@ -991,7 +994,58 @@ export class AppDatabase {
     jobId?: string,
     route?: { model: string; reasoningEffort: string }
   ): AiScheduleJob | null {
+    return this.runTransaction(() => this.claimPendingAiScheduleJob(agentId, reference, jobId, route))
+  }
+
+  startAiScheduleJob(
+    agentId: string,
+    gameId: GameId,
+    target: SyncTarget,
+    requestContext: SyncRequestContext,
+    reference = new Date(),
+    route?: { model: string; reasoningEffort: string }
+  ): AiScheduleJobClaim {
     return this.runTransaction(() => {
+      const queued = this.createAiScheduleJob(
+        gameId, 'public_schedule', reference, true, target, requestContext
+      )
+      const claimed = this.claimPendingAiScheduleJob(agentId, reference, queued.id, route)
+      return this.describeAiScheduleJobClaim(queued.id, agentId, claimed)
+    })
+  }
+
+  claimAiScheduleJobResult(
+    agentId: string,
+    jobId: string,
+    reference = new Date(),
+    route?: { model: string; reasoningEffort: string }
+  ): AiScheduleJobClaim {
+    const claimed = this.claimAiScheduleJob(agentId, reference, jobId, route)
+    return this.describeAiScheduleJobClaim(jobId, agentId, claimed)
+  }
+
+  private describeAiScheduleJobClaim(
+    jobId: string, agentId: string, claimed: AiScheduleJob | null
+  ): AiScheduleJobClaim {
+    const summary = this.getAiScheduleJobSummary(jobId)
+    const resumable = summary?.status === 'claimed' && summary.agentId === agentId
+    return {
+      jobId,
+      claimOutcome: claimed ? 'claimed' : resumable ? 'resumed'
+        : summary?.status === 'claimed' ? 'claimed_by_another_agent'
+        : summary?.status ?? 'not_found',
+      currentStatus: summary?.status ?? null,
+      job: claimed ?? (resumable ? this.getAiScheduleJob(jobId) : null),
+      message: summary?.message ?? '指定任务不存在'
+    }
+  }
+
+  private claimPendingAiScheduleJob(
+    agentId: string,
+    reference: Date,
+    jobId?: string,
+    route?: { model: string; reasoningEffort: string }
+  ): AiScheduleJob | null {
       const agent = this.database.prepare('SELECT name FROM ai_schedule_agents WHERE id = ?').get(agentId)
       if (!agent) throw new Error('AI 资料 Agent 尚未登记')
       const now = reference.toISOString()
@@ -1042,7 +1096,48 @@ export class AppDatabase {
         now
       )
       return claimed
-    })
+  }
+
+  getAiScheduleJobSummary(id: string, includeResearch = false): AiScheduleJobSummary | null {
+    const row = this.database.prepare(`
+      SELECT id, game_id AS gameId, target, status, agent_id AS agentId, message,
+        requested_at AS requestedAt, claimed_at AS claimedAt, completed_at AS completedAt,
+        progress_phase AS progressPhase, progress_current AS progressCurrent,
+        progress_total AS progressTotal, progress_updated_at AS progressUpdatedAt,
+        completed_targets_json AS completedTargetsJson, remaining_targets_json AS remainingTargetsJson,
+        evidence_json AS evidenceJson
+      FROM ai_schedule_jobs WHERE id = ?
+    `).get(id) as Omit<AiScheduleJobSummary,
+      'completedTargets' | 'remainingTargets' | 'researchDecisions' | 'auditComplete' |
+      'unresolvedDecisionCount'> & {
+        completedTargetsJson: string; remainingTargetsJson: string; evidenceJson: string | null
+      } | undefined
+    if (!row) return null
+    const { completedTargetsJson, remainingTargetsJson, evidenceJson, ...summary } = row
+    const researchDecisions = this.parseAiScheduleResearchDecisions(evidenceJson)
+    const persistedRemainingTargets = parseAiSectionTargets(remainingTargetsJson)
+    const remainingTargets = persistedRemainingTargets.length > 0 || row.status === 'completed'
+      ? persistedRemainingTargets : row.target === 'all' ? [...AI_SECTION_TARGETS] : [row.target]
+    const unresolvedDecisionCount = researchDecisions.filter((decision) => decision.status === 'pending').length
+    const audit = JSON.parse(evidenceJson ?? '[]') as { auditComplete?: boolean }
+    return {
+      ...summary,
+      completedTargets: parseAiSectionTargets(completedTargetsJson),
+      remainingTargets,
+      auditComplete: row.status !== 'completed' || remainingTargets.length > 0 || unresolvedDecisionCount > 0
+        ? false : typeof audit?.auditComplete === 'boolean' ? audit.auditComplete : null,
+      unresolvedDecisionCount,
+      ...(includeResearch ? { researchDecisions } : {})
+    }
+  }
+
+  private parseAiScheduleResearchDecisions(evidenceJson: string | null): AiScheduleResearchDecision[] {
+    const record = JSON.parse(evidenceJson ?? '[]') as { researchDecisions?: AiScheduleResearchDecision[] }
+    return Array.isArray(record?.researchDecisions) ? record.researchDecisions : []
+  }
+
+  private aiScheduleEvidenceJson(job: AiScheduleJob, evidence: unknown, auditComplete = false): string {
+    return JSON.stringify({ evidence, auditComplete, researchDecisions: job.researchDecisions ?? [] })
   }
 
   getActiveAiScheduleJob(
@@ -1277,7 +1372,8 @@ export class AppDatabase {
     message: string,
     current: number | null,
     total: number | null,
-    reference = new Date()
+    reference = new Date(),
+    researchDecisions: AiScheduleResearchDecision[] = []
   ): AiScheduleJob {
     if (!message.trim()) throw new Error('同步进度说明不能为空')
     if (['queued', 'completed', 'failed'].includes(phase)) {
@@ -1293,12 +1389,50 @@ export class AppDatabase {
       throw new Error('同步进度当前值不能超过总数')
     }
     const now = reference.toISOString()
+    const owned = this.getAiScheduleJobSummary(jobId, true)
+    if (owned?.status !== 'claimed' || owned.agentId !== agentId) {
+      throw new Error('AI 资料任务未由当前 Agent 领取或已经结束')
+    }
+    const decisions = new Map((owned.researchDecisions ?? []).map((decision) => [
+      decision.target + ':' + decision.key, decision
+    ]))
+    for (const decision of researchDecisions) {
+      if (!owned.remainingTargets.includes(decision.target)) {
+        throw new Error('研究裁决必须属于当前任务尚未完成的目标')
+      }
+      const key = decision.target + ':' + decision.key
+      const previous = decisions.get(key)
+      const changed = previous && (
+        previous.status !== decision.status || previous.adoptedValue !== decision.adoptedValue ||
+        previous.timeBasis !== decision.timeBasis
+      )
+      const fingerprint = (entry: AiScheduleResearchDecision) => JSON.stringify(
+        entry.sources.map((source) => JSON.stringify([
+          source.url, source.publishedAt ?? null, source.statement
+        ])).sort()
+      )
+      if (previous && previous.status !== 'pending' && changed &&
+        fingerprint(previous) === fingerprint(decision) && !decision.correctionReason?.trim()) {
+        throw new Error('已裁决事项重开需要新增证据或明确的纠错理由')
+      }
+      decisions.set(key, decision)
+    }
+    if (decisions.size > 200) throw new Error('单个维护任务最多保存 200 项研究裁决')
+    const stored = this.database.prepare('SELECT evidence_json AS evidence FROM ai_schedule_jobs WHERE id = ?')
+      .get(jobId) as { evidence: string | null }
+    const document = JSON.parse(stored.evidence ?? '[]')
+    const researchJson = researchDecisions.length > 0
+      ? JSON.stringify({
+        evidence: document?.researchDecisions ? document.evidence ?? [] : document,
+        researchDecisions: [...decisions.values()]
+      }) : null
     const result = this.database.prepare(`
       UPDATE ai_schedule_jobs
       SET progress_phase = ?, progress_current = ?, progress_total = ?,
-          progress_updated_at = ?, message = ?, updated_at = ?
+          progress_updated_at = ?, message = ?, updated_at = ?,
+          evidence_json = COALESCE(?, evidence_json)
       WHERE id = ? AND status = 'claimed' AND agent_id = ?
-    `).run(phase, current, total, now, message.trim(), now, jobId, agentId)
+    `).run(phase, current, total, now, message.trim(), now, researchJson, jobId, agentId)
     if (result.changes === 0) throw new Error('AI 资料任务未由当前 Agent 领取或已经结束')
     this.database.prepare(`
       UPDATE ai_schedule_agents SET last_seen_at = ?, updated_at = ? WHERE id = ?
@@ -1333,6 +1467,11 @@ export class AppDatabase {
     }
     if (job.status !== 'claimed' || job.agentId !== agentId) {
       throw new Error('AI 资料任务未由当前 Agent 领取或已经结束')
+    }
+    const pendingDecisions = (job.researchDecisions ?? []).filter((decision) => decision.status === 'pending')
+    const pendingTargets = new Set(pendingDecisions.map((decision) => decision.target))
+    if (verifiedUnchangedTargets.some((target) => pendingTargets.has(target))) {
+      throw new Error('仍有待核实裁决的目标不能声明已全量核验且无变化')
     }
     const activeTarget = job.activeTarget
     const targetCategories: Partial<Record<SyncTarget, ChecklistCategory[]>> = {
@@ -1633,9 +1772,9 @@ export class AppDatabase {
       exploration: '地图'
     }
     const tagMessage = activityTagUpdates.length > 0 ? `，补全标签 ${activityTagUpdates.length}` : ''
-    const unresolvedMessage = unresolvedActivityCount > 0
+    const unresolvedMessage = (unresolvedActivityCount > 0
       ? `；仍有 ${unresolvedActivityCount} 项活动经本轮核验后暂为未知`
-      : ''
+      : '') + (pendingDecisions.length > 0 ? `；仍有 ${pendingDecisions.length} 项公开事实待核实` : '')
     const archiveMessage = archived > 0 ? `，移入回收站 ${archived}` : ''
     const noMutation = mutationTargets.size === 0 && archiveItems.length === 0
     const mergeMessage = noMutation && uniqueVerifiedUnchangedTargets.length > 0
@@ -1647,11 +1786,13 @@ export class AppDatabase {
       ? `AI 资料部分同步完成：${mergeMessage}；仍需补齐${effectiveMissingTargets.map(
           (target) => targetNames[target]
         ).join('、')}${unresolvedMessage}`
-      : `AI 资料同步完成：${mergeMessage}${unresolvedMessage}`
+      : `${pendingDecisions.length > 0 ? '已保存已确认差异' : 'AI 资料同步完成'}：${mergeMessage}${unresolvedMessage}`
     if (requiresFullCoverage && effectiveMissingTargets.length > 0) {
       for (const coveredTarget of coveredTargets) {
-        this.recordCatalogCoverage(job.gameId, coveredTarget, 'public_schedule', 'complete')
-        this.recordSyncTargetSuccess(job.gameId, coveredTarget, reference)
+        this.recordCatalogCoverage(job.gameId, coveredTarget, 'public_schedule',
+          pendingTargets.has(coveredTarget) ? 'partial' : 'complete')
+        if (pendingTargets.has(coveredTarget)) this.recordSyncTargetAttempt(job.gameId, coveredTarget, 'stale', reference)
+        else this.recordSyncTargetSuccess(job.gameId, coveredTarget, reference)
       }
       this.recordCatalogCoverage(job.gameId, 'all', 'public_schedule', 'partial')
       this.recordSyncTargetAttempt(job.gameId, 'all', 'stale', reference)
@@ -1666,7 +1807,7 @@ export class AppDatabase {
             progress_updated_at = ?, updated_at = ?
         WHERE id = ? AND status = 'claimed' AND agent_id = ?
       `).run(
-        JSON.stringify(evidence),
+        this.aiScheduleEvidenceJson(job, evidence),
         retryMessage,
         effectiveMissingTargets.length,
         JSON.stringify([...coveredAcrossJob]),
@@ -1694,7 +1835,7 @@ export class AppDatabase {
       WHERE id = ? AND status = 'claimed' AND agent_id = ?
     `).run(
       now,
-      JSON.stringify(evidence),
+      this.aiScheduleEvidenceJson(job, evidence, pendingDecisions.length === 0 && unresolvedActivityCount === 0),
       message,
       JSON.stringify(job.target === 'all' ? AI_SECTION_TARGETS : [job.target]),
       now,
@@ -1702,7 +1843,8 @@ export class AppDatabase {
       jobId,
       agentId
     )
-    const partialPublicResult = job.target === 'all' && effectiveMissingTargets.length > 0
+    const partialPublicResult = (job.target === 'all' && effectiveMissingTargets.length > 0) ||
+      pendingDecisions.length > 0
     const finalStatus = partialPublicResult ? 'stale' : 'success'
     this.recordSyncOutcome(
       job.gameId,
@@ -1712,8 +1854,10 @@ export class AppDatabase {
     )
     if (job.target === 'all') {
       for (const coveredTarget of coveredTargets) {
-        this.recordCatalogCoverage(job.gameId, coveredTarget, 'public_schedule', 'complete')
-        this.recordSyncTargetSuccess(job.gameId, coveredTarget, reference)
+        this.recordCatalogCoverage(job.gameId, coveredTarget, 'public_schedule',
+          pendingTargets.has(coveredTarget) ? 'partial' : 'complete')
+        if (pendingTargets.has(coveredTarget)) this.recordSyncTargetAttempt(job.gameId, coveredTarget, 'stale', reference)
+        else this.recordSyncTargetSuccess(job.gameId, coveredTarget, reference)
       }
       if (!partialPublicResult) {
         this.recordCatalogCoverage(job.gameId, 'all', 'public_schedule', 'complete')
@@ -1723,8 +1867,10 @@ export class AppDatabase {
         this.recordSyncTargetAttempt(job.gameId, 'all', 'stale', reference)
       }
     } else {
-      this.recordCatalogCoverage(job.gameId, job.target, 'public_schedule', 'complete')
-      this.recordSyncTargetSuccess(job.gameId, job.target, reference)
+      this.recordCatalogCoverage(job.gameId, job.target, 'public_schedule',
+        pendingTargets.has(job.target) ? 'partial' : 'complete')
+      if (pendingTargets.has(job.target)) this.recordSyncTargetAttempt(job.gameId, job.target, 'stale', reference)
+      else this.recordSyncTargetSuccess(job.gameId, job.target, reference)
     }
     return {
       job: this.getAiScheduleJob(jobId),
@@ -1965,7 +2111,8 @@ export class AppDatabase {
         j.assigned_reasoning_effort AS assignedReasoningEffort,
         j.last_failure_kind AS lastFailureKind,
         j.completed_targets_json AS completedTargetsJson,
-        j.remaining_targets_json AS remainingTargetsJson
+        j.remaining_targets_json AS remainingTargetsJson,
+        j.evidence_json AS evidenceJson
       FROM ai_schedule_jobs j
       LEFT JOIN ai_schedule_agents a ON a.id = j.agent_id
       WHERE j.id = ?
@@ -1973,8 +2120,8 @@ export class AppDatabase {
       AiScheduleJob,
       'activeTarget' | 'completedTargets' | 'remainingTargets' | 'activityTagTargets' |
       'matchCandidates' | 'currentVersionWindow' | 'sourceObservations' | 'contract' |
-      'requestContext'
-    > & { completedTargetsJson: string; remainingTargetsJson: string } | undefined
+      'requestContext' | 'researchDecisions'
+    > & { completedTargetsJson: string; remainingTargetsJson: string; evidenceJson: string | null } | undefined
     if (!row) throw new Error('AI 资料任务不存在')
     const completedTargets = parseAiSectionTargets(row.completedTargetsJson)
     const persistedRemainingTargets = parseAiSectionTargets(row.remainingTargetsJson)
@@ -2048,9 +2195,10 @@ export class AppDatabase {
       ? this.listScheduleSourceObservations(row.gameId, contractSectionTargets, new Date())
       : []
     const { completedTargetsJson: _completedTargetsJson,
-      remainingTargetsJson: _remainingTargetsJson, ...jobRow } = row
+      remainingTargetsJson: _remainingTargetsJson, evidenceJson, ...jobRow } = row
     return {
       ...jobRow,
+      researchDecisions: this.parseAiScheduleResearchDecisions(evidenceJson),
       activeTarget,
       completedTargets,
       remainingTargets,

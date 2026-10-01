@@ -4,6 +4,7 @@ import type {
   SyncSectionContract,
   SyncTarget
 } from '../../shared/contracts'
+import { BASELINE_MAINTENANCE_POLICY } from '../ai/baseline-maintenance-policy'
 import {
   MAX_AI_ACTIVITY_TAGS,
   MIN_AI_ACTIVITY_TAGS,
@@ -183,6 +184,7 @@ export function getPublicSyncContract(
   sectionTargets?: Exclude<SyncTarget, 'all'>[]
 ): PublicSyncContract {
   return {
+    maintenancePolicy: BASELINE_MAINTENANCE_POLICY,
     schemaVersion: 16,
     jobKind: 'public_catalog',
     authority: 'interface_contract',
@@ -230,7 +232,7 @@ export function getPublicSyncContract(
       category: 'Codex 根据资料语义选择最终版块分类；页面或接口的栏目名只是证据，不能代替活动容器、周期模式或地图层级的实际语义判断。',
       title: `由 ${requestContext.outputLocale} 官方本地化资料确认的游戏内名称，不自行翻译。`,
       activityTags: activityTagSemantics(requestContext.outputLocale),
-      startsAt: '活动、周期或当前游戏版本开始的绝对时刻，ISO-8601 且包含 Z 或明确 UTC 偏移量。',
+      startsAt: '活动、周期或当前游戏版本开始的排期基准，ISO-8601 且包含 Z 或明确 UTC 偏移量。官方维护推导的 nominal 开始须按 maintenancePolicy 记录依据，不能冒充实测开放。',
       endsAt: '活动、周期或当前游戏版本结束的绝对时刻，ISO-8601 且包含 Z 或明确 UTC 偏移量。版本校时在官方精确时刻尚未公布时按 tasks 契约提交可靠暂定值，其他版块不得套用该例外。',
       periodKey: '版本或周期实例身份；同一期稳定，不同周期不能复用。周期挑战的标题、副标题或期数变化通常属于 periodKey，而不是新的 modeKey。',
       modeKey: '跨周期稳定的玩法模式身份；单层、节点、阶段、难度、增益或奖励档位不能拥有独立 modeKey。',

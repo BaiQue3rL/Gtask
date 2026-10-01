@@ -71,6 +71,7 @@ describe('本地 MCP server', () => {
       'register_gtask_schedule_agent',
       'queue_gtask_baseline_maintenance',
       'claim_gtask_schedule_job',
+      'get_gtask_schedule_job',
       'update_gtask_schedule_job_progress',
       'register_gtask_activity_tag',
       'apply_gtask_public_schedule',

@@ -9,7 +9,8 @@ import {
   SYNC_PROGRESS_PHASES,
   SUPPORTED_GAME_IDS,
   type ChecklistCategory,
-  type GameId
+  type GameId,
+  type AiScheduleResearchDecision
 } from '../shared/contracts'
 import type { AppDatabase } from './database'
 import { deadlineReviewSchema } from './published-schedules'
@@ -37,6 +38,21 @@ const mapNodeKindSchema = z.enum(MAP_NODE_KINDS)
 const nullableTextSchema = z.string().max(200).nullable().optional()
 const nullableDateSchema = z.string().nullable().optional()
 const nullableProgressSchema = z.number().min(0).max(100).nullable().optional()
+const researchDecisionSchema = z.object({
+  key: z.string().min(1).max(200),
+  target: z.enum(['tasks', 'events', 'cycles', 'exploration']),
+  status: z.enum(['resolved', 'pending', 'excluded']),
+  previousValue: z.string().max(500).nullable().optional(),
+  adoptedValue: z.string().max(500).nullable().optional(),
+  timeBasis: z.enum(['exact', 'nominal_maintenance', 'date_only', 'unknown']).optional(),
+  reason: z.string().min(1).max(1000),
+  correctionReason: z.string().min(1).max(1000).optional(),
+  sources: z.array(z.object({
+    url: z.string().url().refine((value) => /^https?:\/\//.test(value), '来源必须是 HTTP(S)'),
+    publishedAt: z.string().max(100).optional(),
+    statement: z.string().min(1).max(1000)
+  }).strict()).min(1).max(10)
+}).strict()
 const recurrenceRuleSchema = z.string().max(200).refine(
   (value) => /^interval-days:\d{1,3}$/.test(value) ||
     /^monthly-days:[\d,]+@\d{2}:\d{2}\[Asia\/Shanghai\]$/.test(value),
@@ -142,6 +158,7 @@ function toolError(error: unknown) {
   const message = error instanceof Error ? error.message : '未知错误'
   return {
     content: [{ type: 'text' as const, text: message }],
+    structuredContent: { error: { message } },
     isError: true
   }
 }
@@ -365,17 +382,28 @@ export function createLocalMcpServer(
     'queue_gtask_baseline_maintenance',
     {
       title: '创建基准表维护任务',
-      description: '由本机 Codex 管理端为指定游戏和版块创建一次基准表维护任务；调用方应只领取返回的精确 jobId。',
+      description: '指定游戏和版块创建维护任务。直接维护传 agentId，在同一事务中创建并领取，避免后台抢单；不传 agentId 则仅排队给后台。检查 claimOutcome，只有 claimed/resumed 可写入。',
       inputSchema: {
         gameId: gameIdSchema,
         target: z.enum(['tasks', 'events', 'cycles', 'exploration', 'all']).default('all'),
         outputLocale: z.string().min(2).max(35).default('zh-CN'),
-        userTimeZone: z.string().min(1).max(100).default('Asia/Shanghai')
+        userTimeZone: z.string().min(1).max(100).default('Asia/Shanghai'),
+        agentId: z.string().min(1).max(100).optional(),
+        model: z.enum(CODEX_WORKER_MODELS).optional(),
+        reasoningEffort: z.enum(CODEX_REASONING_EFFORTS).optional()
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true }
     },
-    async ({ gameId, target, outputLocale, userTimeZone }) => {
+    async ({ gameId, target, outputLocale, userTimeZone, agentId, model, reasoningEffort }) => {
       try {
+        if (agentId) {
+          return toolResult({
+            command: 'queue_baseline_maintenance',
+            ...database.startAiScheduleJob(agentId, gameId, target,
+              { outputLocale, userTimeZone }, new Date(),
+              { model: model ?? 'inherit', reasoningEffort: reasoningEffort ?? 'inherit' })
+          })
+        }
         return toolResult({
           command: 'queue_baseline_maintenance',
           job: database.createAiScheduleJob(
@@ -408,21 +436,33 @@ export function createLocalMcpServer(
     },
     async ({ agentId, jobId, model, reasoningEffort }) => {
       try {
-        const claimed = database.claimAiScheduleJob(agentId, new Date(), jobId,
-          model && reasoningEffort ? { model, reasoningEffort } : undefined)
-        let current = claimed
-        if (!current) {
-          try { current = database.getAiScheduleJobById(jobId) } catch { /* Missing exact job. */ }
-        }
-        const resumable = current?.status === 'claimed' && current.agentId === agentId
         return toolResult({
           command: 'claim_schedule_job',
-          claimOutcome: claimed ? 'claimed' : resumable ? 'resumed'
-            : current?.status === 'claimed' ? 'claimed_by_another_agent'
-            : current?.status ?? 'not_found',
-          job: claimed ?? (resumable ? current : null),
-          currentStatus: current?.status ?? null,
-          message: current?.message ?? '指定任务不存在'
+          ...database.claimAiScheduleJobResult(agentId, jobId, new Date(),
+            model && reasoningEffort ? { model, reasoningEffort } : undefined)
+        })
+      } catch (error) {
+        return toolError(error)
+      }
+    }
+  )
+
+  server.registerTool(
+    'get_gtask_schedule_job',
+    {
+      title: '读取维护任务状态',
+      description: '按精确 jobId 只读查询所有者、进度、终态、覆盖及审计是否完整。默认小摘要，不读取清单或个人数据；includeResearch 可读取已保存裁决。查询不会领取、续租或重新排队。',
+      inputSchema: {
+        jobId: z.string().uuid(),
+        includeResearch: z.boolean().default(false)
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false }
+    },
+    async ({ jobId, includeResearch }) => {
+      try {
+        const job = database.getAiScheduleJobSummary(jobId, includeResearch)
+        return toolResult({
+          command: 'get_schedule_job', job, currentStatus: job?.status ?? 'not_found'
         })
       } catch (error) {
         return toolError(error)
@@ -434,29 +474,28 @@ export function createLocalMcpServer(
     'update_gtask_schedule_job_progress',
     {
       title: '更新公开资料同步进度',
-      description: '记录 Codex 当前的结构化阶段、数量与内部诊断。Gtask 只按 phase/current/total 生成固定用户文案，不直接展示 message。',
+      description: '记录阶段、数量及公開研究裁决；重开已解决结论须有新证据，或 correctionReason 说明旧解读错误/用户纠正。默认返回小摘要，compact=false 返回完整契约。Gtask 不直接展示 message。',
       inputSchema: {
         agentId: z.string().min(1).max(100),
         jobId: z.string().uuid(),
         phase: syncProgressPhaseSchema,
         message: z.string().min(1).max(200),
         current: z.number().int().min(0).nullable().optional(),
-        total: z.number().int().min(1).nullable().optional()
+        total: z.number().int().min(1).nullable().optional(),
+        researchDecisions: z.array(researchDecisionSchema).max(200).optional(),
+        compact: z.boolean().default(true)
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true }
     },
-    async ({ agentId, jobId, phase, message, current, total }) => {
+    async ({ agentId, jobId, phase, message, current, total, researchDecisions, compact }) => {
       try {
+        const updated = database.updateAiScheduleJobProgress(
+          jobId, agentId, phase, message, current ?? null, total ?? null,
+          new Date(), researchDecisions as AiScheduleResearchDecision[] | undefined
+        )
         return toolResult({
           command: 'update_schedule_job_progress',
-          job: database.updateAiScheduleJobProgress(
-            jobId,
-            agentId,
-            phase,
-            message,
-            current ?? null,
-            total ?? null
-          )
+          job: compact ? database.getAiScheduleJobSummary(jobId) : updated
         })
       } catch (error) {
         return toolError(error)

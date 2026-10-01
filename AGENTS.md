@@ -27,6 +27,12 @@ This file is an AI entry point. It is intentionally concise; users are not expec
 - Compare the official publication/update order and the actual statements, not just retrieval times or repost dates. Retain the old value, adopted value, source links, and reason in the research record. A newer unrelated page or a page for another server/period does not supersede the applicable rule. Source selection and catalog decisions remain Agent responsibilities, never runtime inference from personal progress.
 - Resolve source precedence separately from time precision. Preserve the official wording and distinguish a published schedule baseline from a measured opening time. For an event confirmed open that starts after a version update, when the official maintenance start and expected duration are explicit, the Agent may normalize its start to the announced expected maintenance-completion time; document that basis as nominal, not as an observed actual opening. Do not invent an unsupported time or retain a superseded date merely because the announcement uses conditional wording.
 
+## Maintenance throughput
+
+- The live job's `maintenancePolicy` is the shared maintenance procedure for foreground and background Agents; its implementation is `src/main/ai/baseline-maintenance-policy.ts`. Keep the repository Skill aligned. Source decisions remain Agent-owned; programs validate ownership, decision records, coverage and transactions only.
+- Direct application-data maintenance passes `agentId` when queuing to create and claim atomically. Only a claimed/resumed owner may write. Query another owner's job through the read-only status tool; never use repeated claims as polling or silently start substitute jobs.
+- Save and reuse conflict decisions. Reopen only for new evidence or an explicit correctionReason identifying an interpretation/structuring error or user correction; never lock a proven error in place. Report pending facts separately, never as verified unchanged. Finalize the batch before checks and reuse unchanged validation; retain the workspace through all delivery steps.
+
 ## Canonical map catalog maintenance
 
 When the user asks to add, correct, audit, calibrate, or update a built-in map baseline, read **all of** `docs/ai-map-catalog-maintenance.md` before editing anything. That document defines:
