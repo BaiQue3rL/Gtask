@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "revision": "2026-10-01.star-rail-4.6-official-schedules",
-  "publishedAt": "2026-10-01T13:01:43.222Z",
+  "revision": "2026-10-11.zenless-3.2-event-completion",
+  "publishedAt": "2026-10-11T11:02:00.000Z",
   "games": [
     {
       "gameId": "genshin",
@@ -638,7 +638,7 @@
           "category": "limited_event",
           "title": "「弹球勇者」哐哐当！",
           "startsAt": "2026-09-10T10:00:00+08:00",
-          "endsAt": "2026-10-19T03:59:00+08:00",
+          "endsAt": "2026-10-18T19:59:59.000Z",
           "activityTags": [
             "combat",
             "challenge"
@@ -666,7 +666,7 @@
           "category": "limited_event",
           "title": "惊喜放映企划",
           "startsAt": "2026-09-23T10:00:00+08:00",
-          "endsAt": "2026-10-20T03:59:00+08:00",
+          "endsAt": "2026-10-19T19:59:59.000Z",
           "activityTags": [
             "sign-in"
           ],
@@ -693,7 +693,7 @@
           "category": "limited_event",
           "title": "锵锵！球仔成长日记",
           "startsAt": "2026-09-30T10:00:00+08:00",
-          "endsAt": "2026-10-19T03:59:00+08:00",
+          "endsAt": "2026-10-18T19:59:59.000Z",
           "activityTags": [
             "management"
           ],
@@ -719,7 +719,7 @@
           "category": "limited_event",
           "title": "跛脚乌鸦奇探录",
           "startsAt": "2026-10-03T10:00:00+08:00",
-          "endsAt": "2026-10-19T03:59:00+08:00",
+          "endsAt": "2026-10-18T19:59:59.000Z",
           "activityTags": [
             "puzzle",
             "quest"
@@ -759,6 +759,45 @@
           "parentRemoteKey": "map-catalog:zenless:region:e27477172b3cccb95766",
           "parentTitle": "罗斯凯利法",
           "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000"
+        },
+        {
+          "remoteKey": "event:3.2:all-new-program",
+          "category": "limited_event",
+          "title": "全新放送",
+          "startsAt": "2026-09-09T11:00:00+08:00",
+          "endsAt": "2026-10-20T03:59:00+08:00",
+          "activityTags": [
+            "sign-in"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/846338875205881053"
+        },
+        {
+          "remoteKey": "event:3.2:angels-cheering-operation",
+          "category": "limited_event",
+          "title": "天使应援大作战",
+          "startsAt": "2026-09-09T11:00:00+08:00",
+          "endsAt": "2026-11-30T03:59:00+08:00",
+          "activityTags": [
+            "quest"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/845970778565380091"
+        },
+        {
+          "remoteKey": "event:3.2:potential-preview-fiery-hammer",
+          "category": "limited_event",
+          "title": "潜能预演·烈火重锤",
+          "startsAt": "2026-09-09T11:00:00+08:00",
+          "endsAt": "2026-10-21T06:00:00+08:00",
+          "activityTags": [
+            "combat"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/846338342462163795"
         }
       ],
       "archives": [

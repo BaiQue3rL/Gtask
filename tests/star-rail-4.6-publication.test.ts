@@ -4,7 +4,9 @@ import { AppDatabase } from '../src/main/database'
 import { parseRemoteCatalogFeed } from '../src/main/remote-catalog-update'
 
 const sourceUrl = 'https://www.taptap.cn/moment/841375445998898274'
-const publication = { ...catalog, games: catalog.games.filter(game => game.gameId === 'star-rail') }
+// Keep this historical scenario independent of later, unrelated catalog publications.
+const publication = { ...catalog, publishedAt: '2026-10-01T13:01:43.222Z',
+  games: catalog.games.filter(game => game.gameId === 'star-rail') }
 const instant = (value: string) => new Date(value).toISOString()
 const modes = [
   ['memory-of-chaos', '混沌回忆', '2026-08-17T04:00:00+08:00', '2026-09-28T19:00:00+08:00'],

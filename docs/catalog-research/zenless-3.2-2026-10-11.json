@@ -1,0 +1,626 @@
+{
+  "gameId": "zenless",
+  "verifiedAt": "2026-10-11T11:02:00.000Z",
+  "outputLocale": "zh-CN",
+  "timeZone": "Asia/Shanghai",
+  "scope": "3.2现行及已公告限时活动、3.3官方前瞻、稳定周期模式、当前开放地图候选与版本边界。",
+  "inventory": {
+    "eventsBefore": 6,
+    "eventsAfter": 9,
+    "cycleModes": [
+      "式舆防卫战",
+      "危局强袭战"
+    ],
+    "mapRegions": 6,
+    "mapSubregions": 26,
+    "deadlineReviews": 0
+  },
+  "auditComplete": false,
+  "changed": [
+    {
+      "action": "create",
+      "remoteKey": "event:3.2:all-new-program",
+      "category": "limited_event",
+      "title": "全新放送",
+      "startsAt": "2026-09-09T11:00:00+08:00",
+      "endsAt": "2026-10-20T03:59:00+08:00",
+      "activityTags": [
+        "sign-in"
+      ],
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://www.taptap.cn/moment/846338875205881053"
+    },
+    {
+      "action": "create",
+      "remoteKey": "event:3.2:angels-cheering-operation",
+      "category": "limited_event",
+      "title": "天使应援大作战",
+      "startsAt": "2026-09-09T11:00:00+08:00",
+      "endsAt": "2026-11-30T03:59:00+08:00",
+      "activityTags": [
+        "quest"
+      ],
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://www.taptap.cn/moment/845970778565380091"
+    },
+    {
+      "action": "create",
+      "remoteKey": "event:3.2:potential-preview-fiery-hammer",
+      "category": "limited_event",
+      "title": "潜能预演·烈火重锤",
+      "startsAt": "2026-09-09T11:00:00+08:00",
+      "endsAt": "2026-10-21T06:00:00+08:00",
+      "activityTags": [
+        "combat"
+      ],
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://www.taptap.cn/moment/846338342462163795"
+    },
+    {
+      "action": "update",
+      "remoteKey": "event:3.2:pinball-knight",
+      "category": "limited_event",
+      "title": "「弹球勇者」哐哐当！",
+      "startsAt": "2026-09-10T10:00:00+08:00",
+      "endsAt": "2026-10-18T19:59:59.000Z",
+      "activityTags": [
+        "combat",
+        "challenge"
+      ],
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000"
+    },
+    {
+      "action": "update",
+      "remoteKey": "event:3.2:surprise-screening-plan",
+      "category": "limited_event",
+      "title": "惊喜放映企划",
+      "startsAt": "2026-09-23T10:00:00+08:00",
+      "endsAt": "2026-10-19T19:59:59.000Z",
+      "activityTags": [
+        "sign-in"
+      ],
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000"
+    },
+    {
+      "action": "update",
+      "remoteKey": "event:3.2:hobbling-crow-chronicles",
+      "category": "limited_event",
+      "title": "跛脚乌鸦奇探录",
+      "startsAt": "2026-10-03T10:00:00+08:00",
+      "endsAt": "2026-10-18T19:59:59.000Z",
+      "activityTags": [
+        "puzzle",
+        "quest"
+      ],
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000"
+    },
+    {
+      "action": "update",
+      "remoteKey": "event:3.2:orbie-parent-diary",
+      "category": "limited_event",
+      "title": "锵锵！球仔成长日记",
+      "startsAt": "2026-09-30T10:00:00+08:00",
+      "endsAt": "2026-10-18T19:59:59.000Z",
+      "activityTags": [
+        "management"
+      ],
+      "scheduleKind": "fixed_window",
+      "timeZone": "Asia/Shanghai",
+      "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000"
+    }
+  ],
+  "unchanged": {
+    "tasks": "3.2维持42天，2026-09-09 06:00至2026-10-21 06:00 UTC+8；与自动规则一致，不发布常规版本窗口。",
+    "events": [
+      "「嗯呢」从天降",
+      "数据悬赏-实战模拟"
+    ],
+    "existingCycles": "两个已收录模式的第一方观察起点匹配现有14天规则；末端1秒的闭区间精度不表示周期规则改变，不发布普通换期实例。拟境候选另列pending，不宣称周期范围完整。",
+    "existingMaps": "复用旧目录的已验证身份、父级与开放依据，对照3.2新增地区；32节点保持原样。维尔乌姆城区的独立探索度仍待证实，不宣称地图范围完整。",
+    "stableIdentities": "四项更新沿用原remoteKey和本地itemId；不变更现有地图、周期、版本、退役记录和其他游戏。"
+  },
+  "excluded": [
+    {
+      "title": "虚境逐影争锋、先遣赏金-区域巡防（3.2）",
+      "reason": "分别已于10-05、09-28结束；由既有到期规则处理，不重新创建或重复发布退役。"
+    },
+    {
+      "title": "维尔乌姆假日相册",
+      "reason": "复用上轮官方活动页证据，已于10-10 23:59结束，本轮不补入过期活动。",
+      "sourceUrl": "https://act.mihoyo.com/zzz/event/e20260909flintworkshop-s3ou3r/index.html"
+    },
+    {
+      "title": "天使应援大作战第三阶段",
+      "reason": "同一跨版本限时活动的内部任务，纳入原容器，不另外建项。"
+    },
+    {
+      "title": "宁息屿、迷宫诡域：古怪试炼等3.3内容",
+      "reason": "当前尚未开放；未来地图不预先纳入开放目录，玩法预告也不自动构成限时活动。"
+    },
+    {
+      "title": "卡池、角色时装商品、主线、信赖、前瞻兑换码、社区抽奖、线下FES与演出",
+      "reason": "不属于本次独立游戏活动/签到、可重复终局模式或已开放探索目录。"
+    }
+  ],
+  "researchDecisions": [
+    {
+      "key": "event:3.2:all-new-program",
+      "target": "events",
+      "status": "resolved",
+      "previousValue": "2026-09-14核查因缺实测开服时间暂缓收录",
+      "adoptedValue": "{\"startsAt\":\"2026-09-09T11:00:00+08:00\",\"endsAt\":\"2026-10-20T03:59:00+08:00\",\"activityTags\":[\"sign-in\"]}",
+      "timeBasis": "nominal_maintenance",
+      "reason": "当前维护契约允许对已开放活动使用官方预计维护完成时刻；补入独立限时活动，11:00为公告排期基准，不是实测开服。保留公告分钟精度，不凭空补59秒。",
+      "correctionReason": "旧记录将缺实测开服时刻解释为必须漏收，与现行nominal_maintenance政策不一致。",
+      "sources": [
+        {
+          "url": "https://zzz.mihoyo.com/news/166026",
+          "publishedAt": "2026-09-09",
+          "statement": "维护从09-09 06:00开始、预计五小时；3.2至10-21 06:00结束，共42天。"
+        },
+        {
+          "url": "https://www.taptap.cn/moment/846338875205881053",
+          "publishedAt": "2026-09-08",
+          "statement": "累计登录七天领取奖励，至10-20 03:59。"
+        }
+      ]
+    },
+    {
+      "key": "event:3.2:angels-cheering-operation",
+      "target": "events",
+      "status": "resolved",
+      "previousValue": "2026-09-14核查因缺实测开服时间暂缓收录",
+      "adoptedValue": "{\"startsAt\":\"2026-09-09T11:00:00+08:00\",\"endsAt\":\"2026-11-30T03:59:00+08:00\",\"activityTags\":[\"quest\"]}",
+      "timeBasis": "nominal_maintenance",
+      "reason": "当前维护契约允许对已开放活动使用官方预计维护完成时刻；补入独立限时活动，11:00为公告排期基准，不是实测开服。保留公告分钟精度，不凭空补59秒。",
+      "correctionReason": "旧记录将缺实测开服时刻解释为必须漏收，与现行nominal_maintenance政策不一致。",
+      "sources": [
+        {
+          "url": "https://zzz.mihoyo.com/news/166026",
+          "publishedAt": "2026-09-09",
+          "statement": "维护从09-09 06:00开始、预计五小时；3.2至10-21 06:00结束，共42天。"
+        },
+        {
+          "url": "https://www.taptap.cn/moment/845970778565380091",
+          "publishedAt": "2026-09-07",
+          "statement": "同一容器包含跨3.2至3.3解锁的三项限时任务，至11-30 03:59。"
+        }
+      ]
+    },
+    {
+      "key": "event:3.2:potential-preview-fiery-hammer",
+      "target": "events",
+      "status": "resolved",
+      "previousValue": "2026-09-14核查因缺实测开服时间暂缓收录",
+      "adoptedValue": "{\"startsAt\":\"2026-09-09T11:00:00+08:00\",\"endsAt\":\"2026-10-21T06:00:00+08:00\",\"activityTags\":[\"combat\"]}",
+      "timeBasis": "nominal_maintenance",
+      "reason": "当前维护契约允许对已开放活动使用官方预计维护完成时刻；补入独立限时活动，11:00为公告排期基准，不是实测开服。保留公告分钟精度，不凭空补59秒。",
+      "correctionReason": "旧记录将缺实测开服时刻解释为必须漏收，与现行nominal_maintenance政策不一致。",
+      "sources": [
+        {
+          "url": "https://zzz.mihoyo.com/news/166026",
+          "publishedAt": "2026-09-09",
+          "statement": "维护从09-09 06:00开始、预计五小时；3.2至10-21 06:00结束，共42天。"
+        },
+        {
+          "url": "https://www.taptap.cn/moment/846338342462163795",
+          "publishedAt": "2026-09-08",
+          "statement": "指定队伍挑战潜能前后试玩关卡，参与期限为3.2更新后至版本结束。"
+        }
+      ]
+    },
+    {
+      "key": "event:3.2:pinball-knight",
+      "target": "events",
+      "status": "resolved",
+      "previousValue": "2026-10-19T03:59:00+08:00",
+      "adoptedValue": "2026-10-18T19:59:59.000Z",
+      "timeBasis": "exact",
+      "reason": "同一活动第一方日历观察将公告的03:59分钟补足至03:59:59；保留名称、标签、开始边界和稳定身份。",
+      "sources": [
+        {
+          "url": "https://zenless.hoyoverse.com/m/zh-cn/news/166000",
+          "statement": "公告提供分钟精度；job.sourceObservations 276ef5f5-4087-41de-a5ea-014c947f5cf1 于2026-10-11给出结束秒数。"
+        }
+      ]
+    },
+    {
+      "key": "event:3.2:surprise-screening-plan",
+      "target": "events",
+      "status": "resolved",
+      "previousValue": "2026-10-20T03:59:00+08:00",
+      "adoptedValue": "2026-10-19T19:59:59.000Z",
+      "timeBasis": "exact",
+      "reason": "同一活动第一方日历观察将公告的03:59分钟补足至03:59:59；保留名称、标签、开始边界和稳定身份。",
+      "sources": [
+        {
+          "url": "https://zenless.hoyoverse.com/m/zh-cn/news/166000",
+          "statement": "公告提供分钟精度；job.sourceObservations 6b931a0b-0a89-499f-8c92-18e2c3b84eb5 于2026-10-11给出结束秒数。"
+        }
+      ]
+    },
+    {
+      "key": "event:3.2:hobbling-crow-chronicles",
+      "target": "events",
+      "status": "resolved",
+      "previousValue": "2026-10-19T03:59:00+08:00",
+      "adoptedValue": "2026-10-18T19:59:59.000Z",
+      "timeBasis": "exact",
+      "reason": "同一活动第一方日历观察将公告的03:59分钟补足至03:59:59；保留名称、标签、开始边界和稳定身份。",
+      "sources": [
+        {
+          "url": "https://zenless.hoyoverse.com/m/zh-cn/news/166000",
+          "statement": "公告提供分钟精度；job.sourceObservations 053f6d99-e184-4407-8ae2-8e99d3b3e010 于2026-10-11给出结束秒数。"
+        }
+      ]
+    },
+    {
+      "key": "event:3.2:orbie-parent-diary",
+      "target": "events",
+      "status": "resolved",
+      "previousValue": "2026-10-19T03:59:00+08:00",
+      "adoptedValue": "2026-10-18T19:59:59.000Z",
+      "timeBasis": "exact",
+      "reason": "同一活动第一方日历观察将公告的03:59分钟补足至03:59:59；保留名称、标签、开始边界和稳定身份。",
+      "sources": [
+        {
+          "url": "https://zenless.hoyoverse.com/m/zh-cn/news/166000",
+          "statement": "公告提供分钟精度；job.sourceObservations deb01bb1-0efd-4605-8f40-0eba305a7d55 于2026-10-11给出结束秒数。"
+        }
+      ]
+    },
+    {
+      "key": "version:3.2",
+      "target": "tasks",
+      "status": "resolved",
+      "previousValue": "2026-09-09T06:00:00+08:00..2026-10-21T06:00:00+08:00",
+      "adoptedValue": "unchanged",
+      "timeBasis": "exact",
+      "reason": "当前42天规则和官方版本边界一致；不重复发布常规versionWindow。",
+      "sources": [
+        {
+          "url": "https://zzz.mihoyo.com/news/166026",
+          "publishedAt": "2026-09-09",
+          "statement": "维护从09-09 06:00开始、预计五小时；3.2至10-21 06:00结束，共42天。"
+        }
+      ]
+    },
+    {
+      "key": "cycles:existing-modes",
+      "target": "cycles",
+      "status": "resolved",
+      "previousValue": "式舆防卫战/危局强袭战，每14天、错开7天",
+      "adoptedValue": "unchanged",
+      "timeBasis": "exact",
+      "reason": "本期第一方观察起点与既有规则一致；秒级闭区间末端不代表规则或锚点改变，保留自动换期，不发本期实例。",
+      "sources": [
+        {
+          "url": "https://zzz.mihoyo.com/news/166026",
+          "publishedAt": "2026-09-09",
+          "statement": "维护从09-09 06:00开始、预计五小时；3.2至10-21 06:00结束，共42天。"
+        }
+      ]
+    },
+    {
+      "key": "cycles:hollow-annihilation",
+      "target": "cycles",
+      "status": "pending",
+      "previousValue": null,
+      "adoptedValue": null,
+      "timeBasis": "unknown",
+      "reason": "已检查官方3.0玩法说明与3.3更新预告；能确认独立高难玩法，但缺少可核验的当前轮换规则、重置锚点及开放/结算窗口。第三方两周轮换说法与官方模式描述不一致，不能据此建立周期卡片。",
+      "sources": [
+        {
+          "url": "https://www.taptap.cn/moment/816024102270667939",
+          "statement": "拟境湮灭战自3.0更新后开放，为每个目标提供常规、极限两个难度；未公布重复排期。"
+        },
+        {
+          "url": "https://www.taptap.cn/moment/857697059656960823",
+          "publishedAt": "2026-10-09",
+          "statement": "3.3将于10-21上线；官方总览图列出八项限时活动及两项玩法更新，未提供这些新活动的完整起止排期。"
+        }
+      ]
+    },
+    {
+      "key": "candidate:3.3:all-new-program",
+      "target": "events",
+      "status": "pending",
+      "previousValue": null,
+      "adoptedValue": null,
+      "timeBasis": "unknown",
+      "reason": "全新放送已在官方3.3总览预告中列名，但尚未取得完整起止时间；当前未开放，不使用缺截止时间例外。检查总览及独立定向排期检索后无可靠新增时间。",
+      "sources": [
+        {
+          "url": "https://www.taptap.cn/moment/857697059656960823",
+          "publishedAt": "2026-10-09",
+          "statement": "3.3将于10-21上线；官方总览图列出八项限时活动及两项玩法更新，未提供这些新活动的完整起止排期。"
+        },
+        {
+          "url": "https://zzz.mihoyo.com/news/166652",
+          "publishedAt": "2026-10-09",
+          "statement": "3.3在10-21上线；开发中画面与奖励以正式上线为准，未提供各活动排期。"
+        }
+      ]
+    },
+    {
+      "key": "candidate:3.3:boopons-from-above",
+      "target": "events",
+      "status": "pending",
+      "previousValue": null,
+      "adoptedValue": null,
+      "timeBasis": "unknown",
+      "reason": "「嗯呢」从天降已在官方3.3总览预告中列名，但尚未取得完整起止时间；当前未开放，不使用缺截止时间例外。检查总览及独立定向排期检索后无可靠新增时间。",
+      "sources": [
+        {
+          "url": "https://www.taptap.cn/moment/857697059656960823",
+          "publishedAt": "2026-10-09",
+          "statement": "3.3将于10-21上线；官方总览图列出八项限时活动及两项玩法更新，未提供这些新活动的完整起止排期。"
+        },
+        {
+          "url": "https://zzz.mihoyo.com/news/166652",
+          "publishedAt": "2026-10-09",
+          "statement": "3.3在10-21上线；开发中画面与奖励以正式上线为准，未提供各活动排期。"
+        }
+      ]
+    },
+    {
+      "key": "candidate:3.3:haunted-house",
+      "target": "events",
+      "status": "pending",
+      "previousValue": null,
+      "adoptedValue": null,
+      "timeBasis": "unknown",
+      "reason": "怪奇诡屋惊魂记已在官方3.3总览预告中列名，但尚未取得完整起止时间；当前未开放，不使用缺截止时间例外。检查总览及独立定向排期检索后无可靠新增时间。",
+      "sources": [
+        {
+          "url": "https://www.taptap.cn/moment/857697059656960823",
+          "publishedAt": "2026-10-09",
+          "statement": "3.3将于10-21上线；官方总览图列出八项限时活动及两项玩法更新，未提供这些新活动的完整起止排期。"
+        },
+        {
+          "url": "https://zzz.mihoyo.com/news/166652",
+          "publishedAt": "2026-10-09",
+          "statement": "3.3在10-21上线；开发中画面与奖励以正式上线为准，未提供各活动排期。"
+        }
+      ]
+    },
+    {
+      "key": "candidate:3.3:cyber-doctor",
+      "target": "events",
+      "status": "pending",
+      "previousValue": null,
+      "adoptedValue": null,
+      "timeBasis": "unknown",
+      "reason": "赛博圣手，出诊！已在官方3.3总览预告中列名，但尚未取得完整起止时间；当前未开放，不使用缺截止时间例外。检查总览及独立定向排期检索后无可靠新增时间。",
+      "sources": [
+        {
+          "url": "https://www.taptap.cn/moment/857697059656960823",
+          "publishedAt": "2026-10-09",
+          "statement": "3.3将于10-21上线；官方总览图列出八项限时活动及两项玩法更新，未提供这些新活动的完整起止排期。"
+        },
+        {
+          "url": "https://zzz.mihoyo.com/news/166652",
+          "publishedAt": "2026-10-09",
+          "statement": "3.3在10-21上线；开发中画面与奖励以正式上线为准，未提供各活动排期。"
+        }
+      ]
+    },
+    {
+      "key": "candidate:3.3:hobbling-crow-mystery",
+      "target": "events",
+      "status": "pending",
+      "previousValue": null,
+      "adoptedValue": null,
+      "timeBasis": "unknown",
+      "reason": "跛脚乌鸦奇踪记已在官方3.3总览预告中列名，但尚未取得完整起止时间；当前未开放，不使用缺截止时间例外。检查总览及独立定向排期检索后无可靠新增时间。",
+      "sources": [
+        {
+          "url": "https://www.taptap.cn/moment/857697059656960823",
+          "publishedAt": "2026-10-09",
+          "statement": "3.3将于10-21上线；官方总览图列出八项限时活动及两项玩法更新，未提供这些新活动的完整起止排期。"
+        },
+        {
+          "url": "https://zzz.mihoyo.com/news/166652",
+          "publishedAt": "2026-10-09",
+          "statement": "3.3在10-21上线；开发中画面与奖励以正式上线为准，未提供各活动排期。"
+        }
+      ]
+    },
+    {
+      "key": "candidate:3.3:drifting-picture-album",
+      "target": "events",
+      "status": "pending",
+      "previousValue": null,
+      "adoptedValue": null,
+      "timeBasis": "unknown",
+      "reason": "修复吧！漂流画集已在官方3.3总览预告中列名，但尚未取得完整起止时间；当前未开放，不使用缺截止时间例外。检查总览及独立定向排期检索后无可靠新增时间。",
+      "sources": [
+        {
+          "url": "https://www.taptap.cn/moment/857697059656960823",
+          "publishedAt": "2026-10-09",
+          "statement": "3.3将于10-21上线；官方总览图列出八项限时活动及两项玩法更新，未提供这些新活动的完整起止排期。"
+        },
+        {
+          "url": "https://zzz.mihoyo.com/news/166652",
+          "publishedAt": "2026-10-09",
+          "statement": "3.3在10-21上线；开发中画面与奖励以正式上线为准，未提供各活动排期。"
+        }
+      ]
+    },
+    {
+      "key": "candidate:3.3:regional-patrol-bounty",
+      "target": "events",
+      "status": "pending",
+      "previousValue": null,
+      "adoptedValue": null,
+      "timeBasis": "unknown",
+      "reason": "先遣赏金-区域巡防已在官方3.3总览预告中列名，但尚未取得完整起止时间；当前未开放，不使用缺截止时间例外。检查总览及独立定向排期检索后无可靠新增时间。",
+      "sources": [
+        {
+          "url": "https://www.taptap.cn/moment/857697059656960823",
+          "publishedAt": "2026-10-09",
+          "statement": "3.3将于10-21上线；官方总览图列出八项限时活动及两项玩法更新，未提供这些新活动的完整起止排期。"
+        },
+        {
+          "url": "https://zzz.mihoyo.com/news/166652",
+          "publishedAt": "2026-10-09",
+          "statement": "3.3在10-21上线；开发中画面与奖励以正式上线为准，未提供各活动排期。"
+        }
+      ]
+    },
+    {
+      "key": "candidate:3.3:combat-simulation-bounty",
+      "target": "events",
+      "status": "pending",
+      "previousValue": null,
+      "adoptedValue": null,
+      "timeBasis": "unknown",
+      "reason": "数据悬赏-实战模拟已在官方3.3总览预告中列名，但尚未取得完整起止时间；当前未开放，不使用缺截止时间例外。检查总览及独立定向排期检索后无可靠新增时间。",
+      "sources": [
+        {
+          "url": "https://www.taptap.cn/moment/857697059656960823",
+          "publishedAt": "2026-10-09",
+          "statement": "3.3将于10-21上线；官方总览图列出八项限时活动及两项玩法更新，未提供这些新活动的完整起止排期。"
+        },
+        {
+          "url": "https://zzz.mihoyo.com/news/166652",
+          "publishedAt": "2026-10-09",
+          "statement": "3.3在10-21上线；开发中画面与奖励以正式上线为准，未提供各活动排期。"
+        }
+      ]
+    },
+    {
+      "key": "map-candidate:verum-city",
+      "target": "exploration",
+      "status": "pending",
+      "previousValue": "未纳入独立探索目录",
+      "adoptedValue": null,
+      "timeBasis": "unknown",
+      "reason": "官方3.2确认维尔乌姆城区归属罗斯凯利法，复核完整32节点目录及新增地区后，该候选仍缺独立探索进度依据。独立全收集资料仅列宝箱、布连币与交互点，不能证明独立探索百分比；保留既有稳定键和父子关系。",
+      "sources": [
+        {
+          "url": "https://zzz.mihoyo.com/news/166026",
+          "publishedAt": "2026-09-09",
+          "statement": "全新地区列出罗斯凯利法下的维尔乌姆城区、辉金研究所和隐礁中转站。后两项已在公开基准。"
+        },
+        {
+          "url": "https://www.bilibili.com/video/BV16cYs6sEU1/",
+          "statement": "3.2全收集导航包含维尔乌姆城区的宝箱、布连币等；未取得可确证独立探索度的界面或文字。"
+        }
+      ]
+    }
+  ],
+  "sourceResolution": {
+    "nominalStartsAt": "2026-09-09T11:00:00+08:00",
+    "nominalBasis": "官方明确06:00开始、预计5小时，3.2已上线；11:00为公告预计维护完成基准，未宣称实测开放。旧9月14日记录因缺实测时刻而漏收的三项，按现行维护契约重新结构化。",
+    "endPrecision": "四项既有活动使用脱敏第一方日历的03:59:59，观察时间为2026-10-11T10:53:31.539Z；其余仅有公告03:59的活动保留分钟精度，不擅自推定59秒。",
+    "observations": [
+      {
+        "observationId": "276ef5f5-4087-41de-a5ea-014c947f5cf1",
+        "title": "「弹球勇者」哐哐当！",
+        "startsAt": "2026-09-10T02:00:00.000Z",
+        "endsAt": "2026-10-18T19:59:59.000Z",
+        "observedAt": "2026-10-11T10:53:31.539Z",
+        "provider": "miyoushe",
+        "endpoint": "miyoushe-zenless-event-calendar"
+      },
+      {
+        "observationId": "6b931a0b-0a89-499f-8c92-18e2c3b84eb5",
+        "title": "惊喜放映企划",
+        "startsAt": "2026-09-23T02:00:00.000Z",
+        "endsAt": "2026-10-19T19:59:59.000Z",
+        "observedAt": "2026-10-11T10:53:31.539Z",
+        "provider": "miyoushe",
+        "endpoint": "miyoushe-zenless-event-calendar"
+      },
+      {
+        "observationId": "053f6d99-e184-4407-8ae2-8e99d3b3e010",
+        "title": "跛脚乌鸦奇探录",
+        "startsAt": "2026-10-03T02:00:00.000Z",
+        "endsAt": "2026-10-18T19:59:59.000Z",
+        "observedAt": "2026-10-11T10:53:31.539Z",
+        "provider": "miyoushe",
+        "endpoint": "miyoushe-zenless-event-calendar"
+      },
+      {
+        "observationId": "deb01bb1-0efd-4605-8f40-0eba305a7d55",
+        "title": "锵锵！球仔成长日记",
+        "startsAt": "2026-09-30T02:00:00.000Z",
+        "endsAt": "2026-10-18T19:59:59.000Z",
+        "observedAt": "2026-10-11T10:53:31.539Z",
+        "provider": "miyoushe",
+        "endpoint": "miyoushe-zenless-event-calendar"
+      }
+    ],
+    "overviewImage": "https://img2-tc.tapimg.com/moment/etag/lu-oEQMlJr3oLtq4zEEyYk1IhMln_20261009190146.jpg/_tap_ugc.jpg",
+    "overviewReview": "已实际查看官方3.3总览图片：八项活动有名称、玩法展示或奖励，未列完整参与窗口。一次独立定向检索未找到可靠完整时间，保留pending；不借用卡池时间。",
+    "researchLimitations": "部分HoYoverse文章页面只有动态外壳；使用米哈游中国官网、官方TapTap正文及其原图核验。拟境周期说法缺官方依据且第三方描述互相矛盾；地图攻略的收集物不证明独立探索进度。未读取凭据或原始个人接口。"
+  },
+  "localMaintenance": {
+    "jobId": "ee78d6e8-5280-480b-b76d-4b60a09a1577",
+    "status": "partial_saved_job_failed",
+    "merge": {
+      "added": 3,
+      "updated": 4,
+      "preserved": 0
+    },
+    "archived": 0,
+    "summary": {
+      "id": "ee78d6e8-5280-480b-b76d-4b60a09a1577",
+      "gameId": "zenless",
+      "target": "all",
+      "status": "failed",
+      "agentId": "codex-zenless-baseline-20261011-01a12a9a",
+      "message": "已保存确认的3项新增活动和4项截止秒数校正。尚有10项公开事实待核实：3.3八项活动完整排期、拟境湮灭战重复规则、维尔乌姆城区独立探索进度。周期/地图不冒充全量无变化，保留原基准。",
+      "requestedAt": "2026-10-11T10:55:43.925Z",
+      "claimedAt": "2026-10-11T10:55:43.925Z",
+      "completedAt": "2026-10-11T11:01:39.416Z",
+      "progressPhase": "failed",
+      "progressCurrent": 2,
+      "progressTotal": 4,
+      "progressUpdatedAt": "2026-10-11T11:01:39.416Z",
+      "completedTargets": [
+        "events",
+        "tasks"
+      ],
+      "remainingTargets": [
+        "cycles",
+        "exploration"
+      ],
+      "auditComplete": false,
+      "unresolvedDecisionCount": 10
+    },
+    "verification": "专用MCP读回9个公共活动：3项新记录与4项修正的名称、起止时刻均一致，既有4项itemId保持不变。仅筛出公共字段验证；未导出个人进度。",
+    "clientReceiptKind": "direct_public_maintenance",
+    "unresolvedDecisionCount": 10
+  },
+  "publication": {
+    "revision": "2026-10-11.zenless-3.2-event-completion",
+    "delta": "zenless-3.2-2026-10-11.delta.json",
+    "feed": "../../updates/catalog.json",
+    "softwareVersion": "1.2.0",
+    "deliveryOrder": "先本地MCP公共维护写入及读回校验，再校验并发布累计公共清单。",
+    "validation": "passed",
+    "contentHash": "c8b61b6b95856bae7f396a210ade730c5539f1af15cbe433dc69dc31d3b6b328",
+    "compilation": "使用catalog:check编译累计差异，再保留原有字段顺序和URL书写以限制diff；断言与编译输出在URL规范化后完全一致。"
+  },
+  "verification": [
+    "pnpm test：76个测试文件通过，2个跳过；478项通过，12项按原条件跳过，包含地图目录与新鲜度专项。",
+    "pnpm build通过；在测试调整后再次pnpm typecheck通过。未修改产品代码或历史种子。",
+    "pnpm catalog:check通过，真实消费器隔离回执contentHash=c8b61b6b95856bae7f396a210ade730c5539f1af15cbe433dc69dc31d3b6b328。",
+    "语义断言：仅3项新增与4项结束时间加59秒；其他游戏、旧稳定键、地图父子、周期/版本、累计退役列表原样保留。",
+    "扩充既有消费回归，确认已完成活动校时后保留id、完成状态和手动锁；移除要求每次新事实复制到历史TS种子的过时断言。",
+    "星铁历史情境固定在原4.6修订时间，避免绝区零的新发布日期推进情境到下一周期并产生假失败。",
+    "本地专用MCP确认added=3、updated=4、archived=0；读回9个活动的公开字段与本轮差异一致。",
+    "git diff --check通过。"
+  ]
+}
