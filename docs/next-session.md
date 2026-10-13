@@ -2,11 +2,13 @@
 
 更新：2026-10-14，Asia/Shanghai。这里记录当前工作区；历史发布与安装记录保留在 `history/next-session-through-2026-09-14.md`，不作为当前能力或未完成事项的依据。
 
-## 2026-10-14 1.2.1 发布准备
+## 2026-10-14 1.2.1 发布
 
 用户授权本轮更新版本并在全部工作完成后关机。完成判定修复按补丁版本升至 1.2.1，应用与随附插件版本一致，数据库保持 schema 8。安装器构建脚本可传入输出目录，发布流程仍固定不自动发布，使本机验收包可在仓库外构建并保留既有发布产物。
 
-498 项测试通过、12 项按原配置跳过；类型检查、生产构建、清单消费校验、安装版与便携版检查通过，安装器依赖模板已恢复。本机 `D:\Git\Gtask` 已升级到 1.2.1，37 个程序文件与验收包一致，7 个维护运行时文件核对一致；同步成功显示绿色“已同步”和时间，弹球活动仍为自动完成，重启验收通过。个人清单、保护行、绑定、快照、设置和加密凭据在替换期间核验保留，未创建部署备份。回执位于 `C:\Users\Administrator\AppData\Local\Codex\task-receipts\gtask-release-1.2.1-deployment.json`、`gtask-release-1.2.1-acceptance.json` 和 `gtask-release-1.2.1-local-assets.json`。远端发布与更新入口尚待验证，当前 `updates/latest.json` 继续指向已发布的 1.2.0；关机尚未执行。
+498 项测试通过、12 项按原配置跳过；类型检查、生产构建、清单消费校验、安装版与便携版检查通过，安装器依赖模板已恢复。本机 `D:\Git\Gtask` 已升级到 1.2.1，37 个程序文件与验收包一致，7 个维护运行时文件核对一致；同步成功显示绿色“已同步”和时间，弹球活动仍为自动完成，重启验收通过。个人清单、保护行、绑定、快照、设置和加密凭据在替换期间核验保留，未创建部署备份。回执位于 `C:\Users\Administrator\AppData\Local\Codex\task-receipts\gtask-release-1.2.1-deployment.json`、`gtask-release-1.2.1-acceptance.json` 和 `gtask-release-1.2.1-local-assets.json`。
+
+PR #10 已合并，发布标签 `v1.2.1` 指向 `9e48ac0b598c0be50b6d8033d418b4df603ee3f0`。主分支 Verify `38433853219`、PR Verify `38432871193` 与 Release `38434677865` 均成功结束；三个 GitHub 附件已实际下载并匹配远端 digest 与校验文件。Gitee Release `1203641` 的附件为空，镜像步骤失败，两个更新下载入口改用 GitHub 1.2.1。源码通过认证 GitHub Git 数据接口同步，原始提交编号逐一核验；详细发布证据见 `release-verification-1.2.1.md` 与本机 `gtask-release-1.2.1-remote-assets.json` 回执。更新入口的在线检查与最后关机以同目录后续回执为准；历史关机请求不能作为再次关机的授权。
 
 ## 2026-10-13 个人完成语义修复
 
