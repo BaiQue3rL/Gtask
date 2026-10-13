@@ -1,6 +1,6 @@
 import { CHECKLIST_CATEGORIES, MAP_NODE_KINDS, SCHEDULE_KINDS } from '../../shared/contracts'
 import { normalizeActivityTags } from '../activity-tags'
-import type { NormalizedSyncItem } from './types'
+import type { EventCompletionEvidence, NormalizedSyncItem } from './types'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -70,6 +70,7 @@ export function normalizeSyncItem(value: unknown): NormalizedSyncItem {
   if (value.completed !== undefined && typeof value.completed !== 'boolean') {
     throw new Error('同步完成状态格式不正确')
   }
+  const completionEvidence = optionalCompletionEvidence(value.completionEvidence, value.completed)
   if (
     value.progressPercent !== undefined &&
     value.progressPercent !== null &&
@@ -120,6 +121,7 @@ export function normalizeSyncItem(value: unknown): NormalizedSyncItem {
     title: requiredString(value.title, '同步事项名称', 100),
     activityTags: optionalActivityTags(value.activityTags),
     completed: value.completed as boolean | undefined,
+    ...(completionEvidence ? { completionEvidence } : {}),
     progressPercent: value.progressPercent as number | null | undefined,
     parentTitle: nullableString(value.parentTitle, '同步上级区域'),
     mapNodeKind: value.mapNodeKind as NormalizedSyncItem['mapNodeKind'] | undefined,
@@ -135,6 +137,29 @@ export function normalizeSyncItem(value: unknown): NormalizedSyncItem {
     recurrenceRule: null,
     sourceIdentity: optionalSourceIdentity(value.sourceIdentity)
   }
+}
+
+function optionalCompletionEvidence(value: unknown, completed: unknown): EventCompletionEvidence | undefined {
+  if (value === undefined) return undefined
+  if (!isRecord(value) || typeof value.status !== 'string' ||
+    !['complete', 'incomplete', 'unknown'].includes(value.status)) {
+    throw new Error('个人完成判定证据格式不正确')
+  }
+  const basis = {
+    rule: requiredString(value.rule, '个人完成判定规则', 200),
+    field: requiredString(value.field, '个人完成判定字段', 80)
+  }
+  if (value.status === 'unknown') {
+    if (completed !== undefined || typeof value.reason !== 'string' ||
+      !['missing-field', 'invalid-field', 'unrecognized-value'].includes(value.reason)) {
+      throw new Error('未知完成证据不能覆盖完成状态')
+    }
+    return { ...basis, status: 'unknown', reason: value.reason as 'missing-field' | 'invalid-field' | 'unrecognized-value' }
+  }
+  if (completed !== (value.status === 'complete')) {
+    throw new Error('个人完成判定证据与完成状态冲突')
+  }
+  return { ...basis, status: value.status as 'complete' | 'incomplete' }
 }
 
 export function normalizeSyncItems(values: unknown): NormalizedSyncItem[] {

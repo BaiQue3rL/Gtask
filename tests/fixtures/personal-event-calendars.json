@@ -1,0 +1,23 @@
+{
+  "provenance": "Official CN calendar response shapes verified 2026-10-13; account identifiers removed. Only fields relevant to completion are retained.",
+  "zenless": {
+    "activity_list": [
+      { "activity_id": 5000161, "name": "「弹球勇者」哐哐当！", "state": "STATE_COMPLETED", "monochrome_cnt": 800, "monochrome_got_cnt": 800, "start_ts": 1789005600, "end_ts": 1792353599 },
+      { "activity_id": 5000162, "name": "锵锵！球仔成长日记", "state": "STATE_IN_PROGRESS", "monochrome_cnt": 300, "monochrome_got_cnt": 120, "start_ts": 1790733600, "end_ts": 1792353599 },
+      { "activity_id": 5000164, "name": "跛脚乌鸦奇探录", "state": "STATE_IN_PROGRESS", "monochrome_cnt": 360, "monochrome_got_cnt": 0, "start_ts": 1790992800, "end_ts": 1792353599 }
+    ]
+  },
+  "genshin": {
+    "act_list": [
+      { "id": 448, "name": "判测胜券本征", "status": 2, "is_finished": false },
+      { "id": 453, "name": "巡历雪境，凝铸锋锐", "status": 2, "is_finished": true }
+    ]
+  },
+  "star-rail": {
+    "act_list": [
+      { "id": 284, "name": "位面分裂", "act_status": "DoubleRewardActStatusFinish", "total_progress": 12, "current_progress": 0, "all_finished": true },
+      { "id": 283, "name": "花藏繁生", "act_status": "DoubleRewardActStatusUnopened", "total_progress": 84, "current_progress": 84, "all_finished": false },
+      { "id": 286, "name": "镇伏「贪饕」，汇聚愿力", "act_status": "OtherActStatusUnFinish", "total_progress": 9, "current_progress": 6, "all_finished": false }
+    ]
+  }
+}

@@ -116,17 +116,16 @@ describe('Star Rail personal parsing', () => {
 
     expect(candidates).toEqual([expect.objectContaining({
       target: 'events',
-      kind: 'personal-item-semantics',
+      kind: 'personal-event-progress',
       payload: expect.objectContaining({
         officialEventId: '6011',
         title: '反贪「砖」家',
         normalizedStartAt: '2026-07-13T01:20:00.000Z',
         normalizedEndAt: '2026-08-25T15:59:00.000Z',
-        observedStatus: {
-          allFinished: true,
-          actStatus: 'OtherActStatusFinish',
-          currentProgress: 10,
-          totalProgress: 10
+        completionEvidence: {
+          status: 'complete',
+          rule: 'miyoushe-star-rail-event-calendar:all_finished',
+          field: 'all_finished'
         }
       })
     })])

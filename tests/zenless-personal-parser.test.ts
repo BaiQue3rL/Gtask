@@ -136,7 +136,7 @@ describe('绝区零个人战绩解析', () => {
     expect(() => parseZenlessPersonalData({})).toThrow('没有可识别')
   })
 
-  it('活动状态只脱敏进入 Codex 核验，不由本地状态枚举直接判完成', () => {
+  it('已验证的活动状态形成个人完成证据，不混入账号与奖励数量', () => {
     const candidates = extractZenlessEventProgressCandidates({
       uid: '不应读取',
       activity_list: [{
@@ -152,17 +152,16 @@ describe('绝区零个人战绩解析', () => {
     expect(candidates).toEqual([
       expect.objectContaining({
         target: 'events',
-        kind: 'personal-item-semantics',
+        kind: 'personal-event-progress',
         payload: expect.objectContaining({
           officialEventId: '7001',
           title: '嗯呢从天降',
           normalizedStartAt: '2026-07-20T00:00:00.000Z',
           normalizedEndAt: '2026-08-19T23:59:59.000Z',
-          observedStatus: {
-            state: 'STATE_IN_PROGRESS',
-            status: null,
-            obtainedCount: 240,
-            totalCount: 300
+          completionEvidence: {
+            status: 'incomplete',
+            rule: 'miyoushe-zenless-event-calendar:state',
+            field: 'state'
           }
         })
       })
@@ -288,6 +287,7 @@ describe('绝区零个人战绩解析', () => {
     const eventsOnly = await adapter.sync('zenless', 'events')
     expect(order).toEqual(['events'])
     expect(eventsOnly.items).toHaveLength(1)
+    expect(eventsOnly.items[0].completed).toBe(true)
     order.length = 0
     const exploration = await adapter.sync('zenless', 'exploration')
     expect(order).toEqual(['exploration'])

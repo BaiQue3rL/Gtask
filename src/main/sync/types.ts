@@ -18,6 +18,8 @@ export interface NormalizedSyncItem {
   title: string
   activityTags?: string[]
   completed?: boolean
+  /** Account evidence decoded by the endpoint, never guessed from generic progress. */
+  completionEvidence?: EventCompletionEvidence
   progressPercent?: number | null
   parentTitle?: string | null
   mapNodeKind?: MapNodeKind | null
@@ -66,6 +68,10 @@ export interface SyncMergeResult {
   expiredRemoved?: number
 }
 
+export interface PersonalSnapshotResult extends SyncMergeResult {
+  progress: import('../../shared/contracts').PersonalProgressSummary
+}
+
 export interface ActivityTagUpdate {
   itemId: string
   title: string
@@ -86,6 +92,28 @@ export interface PersonalProgressCandidate {
   target: Exclude<SyncTarget, 'all' | 'tasks'>
   kind: string
   payload: Record<string, unknown>
+}
+
+export type EventCompletionEvidence = {
+  rule: string
+  field: string
+} & (
+  | { status: 'complete' | 'incomplete' }
+  | { status: 'unknown'; reason: 'missing-field' | 'invalid-field' | 'unrecognized-value' }
+)
+
+/** Every event adapter must deliver an explicit decision, including unknown. */
+export interface PersonalEventProgressCandidate extends PersonalProgressCandidate {
+  target: 'events'
+  kind: 'personal-event-progress'
+  payload: {
+    sourceContext: string
+    officialEventId: string
+    title: string
+    normalizedStartAt: string | null
+    normalizedEndAt: string | null
+    completionEvidence: EventCompletionEvidence
+  }
 }
 
 export interface ScheduleObservationInput {

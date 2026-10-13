@@ -278,16 +278,16 @@ describe('Genshin personal parsing', () => {
 
     expect(candidates).toEqual([expect.objectContaining({
       target: 'events',
-      kind: 'personal-item-semantics',
+      kind: 'personal-event-progress',
       payload: expect.objectContaining({
         officialEventId: '9010',
         title: '幽境危战·栗烈之役',
         normalizedStartAt: '2026-07-20T00:00:00.000Z',
         normalizedEndAt: '2026-08-19T23:59:59.000Z',
-        observedStatus: {
-          isFinished: true,
-          explorationFinished: true,
-          explorationPercent: 100
+        completionEvidence: {
+          status: 'complete',
+          rule: 'miyoushe-genshin-event-calendar:is_finished',
+          field: 'is_finished'
         }
       })
     })])

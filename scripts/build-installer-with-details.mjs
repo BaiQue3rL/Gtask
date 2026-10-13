@@ -57,7 +57,7 @@ try {
   const cliPath = require.resolve('electron-builder/cli.js')
   const result = spawnSync(
     process.execPath,
-    [cliPath, '--win', 'nsis', '--publish', 'never'],
+    [cliPath, '--win', 'nsis', ...process.argv.slice(2), '--publish', 'never'],
     {
       cwd: process.cwd(),
       env: process.env,

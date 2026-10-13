@@ -1,9 +1,11 @@
 import {
   type NormalizedSyncItem,
+  type PersonalEventProgressCandidate,
   type PersonalProgressCandidate
 } from './types'
 import { hasChallengeRecordEvidence } from './challenge-record-evidence'
 import { finiteNumber } from './numbers'
+import { readEventCalendarRecords, readEventCompletionEvidence } from './event-completion-evidence'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -125,34 +127,23 @@ function optionalChinaDateTime(value: unknown, field: string): string | undefine
   return parsed.toISOString()
 }
 
-export function extractZenlessEventProgressCandidates(value: unknown): PersonalProgressCandidate[] {
+export function extractZenlessEventProgressCandidates(value: unknown): PersonalEventProgressCandidate[] {
   const root = requiredRecord(value, '活动日历')
-  const events = Array.isArray(root.activity_list) ? root.activity_list.filter(isRecord) : []
+  const events = readEventCalendarRecords(root.activity_list, '绝区零')
   return events.map((event) => {
     const id = requiredIdentifier(event.activity_id ?? event.id, '活动 id')
     const title = typeof event.name === 'string' && event.name.trim() ? event.name.trim() : null
     if (!title) throw new Error('绝区零个人数据缺少活动名称')
     return {
       target: 'events',
-      kind: 'personal-item-semantics',
+      kind: 'personal-event-progress',
       payload: {
         sourceContext: 'miyoushe-zenless-event-calendar',
         officialEventId: id,
         title,
         normalizedStartAt: optionalUnixIso(event.start_ts),
         normalizedEndAt: optionalUnixIso(event.end_ts),
-        observedTime: {
-          startTimestamp: safeObservedValue(event.start_ts),
-          endTimestamp: safeObservedValue(event.end_ts),
-          startTime: safeObservedValue(event.start),
-          endTime: safeObservedValue(event.end)
-        },
-        observedStatus: {
-          state: typeof event.state === 'string' ? event.state : null,
-          status: typeof event.status === 'string' ? event.status : null,
-          obtainedCount: finiteNumber(event.monochrome_got_cnt),
-          totalCount: finiteNumber(event.monochrome_cnt)
-        }
+        completionEvidence: readEventCompletionEvidence('miyoushe-zenless-event-calendar', event)
       }
     }
   })
@@ -163,15 +154,6 @@ function optionalUnixIso(value: unknown): string | null {
   if (timestamp === null || timestamp <= 0) return null
   const date = new Date(timestamp < 10_000_000_000 ? timestamp * 1000 : timestamp)
   return Number.isNaN(date.getTime()) ? null : date.toISOString()
-}
-
-function safeObservedValue(value: unknown): string | number | null | Record<string, number | null> {
-  if (typeof value === 'string' || typeof value === 'number') return value
-  if (!isRecord(value)) return null
-  return Object.fromEntries(
-    ['year', 'month', 'day', 'hour', 'minute', 'second']
-      .map((key) => [key, finiteNumber(value[key])])
-  )
 }
 
 export function parseZenlessShiyuDefense(value: unknown): NormalizedSyncItem {
