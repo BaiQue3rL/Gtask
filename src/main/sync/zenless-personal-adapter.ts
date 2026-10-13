@@ -100,7 +100,7 @@ export class ZenlessPersonalAdapter implements SyncAdapter {
       items,
       scheduleObservations: scheduleObservationsFromItems(items),
       snapshotCompleteness: outcomes.every((outcome) => outcome.succeeded) ? 'complete' : 'partial',
-      adapterVersion: 'zenless-personal-v1',
+      adapterVersion: 'zenless-personal-v2',
       message: (target === 'events'
         ? '绝区零活动进度已读取'
         : target === 'exploration'

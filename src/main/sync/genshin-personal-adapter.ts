@@ -105,7 +105,7 @@ export class GenshinPersonalAdapter implements SyncAdapter {
       items,
       scheduleObservations: scheduleObservationsFromItems(items),
       snapshotCompleteness: outcomes.every((outcome) => outcome.succeeded) ? 'complete' : 'partial',
-      adapterVersion: 'genshin-personal-v1',
+      adapterVersion: 'genshin-personal-v2',
       message: (target === 'events'
         ? '原神活动进度已读取'
         : target === 'exploration'

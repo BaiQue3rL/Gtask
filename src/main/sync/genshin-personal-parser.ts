@@ -1,9 +1,11 @@
 import {
   type NormalizedSyncItem,
+  type PersonalEventProgressCandidate,
   type PersonalProgressCandidate
 } from './types'
 import { hasChallengeRecordEvidence } from './challenge-record-evidence'
 import { finiteNumber } from './numbers'
+import { readEventCalendarRecords, readEventCompletionEvidence } from './event-completion-evidence'
 
 export interface GenshinPersonalPayload {
   profile?: unknown
@@ -28,34 +30,22 @@ export function parseGenshinPersonalData(input: GenshinPersonalPayload): Normali
   return items
 }
 
-export function extractGenshinEventProgressCandidates(value: unknown): PersonalProgressCandidate[] {
+export function extractGenshinEventProgressCandidates(value: unknown): PersonalEventProgressCandidate[] {
   const root = requiredRecord(value, '活动日历')
-  const events = Array.isArray(root.act_list) ? root.act_list.filter(isRecord) : []
+  const events = readEventCalendarRecords(root.act_list, '原神')
   return events.map((event) => {
     const id = requiredIdentifier(event.id, '活动 id')
     const title = requiredString(event.name, '活动名称')
-    const exploration = isRecord(event.explore_detail) ? event.explore_detail : null
     return {
       target: 'events',
-      kind: 'personal-item-semantics',
+      kind: 'personal-event-progress',
       payload: {
         sourceContext: 'miyoushe-genshin-event-calendar',
         officialEventId: id,
         title,
         normalizedStartAt: optionalUnixIso(event.start_timestamp),
         normalizedEndAt: optionalUnixIso(event.end_timestamp),
-        observedTime: {
-          startTimestamp: safeObservedValue(event.start_timestamp),
-          endTimestamp: safeObservedValue(event.end_timestamp),
-          startTime: safeObservedValue(event.start_time),
-          endTime: safeObservedValue(event.end_time)
-        },
-        observedStatus: {
-          isFinished: typeof event.is_finished === 'boolean' ? event.is_finished : null,
-          explorationFinished:
-            typeof exploration?.is_finished === 'boolean' ? exploration.is_finished : null,
-          explorationPercent: finiteNumber(exploration?.explore_percent)
-        }
+        completionEvidence: readEventCompletionEvidence('miyoushe-genshin-event-calendar', event)
       }
     }
   })
@@ -66,15 +56,6 @@ function optionalUnixIso(value: unknown): string | null {
   if (timestamp === null || timestamp <= 0) return null
   const date = new Date(timestamp < 10_000_000_000 ? timestamp * 1000 : timestamp)
   return Number.isNaN(date.getTime()) ? null : date.toISOString()
-}
-
-function safeObservedValue(value: unknown): string | number | null | Record<string, number | null> {
-  if (typeof value === 'string' || typeof value === 'number') return value
-  if (!isRecord(value)) return null
-  return Object.fromEntries(
-    ['year', 'month', 'day', 'hour', 'minute', 'second']
-      .map((key) => [key, finiteNumber(value[key])])
-  )
 }
 
 export function parseExplorations(value: unknown): NormalizedSyncItem[] {

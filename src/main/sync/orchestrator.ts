@@ -215,13 +215,12 @@ export class SyncOrchestrator {
         current: 1,
         total: 1
       })
-      const merge = { added: 0, updated: 0, preserved: 0, expiredRemoved: 0 }
       if (result.snapshotCompleteness === 'partial') {
         throw new Error('个人接口只返回了部分进度，已保留上次结果，请稍后重试')
       }
       if (!result.accountScope) throw new Error('个人进度缺少安全账号作用域，请重新登录')
       throwIfSyncCancelled(signal)
-      const replaced = this.database.replacePersonalSnapshot(
+      const merge = this.database.replacePersonalSnapshot(
         gameId,
         target,
         result.accountScope,
@@ -232,16 +231,17 @@ export class SyncOrchestrator {
         true,
         result.scheduleObservations ?? []
       )
-      merge.added += replaced.added
-      merge.updated += replaced.updated
-      merge.preserved += replaced.preserved
-      merge.expiredRemoved += replaced.expiredRemoved ?? 0
       throwIfSyncCancelled(signal)
       const changes = merge.added + merge.updated
       const changeMessage = changes > 0
         ? `新增 ${merge.added}，更新 ${merge.updated}`
         : '无清单变更'
-      const preservedMessage = merge.preserved > 0 ? `，保护 ${merge.preserved}` : ''
+      const progress = merge.progress
+      const evidenceMessage = `，已确认完成 ${progress.complete}，未完成 ${progress.incomplete}`
+      const unknownMessage = progress.unknown > 0 ? `，无法判断 ${progress.unknown}（保留原状态）` : ''
+      const notReturnedMessage = progress.notReturned > 0 ? `，接口未返回 ${progress.notReturned}（保留原状态）` : ''
+      const unmatchedMessage = progress.unmatched > 0 ? `，未匹配 ${progress.unmatched}` : ''
+      const preservedMessage = progress.manualProtected > 0 ? `，手动保护 ${progress.manualProtected}` : ''
       const expiredMessage = (merge.expiredRemoved ?? 0) > 0
         ? `，淘汰到期 ${merge.expiredRemoved}`
         : ''
@@ -255,7 +255,7 @@ export class SyncOrchestrator {
       return {
         source: 'personal_data',
         status: 'success',
-        message: `${result.message}（${changeMessage}${preservedMessage}${expiredMessage}）`,
+        message: `${result.message}（${changeMessage}${evidenceMessage}${unknownMessage}${notReturnedMessage}${unmatchedMessage}${preservedMessage}${expiredMessage}）`,
         ...merge
       }
     } catch (error) {

@@ -55,7 +55,7 @@ export class StarRailPersonalAdapter implements SyncAdapter {
         items: eventItems,
         scheduleObservations: scheduleObservationsFromItems(eventItems),
         snapshotCompleteness: 'complete',
-        adapterVersion: 'star-rail-personal-v1',
+        adapterVersion: 'star-rail-personal-v2',
         message: '星铁活动进度已读取'
       }
     }
@@ -126,7 +126,7 @@ export class StarRailPersonalAdapter implements SyncAdapter {
       items,
       scheduleObservations: scheduleObservationsFromItems(items),
       snapshotCompleteness: outcomes.every((outcome) => outcome.succeeded) ? 'complete' : 'partial',
-      adapterVersion: 'star-rail-personal-v1',
+      adapterVersion: 'star-rail-personal-v2',
       message: '星铁四种周期战绩已同步' + suffix
     }
   }

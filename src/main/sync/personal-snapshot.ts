@@ -1,5 +1,5 @@
 import type { GameId } from '../../shared/contracts'
-import type { NormalizedSyncItem, PersonalProgressCandidate } from './types'
+import type { NormalizedSyncItem, PersonalEventProgressCandidate, PersonalProgressCandidate } from './types'
 
 type PersonalProvider = 'miyoushe' | 'kuro-community'
 
@@ -30,7 +30,7 @@ export function withPersonalIdentity(
 export function personalEventsFromCandidates(
   gameId: GameId,
   provider: PersonalProvider,
-  candidates: PersonalProgressCandidate[],
+  candidates: PersonalEventProgressCandidate[],
   reference = new Date()
 ): NormalizedSyncItem[] {
   const now = reference.getTime()
@@ -50,10 +50,13 @@ export function personalEventsFromCandidates(
     const startsAt = readIso(candidate.payload.normalizedStartAt)
     const endsAt = readIso(candidate.payload.normalizedEndAt)
     if (endsAt && Date.parse(endsAt) <= now) continue
-    const completed = readExplicitEventCompletion(endpoint, candidate.payload.observedStatus)
+    const completionEvidence = candidate.payload.completionEvidence
+    if (!completionEvidence) throw new Error('官方活动进度缺少完成判定证据')
+    const completed = completionEvidence.status === 'unknown'
+      ? undefined : completionEvidence.status === 'complete'
     const externalId = String(id).trim()
     const remoteKey = `personal-event:${provider}:${endpoint}:${externalId}`
-    if (seen.has(remoteKey)) continue
+    if (seen.has(remoteKey)) throw new Error(`官方活动列表包含重复标识：${title}`)
     seen.add(remoteKey)
     items.push({
       remoteKey,
@@ -64,29 +67,11 @@ export function personalEventsFromCandidates(
       scheduleKind: 'fixed_window',
       modeKey: `official-event-${externalId}`,
       sourceIdentity: { provider, endpoint, externalId },
-      // 只采信接口明确提供的“全部完成”布尔值；生命周期状态和进度数字不用于猜测。
+      completionEvidence,
       ...(completed === undefined ? {} : { completed })
     })
   }
   return items
-}
-
-function readExplicitEventCompletion(endpoint: string, value: unknown): boolean | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
-  const status = value as Record<string, unknown>
-  if (
-    endpoint === 'miyoushe-genshin-event-calendar' &&
-    typeof status.isFinished === 'boolean'
-  ) {
-    return status.isFinished
-  }
-  if (
-    endpoint === 'miyoushe-star-rail-event-calendar' &&
-    typeof status.allFinished === 'boolean'
-  ) {
-    return status.allFinished
-  }
-  return undefined
 }
 
 export function personalMapsFromCandidates(

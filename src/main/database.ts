@@ -59,6 +59,7 @@ import {
   type CodexScheduleItem,
   type CodexVersionWindow,
   type NormalizedSyncItem,
+  type PersonalSnapshotResult,
   type ScheduleObservationInput,
   type SyncMergeResult
 } from './sync/types'
@@ -2829,7 +2830,7 @@ export class AppDatabase {
     },
     manageTransaction = true,
     observations?: ScheduleObservationInput[]
-  ): SyncMergeResult {
+  ): PersonalSnapshotResult {
     assertAccountScope(accountScope)
     if (!adapterVersion.trim() || adapterVersion.length > 100) {
       throw new Error('个人数据适配器版本格式不正确')
@@ -2857,10 +2858,13 @@ export class AppDatabase {
       if (identities.has(identity)) throw new Error(`个人快照包含重复官方标识：${item.title}`)
       identities.add(identity)
     }
-    const replace = (): SyncMergeResult => {
+    const replace = (): PersonalSnapshotResult => {
       const now = reference.toISOString()
       const snapshotId = randomUUID()
-      const result: SyncMergeResult = { added: 0, updated: 0, preserved: 0 }
+      const result: PersonalSnapshotResult = {
+        added: 0, updated: 0, preserved: 0,
+        progress: { complete: 0, incomplete: 0, unknown: 0, notReturned: 0, unmatched: 0, manualProtected: 0 }
+      }
       const matched: Array<{ item: NormalizedSyncItem; baseline: ChecklistItem }> = []
       const matchedBaselineIds = new Set<string>()
       const matchContext = this.createPersonalMatchContext(gameId)
@@ -2869,6 +2873,7 @@ export class AppDatabase {
         if (!baseline?.remoteKey || baseline.category !== item.category ||
           !personalCycleMatchesBaselineWindow(item, baseline, reference)) {
           result.preserved += 1
+          result.progress.unmatched += 1
           continue
         }
         if (matchedBaselineIds.has(baseline.id)) {
@@ -2877,6 +2882,11 @@ export class AppDatabase {
         matchedBaselineIds.add(baseline.id)
         matched.push({ item, baseline })
       }
+      result.progress.notReturned = matchContext.items.filter(item =>
+        expectedCategories[target].includes(item.category) && !matchedBaselineIds.has(item.id) &&
+        (!item.startsAt || Date.parse(item.startsAt) <= reference.getTime()) &&
+        (!item.endsAt || Date.parse(item.endsAt) > reference.getTime())
+      ).length
 
       this.database.prepare(`
         INSERT INTO personal_sync_snapshots(
@@ -2916,6 +2926,10 @@ export class AppDatabase {
         SET source_snapshot_id = ?, last_synced_at = ?
         WHERE id = ? AND source = 'public_schedule' AND archived = 0
       `)
+      const touchAttempt = this.database.prepare(`
+        UPDATE checklist_items SET last_synced_at = ?
+        WHERE id = ? AND source = 'public_schedule' AND archived = 0
+      `)
 
       for (const { item, baseline } of matched) {
         const identity = item.sourceIdentity!
@@ -2950,9 +2964,14 @@ export class AppDatabase {
           progressPercent = baseline.progressPercent
         }
 
+        if (!hasProgressEvidence) result.progress.unknown += 1
+        else if (completed) result.progress.complete += 1
+        else result.progress.incomplete += 1
+
         const completionProtected = hasProgressEvidence && !completed &&
           baseline.manualCompletionLocked
         if (completionProtected) {
+          result.progress.manualProtected += 1
           completed = baseline.completed
           progressPercent = baseline.progressPercent
         }
@@ -2975,9 +2994,11 @@ export class AppDatabase {
             baseline.id
           )
           result.updated += 1
-          if (completionProtected) result.preserved += 1
         } else {
-          touchProgress.run(snapshotId, now, baseline.id)
+          // An unknown observation or a manual override cannot replace the
+          // snapshot that actually proved the stored progress.
+          if (hasProgressEvidence && !completionProtected) touchProgress.run(snapshotId, now, baseline.id)
+          else touchAttempt.run(now, baseline.id)
           result.preserved += 1
         }
         bind.run(

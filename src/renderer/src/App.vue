@@ -62,6 +62,14 @@ import {
   personalProgressKey
 } from './personal-sync-progress'
 import { credentialProviderForSyncResult } from './sync-credential-notice'
+import {
+  formatPersonalProgressSummary,
+  hasUnconfirmedProgress,
+  personalSummaryForState,
+  readPersonalSyncReceipts,
+  recordPersonalSyncReceipt,
+  writePersonalSyncReceipts
+} from './personal-sync-summary'
 import { isChecklistItemComplete } from './checklist-completion'
 import { claimStartupAutoSync } from './startup-auto-sync'
 import {
@@ -174,6 +182,7 @@ const backups = ref<BackupSummary[]>([])
 const backingUp = ref(false)
 const restoringBackup = ref<string | null>(null)
 const personalSyncProgressByKey = ref<Record<string, SyncProgressUpdate>>({})
+const personalSyncReceipts = ref(readPersonalSyncReceipts(window.localStorage))
 const editingItem = ref<ChecklistItem | null>(null)
 const renderingModeState = ref<RenderingModeState | null>(null)
 const renderingModeSelection = ref<RenderingMode>('compatibility')
@@ -756,7 +765,8 @@ function syncStateTimestamp(state: SyncTargetState | undefined): string | null {
 
 function syncStateLabel(state: SyncTargetState | undefined): string {
   if (!state || (!state.lastAttemptAt && !state.lastSuccessAt)) return '未同步'
-  if (state.status === 'success') return '已同步'
+  if (state.status === 'success') return hasUnconfirmedProgress(personalSummaryForState(personalSyncReceipts.value, state))
+    ? '部分进度待确认' : '已同步'
   if (state.status === 'stale') return '部分同步'
   if (state.status === 'error') return '同步失败'
   if (state.status === 'verification_required') return '需要验证'
@@ -764,7 +774,15 @@ function syncStateLabel(state: SyncTargetState | undefined): string {
 }
 
 function syncStateClass(state: SyncTargetState | undefined): string {
+  if (hasUnconfirmedProgress(personalSummaryForState(personalSyncReceipts.value, state))) return 'stale'
   return state?.status ?? 'idle'
+}
+
+function syncStateTitle(state: SyncTargetState | undefined): string {
+  const timestamp = syncStateTimestamp(state)
+  const time = timestamp ? `同步时间：${new Date(timestamp).toLocaleString()}` : '这个版块还没同步'
+  const summary = personalSummaryForState(personalSyncReceipts.value, state)
+  return summary ? `${time}\n${formatPersonalProgressSummary(summary)}` : time
 }
 
 let archivedLoadGeneration = 0
@@ -1230,6 +1248,8 @@ async function runPersonalSync(
       outputLocale: document.documentElement.lang || 'zh-CN',
       userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
     })
+    personalSyncReceipts.value = recordPersonalSyncReceipt(personalSyncReceipts.value, result)
+    writePersonalSyncReceipts(window.localStorage, personalSyncReceipts.value)
     if (selectedGameId.value === gameId) {
       const credentialProvider = credentialProviderForSyncResult(result)
       await Promise.all([loadItems(), loadSyncSettings(), loadSyncTargetStates()])
@@ -1668,9 +1688,7 @@ function showError(error: unknown): void {
                     v-if="panel.syncTarget && personalSyncTargets.includes(panel.syncTarget)"
                     class="section-sync-indicator"
                     :class="syncStateClass(syncTargetState(panel.syncTarget))"
-                    :title="syncStateTimestamp(syncTargetState(panel.syncTarget))
-                      ? `同步时间：${new Date(syncStateTimestamp(syncTargetState(panel.syncTarget))!).toLocaleString()}`
-                      : '这个版块还没同步'"
+                    :title="syncStateTitle(syncTargetState(panel.syncTarget))"
                   >
                     {{ syncStateLabel(syncTargetState(panel.syncTarget)) }}
                     <time v-if="syncStateTimestamp(syncTargetState(panel.syncTarget))">

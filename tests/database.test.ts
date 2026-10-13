@@ -1339,7 +1339,8 @@ describe('AppDatabase', () => {
       }],
       'test-personal-v1',
       new Date('2026-08-01T00:00:00.000Z')
-    )).toEqual({ added: 0, updated: 0, preserved: 1 })
+    )).toEqual({ added: 0, updated: 0, preserved: 1,
+      progress: { complete: 0, incomplete: 1, unknown: 0, notReturned: 0, unmatched: 0, manualProtected: 1 } })
 
     const protectedRemote = database
       .listChecklistItems('genshin')
@@ -1691,7 +1692,8 @@ describe('AppDatabase', () => {
         }
       }], 'test-personal-v1')
 
-      expect(result).toEqual({ added: 0, updated: 0, preserved: 1 })
+      expect(result).toEqual({ added: 0, updated: 0, preserved: 1,
+        progress: { complete: 0, incomplete: 0, unknown: 0, notReturned: 0, unmatched: 1, manualProtected: 0 } })
       expect(database.listChecklistItems(gameId)
         .filter((item) => item.category === 'limited_event')).toHaveLength(0)
     }
@@ -1719,7 +1721,8 @@ describe('AppDatabase', () => {
         }
       }], 'test-personal-v1')
 
-      expect(result).toEqual({ added: 0, updated: 0, preserved: 1 })
+      expect(result).toEqual({ added: 0, updated: 0, preserved: 1,
+        progress: { complete: 0, incomplete: 0, unknown: 0, notReturned: 0, unmatched: 1, manualProtected: 0 } })
       expect(database.listChecklistItems(gameId)
         .filter((item) => item.category === 'limited_event')).toHaveLength(0)
     }

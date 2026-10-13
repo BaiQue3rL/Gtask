@@ -504,6 +504,15 @@ export interface SyncTargetState {
   catalogSource: 'public_schedule' | 'personal_data' | null
 }
 
+export interface PersonalProgressSummary {
+  complete: number
+  incomplete: number
+  unknown: number
+  notReturned: number
+  unmatched: number
+  manualProtected: number
+}
+
 export interface SyncSourceResult {
   source: 'public_schedule' | 'personal_data'
   status: 'success' | 'error' | 'skipped' | 'verification_required' | 'cancelled'
@@ -511,6 +520,7 @@ export interface SyncSourceResult {
   added: number
   updated: number
   preserved: number
+  progress?: PersonalProgressSummary
 }
 
 export interface SyncResult {

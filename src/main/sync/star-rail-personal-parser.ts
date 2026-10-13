@@ -1,9 +1,10 @@
 import {
   type NormalizedSyncItem,
-  type PersonalProgressCandidate
+  type PersonalEventProgressCandidate
 } from './types'
 import { hasChallengeRecordEvidence } from './challenge-record-evidence'
 import { finiteNumber } from './numbers'
+import { readEventCalendarRecords, readEventCompletionEvidence } from './event-completion-evidence'
 
 export interface StarRailPersonalPayload {
   memoryOfChaos?: unknown
@@ -50,9 +51,9 @@ export function parseStarRailPersonalData(
   return items
 }
 
-export function extractStarRailEventProgressCandidates(value: unknown): PersonalProgressCandidate[] {
+export function extractStarRailEventProgressCandidates(value: unknown): PersonalEventProgressCandidate[] {
   const root = requiredRecord(value, '活动日历')
-  const events = Array.isArray(root.act_list) ? root.act_list.filter(isRecord) : []
+  const events = readEventCalendarRecords(root.act_list, '星铁')
   return events.map((event) => {
     const timeInfo = isRecord(event.time_info) ? event.time_info : {}
     const id = requiredIdentifier(event.id, '活动 id')
@@ -60,25 +61,14 @@ export function extractStarRailEventProgressCandidates(value: unknown): Personal
     if (!title) throw new Error('星铁个人数据缺少活动名称')
     return {
       target: 'events',
-      kind: 'personal-item-semantics',
+      kind: 'personal-event-progress',
       payload: {
         sourceContext: 'miyoushe-star-rail-event-calendar',
         officialEventId: id,
         title: title.replaceAll('\\n', ' '),
         normalizedStartAt: optionalUnixIso(timeInfo.start_ts),
         normalizedEndAt: optionalUnixIso(timeInfo.end_ts),
-        observedTime: {
-          startTimestamp: safeObservedValue(timeInfo.start_ts),
-          endTimestamp: safeObservedValue(timeInfo.end_ts),
-          startTime: safeObservedValue(timeInfo.start_time ?? timeInfo.start),
-          endTime: safeObservedValue(timeInfo.end_time ?? timeInfo.end)
-        },
-        observedStatus: {
-          allFinished: typeof event.all_finished === 'boolean' ? event.all_finished : null,
-          actStatus: requiredOptionalString(event.act_status) ?? null,
-          currentProgress: finiteNumber(event.current_progress),
-          totalProgress: finiteNumber(event.total_progress)
-        }
+        completionEvidence: readEventCompletionEvidence('miyoushe-star-rail-event-calendar', event)
       }
     }
   })
@@ -89,15 +79,6 @@ function optionalUnixIso(value: unknown): string | null {
   if (timestamp === null || timestamp <= 0) return null
   const date = new Date(timestamp < 10_000_000_000 ? timestamp * 1000 : timestamp)
   return Number.isNaN(date.getTime()) ? null : date.toISOString()
-}
-
-function safeObservedValue(value: unknown): string | number | null | Record<string, number | null> {
-  if (typeof value === 'string' || typeof value === 'number') return value
-  if (!isRecord(value)) return null
-  return Object.fromEntries(
-    ['year', 'month', 'day', 'hour', 'minute', 'second']
-      .map((key) => [key, finiteNumber(value[key])])
-  )
 }
 
 function parseChallengeMode(definition: ChallengeModeDefinition): NormalizedSyncItem {
