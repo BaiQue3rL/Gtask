@@ -155,7 +155,7 @@ function cloudReceipt(expected, overrides = {}) {
 test('rearming preserves the cloud watch with a daily recovery guard anchored to the next node', () => {
   const expected = planCloudRearm(planMaintenance(fixture(), at(5)))
   assert.equal(expected.at, new Date(at(12)).toISOString())
-  assert.match(expected.schedule, /DTSTART:20261112T030000Z/)
+  assert.match(expected.schedule, /DTSTART;TZID=Asia\/Shanghai:20261112T110000/)
   assert.match(expected.schedule, /RRULE:FREQ=DAILY;INTERVAL=1/)
   assert.deepEqual(verifyCloudRearm('fixture-automation', expected, cloudReceipt(expected)), { ok: true, at: expected.at })
 })
@@ -169,7 +169,7 @@ test('a seven-day correction fails readback verification until the real timer is
   const state = fixture(), old = planCloudRearm(planMaintenance(state, at(5)))
   state.periods[0].firstHalfEndsAt = at(19)
   const expected = planCloudRearm(planMaintenance(state, at(5)))
-  assert.throws(() => verifyCloudRearm('fixture-automation', expected, cloudReceipt(old)), /old wake time/)
+  assert.throws(() => verifyCloudRearm('fixture-automation', expected, cloudReceipt(old)), /old or shifted wake time/)
   assert.equal(verifyCloudRearm('fixture-automation', expected, cloudReceipt(expected)).ok, true)
 })
 test('schedule readback rejects another task, disabled state, wrong timezone, wrong type and hourly polling', () => {
@@ -187,6 +187,19 @@ test('cloud schedule normalization accepts CRLF and an omitted default interval 
   for (const suffix of [';BYHOUR=8', ';COUNT=1', ';INTERVAL=2']) {
     assert.throws(() => verifyCloudRearm('fixture-automation', expected,
       cloudReceipt(expected, { schedule: expected.schedule.replace(';INTERVAL=1', suffix) })))
+  }
+})
+test('readback compares actual instants across IANA, UTC and task-timezone representations', () => {
+  const expected = planCloudRearm(planMaintenance(fixture(), at(5)))
+  for (const start of ['DTSTART;TZID=Asia/Shanghai:20261112T110000',
+    'DTSTART:20261112T030000Z', 'DTSTART:20261112T110000']) {
+    const schedule = expected.schedule.replace(/^DTSTART[^\n]+/m, start)
+    assert.equal(verifyCloudRearm('fixture-automation', expected, cloudReceipt(expected, { schedule })).ok, true)
+  }
+  for (const start of ['DTSTART:20261112T030000', 'DTSTART;TZID=UTC:20261112T030000',
+    'DTSTART;TZID=Asia/Shanghai:20261112T110000Z']) {
+    const schedule = expected.schedule.replace(/^DTSTART[^\n]+/m, start)
+    assert.throws(() => verifyCloudRearm('fixture-automation', expected, cloudReceipt(expected, { schedule })))
   }
 })
 test('cloud publication cannot alter local maintenance rules, runtime, workflows or versions', () => {

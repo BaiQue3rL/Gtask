@@ -38,7 +38,7 @@
 3. 先读取原任务的实际 ID、`last_run_time`、时区、启用状态及当前调度。`last_run_time` 有值时，规范为带时区时间传给 `node automation/cloud-baseline/plan.mjs --last-run <实际运行时间>`；没有值时省略。保存命令的真实输出到仓库外。输出 `rearm.at` 会遵守至少一小时的运行间隔，秒以下时间向后取整；非常接近的节点可以延后到同一轮处理，不能用连续单次重排绕过平台频率限制。
 4. 现有云端 `condition_watch` 的更新接口没有 `timing_mode` 入参，且要求保留重复规则。因此直接使用规划器生成的 `rearm.schedule`：把 `DTSTART` 锚定到下一目标，保留每日一次的恢复规则。正常运行结束后立即把锚点移到新目标，平日不空跑；若运行在重排前崩溃，原周期仍给它一次次日恢复机会。不得声称它已转换成 `exact_schedule` 或无兜底的一次性任务。
 5. 在开始较长的到期维护前，先按本轮计划布置恢复唤醒；交付或补查完成后，从 **main 已保存的最新状态**重新计算，再以 `automations_update` 更新同一任务的 `schedule` 和 `default_timezone`，显式保持 `is_enabled=true`。保留名称、绑定聊天、模型及其他设置。调度目标如果在操作中已经到期，重新规划并处理到期义务，不能写入过去时间。
-6. 更新后必须调用 `automations_peek`。将实际返回值规范为 `{id, enabled, timingMode, timeZone, schedule}`；连同更新前保存的 `rearm` 原对象和原任务 ID，写入仓库外的 `{automationId, expected, receipt}` JSON，运行 `node automation/cloud-baseline/plan.mjs --verify-rearm <回执路径>`。该校验会拒绝旧时间、小时轮询、其他任务、停用、时区或类型漂移。回执字段必须来自真实读回，不能复制请求伪造。`next_run_time=null` 时，只能确认已保存的调度，实际唤醒另看运行记录。
+6. 更新后必须调用 `automations_peek`。将实际返回值规范为 `{id, enabled, timingMode, timeZone, schedule}`；连同更新前保存的 `rearm` 原对象和原任务 ID，写入仓库外的 `{automationId, expected, receipt}` JSON，运行 `node automation/cloud-baseline/plan.mjs --verify-rearm <回执路径>`。规划器使用带 `Asia/Shanghai` 的本地时刻，避免接口规范化时丢失 UTC 标记；验证器比较实际时刻，接受等价的 IANA/UTC/明确任务时区表示，但拒绝八小时偏移、旧时间、小时轮询、其他任务、停用、时区或类型漂移。回执字段必须来自真实读回，不能复制请求伪造。`next_run_time=null` 时，只能确认已保存的调度，实际唤醒另看运行记录。
 7. 只有排期数据已交付、真实定时器已更新且读回校验通过，才可声称“已自动改期”。工具缺失、更新失败或读回不符时保留已有工作和恢复调度，报告具体阻碍；不能悄悄退回固定小时轮询、修改其他任务或扩大权限。只更改自己下次唤醒且成功、没有待报告事项时保持安静。
 
 ## 到点后的清单维护
