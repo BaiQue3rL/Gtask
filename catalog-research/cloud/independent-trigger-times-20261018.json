@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "kind": "schedule_structuring_correction",
+  "checkedAt": "2026-10-18T10:12:20.452Z",
+  "scope": "云端调度字段修正与鸣潮3.7已确认半程节点建档；不修改客户端公共清单",
+  "auditComplete": false,
+  "catalogChanged": false,
+  "correctionReason": "首次调度格式要求完整版本起止，导致已确认的上半结束因版本结束未知被漏出触发计划。两个业务触发应独立保存。解除这一结构限制，不改变来源判断或捏造缺失时间。",
+  "sources": [
+    {
+      "url": "https://www.taptap.cn/moment/853756601964691535",
+      "publisher": "鸣潮官方版主",
+      "publishedDate": "2026-09-29",
+      "result": "readable_rechecked",
+      "statement": "3.7版本角色及武器第一期唤取公告明确服务器时间10月22日09:59结束；仅用作调度证据，不收录卡池清单项。",
+      "firstHalfEndsAt": "2026-10-22T09:59:00+08:00"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/854139064348051537",
+      "publisher": "鸣潮官方版主",
+      "publishedDate": "2026-09-30",
+      "result": "readable_rechecked",
+      "statement": "3.7版本内容说明列出9月30日04:00至11:00的UTC+8维护排期；11:00为公告预计完成，不是测量开服时刻。公告中活动截止不能代替版本结束。",
+      "nominalStartsAt": "2026-09-30T11:00:00+08:00",
+      "versionEndsAt": null
+    }
+  ],
+  "decisions": [
+    {
+      "field": "wuthering-waves/3.7/first_half_end",
+      "oldValue": "因完整版本窗口要求而仅保留在待查记录，未安排节点",
+      "adoptedValue": "2026-10-22T09:59:00+08:00",
+      "timeBasis": "official_minute_precision",
+      "reason": "半程结束已有独立官方证据；版本结束继续为null，另行补查。"
+    },
+    {
+      "field": "nextScheduleReviewAt",
+      "reason": "待查游戏清单只是范围提示，实际补查等待nextScheduleReviewAt，避免每小时重做同一排期研究。到期业务节点仍照常处理。"
+    }
+  ],
+  "pending": [
+    "原神7.1版本结束和上半结束仍缺官方可读证据",
+    "鸣潮3.7版本结束仍缺官方依据",
+    "未公布或不可读的下一版本时间按现有scheduleGaps续查"
+  ],
+  "validation": {
+    "planTests": "12 passed, 0 failed",
+    "publication": "PR最新提交的Verify和Cloud baseline checks通过后合入"
+  }
+}

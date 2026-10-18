@@ -38,6 +38,20 @@
         "https://www.taptap.cn/moment/845969989931372181"
       ],
       "checkedAt": "2026-10-18T10:04:51.285Z"
+    },
+    {
+      "gameId": "wuthering-waves",
+      "periodKey": "3.7",
+      "startsAt": "2026-09-30T11:00:00+08:00",
+      "endsAt": null,
+      "firstHalfEndsAt": "2026-10-22T09:59:00+08:00",
+      "versionSources": [
+        "https://www.taptap.cn/moment/854139064348051537"
+      ],
+      "firstHalfSources": [
+        "https://www.taptap.cn/moment/853756601964691535"
+      ],
+      "checkedAt": "2026-10-18T10:12:20.452Z"
     }
   ],
   "scheduleGaps": [
@@ -86,7 +100,7 @@
     {
       "gameId": "wuthering-waves",
       "periodKey": "3.7",
-      "reason": "已读官方版主公告确定预计开始2026-09-30T11:00:00+08:00、第一期结束2026-10-22T09:59:00+08:00，保存在研究回执；未取得版本结束维护边界。不能采用单一活动11月11日结束或旧catalog的11月12日04:00作为已核验结束；schema要求period结束时间，故本轮不写入不完整period。",
+      "reason": "版本结束维护边界仍待官方证据；不从单一活动截止或旧catalog推断。已确认的上半结束2026-10-22T09:59:00+08:00已独立保存到periods，不受版本结束缺口阻塞；详见independent-trigger-times-20261018研究记录。",
       "checkedSources": [
         "https://mc.kurogames.com/main/news/detail/5569",
         "https://www.taptap.cn/moment/854139064348051537",
