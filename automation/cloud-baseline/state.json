@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "repository": "BaiQue3rL/Gtask",
+  "timeZone": "Asia/Shanghai",
+  "activatedAt": "2026-10-18T17:55:26+08:00",
+  "games": ["genshin", "star-rail", "zenless", "wuthering-waves"],
+  "nextScheduleReviewAt": null,
+  "periods": [],
+  "scheduleGaps": [],
+  "runs": []
+}

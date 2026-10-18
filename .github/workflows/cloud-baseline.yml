@@ -1,0 +1,30 @@
+name: Cloud baseline checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  cloud-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Test cloud scheduling and publication boundaries
+        run: node --test automation/cloud-baseline/plan.test.mjs
+      - name: Validate cloud scheduling metadata
+        run: node automation/cloud-baseline/plan.mjs
+      - name: Restrict automated publications to public data and cloud receipts
+        if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'codex/cloud-baseline/')
+        env:
+          CLOUD_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node automation/cloud-baseline/plan.mjs --guard "$CLOUD_BASE_SHA"
