@@ -149,11 +149,12 @@ test('scheduler precision rounds forward without waking before the verified time
   assert.equal(planMaintenance(state, at(5)).nextWake.at, '2026-11-08T03:00:01.000Z')
 })
 function cloudReceipt(expected, overrides = {}) {
-  return { id: 'fixture-automation', enabled: true, timingMode: 'condition_watch',
+  return { id: 'fixture-automation', enabled: true, timingMode: expected.timingMode,
     timeZone: 'Asia/Shanghai', schedule: expected.schedule, ...overrides }
 }
-test('rearming preserves the cloud watch with a daily recovery guard anchored to the next node', () => {
+test('direct scheduling keeps a daily recovery guard anchored to the next node', () => {
   const expected = planCloudRearm(planMaintenance(fixture(), at(5)))
+  assert.equal(expected.timingMode, 'exact_schedule')
   assert.equal(expected.at, new Date(at(12)).toISOString())
   assert.match(expected.schedule, /DTSTART;TZID=Asia\/Shanghai:20261112T110000/)
   assert.match(expected.schedule, /RRULE:FREQ=DAILY;INTERVAL=1/)
@@ -174,7 +175,7 @@ test('a seven-day correction fails readback verification until the real timer is
 })
 test('schedule readback rejects another task, disabled state, wrong timezone, wrong type and hourly polling', () => {
   const expected = planCloudRearm(planMaintenance(fixture(), at(5)))
-  for (const change of [{ id: 'other' }, { enabled: false }, { timingMode: 'exact_schedule' },
+  for (const change of [{ id: 'other' }, { enabled: false }, { timingMode: 'condition_watch' },
     { timeZone: 'UTC' }, { schedule: expected.schedule.replace('FREQ=DAILY', 'FREQ=HOURLY') },
     { schedule: expected.schedule.replace('RRULE:FREQ=DAILY;INTERVAL=1\n', '') }]) {
     assert.throws(() => verifyCloudRearm('fixture-automation', expected, cloudReceipt(expected, change)))
@@ -201,6 +202,12 @@ test('readback compares actual instants across IANA, UTC and task-timezone repre
     const schedule = expected.schedule.replace(/^DTSTART[^\n]+/m, start)
     assert.throws(() => verifyCloudRearm('fixture-automation', expected, cloudReceipt(expected, { schedule })))
   }
+})
+test('legacy watches retain their actual type until an explicit replacement is verified', () => {
+  const expected = planCloudRearm(planMaintenance(fixture(), at(5)), null, 'condition_watch')
+  assert.equal(verifyCloudRearm('fixture-automation', expected, cloudReceipt(expected)).ok, true)
+  assert.throws(() => verifyCloudRearm('fixture-automation', expected, cloudReceipt(expected, { timingMode: 'exact_schedule' })))
+  assert.throws(() => planCloudRearm(planMaintenance(fixture(), at(5)), null, 'invented'))
 })
 test('cloud publication cannot alter local maintenance rules, runtime, workflows or versions', () => {
   for (const path of ['AGENTS.md', 'package.json', 'src/main/ai/baseline-maintenance-policy.ts',
