@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { planMaintenance, validateState, runKey, assertCloudPublicationPaths } from './plan.mjs'
+import { planMaintenance, validateState, runKey, assertCloudPublicationPaths, planCloudRearm, verifyCloudRearm } from './plan.mjs'
 
 const at = day => `2026-11-${String(day).padStart(2, '0')}T11:00:00+08:00`
 const source = 'https://example.com/official-fixture'
@@ -83,6 +83,111 @@ test('preserves each game and identifies missing scheduling evidence', () => {
   const result = planMaintenance(state, at(15))
   assert.equal(result.scheduleReviewDue, true)
   assert.deepEqual(result.unconfiguredGames, ['future-game'])
+})
+test('a seven-day shorter version moves the next wake without changing other periods', () => {
+  const state = fixture(); state.runs = [receipt('published')]
+  state.periods.push({ ...state.periods[0], periodKey: 'later', startsAt: null,
+    firstHalfEndsAt: null, firstHalfSources: [], endsAt: '2026-12-31T11:00:00+08:00' })
+  assert.equal(planMaintenance(state, at(15)).nextWake.at, new Date(at(29)).toISOString())
+  state.periods[0].endsAt = at(22)
+  const before = structuredClone(state)
+  assert.deepEqual(planMaintenance(state, at(15)).nextWake, {
+    at: new Date(at(22)).toISOString(), reasons: [{ type: 'maintenance', key: 'genshin/fixture/version_end' }] })
+  assert.deepEqual(state, before)
+})
+test('an extended first half postpones its wake instead of retaining the old date', () => {
+  const state = fixture()
+  assert.equal(planMaintenance(state, at(11)).nextWake.at, new Date(at(12)).toISOString())
+  state.periods[0].firstHalfEndsAt = at(19)
+  assert.equal(planMaintenance(state, at(11)).nextWake.at, new Date(at(19)).toISOString())
+  assert.equal(state.periods[0].endsAt, at(29))
+})
+test('one wake covers the earliest verified nodes across games, including simultaneous nodes', () => {
+  const state = fixture(); state.games.push('another-game')
+  state.periods.push({ ...state.periods[0], gameId: 'another-game', firstHalfEndsAt: at(10) })
+  assert.equal(planMaintenance(state, at(5)).nextWake.at, new Date(at(10)).toISOString())
+  state.periods[1].firstHalfEndsAt = at(12)
+  const next = planMaintenance(state, at(5)).nextWake
+  assert.equal(next.at, new Date(at(12)).toISOString())
+  assert.deepEqual(next.reasons.map(x => x.key).sort(), ['another-game/fixture/first_half_end', 'genshin/fixture/first_half_end'])
+})
+test('a recorded review wakes before a later business node without hourly polling', () => {
+  const state = fixture(); state.nextScheduleReviewAt = at(8)
+  assert.deepEqual(planMaintenance(state, at(5)).nextWake, {
+    at: new Date(at(8)).toISOString(), reasons: [{ type: 'schedule_review' }] })
+})
+test('pending retries and running leases schedule their next actual opportunity', () => {
+  for (const status of ['pending', 'running']) {
+    const state = fixture(); state.runs = [receipt(status, { retryAt: at(14) })]
+    assert.deepEqual(planMaintenance(state, at(13)).nextWake, {
+      at: new Date(at(14)).toISOString(), reasons: [{ type: 'retry', key: 'genshin/fixture/first_half_end' }] })
+    state.periods[0].firstHalfEndsAt = at(16)
+    assert.equal(planMaintenance(state, at(13)).nextWake.at, new Date(at(16)).toISOString())
+    state.runs[0].retryAt = at(18)
+    assert.equal(planMaintenance(state, at(13)).nextWake.at, new Date(at(18)).toISOString())
+  }
+})
+test('unfinished work schedules a bounded recovery, then successful delivery advances the wake', () => {
+  const state = fixture(), now = new Date(at(15))
+  assert.deepEqual(planMaintenance(state, now).nextWake, {
+    at: new Date(now.getTime() + 60 * 60 * 1000).toISOString(),
+    reasons: [{ type: 'unfinished_work', key: 'genshin/fixture/first_half_end' }] })
+  state.runs = [receipt('verified_unchanged')]
+  assert.equal(planMaintenance(state, now).nextWake.at, new Date(at(29)).toISOString())
+})
+test('overdue or missing reviews get a future recovery wake, never an expired one-shot', () => {
+  for (const review of [null, at(1)]) {
+    const state = fixture(); state.nextScheduleReviewAt = review
+    const now = new Date(at(5)), result = planMaintenance(state, now)
+    assert.equal(result.scheduleReviewDue, true)
+    assert.deepEqual(result.nextWake, { at: new Date(now.getTime() + 60 * 60 * 1000).toISOString(),
+      reasons: [{ type: 'schedule_review' }] })
+  }
+})
+test('scheduler precision rounds forward without waking before the verified time', () => {
+  const state = fixture(); state.nextScheduleReviewAt = '2026-11-08T03:00:00.285Z'
+  assert.equal(planMaintenance(state, at(5)).nextWake.at, '2026-11-08T03:00:01.000Z')
+})
+function cloudReceipt(expected, overrides = {}) {
+  return { id: 'fixture-automation', enabled: true, timingMode: 'condition_watch',
+    timeZone: 'Asia/Shanghai', schedule: expected.schedule, ...overrides }
+}
+test('rearming preserves the cloud watch with a daily recovery guard anchored to the next node', () => {
+  const expected = planCloudRearm(planMaintenance(fixture(), at(5)))
+  assert.equal(expected.at, new Date(at(12)).toISOString())
+  assert.match(expected.schedule, /DTSTART:20261112T030000Z/)
+  assert.match(expected.schedule, /RRULE:FREQ=DAILY;INTERVAL=1/)
+  assert.deepEqual(verifyCloudRearm('fixture-automation', expected, cloudReceipt(expected)), { ok: true, at: expected.at })
+})
+test('self-rearming cannot bypass the cloud task hourly rate limit', () => {
+  const plan = planMaintenance(fixture(), at(5))
+  const lastRun = '2026-11-12T02:45:00.001Z', expected = planCloudRearm(plan, lastRun)
+  assert.equal(expected.requestedAt, '2026-11-12T03:00:00.000Z')
+  assert.equal(expected.at, '2026-11-12T03:45:01.000Z')
+})
+test('a seven-day correction fails readback verification until the real timer is moved', () => {
+  const state = fixture(), old = planCloudRearm(planMaintenance(state, at(5)))
+  state.periods[0].firstHalfEndsAt = at(19)
+  const expected = planCloudRearm(planMaintenance(state, at(5)))
+  assert.throws(() => verifyCloudRearm('fixture-automation', expected, cloudReceipt(old)), /old wake time/)
+  assert.equal(verifyCloudRearm('fixture-automation', expected, cloudReceipt(expected)).ok, true)
+})
+test('schedule readback rejects another task, disabled state, wrong timezone, wrong type and hourly polling', () => {
+  const expected = planCloudRearm(planMaintenance(fixture(), at(5)))
+  for (const change of [{ id: 'other' }, { enabled: false }, { timingMode: 'exact_schedule' },
+    { timeZone: 'UTC' }, { schedule: expected.schedule.replace('FREQ=DAILY', 'FREQ=HOURLY') },
+    { schedule: expected.schedule.replace('RRULE:FREQ=DAILY;INTERVAL=1\n', '') }]) {
+    assert.throws(() => verifyCloudRearm('fixture-automation', expected, cloudReceipt(expected, change)))
+  }
+})
+test('cloud schedule normalization accepts CRLF and an omitted default interval only', () => {
+  const expected = planCloudRearm(planMaintenance(fixture(), at(5)))
+  assert.equal(verifyCloudRearm('fixture-automation', expected, cloudReceipt(expected,
+    { schedule: expected.schedule.replace(';INTERVAL=1', '').replace(/\n/g, '\r\n') })).ok, true)
+  for (const suffix of [';BYHOUR=8', ';COUNT=1', ';INTERVAL=2']) {
+    assert.throws(() => verifyCloudRearm('fixture-automation', expected,
+      cloudReceipt(expected, { schedule: expected.schedule.replace(';INTERVAL=1', suffix) })))
+  }
 })
 test('cloud publication cannot alter local maintenance rules, runtime, workflows or versions', () => {
   for (const path of ['AGENTS.md', 'package.json', 'src/main/ai/baseline-maintenance-policy.ts',
