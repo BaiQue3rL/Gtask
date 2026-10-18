@@ -16,7 +16,7 @@
 
 1. 确认云端实际可读写仓库、创建及合并 PR、查询 CI、研究官方网页，并能建立真正的云端定时任务。只读预检不能证明写入已成功。
 2. 读取现有 `docs/catalog-maintenance.md`、`src/main/ai/baseline-maintenance-policy.ts`、`src/main/published-schedules.ts`；地图维护前完整读取 `docs/ai-map-catalog-maintenance.md`。这些文件是现有标准，只读引用，不改写它们。
-3. 为 `state.json` 中列出的游戏核验当前/下一个版本的版本窗口与上半结束时间，使用适用服务器的官方公告。`periods` 保存官方来源和核查时间；`firstHalfEndsAt` 缺证据时保留 null，并在 `scheduleGaps` 记录具体缺口和已查链接。不得统一加 21 天、平分版本、用单个活动结束时间或个人接口推断半程。卡池公告可证明切换时刻，但卡池本身不能因此加入任务清单。
+3. 为 `state.json` 中列出的游戏核验当前/下一个版本的版本窗口与上半结束时间，使用适用服务器的官方公告。`periods` 保存官方来源和核查时间；`startsAt`、`endsAt`、`firstHalfEndsAt` 分别核验，缺证据的字段保留 null，并在 `scheduleGaps` 记录具体缺口和已查链接。**两个触发节点独立：只要任一结束边界已核验就可以建档，不能因版本结束未知而漏掉已确认的上半结束。** 至少须有一个已确认的触发边界；仅知道版本开始时先留在研究记录。不得统一加 21 天、平分版本、用单个活动结束时间或个人接口推断半程。卡池公告可证明切换时刻，但卡池本身不能因此加入任务清单。
 4. 本地倒计时也可能来自已发布规则的预测。云端可用相同规则安排排期核查，但预测不冒充已核验版本事实；确认后才写入 `periods`。官方延期/缩短和后续更正更新同一 `gameId/periodKey`，保留旧来源及裁决记录。
 5. `activatedAt` 是本自动化开始负责的时间，不改成每次运行时间，也不补做它之前的历史节点。空初始排期表示待建档，不表示已经核验无变化。首次建档只研究调度时间，不擅自执行尚未到点的全量清单维护。
 6. 有未解决排期时，把 `nextScheduleReviewAt` 设在 24 小时以内；排期完整时设在下一业务节点与 7 天后中较早者。新版本维护结束前同时核验下一半程/版更节点，避免排期用完后停止。
@@ -25,7 +25,7 @@
 
 1. 读取 main 最新的本文件、`state.json`、`updates/catalog.json` 和相关研究回执。先检查是否存在本自动化未合并的 PR；有则续接它，避免两个运行同时发布。
 2. 在可执行 Node 的隔离环境运行 `node automation/cloud-baseline/plan.mjs`。它只读公共调度数据，不访问玩家数据库。无 Node 时依据相同规则读取 JSON，并由 GitHub CI 执行同一个验证器；不得因此跳过清单真实消费器验证。
-3. `scheduleReviewDue` 或 `unconfiguredGames` 有内容时，仅补做排期核查。`due` 为空且无需排期核查时立即结束，不做全量审计、不生成新修订或无变化报告。
+3. 只有 `scheduleReviewDue=true` 时补做排期核查。`unconfiguredGames` 是待查范围提示，不能绕过 `nextScheduleReviewAt` 在每次小时轮询重复研究。`due` 为空且无需排期核查时立即结束，不做全量审计、不生成新修订或无变化报告。
 4. 节点判断为 **已到时刻且尚未成功处理**，不能要求恰好等于触发时间。`gameId/periodKey/node` 是唯一键；官方改时不生成第二个节点。一个运行串行处理到期任务，其他运行续接相同分支/PR。
 5. 新任务使用 `codex/cloud-baseline/<唯一节点摘要>` 分支。先在该分支写入 `running` 回执及有限租约（`retryAt`），创建或复用该节点的 PR，后续重用已有研究。GitHub 写入使用预期文件/分支 SHA；冲突先重读和合并，不强推覆盖。
 6. `pending` 记录缺口和下次补查时间；`running` 过租约后可续接；`ready` 只能确认发布或继续交付，不能当作成功。失败和缺证据都不是 `verified_unchanged`。

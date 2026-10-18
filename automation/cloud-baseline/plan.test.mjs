@@ -26,6 +26,22 @@ test('does not assume a 21-day half or invent a missing phase', () => {
   const state = fixture(); state.periods[0].firstHalfEndsAt = null; state.periods[0].firstHalfSources = []
   assert.equal(planMaintenance(state, at(24)).due.length, 0)
 })
+test('a verified first-half boundary still triggers when the version end is unknown', () => {
+  const state = fixture(); state.periods[0].endsAt = null
+  assert.deepEqual(planMaintenance(state, at(15)).due.map(x => x.node), ['first_half_end'])
+  state.periods[0].startsAt = null; state.periods[0].versionSources = []
+  assert.deepEqual(planMaintenance(state, at(15)).due.map(x => x.node), ['first_half_end'])
+  state.periods[0].firstHalfEndsAt = null; state.periods[0].firstHalfSources = []
+  assert.throws(() => validateState(state))
+})
+test('a recorded scheduling gap waits until its review time without inventing missing nodes', () => {
+  const state = fixture(); state.games.push('pending-game')
+  state.scheduleGaps = [{ gameId: 'pending-game', periodKey: null, reason: 'Missing official timing', checkedSources: [source], checkedAt: at(1) }]
+  const result = planMaintenance(state, at(11))
+  assert.equal(result.scheduleReviewDue, false)
+  assert.deepEqual(result.unconfiguredGames, ['pending-game'])
+  assert.equal(result.due.length, 0)
+})
 test('ignores boundaries before activation rather than replaying historical versions', () => {
   const state = fixture(); state.activatedAt = at(13)
   assert.deepEqual(planMaintenance(state, at(30)).due.map(x => x.node), ['version_end'])

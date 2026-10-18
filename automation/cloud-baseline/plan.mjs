@@ -43,13 +43,16 @@ export function validateState(state) {
     fields(period, ['gameId', 'periodKey', 'startsAt', 'endsAt', 'firstHalfEndsAt', 'versionSources', 'firstHalfSources', 'checkedAt'])
     assert(state.games.includes(period.gameId), 'Unknown game')
     assert(typeof period.periodKey === 'string' && slug.test(period.periodKey))
-    const start = timestamp(period.startsAt), end = timestamp(period.endsAt)
-    assert(start < end, 'Version window is reversed')
+    const start = period.startsAt === null ? null : timestamp(period.startsAt)
+    const end = period.endsAt === null ? null : timestamp(period.endsAt)
+    assert(end !== null || period.firstHalfEndsAt !== null, 'At least one verified trigger boundary is required')
+    if (start !== null && end !== null) assert(start < end, 'Version window is reversed')
     if (period.firstHalfEndsAt !== null) {
       const half = timestamp(period.firstHalfEndsAt)
-      assert(start < half && half < end, 'First-half boundary must be inside its version')
+      if (start !== null) assert(start < half, 'First-half boundary must follow the version start')
+      if (end !== null) assert(half < end, 'First-half boundary must precede the version end')
     }
-    sources(period.versionSources)
+    sources(period.versionSources, start === null && end === null)
     sources(period.firstHalfSources, period.firstHalfEndsAt === null)
     if (period.firstHalfEndsAt === null) assert.equal(period.firstHalfSources.length, 0)
     timestamp(period.checkedAt)
@@ -111,7 +114,7 @@ export function planMaintenance(input, reference = new Date()) {
   const byTime = (a, b) => timestamp(a.boundaryAt) - timestamp(b.boundaryAt) || a.key.localeCompare(b.key)
   return { checkedAt: new Date(now).toISOString(),
     scheduleReviewDue: state.nextScheduleReviewAt === null || timestamp(state.nextScheduleReviewAt) <= now,
-    unconfiguredGames: state.games.filter(game => !state.periods.some(p => p.gameId === game && timestamp(p.endsAt) > now)),
+    unconfiguredGames: state.games.filter(game => !state.periods.some(p => p.gameId === game && p.endsAt !== null && timestamp(p.endsAt) > now)),
     due: due.sort(byTime), upcoming: upcoming.sort(byTime) }
 }
 
