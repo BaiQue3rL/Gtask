@@ -166,6 +166,29 @@ test('self-rearming cannot bypass the cloud task hourly rate limit', () => {
   assert.equal(expected.requestedAt, '2026-11-12T03:00:00.000Z')
   assert.equal(expected.at, '2026-11-12T03:45:01.000Z')
 })
+
+test('an early scheduled run keeps an imminent business node reachable with stale run metadata', () => {
+  const state = fixture(), early = '2026-11-12T02:56:00.285Z'
+  const plan = planMaintenance(state, early)
+  assert.equal(plan.due.length, 0)
+  for (const lastRun of [null, at(5)]) {
+    const expected = planCloudRearm(plan, lastRun)
+    assert.equal(expected.requestedAt, '2026-11-12T03:00:00.000Z')
+    assert.equal(expected.at, '2026-11-12T03:56:01.000Z')
+    assert.deepEqual(planMaintenance(state, expected.at).due.map(x => x.key), ['genshin/fixture/first_half_end'])
+  }
+})
+
+test('an early review wake is retried after its deadline instead of reusing its imminent timer', () => {
+  const state = fixture(); state.nextScheduleReviewAt = at(8)
+  const plan = planMaintenance(state, '2026-11-08T02:56:00Z')
+  assert.equal(plan.scheduleReviewDue, false)
+  const expected = planCloudRearm(plan, at(5))
+  assert.equal(expected.requestedAt, '2026-11-08T03:00:00.000Z')
+  assert.equal(expected.at, '2026-11-08T03:56:00.000Z')
+  assert.equal(planMaintenance(state, expected.at).scheduleReviewDue, true)
+})
+
 test('a seven-day correction fails readback verification until the real timer is moved', () => {
   const state = fixture(), old = planCloudRearm(planMaintenance(state, at(5)))
   state.periods[0].firstHalfEndsAt = at(19)
