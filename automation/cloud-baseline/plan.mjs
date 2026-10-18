@@ -138,9 +138,12 @@ export function planCloudRearm(plan, lastRunAt = null) {
   const requested = timestamp(plan.nextWake.at)
   const at = Math.ceil(Math.max(requested, lastRunAt === null ? requested : timestamp(lastRunAt) + recoveryDelayMs) / 1000) * 1000
   const iso = new Date(at).toISOString()
-  const start = iso.replace(/[-:]/g, '').replace('.000', '')
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai',
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hourCycle: 'h23' }).formatToParts(new Date(at)).map(x => [x.type, x.value]))
+  const start = `${parts.year}${parts.month}${parts.day}T${parts.hour}${parts.minute}${parts.second}`
   return { requestedAt: plan.nextWake.at, at: iso, timeZone: 'Asia/Shanghai',
-    schedule: `BEGIN:VEVENT\nDTSTART:${start}\nRRULE:FREQ=DAILY;INTERVAL=1\nEND:VEVENT` }
+    schedule: `BEGIN:VEVENT\nDTSTART;TZID=Asia/Shanghai:${start}\nRRULE:FREQ=DAILY;INTERVAL=1\nEND:VEVENT` }
 }
 
 /** receipt is normalized from a fresh automations_peek result, never from the
@@ -155,13 +158,17 @@ export function verifyCloudRearm(automationId, expected, receipt) {
   assert.equal(receipt.timingMode, 'condition_watch', 'Do not silently replace the cloud task type')
   assert.equal(expected.timeZone, 'Asia/Shanghai')
   assert.equal(receipt.timeZone, expected.timeZone, 'Cloud task timezone changed')
-  function event(value) {
+  function event(value, timeZone) {
     assert(typeof value === 'string')
     const lines = value.replace(/\r/g, '').split('\n').map(x => x.trim()).filter(Boolean)
     assert.equal(lines.length, 4, 'Unexpected cloud schedule fields')
     assert(lines.includes('BEGIN:VEVENT') && lines.includes('END:VEVENT'))
-    const start = lines.find(x => /^DTSTART:\d{8}T\d{6}Z$/.test(x))
-    assert(start, 'Cloud schedule must retain the absolute UTC wake time')
+    const start = lines.find(x => x.startsWith('DTSTART'))?.match(
+      /^DTSTART(?:;TZID=(Asia\/Shanghai))?:(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z)?$/)
+    assert(start, 'Cloud schedule needs UTC or an explicit supported task timezone')
+    assert(!start[1] || !start[8], 'Do not mix a local timezone with UTC')
+    assert(start[8] || start[1] === 'Asia/Shanghai' || timeZone === 'Asia/Shanghai', 'Ambiguous floating schedule time')
+    const when = `${start[2]}-${start[3]}-${start[4]}T${start[5]}:${start[6]}:${start[7]}${start[8] ? 'Z' : '+08:00'}`
     const rule = lines.find(x => x.startsWith('RRULE:'))
     assert(rule, 'Condition watches require a periodic recovery guard')
     const pairs = rule.slice(6).split(';').map(x => x.split('='))
@@ -170,10 +177,10 @@ export function verifyCloudRearm(automationId, expected, receipt) {
     assert(Object.keys(parts).every(x => ['FREQ', 'INTERVAL'].includes(x)))
     assert.equal(parts.FREQ, 'DAILY', 'Hourly polling must not remain')
     assert.equal(parts.INTERVAL ?? '1', '1')
-    return start
+    return timestamp(when)
   }
-  assert.equal(event(expected.schedule), `DTSTART:${expected.at.replace(/[-:]/g, '').replace('.000', '')}`)
-  assert.equal(event(receipt.schedule), event(expected.schedule), 'Cloud timer still has an old wake time')
+  assert.equal(event(expected.schedule, expected.timeZone), timestamp(expected.at))
+  assert.equal(event(receipt.schedule, receipt.timeZone), timestamp(expected.at), 'Cloud timer still has an old or shifted wake time')
   assert(timestamp(expected.at) >= timestamp(expected.requestedAt), 'Do not run before the planned obligation')
   return { ok: true, at: expected.at }
 }
