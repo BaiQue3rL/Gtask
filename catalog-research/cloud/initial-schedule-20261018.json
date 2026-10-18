@@ -1,0 +1,197 @@
+{
+  "schemaVersion": 1,
+  "kind": "initial_schedule_registration",
+  "checkedAt": "2026-10-18T10:04:51.285Z",
+  "baseCommit": "64536cffa8d4f5587143b651df60b6c2898f4ed4",
+  "scope": "四游戏当前/下一版本调度；没有开展清单审计",
+  "auditComplete": false,
+  "catalogChanged": false,
+  "sources": [
+    {
+      "url": "https://www.taptap.cn/moment/853326330178046059?group_id=311675",
+      "publisher": "崩坏：星穹铁道官方账号",
+      "publishedDate": "2026-09-27",
+      "result": "readable",
+      "facts": {
+        "maintenanceStartsAt": "2026-09-28T06:00:00+08:00",
+        "estimatedDurationHours": 5,
+        "versionEndsAt": "2026-11-11T06:00:00+08:00"
+      }
+    },
+    {
+      "url": "https://www.taptap.cn/moment/852211155802787824?group_id=311675",
+      "publisher": "崩坏：星穹铁道官方账号",
+      "publishedDate": "2026-09-27",
+      "result": "readable",
+      "facts": {
+        "firstPhaseEndsAt": "2026-10-21T11:59:00+08:00",
+        "note": "复刻池第一期边界；新角色池延续至11月10日，不以延长池混淆半程"
+      }
+    },
+    {
+      "url": "https://www.taptap.cn/moment/846454619398734794?group_id=330333",
+      "publisher": "绝区零官方账号",
+      "publishedDate": "2026-09-08",
+      "result": "readable",
+      "facts": {
+        "maintenanceStartsAt": "2026-09-09T06:00:00+08:00",
+        "estimatedDurationHours": 5,
+        "versionEndsAt": "2026-10-21T06:00:00+08:00"
+      }
+    },
+    {
+      "url": "https://www.taptap.cn/moment/845969989931372181",
+      "publisher": "绝区零官方账号",
+      "publishedDate": "2026-09-07",
+      "result": "readable",
+      "facts": {
+        "firstPhaseEndsAt": "2026-09-30T11:59:00+08:00"
+      }
+    },
+    {
+      "url": "https://www.taptap.cn/moment/854139064348051537",
+      "publisher": "鸣潮官方版主",
+      "publishedDate": "2026-09-30",
+      "result": "readable",
+      "facts": {
+        "maintenanceStartsAt": "2026-09-30T04:00:00+08:00",
+        "estimatedMaintenanceEndsAt": "2026-09-30T11:00:00+08:00",
+        "versionEndsAt": null
+      }
+    },
+    {
+      "url": "https://www.taptap.cn/moment/853756601964691535",
+      "publisher": "鸣潮官方版主",
+      "publishedDate": "2026-09-29",
+      "result": "readable",
+      "facts": {
+        "firstPhaseEndsAt": "2026-10-22T09:59:00+08:00"
+      }
+    },
+    {
+      "url": "https://www.taptap.cn/moment/851520146462737868?group_id=201765",
+      "publisher": "提瓦特测试员",
+      "result": "readable_repost_not_accepted_as_official",
+      "facts": {
+        "version": "7.1",
+        "versionEndsAt": null
+      }
+    },
+    {
+      "url": "https://hsr.hoyoverse.com/zh-cn/news/166468",
+      "result": "loading_shell"
+    },
+    {
+      "url": "https://zzz.mihoyo.com/news/166026",
+      "result": "fetch_timeout"
+    },
+    {
+      "url": "https://mc.kurogames.com/main/news/detail/5569",
+      "result": "empty_shell"
+    },
+    {
+      "url": "https://ys.mihoyo.com/main/",
+      "result": "empty_shell"
+    }
+  ],
+  "decisions": [
+    {
+      "field": "startsAt",
+      "decision": "采用官方维护开始加公告预计时长作为nominal排期开始；不是实测开服时间。"
+    },
+    {
+      "field": "firstHalfEndsAt",
+      "decision": "按官方第一期卡池公告的分钟精度截止时刻记录，秒归零；卡池仅作调度证据，不加入清单。"
+    },
+    {
+      "field": "zenless/3.2/first_half_end",
+      "decision": "2026-09-30早于activatedAt，不补做历史节点。"
+    },
+    {
+      "field": "periods",
+      "decision": "只有起止均已核验的窗口写入periods；不完整事实保留sources及scheduleGaps，不修改验证器。"
+    },
+    {
+      "field": "research_limit",
+      "decision": "主要公告与独立定向补查后收敛；空壳、摘要及活动截止不足的事项保持pending，23小时后补查。"
+    }
+  ],
+  "pending": [
+    {
+      "gameId": "genshin",
+      "periodKey": "7.1",
+      "reason": "当前7.1已确认存在；未取得明确的版本结束/下一版本维护边界与官方上半结束完整可读证据。活动截止不能代替版本结束。官网为空壳，独立定向补查所得更新说明由提瓦特测试员转载，不能当官方账号确认；不建立缺少endsAt的period。",
+      "checkedSources": [
+        "https://ys.mihoyo.com/main/",
+        "https://www.taptap.cn/moment/851520146462737868?group_id=201765",
+        "https://www.taptap.cn/app/168332/topic?mobile-app=true&page=6&theme=false&type=official"
+      ],
+      "checkedAt": "2026-10-18T10:04:51.285Z"
+    },
+    {
+      "gameId": "genshin",
+      "periodKey": null,
+      "reason": "下一个版本的官方精确开始、结束和上半结束未核实；不依据42天、21天或中点推断。",
+      "checkedSources": [
+        "https://ys.mihoyo.com/main/",
+        "https://ys.mihoyo.com/main/news"
+      ],
+      "checkedAt": "2026-10-18T10:04:51.285Z"
+    },
+    {
+      "gameId": "star-rail",
+      "periodKey": "4.7",
+      "reason": "下一个版本完整窗口及上半结束未取得可读官方公告，不从4.6结束时间推断4.7开服或结束。",
+      "checkedSources": [
+        "https://hsr.hoyoverse.com/zh-cn/news/166468",
+        "https://www.taptap.cn/app/224267/topic?type=official"
+      ],
+      "checkedAt": "2026-10-18T10:04:51.285Z"
+    },
+    {
+      "gameId": "zenless",
+      "periodKey": "3.3",
+      "reason": "官方前瞻给出10月21日上线日期，但尚无本次可读证据确定3.3精确开服、版本结束及上半结束；仅日期不补造小时。",
+      "checkedSources": [
+        "https://zzz.mihoyo.com/news/166652",
+        "https://www.hoyoverse.com/en-us/news/166759",
+        "https://zenless.hoyoverse.com/zh-cn/news"
+      ],
+      "checkedAt": "2026-10-18T10:04:51.285Z"
+    },
+    {
+      "gameId": "wuthering-waves",
+      "periodKey": "3.7",
+      "reason": "已读官方版主公告确定预计开始2026-09-30T11:00:00+08:00、第一期结束2026-10-22T09:59:00+08:00，保存在研究回执；未取得版本结束维护边界。不能采用单一活动11月11日结束或旧catalog的11月12日04:00作为已核验结束；schema要求period结束时间，故本轮不写入不完整period。",
+      "checkedSources": [
+        "https://mc.kurogames.com/main/news/detail/5569",
+        "https://www.taptap.cn/moment/854139064348051537",
+        "https://www.taptap.cn/moment/853756601964691535",
+        "https://www.taptap.cn/moment/853647253976386369?group_id=330015"
+      ],
+      "checkedAt": "2026-10-18T10:04:51.285Z"
+    },
+    {
+      "gameId": "wuthering-waves",
+      "periodKey": null,
+      "reason": "下一版本精确开始、结束及上半结束未取得官方证据，待补查维护公告；不由活动结束推断。",
+      "checkedSources": [
+        "https://mc.kurogames.com/main/",
+        "https://www.taptap.cn/app/234280/topic?os=pc&type=official"
+      ],
+      "checkedAt": "2026-10-18T10:04:51.285Z"
+    }
+  ],
+  "validation": {
+    "planTests": "10 passed, 0 failed",
+    "planState": "passed: actual plan.mjs exit 0; due=[]; unconfiguredGames=genshin,wuthering-waves",
+    "verify": "PR CI required",
+    "cloudBaselineChecks": "PR CI required"
+  },
+  "delivery": {
+    "catalogRevision": "2026-10-11.zenless-3.2-event-completion",
+    "publication": "schedule metadata only; not a catalog publication",
+    "mirror": "not checked; catalog unchanged",
+    "clientReceipt": "not checked; no local access"
+  }
+}
