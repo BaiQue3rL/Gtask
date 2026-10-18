@@ -138,7 +138,10 @@ export function planMaintenance(input, reference = new Date()) {
 export function planCloudRearm(plan, lastRunAt = null, timingMode = 'exact_schedule') {
   assert(timingModes.includes(timingMode), 'Unsupported cloud task timing mode')
   const requested = timestamp(plan.nextWake.at)
-  const at = Math.ceil(Math.max(requested, lastRunAt === null ? requested : timestamp(lastRunAt) + recoveryDelayMs) / 1000) * 1000
+  // Scheduled runs can start early, while last_run_time still names the previous
+  // run. Re-arming the same imminent boundary could lose it to the daily guard.
+  const latestRun = Math.max(timestamp(plan.checkedAt), lastRunAt === null ? 0 : timestamp(lastRunAt))
+  const at = Math.ceil(Math.max(requested, latestRun + recoveryDelayMs) / 1000) * 1000
   const iso = new Date(at).toISOString()
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai',
     year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
