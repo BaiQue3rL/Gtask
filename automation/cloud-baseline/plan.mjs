@@ -7,6 +7,7 @@ import { resolve } from 'node:path'
 const nodes = ['version_end', 'first_half_end']
 const statuses = ['pending', 'running', 'ready', 'published', 'verified_unchanged']
 const terminal = new Set(['published', 'verified_unchanged'])
+const timingModes = ['exact_schedule', 'condition_watch']
 const recoveryDelayMs = 60 * 60 * 1000
 const slug = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,159}$/
 const digest = /^[a-f0-9]{64}$/
@@ -132,9 +133,10 @@ export function planMaintenance(input, reference = new Date()) {
     nextWake: { at: new Date(next.at).toISOString(), reasons: wakeCandidates.filter(x => x.at === next.at).map(x => x.reason) } }
 }
 
-/** Preserve the existing cloud watch type. Its daily recurrence is a crash-recovery
+/** Preserve the configured cloud task type. Its daily recurrence is a crash-recovery
  * guard; a successful run re-anchors DTSTART to the next actual obligation. */
-export function planCloudRearm(plan, lastRunAt = null) {
+export function planCloudRearm(plan, lastRunAt = null, timingMode = 'exact_schedule') {
+  assert(timingModes.includes(timingMode), 'Unsupported cloud task timing mode')
   const requested = timestamp(plan.nextWake.at)
   const at = Math.ceil(Math.max(requested, lastRunAt === null ? requested : timestamp(lastRunAt) + recoveryDelayMs) / 1000) * 1000
   const iso = new Date(at).toISOString()
@@ -142,7 +144,7 @@ export function planCloudRearm(plan, lastRunAt = null) {
     year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
     hourCycle: 'h23' }).formatToParts(new Date(at)).map(x => [x.type, x.value]))
   const start = `${parts.year}${parts.month}${parts.day}T${parts.hour}${parts.minute}${parts.second}`
-  return { requestedAt: plan.nextWake.at, at: iso, timeZone: 'Asia/Shanghai',
+  return { requestedAt: plan.nextWake.at, at: iso, timeZone: 'Asia/Shanghai', timingMode,
     schedule: `BEGIN:VEVENT\nDTSTART;TZID=Asia/Shanghai:${start}\nRRULE:FREQ=DAILY;INTERVAL=1\nEND:VEVENT` }
 }
 
@@ -150,12 +152,13 @@ export function planCloudRearm(plan, lastRunAt = null) {
  * update request. A stale timer cannot masquerade as a successful schedule edit. */
 export function verifyCloudRearm(automationId, expected, receipt) {
   text(automationId)
-  fields(expected, ['requestedAt', 'at', 'timeZone', 'schedule'])
+  fields(expected, ['requestedAt', 'at', 'timeZone', 'timingMode', 'schedule'])
+  assert(timingModes.includes(expected.timingMode), 'Unsupported cloud task timing mode')
   timestamp(expected.requestedAt); timestamp(expected.at)
   fields(receipt, ['id', 'enabled', 'timingMode', 'timeZone', 'schedule'])
   assert.equal(receipt.id, automationId, 'Read back the original cloud task')
   assert.equal(receipt.enabled, true, 'The cloud task must remain enabled')
-  assert.equal(receipt.timingMode, 'condition_watch', 'Do not silently replace the cloud task type')
+  assert.equal(receipt.timingMode, expected.timingMode, 'Do not silently replace the cloud task type')
   assert.equal(expected.timeZone, 'Asia/Shanghai')
   assert.equal(receipt.timeZone, expected.timeZone, 'Cloud task timezone changed')
   function event(value, timeZone) {
@@ -210,13 +213,13 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       process.stdout.write(`${JSON.stringify(verifyCloudRearm(automationId, expected, receipt))}\n`)
       process.exit(0)
     } else {
-      assert(args.length % 2 === 0 && args.every((arg, i) => i % 2 !== 0 || ['--at', '--last-run'].includes(arg)),
-        'Usage: plan.mjs [--at timestamp] [--last-run timestamp] | --guard base-sha | --verify-rearm receipt.json')
+      assert(args.length % 2 === 0 && args.every((arg, i) => i % 2 !== 0 || ['--at', '--last-run', '--timing-mode'].includes(arg)),
+        'Usage: plan.mjs [--at timestamp] [--last-run timestamp] [--timing-mode mode] | --guard base-sha | --verify-rearm receipt.json')
       assert.equal(new Set(args.filter((_, i) => i % 2 === 0)).size, args.length / 2, 'Duplicate CLI option')
     }
     const options = Object.fromEntries(args[0] === '--guard' ? [] : args.reduce((all, value, i) => i % 2 === 0 ? [...all, [value, args[i + 1]]] : all, []))
     const plan = planMaintenance(state, options['--at'] ?? new Date())
-    process.stdout.write(`${JSON.stringify({ ...plan, rearm: planCloudRearm(plan, options['--last-run'] ?? null) }, null, 2)}\n`)
+    process.stdout.write(`${JSON.stringify({ ...plan, rearm: planCloudRearm(plan, options['--last-run'] ?? null, options['--timing-mode'] ?? 'exact_schedule') }, null, 2)}\n`)
   } catch (error) {
     process.stderr.write(`${JSON.stringify({ ok: false, error: error.message })}\n`)
     process.exitCode = 1
