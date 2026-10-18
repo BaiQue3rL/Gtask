@@ -3,9 +3,108 @@
   "repository": "BaiQue3rL/Gtask",
   "timeZone": "Asia/Shanghai",
   "activatedAt": "2026-10-18T17:55:26+08:00",
-  "games": ["genshin", "star-rail", "zenless", "wuthering-waves"],
-  "nextScheduleReviewAt": null,
-  "periods": [],
-  "scheduleGaps": [],
+  "games": [
+    "genshin",
+    "star-rail",
+    "zenless",
+    "wuthering-waves"
+  ],
+  "nextScheduleReviewAt": "2026-10-19T09:04:51.285Z",
+  "periods": [
+    {
+      "gameId": "star-rail",
+      "periodKey": "4.6",
+      "startsAt": "2026-09-28T11:00:00+08:00",
+      "endsAt": "2026-11-11T06:00:00+08:00",
+      "firstHalfEndsAt": "2026-10-21T11:59:00+08:00",
+      "versionSources": [
+        "https://www.taptap.cn/moment/853326330178046059?group_id=311675"
+      ],
+      "firstHalfSources": [
+        "https://www.taptap.cn/moment/852211155802787824?group_id=311675"
+      ],
+      "checkedAt": "2026-10-18T10:04:51.285Z"
+    },
+    {
+      "gameId": "zenless",
+      "periodKey": "3.2",
+      "startsAt": "2026-09-09T11:00:00+08:00",
+      "endsAt": "2026-10-21T06:00:00+08:00",
+      "firstHalfEndsAt": "2026-09-30T11:59:00+08:00",
+      "versionSources": [
+        "https://www.taptap.cn/moment/846454619398734794?group_id=330333"
+      ],
+      "firstHalfSources": [
+        "https://www.taptap.cn/moment/845969989931372181"
+      ],
+      "checkedAt": "2026-10-18T10:04:51.285Z"
+    }
+  ],
+  "scheduleGaps": [
+    {
+      "gameId": "genshin",
+      "periodKey": "7.1",
+      "reason": "当前7.1已确认存在；未取得明确的版本结束/下一版本维护边界与官方上半结束完整可读证据。活动截止不能代替版本结束。官网为空壳，独立定向补查所得更新说明由提瓦特测试员转载，不能当官方账号确认；不建立缺少endsAt的period。",
+      "checkedSources": [
+        "https://ys.mihoyo.com/main/",
+        "https://www.taptap.cn/moment/851520146462737868?group_id=201765",
+        "https://www.taptap.cn/app/168332/topic?mobile-app=true&page=6&theme=false&type=official"
+      ],
+      "checkedAt": "2026-10-18T10:04:51.285Z"
+    },
+    {
+      "gameId": "genshin",
+      "periodKey": null,
+      "reason": "下一个版本的官方精确开始、结束和上半结束未核实；不依据42天、21天或中点推断。",
+      "checkedSources": [
+        "https://ys.mihoyo.com/main/",
+        "https://ys.mihoyo.com/main/news"
+      ],
+      "checkedAt": "2026-10-18T10:04:51.285Z"
+    },
+    {
+      "gameId": "star-rail",
+      "periodKey": "4.7",
+      "reason": "下一个版本完整窗口及上半结束未取得可读官方公告，不从4.6结束时间推断4.7开服或结束。",
+      "checkedSources": [
+        "https://hsr.hoyoverse.com/zh-cn/news/166468",
+        "https://www.taptap.cn/app/224267/topic?type=official"
+      ],
+      "checkedAt": "2026-10-18T10:04:51.285Z"
+    },
+    {
+      "gameId": "zenless",
+      "periodKey": "3.3",
+      "reason": "官方前瞻给出10月21日上线日期，但尚无本次可读证据确定3.3精确开服、版本结束及上半结束；仅日期不补造小时。",
+      "checkedSources": [
+        "https://zzz.mihoyo.com/news/166652",
+        "https://www.hoyoverse.com/en-us/news/166759",
+        "https://zenless.hoyoverse.com/zh-cn/news"
+      ],
+      "checkedAt": "2026-10-18T10:04:51.285Z"
+    },
+    {
+      "gameId": "wuthering-waves",
+      "periodKey": "3.7",
+      "reason": "已读官方版主公告确定预计开始2026-09-30T11:00:00+08:00、第一期结束2026-10-22T09:59:00+08:00，保存在研究回执；未取得版本结束维护边界。不能采用单一活动11月11日结束或旧catalog的11月12日04:00作为已核验结束；schema要求period结束时间，故本轮不写入不完整period。",
+      "checkedSources": [
+        "https://mc.kurogames.com/main/news/detail/5569",
+        "https://www.taptap.cn/moment/854139064348051537",
+        "https://www.taptap.cn/moment/853756601964691535",
+        "https://www.taptap.cn/moment/853647253976386369?group_id=330015"
+      ],
+      "checkedAt": "2026-10-18T10:04:51.285Z"
+    },
+    {
+      "gameId": "wuthering-waves",
+      "periodKey": null,
+      "reason": "下一版本精确开始、结束及上半结束未取得官方证据，待补查维护公告；不由活动结束推断。",
+      "checkedSources": [
+        "https://mc.kurogames.com/main/",
+        "https://www.taptap.cn/app/234280/topic?os=pc&type=official"
+      ],
+      "checkedAt": "2026-10-18T10:04:51.285Z"
+    }
+  ],
   "runs": []
 }
