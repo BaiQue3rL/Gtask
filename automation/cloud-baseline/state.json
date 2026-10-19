@@ -9,7 +9,7 @@
     "zenless",
     "wuthering-waves"
   ],
-  "nextScheduleReviewAt": "2026-10-19T09:04:51.285Z",
+  "nextScheduleReviewAt": "2026-10-20T15:14:25.351Z",
   "periods": [
     {
       "gameId": "star-rail",
@@ -18,12 +18,13 @@
       "endsAt": "2026-11-11T06:00:00+08:00",
       "firstHalfEndsAt": "2026-10-21T11:59:00+08:00",
       "versionSources": [
-        "https://www.taptap.cn/moment/853326330178046059?group_id=311675"
+        "https://www.taptap.cn/moment/853326330178046059?group_id=311675",
+        "https://hsr.hoyoverse.com/zh-cn/news/166468"
       ],
       "firstHalfSources": [
         "https://www.taptap.cn/moment/852211155802787824?group_id=311675"
       ],
-      "checkedAt": "2026-10-18T10:04:51.285Z"
+      "checkedAt": "2026-10-19T15:14:21.971Z"
     },
     {
       "gameId": "zenless",
@@ -32,12 +33,13 @@
       "endsAt": "2026-10-21T06:00:00+08:00",
       "firstHalfEndsAt": "2026-09-30T11:59:00+08:00",
       "versionSources": [
-        "https://www.taptap.cn/moment/846454619398734794?group_id=330333"
+        "https://www.taptap.cn/moment/846454619398734794?group_id=330333",
+        "https://zzz.mihoyo.com/news/166026"
       ],
       "firstHalfSources": [
         "https://www.taptap.cn/moment/845969989931372181"
       ],
-      "checkedAt": "2026-10-18T10:04:51.285Z"
+      "checkedAt": "2026-10-19T15:14:21.971Z"
     },
     {
       "gameId": "wuthering-waves",
@@ -51,73 +53,106 @@
       "firstHalfSources": [
         "https://www.taptap.cn/moment/853756601964691535"
       ],
-      "checkedAt": "2026-10-18T10:12:20.452Z"
+      "checkedAt": "2026-10-19T15:14:21.971Z"
+    },
+    {
+      "gameId": "genshin",
+      "periodKey": "7.1",
+      "startsAt": "2026-09-23T11:00:00+08:00",
+      "endsAt": null,
+      "firstHalfEndsAt": "2026-10-13T17:59:00+08:00",
+      "versionSources": [
+        "https://www.taptap.cn/moment/850781129639202732?group_id=201765",
+        "https://www.taptap.cn/moment/851520146462737868?group_id=201765"
+      ],
+      "firstHalfSources": [
+        "https://www.taptap.cn/moment/851175040782174930"
+      ],
+      "checkedAt": "2026-10-19T15:14:21.971Z"
+    },
+    {
+      "gameId": "zenless",
+      "periodKey": "3.3",
+      "startsAt": "2026-10-21T11:00:00+08:00",
+      "endsAt": null,
+      "firstHalfEndsAt": "2026-11-11T11:59:00+08:00",
+      "versionSources": [
+        "https://www.taptap.cn/moment/861195006294099434?group_id=330333",
+        "https://zenless.hoyoverse.com/m/zh-cn/news/166925"
+      ],
+      "firstHalfSources": [
+        "https://www.taptap.cn/moment/861197641654994725?group_id=330333"
+      ],
+      "checkedAt": "2026-10-19T15:14:21.971Z"
     }
   ],
   "scheduleGaps": [
     {
       "gameId": "genshin",
       "periodKey": "7.1",
-      "reason": "当前7.1已确认存在；未取得明确的版本结束/下一版本维护边界与官方上半结束完整可读证据。活动截止不能代替版本结束。官网为空壳，独立定向补查所得更新说明由提瓦特测试员转载，不能当官方账号确认；不建立缺少endsAt的period。",
+      "reason": "本轮已核实两位发布者均在TapTap厂商认证官方版主名单，纠正旧来源排除；7.1上半截止2026-10-13T17:59:00+08:00已独立建档，早于activatedAt不补做。版本结束/下版维护边界仍无本轮可读可靠证据，endsAt保持null；不从第二期祈愿或活动结束推断。",
       "checkedSources": [
-        "https://ys.mihoyo.com/main/",
+        "https://www.taptap.cn/group/201765/info",
+        "https://www.taptap.cn/moment/851175040782174930",
+        "https://www.taptap.cn/moment/850781129639202732?group_id=201765",
         "https://www.taptap.cn/moment/851520146462737868?group_id=201765",
-        "https://www.taptap.cn/app/168332/topic?mobile-app=true&page=6&theme=false&type=official"
+        "https://ys.mihoyo.com/main/"
       ],
-      "checkedAt": "2026-10-18T10:04:51.285Z"
+      "checkedAt": "2026-10-19T15:14:21.971Z"
     },
     {
       "gameId": "genshin",
       "periodKey": null,
-      "reason": "下一个版本的官方精确开始、结束和上半结束未核实；不依据42天、21天或中点推断。",
+      "reason": "下一个版本的精确开始、结束和上半截止仍未取得本轮可读官方证据；主站空壳，已补查国服官方列表及针对下一版维护的定向搜索；未检出不等于官方尚未发布，不按42/21天推断。",
       "checkedSources": [
         "https://ys.mihoyo.com/main/",
-        "https://ys.mihoyo.com/main/news"
+        "https://www.taptap.cn/app/168332/topic?type=official"
       ],
-      "checkedAt": "2026-10-18T10:04:51.285Z"
+      "checkedAt": "2026-10-19T15:14:21.971Z"
     },
     {
       "gameId": "star-rail",
       "periodKey": "4.7",
-      "reason": "下一个版本完整窗口及上半结束未取得可读官方公告，不从4.6结束时间推断4.7开服或结束。",
+      "reason": "4.6当前版本窗口与返场上半边界本轮重核；4.7官方列表预热内容没有提供完整调度，官方新闻页面仍为Loading，定向补查未取得精确开始、结束及上半边界；不从4.6结束推断。",
       "checkedSources": [
         "https://hsr.hoyoverse.com/zh-cn/news/166468",
         "https://www.taptap.cn/app/224267/topic?type=official"
       ],
-      "checkedAt": "2026-10-18T10:04:51.285Z"
+      "checkedAt": "2026-10-19T15:14:21.971Z"
     },
     {
       "gameId": "zenless",
       "periodKey": "3.3",
-      "reason": "官方前瞻给出10月21日上线日期，但尚无本次可读证据确定3.3精确开服、版本结束及上半结束；仅日期不补造小时。",
+      "reason": "10月19日官方更新通知明确10月21日06:00开始、预计5小时，采用11:00为nominal开始；上期公告确认11月11日11:59截止，两个已知字段独立建档。3.3版本结束仍缺明确官方依据，不能把商城12月2日05:59或42天当作版本结束。",
       "checkedSources": [
-        "https://zzz.mihoyo.com/news/166652",
-        "https://www.hoyoverse.com/en-us/news/166759",
+        "https://www.taptap.cn/moment/861195006294099434?group_id=330333",
+        "https://www.taptap.cn/moment/861197641654994725?group_id=330333",
+        "https://www.taptap.cn/app/234493/topic?type=official",
         "https://zenless.hoyoverse.com/zh-cn/news"
       ],
-      "checkedAt": "2026-10-18T10:04:51.285Z"
+      "checkedAt": "2026-10-19T15:14:21.971Z"
     },
     {
       "gameId": "wuthering-waves",
       "periodKey": "3.7",
-      "reason": "版本结束维护边界仍待官方证据；不从单一活动截止或旧catalog推断。已确认的上半结束2026-10-22T09:59:00+08:00已独立保存到periods，不受版本结束缺口阻塞；详见independent-trigger-times-20261018研究记录。",
+      "reason": "本轮重核官方版主3.7维护说明（UTC+8）及上期唤取服务器时间，继续保留10月22日09:59上半截止。3.7版本结束维护边界仍缺可靠可读证据；官网为空壳，官方列表及一次独立定向补查未解决，不由单一活动推断。",
       "checkedSources": [
         "https://mc.kurogames.com/main/news/detail/5569",
         "https://www.taptap.cn/moment/854139064348051537",
         "https://www.taptap.cn/moment/853756601964691535",
-        "https://www.taptap.cn/moment/853647253976386369?group_id=330015"
+        "https://www.taptap.cn/app/234280/topic?os=pc&type=official"
       ],
-      "checkedAt": "2026-10-18T10:04:51.285Z"
+      "checkedAt": "2026-10-19T15:14:21.971Z"
     },
     {
       "gameId": "wuthering-waves",
       "periodKey": null,
-      "reason": "下一版本精确开始、结束及上半结束未取得官方证据，待补查维护公告；不由活动结束推断。",
+      "reason": "下一版本完整窗口和上半边界仍未取得本轮可读官方证据；已查当前官方列表及下一版维护定向搜索。旧版本或非官方结果不采用，不以当前活动结束推断。",
       "checkedSources": [
-        "https://mc.kurogames.com/main/",
-        "https://www.taptap.cn/app/234280/topic?os=pc&type=official"
+        "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
+        "https://mc.kurogames.com/main/news/detail/5569"
       ],
-      "checkedAt": "2026-10-18T10:04:51.285Z"
+      "checkedAt": "2026-10-19T15:14:21.971Z"
     }
   ],
   "runs": []
