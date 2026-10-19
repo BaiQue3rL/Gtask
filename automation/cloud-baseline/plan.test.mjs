@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { planMaintenance, validateState, runKey, assertCloudPublicationPaths, planCloudRearm, verifyCloudRearm } from './plan.mjs'
+import { planMaintenance, validateState, runKey, assertCloudPublicationPaths, planCloudRearm, verifyCloudRearm,
+  planNextScheduleReview, CLOUD_EXECUTION_PROFILE, verifyCloudExecutionProfile } from './plan.mjs'
 
 const at = day => `2026-11-${String(day).padStart(2, '0')}T11:00:00+08:00`
 const source = 'https://example.com/official-fixture'
@@ -241,4 +242,48 @@ test('cloud publication cannot alter local maintenance rules, runtime, workflows
   assertCloudPublicationPaths([{ status: 'M', path: 'updates/catalog.json' },
     { status: 'M', path: 'automation/cloud-baseline/state.json' }, { status: 'A', path: 'catalog-research/cloud/fixture.json' }])
   assert.throws(() => assertCloudPublicationPaths([{ status: 'D', path: 'updates/catalog.json' }]))
+})
+
+test('complete schedules enter daily review three days before the next node', () => {
+  const state = fixture(), before = structuredClone(state)
+  assert.deepEqual(planNextScheduleReview(state, at(5)), { at: new Date(at(9)).toISOString(), reason: 'periodic' })
+  assert.deepEqual(planNextScheduleReview(state, at(9)), { at: new Date(at(10)).toISOString(), reason: 'near_node' })
+  assert.deepEqual(state, before)
+  // A recommendation does not complete or defer the outstanding saved review.
+  state.nextScheduleReviewAt = at(1)
+  planNextScheduleReview(state, at(5))
+  assert.equal(planMaintenance(state, at(5)).scheduleReviewDue, true)
+})
+
+test('missing schedules, including an empty initial inventory, are reviewed within a day', () => {
+  for (const change of [
+    state => { state.periods = [] },
+    state => { state.games.push('unconfigured') },
+    state => { state.scheduleGaps = [{ gameId: 'genshin', periodKey: null, reason: 'Next version not announced', checkedSources: [source], checkedAt: at(5) }] }
+  ]) {
+    const state = fixture(); change(state)
+    assert.deepEqual(planNextScheduleReview(state, at(5)), { at: new Date(at(6)).toISOString(), reason: 'missing_schedule' })
+  }
+})
+
+test('review recommendations never sleep past an imminent node or revisit a completed node', () => {
+  const state = fixture()
+  assert.equal(planNextScheduleReview(state, '2026-11-12T02:30:00Z').at, '2026-11-12T03:00:00.000Z')
+  state.runs = [receipt('published')]
+  assert.deepEqual(planNextScheduleReview(state, at(11)), { at: new Date(at(18)).toISOString(), reason: 'periodic' })
+  state.periods[0].endsAt = at(14)
+  assert.equal(planNextScheduleReview(state, at(11)).reason, 'near_node')
+  state.periods[0].endsAt = at(13)
+  assert.equal(planNextScheduleReview(state, at(15)).reason, 'missing_schedule')
+})
+
+test('saved execution profile must match the same cloud task and GPT-6.1 Sol Max', () => {
+  assert.deepEqual(CLOUD_EXECUTION_PROFILE, { model: 'gpt-6.1-sol', reasoningEffort: 'max' })
+  const actual = { id: 'fixture-automation', ...CLOUD_EXECUTION_PROFILE }
+  assert.deepEqual(verifyCloudExecutionProfile(actual.id, actual), { ok: true, ...CLOUD_EXECUTION_PROFILE })
+  for (const change of [{ id: 'another-task' }, { model: 'gpt-6-sol' }, { model: null },
+    { reasoningEffort: 'high' }, { reasoningEffort: null }]) {
+    assert.throws(() => verifyCloudExecutionProfile(actual.id, { ...actual, ...change }))
+  }
+  assert.throws(() => verifyCloudExecutionProfile(actual.id, { id: actual.id, model: actual.model }))
 })
