@@ -9,6 +9,8 @@ const statuses = ['pending', 'running', 'ready', 'published', 'verified_unchange
 const terminal = new Set(['published', 'verified_unchanged'])
 const timingModes = ['exact_schedule', 'condition_watch']
 const recoveryDelayMs = 60 * 60 * 1000
+const dayMs = 24 * recoveryDelayMs
+export const CLOUD_EXECUTION_PROFILE = Object.freeze({ model: 'gpt-6.1-sol', reasoningEffort: 'max' })
 const slug = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,159}$/
 const digest = /^[a-f0-9]{64}$/
 function fields(value, names) {
@@ -133,6 +135,40 @@ export function planMaintenance(input, reference = new Date()) {
     nextWake: { at: new Date(next.at).toISOString(), reasons: wakeCandidates.filter(x => x.at === next.at).map(x => x.reason) } }
 }
 
+/** Call after a real scheduling review, then persist this deadline with its evidence.
+ * Merely reading a plan must never postpone an outstanding review. */
+export function planNextScheduleReview(input, reference = new Date()) {
+  const state = validateState(input), now = new Date(reference).getTime()
+  assert(Number.isFinite(now), 'Invalid reference time')
+  const completed = new Set(state.runs.filter(run => terminal.has(run.status)).map(run => run.key))
+  const boundaries = state.periods.flatMap(period => nodes.map(node => ({
+    key: runKey(period.gameId, period.periodKey, node),
+    at: node === 'version_end' ? period.endsAt : period.firstHalfEndsAt
+  }))).filter(node => node.at !== null && timestamp(node.at) > now &&
+    timestamp(node.at) >= timestamp(state.activatedAt) && !completed.has(node.key))
+  const nearest = Math.min(...boundaries.map(node => timestamp(node.at)))
+  const missing = state.scheduleGaps.length > 0 || state.games.some(game =>
+    !state.periods.some(period => period.gameId === game && period.endsAt !== null && timestamp(period.endsAt) > now))
+  const near = nearest <= now + 3 * dayMs
+  const interval = missing || near ? dayMs : 7 * dayMs
+  // Enter daily review three days before a known node, including when it lies
+  // inside a normal weekly sleep. Unknown schedules still get a daily lookup.
+  const approach = nearest > now + 3 * dayMs ? nearest - 3 * dayMs : Infinity
+  return { at: new Date(Math.min(now + interval, nearest, approach)).toISOString(),
+    reason: missing ? 'missing_schedule' : near ? 'near_node' : 'periodic' }
+}
+
+/** Normalize these values from the saved cloud task or its actual run metadata.
+ * The prompt's requested model is not a receipt for the selected model. */
+export function verifyCloudExecutionProfile(automationId, receipt) {
+  text(automationId)
+  fields(receipt, ['id', 'model', 'reasoningEffort'])
+  assert.equal(receipt.id, automationId, 'Read back the original cloud task profile')
+  assert.equal(receipt.model, CLOUD_EXECUTION_PROFILE.model, 'Cloud maintenance requires GPT-6.1 Sol')
+  assert.equal(receipt.reasoningEffort, CLOUD_EXECUTION_PROFILE.reasoningEffort, 'Cloud maintenance requires Max reasoning')
+  return { ok: true, ...CLOUD_EXECUTION_PROFILE }
+}
+
 /** Preserve the configured cloud task type. Its daily recurrence is a crash-recovery
  * guard; a successful run re-anchors DTSTART to the next actual obligation. */
 export function planCloudRearm(plan, lastRunAt = null, timingMode = 'exact_schedule') {
@@ -210,19 +246,24 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       assertCloudPublicationPaths(output.trim().split('\n').filter(Boolean).map(line => {
         const [status, path] = line.split('\t'); return { status, path }
       }))
-    } else if (args[0] === '--verify-rearm') {
+    } else if (args[0] === '--verify-rearm' || args[0] === '--verify-profile') {
       assert.equal(args.length, 2, 'Expected a receipt JSON path')
       const { automationId, expected, receipt } = JSON.parse(readFileSync(args[1], 'utf8'))
-      process.stdout.write(`${JSON.stringify(verifyCloudRearm(automationId, expected, receipt))}\n`)
+      const result = args[0] === '--verify-profile' ? verifyCloudExecutionProfile(automationId, receipt)
+        : verifyCloudRearm(automationId, expected, receipt)
+      process.stdout.write(`${JSON.stringify(result)}\n`)
       process.exit(0)
     } else {
       assert(args.length % 2 === 0 && args.every((arg, i) => i % 2 !== 0 || ['--at', '--last-run', '--timing-mode'].includes(arg)),
-        'Usage: plan.mjs [--at timestamp] [--last-run timestamp] [--timing-mode mode] | --guard base-sha | --verify-rearm receipt.json')
+        'Usage: plan.mjs [--at timestamp] [--last-run timestamp] [--timing-mode mode] | --guard base-sha | --verify-rearm receipt.json | --verify-profile receipt.json')
       assert.equal(new Set(args.filter((_, i) => i % 2 === 0)).size, args.length / 2, 'Duplicate CLI option')
     }
     const options = Object.fromEntries(args[0] === '--guard' ? [] : args.reduce((all, value, i) => i % 2 === 0 ? [...all, [value, args[i + 1]]] : all, []))
-    const plan = planMaintenance(state, options['--at'] ?? new Date())
-    process.stdout.write(`${JSON.stringify({ ...plan, rearm: planCloudRearm(plan, options['--last-run'] ?? null, options['--timing-mode'] ?? 'exact_schedule') }, null, 2)}\n`)
+    const reference = options['--at'] ?? new Date()
+    const plan = planMaintenance(state, reference)
+    process.stdout.write(`${JSON.stringify({ ...plan, executionProfile: CLOUD_EXECUTION_PROFILE,
+      nextReviewAfterVerification: planNextScheduleReview(state, reference),
+      rearm: planCloudRearm(plan, options['--last-run'] ?? null, options['--timing-mode'] ?? 'exact_schedule') }, null, 2)}\n`)
   } catch (error) {
     process.stderr.write(`${JSON.stringify({ ok: false, error: error.message })}\n`)
     process.exitCode = 1
