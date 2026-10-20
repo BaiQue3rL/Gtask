@@ -9,7 +9,7 @@
     "zenless",
     "wuthering-waves"
   ],
-  "nextScheduleReviewAt": "2026-10-20T15:14:25.351Z",
+  "nextScheduleReviewAt": "2026-10-20T22:00:00.000Z",
   "periods": [
     {
       "gameId": "star-rail",
@@ -24,7 +24,7 @@
       "firstHalfSources": [
         "https://www.taptap.cn/moment/852211155802787824?group_id=311675"
       ],
-      "checkedAt": "2026-10-19T15:14:21.971Z"
+      "checkedAt": "2026-10-20T15:21:25.721Z"
     },
     {
       "gameId": "zenless",
@@ -39,7 +39,7 @@
       "firstHalfSources": [
         "https://www.taptap.cn/moment/845969989931372181"
       ],
-      "checkedAt": "2026-10-19T15:14:21.971Z"
+      "checkedAt": "2026-10-20T15:21:25.721Z"
     },
     {
       "gameId": "wuthering-waves",
@@ -53,7 +53,7 @@
       "firstHalfSources": [
         "https://www.taptap.cn/moment/853756601964691535"
       ],
-      "checkedAt": "2026-10-19T15:14:21.971Z"
+      "checkedAt": "2026-10-20T15:21:25.721Z"
     },
     {
       "gameId": "genshin",
@@ -90,69 +90,67 @@
     {
       "gameId": "genshin",
       "periodKey": "7.1",
-      "reason": "本轮已核实两位发布者均在TapTap厂商认证官方版主名单，纠正旧来源排除；7.1上半截止2026-10-13T17:59:00+08:00已独立建档，早于activatedAt不补做。版本结束/下版维护边界仍无本轮可读可靠证据，endsAt保持null；不从第二期祈愿或活动结束推断。",
+      "reason": "10月20日已查国服官方最新列表、主站和7.1版本结束/下版维护定向补查，未取得可靠精确版本结束边界；主站仍为空壳。保留10月19日已确认的历史上半截止，不补做activatedAt之前节点；不以活动、祈愿或赛季截止推断版本结束。",
       "checkedSources": [
-        "https://www.taptap.cn/group/201765/info",
-        "https://www.taptap.cn/moment/851175040782174930",
-        "https://www.taptap.cn/moment/850781129639202732?group_id=201765",
-        "https://www.taptap.cn/moment/851520146462737868?group_id=201765",
+        "https://www.taptap.cn/app/168332/topic?type=official",
         "https://ys.mihoyo.com/main/"
       ],
-      "checkedAt": "2026-10-19T15:14:21.971Z"
+      "checkedAt": "2026-10-20T15:21:25.721Z"
     },
     {
       "gameId": "genshin",
       "periodKey": null,
-      "reason": "下一个版本的精确开始、结束和上半截止仍未取得本轮可读官方证据；主站空壳，已补查国服官方列表及针对下一版维护的定向搜索；未检出不等于官方尚未发布，不按42/21天推断。",
+      "reason": "10月20日主要官方列表与下一版本维护的独立定向补查未取得下一版本精确开始、结束、上半截止。未检出不证明官方尚未发布；保持缺口，不推算42天或21天。",
       "checkedSources": [
-        "https://ys.mihoyo.com/main/",
-        "https://www.taptap.cn/app/168332/topic?type=official"
+        "https://www.taptap.cn/app/168332/topic?type=official",
+        "https://ys.mihoyo.com/main/"
       ],
-      "checkedAt": "2026-10-19T15:14:21.971Z"
+      "checkedAt": "2026-10-20T15:21:25.721Z"
     },
     {
       "gameId": "star-rail",
       "periodKey": "4.7",
-      "reason": "4.6当前版本窗口与返场上半边界本轮重核；4.7官方列表预热内容没有提供完整调度，官方新闻页面仍为Loading，定向补查未取得精确开始、结束及上半边界；不从4.6结束推断。",
+      "reason": "10月20日官方最新列表主要是活动/预热，新闻页仍为Loading；4.7的完整窗口及上半截止本轮未取得可靠精确证据。4.6上期返场截止10月21日11:59已重核，延长的新角色池仍不代替半程。",
       "checkedSources": [
+        "https://www.taptap.cn/app/224267/topic?type=official",
         "https://hsr.hoyoverse.com/zh-cn/news/166468",
-        "https://www.taptap.cn/app/224267/topic?type=official"
+        "https://www.taptap.cn/moment/852211155802787824?group_id=311675"
       ],
-      "checkedAt": "2026-10-19T15:14:21.971Z"
+      "checkedAt": "2026-10-20T15:21:25.721Z"
     },
     {
       "gameId": "zenless",
       "periodKey": "3.3",
-      "reason": "10月19日官方更新通知明确10月21日06:00开始、预计5小时，采用11:00为nominal开始；上期公告确认11月11日11:59截止，两个已知字段独立建档。3.3版本结束仍缺明确官方依据，不能把商城12月2日05:59或42天当作版本结束。",
+      "reason": "10月20日3.3主维护通知及对应官网链接本轮不可访问；复用10月19日已保存维护开始、nominal开服和上半截止，不重写已确认字段。当前官方列表及一次独立定向补查仍无明确3.3版本结束；商城、活动或丽都城募的单项截止不足以填充endsAt。最近3.2版更边界10月21日06:00已从官方更新公告再次核验，到点再执行全量维护。",
       "checkedSources": [
-        "https://www.taptap.cn/moment/861195006294099434?group_id=330333",
-        "https://www.taptap.cn/moment/861197641654994725?group_id=330333",
         "https://www.taptap.cn/app/234493/topic?type=official",
-        "https://zenless.hoyoverse.com/zh-cn/news"
+        "https://www.taptap.cn/moment/861195006294099434",
+        "https://zenless.hoyoverse.com/m/zh-cn/news/166925",
+        "https://www.taptap.cn/moment/846454619398734794"
       ],
-      "checkedAt": "2026-10-19T15:14:21.971Z"
+      "checkedAt": "2026-10-20T15:21:25.721Z"
     },
     {
       "gameId": "wuthering-waves",
       "periodKey": "3.7",
-      "reason": "本轮重核官方版主3.7维护说明（UTC+8）及上期唤取服务器时间，继续保留10月22日09:59上半截止。3.7版本结束维护边界仍缺可靠可读证据；官网为空壳，官方列表及一次独立定向补查未解决，不由单一活动推断。",
+      "reason": "10月20日重核官方版主上期唤取公告，10月22日09:59（国服服务器时间）边界保留。官网仍为空壳；官方最新列表与下一版维护/当前版本结束的独立补查未取得明确3.7版本结束维护边界；不采纳第三方固定42天或11月11日活动截止。",
       "checkedSources": [
+        "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
         "https://mc.kurogames.com/main/news/detail/5569",
-        "https://www.taptap.cn/moment/854139064348051537",
-        "https://www.taptap.cn/moment/853756601964691535",
-        "https://www.taptap.cn/app/234280/topic?os=pc&type=official"
+        "https://www.taptap.cn/moment/853756601964691535"
       ],
-      "checkedAt": "2026-10-19T15:14:21.971Z"
+      "checkedAt": "2026-10-20T15:21:25.721Z"
     },
     {
       "gameId": "wuthering-waves",
       "periodKey": null,
-      "reason": "下一版本完整窗口和上半边界仍未取得本轮可读官方证据；已查当前官方列表及下一版维护定向搜索。旧版本或非官方结果不采用，不以当前活动结束推断。",
+      "reason": "10月20日已查官方最新列表、主站及3.8维护独立定向补查，下一版本精确开始、结束及上半截止仍缺可靠可读官方证据；不以其他版本公告或第三方攻略填值。",
       "checkedSources": [
         "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
-        "https://mc.kurogames.com/main/news/detail/5569"
+        "https://mc.kurogames.com/main/news/detail/5569",
+        "https://www.taptap.cn/moment/853756601964691535"
       ],
-      "checkedAt": "2026-10-19T15:14:21.971Z"
+      "checkedAt": "2026-10-20T15:21:25.721Z"
     }
   ],
   "runs": []
