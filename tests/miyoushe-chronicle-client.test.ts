@@ -69,6 +69,11 @@ describe('MiyousheZenlessClient', () => {
     expect(String(fetcher.mock.calls[4][0])).toContain('/exploration_detail')
     expect(String(fetcher.mock.calls[4][0])).toContain('uid=10194867')
     expect(String(fetcher.mock.calls[1][0])).toContain('role_id=10194867')
+    const deadlyAssaultUrl = new URL(String(fetcher.mock.calls[2][0]))
+    expect(deadlyAssaultUrl.pathname).toBe('/event/game_record_zzz/api/zzz/hadal_mem_detail_v2')
+    expect(Object.fromEntries(deadlyAssaultUrl.searchParams)).toEqual({
+      uid: '10194867', region: 'prod_gf_cn', schedule_type: '1'
+    })
     const headers = new Headers(fetcher.mock.calls[1][1]?.headers)
     expect(headers.get('cookie')).toBe('cookie_token_v2=secret')
     expect(headers.get('ds')).toMatch(/^\d+,\d+,[0-9a-f]{32}$/)

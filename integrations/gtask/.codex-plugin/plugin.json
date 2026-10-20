@@ -1,6 +1,6 @@
 {
   "name": "gtask",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Connect the local Codex maintainer to Gtask to verify and update public baseline data.",
   "author": {
     "name": "Gtask contributors"

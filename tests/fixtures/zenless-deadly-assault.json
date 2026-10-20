@@ -1,0 +1,22 @@
+{
+  "recorded": {
+    "start_time": { "year": 2026, "month": 10, "day": 9, "hour": 4, "minute": 0, "second": 0 },
+    "end_time": { "year": 2026, "month": 10, "day": 23, "hour": 3, "minute": 59, "second": 59 },
+    "zone_id": 690471,
+    "has_data": true,
+    "total_score": 1,
+    "total_star": 0,
+    "list": [{ "score": 1, "star": 0, "total_star": 3 }],
+    "has_hard": false,
+    "hard_list": []
+  },
+  "empty": {
+    "start_time": { "year": 2026, "month": 10, "day": 9, "hour": 4, "minute": 0, "second": 0 },
+    "end_time": { "year": 2026, "month": 10, "day": 23, "hour": 3, "minute": 59, "second": 59 },
+    "zone_id": 0,
+    "has_data": false,
+    "total_score": 0,
+    "total_star": 0,
+    "list": []
+  }
+}

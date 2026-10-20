@@ -107,7 +107,9 @@ class MiyousheChronicleClient {
 
   async getDeadlyAssault(): Promise<unknown> {
     const account = await this.getAccount('nap_cn', '绝区零')
-    const data = await this.request(`${ZENLESS_RECORD_BASE}/mem_detail`, {
+    // The retired mem_detail endpoint can succeed with an empty placeholder
+    // even when the current Battle Chronicle has manual challenge records.
+    const data = await this.request(`${ZENLESS_RECORD_BASE}/hadal_mem_detail_v2`, {
       uid: account.uid,
       region: account.region,
       schedule_type: '1'
