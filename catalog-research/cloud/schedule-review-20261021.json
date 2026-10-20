@@ -1,0 +1,229 @@
+{
+  "schemaVersion": 1,
+  "kind": "schedule_review",
+  "checkedAt": "2026-10-20T22:10:34.669Z",
+  "baseCommit": "a4be2f45a8a3a22e649a28a0eabd6fd83ee2910f",
+  "scope": [
+    "genshin",
+    "star-rail",
+    "zenless",
+    "wuthering-waves"
+  ],
+  "reviewCompleted": true,
+  "auditComplete": false,
+  "catalogChanged": false,
+  "nodeKeys": [],
+  "coveredSections": [
+    "official_scheduling_updates_and_gaps"
+  ],
+  "serverScope": "中国大陆适用官方公告，UTC+8/Asia/Shanghai；不混用其他服务器",
+  "priorEvidence": [
+    "catalog-research/cloud/schedule-review-20261019.json",
+    "catalog-research/cloud/schedule-review-20261020.json"
+  ],
+  "sources": [
+    {
+      "gameId": "genshin",
+      "url": "https://www.taptap.cn/app/168332/topic?type=official",
+      "sourceRef": "turn18view2",
+      "result": "official_listing_reviewed",
+      "summary": "最近可见公告包括7.1活动与下期祈愿；没有取得可靠7.1结束/7.2完整维护及上半边界。"
+    },
+    {
+      "gameId": "star-rail",
+      "url": "https://www.taptap.cn/app/224267/topic?type=official",
+      "sourceRef": "turn18view0",
+      "result": "official_listing_reviewed",
+      "summary": "4.7预热不含完整排期；不把预热当维护时间。"
+    },
+    {
+      "gameId": "zenless",
+      "url": "https://www.taptap.cn/app/234493/topic?type=official",
+      "sourceRef": "turn15view0",
+      "result": "official_listing_reviewed",
+      "summary": "新版独立活动公告不证明3.3结束；本轮业务维护另见节点研究。"
+    },
+    {
+      "gameId": "wuthering-waves",
+      "url": "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
+      "sourceRef": "turn18view1",
+      "result": "official_listing_reviewed",
+      "summary": "近期活动汇总与锁暝预热不证明3.7结束/3.8完整维护；无提前目录审计。"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/846454619398734794?group_id=330333",
+      "sourceRef": "turn15view2",
+      "publisher": "绝区零官方账号",
+      "publishedDate": "2026-09-08",
+      "result": "readable_rechecked",
+      "facts": {
+        "versionEndsAt": "2026-10-21T06:00:00+08:00"
+      }
+    },
+    {
+      "url": "https://www.taptap.cn/moment/852211155802787824?group_id=311675",
+      "sourceRef": "turn19view0",
+      "publisher": "崩坏：星穹铁道官方账号",
+      "publishedDate": "2026-09-27",
+      "result": "readable_rechecked",
+      "facts": {
+        "firstHalfEndsAt": "2026-10-21T11:59:00+08:00",
+        "extendedCharacterBannerEndsAt": "2026-11-10T15:00:00+08:00"
+      },
+      "note": "返场第一期边界独立于延长的新角色池；卡池不入活动目录。"
+    },
+    {
+      "url": "https://hsr.hoyoverse.com/zh-cn/news/166468",
+      "sourceRef": "turn19search0",
+      "result": "official_index_rechecked_direct_loading_shell",
+      "facts": {
+        "versionEndsAt": "2026-11-11T06:00:00+08:00"
+      },
+      "directRef": "turn20view3"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/853756601964691535",
+      "sourceRef": "turn19view1",
+      "publisher": "鸣潮官方版主",
+      "publishedDate": "2026-09-29",
+      "result": "readable_rechecked",
+      "facts": {
+        "firstHalfEndsAt": "2026-10-22T09:59:00+08:00"
+      },
+      "note": "服务器时间沿用既有已核验国服范围。"
+    },
+    {
+      "url": "https://zenless.hoyoverse.com/m/zh-cn/news/166926",
+      "sourceRef": "turn17search0",
+      "result": "official_index_rechecked",
+      "facts": {
+        "firstHalfEndsAt": "2026-11-11T11:59:00+08:00"
+      },
+      "note": "原社区全文本轮不可读，保留旧period.checkedAt；未以抓取时刻伪称全文重验。"
+    },
+    {
+      "url": "https://ys.mihoyo.com/main/",
+      "sourceRef": "turn20view1",
+      "result": "empty_shell"
+    },
+    {
+      "url": "https://mc.kurogames.com/main/news/detail/5569",
+      "sourceRef": "turn20view2",
+      "result": "empty_shell",
+      "note": "官方搜索索引的单活动11/11截止不等于版本结束。"
+    },
+    {
+      "url": "https://zenless.hoyoverse.com/m/zh-cn/news/166925",
+      "sourceRef": "turn18view3",
+      "result": "fetch_unavailable"
+    }
+  ],
+  "independentSupplement": {
+    "completed": true,
+    "queries": [
+      "原神 7.2 版本 更新维护 公告 2026 11月 site:ys.mihoyo.com",
+      "崩坏星穹铁道 4.7 版本 更新维护 2026 11月 site:hsr.hoyoverse.com",
+      "鸣潮 3.8 版本 更新维护 2026 11月 site:mc.kurogames.com",
+      "绝区零 3.3 更新公告 版本结束"
+    ],
+    "result": "仍无缺失字段的可靠适用来源。保留null与具体pending，停止同轮追加搜索。未检得不等于官方尚未公告。"
+  },
+  "decisions": [
+    {
+      "field": "existing_verified_boundaries",
+      "adoptedValue": "unchanged",
+      "reason": "无可靠适用官方更正；最近三个独立节点已重核，远期已核验事实复用。"
+    },
+    {
+      "field": "missing_version_ends_and_next_periods",
+      "adoptedValue": null,
+      "reason": "不统一加21/42天、不从活动/商店/战令/卡池截止推版本末。"
+    },
+    {
+      "field": "nextScheduleReviewAt",
+      "oldValue": "2026-10-20T22:00:00.000Z",
+      "adoptedValue": "2026-10-21T03:59:00.000Z",
+      "reason": "当轮实际官方补查结束后运行最新main规划器，采用nextReviewAfterVerification；不能仅因只读而延后。"
+    }
+  ],
+  "pending": [
+    {
+      "gameId": "genshin",
+      "periodKey": "7.1",
+      "reason": "10月20日已查国服官方最新列表、主站和7.1版本结束/下版维护定向补查，未取得可靠精确版本结束边界；主站仍为空壳。保留10月19日已确认的历史上半截止，不补做activatedAt之前节点；不以活动、祈愿或赛季截止推断版本结束。 2026-10-21本轮已查官方列表、主来源及一次定向补查：仍未得到该缺失字段的适用明确公告，保留null；未检得不等于官方尚未公告。",
+      "checkedSources": [
+        "https://www.taptap.cn/app/168332/topic?type=official",
+        "https://ys.mihoyo.com/main/"
+      ],
+      "checkedAt": "2026-10-20T22:10:34.669Z"
+    },
+    {
+      "gameId": "genshin",
+      "periodKey": null,
+      "reason": "10月20日主要官方列表与下一版本维护的独立定向补查未取得下一版本精确开始、结束、上半截止。未检出不证明官方尚未发布；保持缺口，不推算42天或21天。 2026-10-21本轮已查官方列表、主来源及一次定向补查：仍未得到该缺失字段的适用明确公告，保留null；未检得不等于官方尚未公告。",
+      "checkedSources": [
+        "https://www.taptap.cn/app/168332/topic?type=official",
+        "https://ys.mihoyo.com/main/"
+      ],
+      "checkedAt": "2026-10-20T22:10:34.669Z"
+    },
+    {
+      "gameId": "star-rail",
+      "periodKey": "4.7",
+      "reason": "10月20日官方最新列表主要是活动/预热，新闻页仍为Loading；4.7的完整窗口及上半截止本轮未取得可靠精确证据。4.6上期返场截止10月21日11:59已重核，延长的新角色池仍不代替半程。 2026-10-21本轮已查官方列表、主来源及一次定向补查：仍未得到该缺失字段的适用明确公告，保留null；未检得不等于官方尚未公告。",
+      "checkedSources": [
+        "https://www.taptap.cn/app/224267/topic?type=official",
+        "https://hsr.hoyoverse.com/zh-cn/news/166468",
+        "https://www.taptap.cn/moment/852211155802787824?group_id=311675"
+      ],
+      "checkedAt": "2026-10-20T22:10:34.669Z"
+    },
+    {
+      "gameId": "zenless",
+      "periodKey": "3.3",
+      "reason": "10月20日3.3主维护通知及对应官网链接本轮不可访问；复用10月19日已保存维护开始、nominal开服和上半截止，不重写已确认字段。当前官方列表及一次独立定向补查仍无明确3.3版本结束；商城、活动或丽都城募的单项截止不足以填充endsAt。最近3.2版更边界10月21日06:00已从官方更新公告再次核验，到点再执行全量维护。 2026-10-21本轮已查官方列表、主来源及一次定向补查：仍未得到该缺失字段的适用明确公告，保留null；未检得不等于官方尚未公告。",
+      "checkedSources": [
+        "https://www.taptap.cn/app/234493/topic?type=official",
+        "https://www.taptap.cn/moment/861195006294099434",
+        "https://zenless.hoyoverse.com/m/zh-cn/news/166925",
+        "https://www.taptap.cn/moment/846454619398734794"
+      ],
+      "checkedAt": "2026-10-20T22:10:34.669Z"
+    },
+    {
+      "gameId": "wuthering-waves",
+      "periodKey": "3.7",
+      "reason": "10月20日重核官方版主上期唤取公告，10月22日09:59（国服服务器时间）边界保留。官网仍为空壳；官方最新列表与下一版维护/当前版本结束的独立补查未取得明确3.7版本结束维护边界；不采纳第三方固定42天或11月11日活动截止。 2026-10-21本轮已查官方列表、主来源及一次定向补查：仍未得到该缺失字段的适用明确公告，保留null；未检得不等于官方尚未公告。",
+      "checkedSources": [
+        "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
+        "https://mc.kurogames.com/main/news/detail/5569",
+        "https://www.taptap.cn/moment/853756601964691535"
+      ],
+      "checkedAt": "2026-10-20T22:10:34.669Z"
+    },
+    {
+      "gameId": "wuthering-waves",
+      "periodKey": null,
+      "reason": "10月20日已查官方最新列表、主站及3.8维护独立定向补查，下一版本精确开始、结束及上半截止仍缺可靠可读官方证据；不以其他版本公告或第三方攻略填值。 2026-10-21本轮已查官方列表、主来源及一次定向补查：仍未得到该缺失字段的适用明确公告，保留null；未检得不等于官方尚未公告。",
+      "checkedSources": [
+        "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
+        "https://mc.kurogames.com/main/news/detail/5569",
+        "https://www.taptap.cn/moment/853756601964691535"
+      ],
+      "checkedAt": "2026-10-20T22:10:34.669Z"
+    }
+  ],
+  "validation": {
+    "plannerTests": "33 passed",
+    "catalogScheduleChanges": false
+  },
+  "delivery": {
+    "stage": "ready_for_restricted_pr",
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/23",
+    "nodeAudit": "catalog-research/cloud/zenless-3-2-version-end.json"
+  },
+  "nextScheduleReview": {
+    "at": "2026-10-21T03:59:00.000Z",
+    "reason": "missing_schedule"
+  }
+}
