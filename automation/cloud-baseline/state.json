@@ -153,5 +153,24 @@
       "checkedAt": "2026-10-20T15:21:25.721Z"
     }
   ],
-  "runs": []
+  "runs": [
+    {
+      "key": "zenless/3.2/version_end",
+      "gameId": "zenless",
+      "periodKey": "3.2",
+      "node": "version_end",
+      "boundaryAt": "2026-10-21T06:00:00+08:00",
+      "status": "running",
+      "attempts": 1,
+      "updatedAt": "2026-10-20T22:04:09.369Z",
+      "retryAt": "2026-10-21T03:00:00.000Z",
+      "branch": "codex/cloud-baseline/zenless-3-2-version-end",
+      "pullRequestUrl": null,
+      "catalogRevision": null,
+      "catalogSha256": null,
+      "evidencePath": "catalog-research/cloud/zenless-3-2-version-end.json",
+      "completedAt": null,
+      "notes": "到期节点已认领。先保存有限租约；维护开始不代表新版已开放，待核验官方新版活动、开放地图、周期定义和例外。"
+    }
+  ]
 }

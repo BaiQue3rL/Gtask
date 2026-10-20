@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "nodeKey": "zenless/3.2/version_end",
+  "gameId": "zenless",
+  "periodKey": "3.2",
+  "node": "version_end",
+  "checkedAt": "2026-10-20T22:04:09.369Z",
+  "status": "running",
+  "auditComplete": false,
+  "coverage": [],
+  "sources": [],
+  "decisions": [],
+  "pending": [
+    {
+      "scope": "zenless 3.3 version update",
+      "reason": "研究尚未完成；维护开始不等于地图或新版活动已经开放。",
+      "retryAt": "2026-10-21T03:00:00.000Z"
+    }
+  ],
+  "delivery": {
+    "stage": "claimed",
+    "branch": "codex/cloud-baseline/zenless-3-2-version-end",
+    "baseMainSha": "a4be2f45a8a3a22e649a28a0eabd6fd83ee2910f",
+    "catalogChanged": false
+  }
+}
