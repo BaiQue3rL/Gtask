@@ -7,7 +7,7 @@
   "node": "version_end",
   "newVersion": "3.3",
   "checkedAt": "2026-10-20T22:10:34.669Z",
-  "status": "ready",
+  "status": "pending",
   "auditComplete": false,
   "serverScope": {
     "region": "中国大陆适用官方公告",
@@ -436,6 +436,11 @@
       "key": "version-3.3-full-announcement",
       "target": "all",
       "reason": "完整3.3更新公告与地图开放/独立进度证据未覆盖。主公告入口及一次定向补查无可靠完整正文；待名义开服后续接。"
+    },
+    {
+      "key": "catalog-delivery-test-assumption",
+      "target": "delivery",
+      "reason": "已验证差异保存，但现有数量断言阻止任何净增的绝区零条目通过Verify。保留固定公开身份与累积退役，等待授权范围之外的软件测试修复；定时任务继续维护其他游戏和公开研究。"
     }
   ],
   "independentSupplement": {
@@ -505,15 +510,17 @@
     },
     "sourceExecution": "Node 24 --experimental-transform-types 加只读扩展名解析钩子，运行未改动main的现有编译器和真实AppDatabase；只用:memory:。锁定zod4.0.0。生产构建/全量测试由最终head Verify承担。",
     "semanticDiff": "已断言仅新活动和revision/publishedAt发生语义变化，其余仅真实编译器URL规范化；稳定键、全部退役、地图/规则和其他游戏保持。",
-    "finalHeadChecks": "待PR最终head Verify与Cloud baseline checks；本字段不伪称未来成功。"
+    "finalHeadChecks": "拟新增清单head的Cloud baseline checks成功、Verify失败；失败结果见publicationBlock。状态/研究提交另由最终head两项CI验证后交付。"
   },
   "delivery": {
-    "stage": "ready",
+    "stage": "pending_catalog_delivery",
     "branch": "codex/cloud-baseline/zenless-3-2-version-end",
     "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/23",
-    "catalogChanged": true,
-    "catalogRevision": "2026-10-21.zenless-3.3-partial",
-    "catalogSha256": "67868a39b4e1e8eb05e7bede22177f227568e6383e3728086a4e7a524f2a50a5",
+    "catalogChanged": false,
+    "catalogRevision": "2026-10-11.zenless-3.2-event-completion",
+    "catalogSha256": "f078d01d82dd7375c6533970717a3634cedef6f4d9238abdce6d668ff75ee9e5",
+    "proposedRevision": "2026-10-21.zenless-3.3-partial",
+    "compiledProposalSha256": "67868a39b4e1e8eb05e7bede22177f227568e6383e3728086a4e7a524f2a50a5",
     "nodeComplete": false,
     "resumeAt": "2026-10-21T03:00:00.000Z"
   },
@@ -524,5 +531,45 @@
       "at": "2026-10-21T03:59:00.000Z",
       "reason": "missing_schedule"
     }
+  },
+  "verifiedCatalogDelta": {
+    "schemaVersion": 2,
+    "revision": "2026-10-21.zenless-3.3-partial",
+    "publishedAt": "2026-10-20T22:08:40.339Z",
+    "games": [
+      {
+        "gameId": "zenless",
+        "upserts": [
+          {
+            "remoteKey": "event:3.3:haunted-house",
+            "category": "limited_event",
+            "title": "怪奇诡屋惊魂记",
+            "startsAt": "2026-10-22T10:00:00+08:00",
+            "endsAt": "2026-11-30T03:59:00+08:00",
+            "activityTags": [
+              "challenge"
+            ],
+            "scheduleKind": "fixed_window",
+            "timeZone": "Asia/Shanghai",
+            "sourceUrl": "https://www.taptap.cn/moment/861568981209714673?group_id=330333"
+          }
+        ],
+        "archives": []
+      }
+    ]
+  },
+  "publicationBlock": {
+    "kind": "deterministic_existing_test_assertion",
+    "firstDetectedAt": "2026-10-20T22:14:46.424Z",
+    "consecutiveBlockedRuns": 1,
+    "file": "tests/remote-catalog-update.test.ts",
+    "line": 142,
+    "blobSha": "202dc25f43d0d1d2ef86d4bbcd6300c416f5de2a",
+    "failedHead": "1c0c31218b9676d515da2bb4fa306e846723423c",
+    "workflowRunId": 39506298443,
+    "jobId": 118915954076,
+    "url": "https://github.com/BaiQue3rL/Gtask/actions/runs/39506298443",
+    "message": "expected length 19 but got 20; 501 tests passed, 1 failed, 12 skipped; build/consumer skipped after test failure",
+    "scopeResolution": "只交付允许的state/研究，清单退回main原始字节；不修改测试或为凑数量删除/复用其他身份。后续读取main测试blob，条件未修复时不盲目重复相同失败CI；记录同节点受阻运行数，连续三轮仍不能交付时按应急报告管理员软件维护。"
   }
 }

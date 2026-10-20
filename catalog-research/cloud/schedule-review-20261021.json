@@ -218,7 +218,7 @@
     "catalogScheduleChanges": false
   },
   "delivery": {
-    "stage": "ready_for_restricted_pr",
+    "stage": "pending_restricted_state_research_delivery",
     "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/23",
     "nodeAudit": "catalog-research/cloud/zenless-3-2-version-end.json"
   },
