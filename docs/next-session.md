@@ -1,6 +1,6 @@
 # Gtask 当前交接
 
-更新：2026-10-19，Asia/Shanghai。这里记录当前工作区；历史发布与安装记录保留在 `history/next-session-through-2026-09-14.md`，不作为当前能力或未完成事项的依据。
+更新：2026-10-20，Asia/Shanghai。这里记录当前工作区；历史发布与安装记录保留在 `history/next-session-through-2026-09-14.md`，不作为当前能力或未完成事项的依据。
 
 ## 2026-10-20 1.2.2 危局强袭战同步修复
 
@@ -10,7 +10,7 @@
 
 [PR #21](https://github.com/BaiQue3rL/Gtask/pull/21) 已在两项检查通过后合并。发布源码和 `v1.2.2` 指向 `1d51871fa970c11761440b8e006b17d5f35580a0`，GitHub/Gitee 源码标签一致。PR Verify `39441597629`、主分支 Verify `39441943075`（第二次执行）和 Release `39441966535` 已成功结束；主分支第一次执行是既有 SQLite 历史保留压力测试 15 秒超时，没有测试断言失败。
 
-三个 GitHub 附件已实际下载并匹配平台 digest 与校验文件。Gitee Release `1223569` 已建立，但公开附件列表为空，上传日志为 `UND_ERR_CONNECT_TIMEOUT`；流水线按配置继续并执行回退步骤，不能把整体绿色误报为镜像附件成功。两个更新下载入口均指向已验证的 GitHub 1.2.2。详细证据见 `release-verification-1.2.2.md` 和 `C:\Users\Administrator\AppData\Local\Codex\task-receipts\gtask-release-1.2.2`；更新元数据提交、在线检查和最终关机以该目录后续回执为准。不要移动发布标签来包含后续文档提交；本次关机授权仅适用于本轮。
+三个 GitHub 附件已实际下载并匹配平台 digest 与校验文件。Gitee Release `1223569` 已建立，但公开附件列表为空，上传日志为 `UND_ERR_CONNECT_TIMEOUT`；流水线按配置继续并执行回退步骤，不能把整体绿色误报为镜像附件成功。更新元数据提交为 `bcc18044c2a10a93dfbbb3dfb444da348e0c2129`，两源已实际读回 1.2.2，两个下载入口均为已验证的 GitHub 1.2.2，11 项在线更新与更新服务测试通过。详细证据见 `release-verification-1.2.2.md` 和 `C:\Users\Administrator\AppData\Local\Codex\task-receipts\gtask-release-1.2.2`；最后文档检查和关机以该目录最终回执为准。不要移动发布标签来包含后续文档提交；本次关机授权仅适用于本轮。
 
 ## 2026-10-19 云端基准全自动维护
 

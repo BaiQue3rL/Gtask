@@ -40,6 +40,6 @@
 
 Gitee 源码与发布标签已同步，Release `1223569` 已建立，但 `/releases/1223569/attach_files` 返回空列表。上传日志明确出现 `fetch failed` / `UND_ERR_CONNECT_TIMEOUT`，回退步骤也执行；尽管平台对启用 continue-on-error 的步骤返回绿色 conclusion，不能据此声称 Gitee 二进制上传成功。
 
-`updates/latest.json` 的两个 provider 下载页均指向已验证的 GitHub 1.2.2。元数据提交和在线更新检测在后续回执记录，不移动发布标签。
+`updates/latest.json` 的两个 provider 下载页均指向已验证的 GitHub 1.2.2。元数据提交为 `bcc18044c2a10a93dfbbb3dfb444da348e0c2129`，GitHub/Gitee 两源均已实际读回 1.2.2；11 项在线更新与更新服务测试通过。后续文档提交不移动发布标签，最后文档检查记录在最终回执。
 
 原始本机更新、重启验收、远端资产、源码和流水线记录保存在 `C:\Users\Administrator\AppData\Local\Codex\task-receipts\gtask-release-1.2.2`。最终关机以同目录最终回执为准，不能把本段授权沿用到下一轮。
