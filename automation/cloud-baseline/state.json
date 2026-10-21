@@ -149,17 +149,17 @@
       "periodKey": "3.2",
       "node": "version_end",
       "boundaryAt": "2026-10-21T06:00:00+08:00",
-      "status": "pending",
-      "attempts": 2,
-      "updatedAt": "2026-10-21T03:18:06.114Z",
-      "retryAt": "2026-10-21T03:59:00.000Z",
+      "status": "running",
+      "attempts": 3,
+      "updatedAt": "2026-10-21T04:24:36.766Z",
+      "retryAt": "2026-10-21T05:23:15.000Z",
       "branch": "codex/cloud-baseline/zenless-3-2-version-end",
       "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/25",
       "catalogRevision": "2026-10-21.zenless-3.3-events",
       "catalogSha256": "1f9ce7e306da392be6f09de446b2626bfe25c7d2426bd56f0fdfef3fa80af8bf",
       "evidencePath": "catalog-research/cloud/zenless-3-2-version-end.json",
       "completedAt": null,
-      "notes": "七项固定档期活动已由PR25精确head 5786faf819f54ddbf387d88b91390694074cf0c7通过Verify/Cloud baseline checks合入；main已读回revision和UTF-8 SHA256一致。完整审计尚有5项pending（开服、地图资格、拟境规则），不记完成；下一共享业务节点续接。当前取得实际交付进展，连续无法推进计数归零。"
+      "notes": "续接五项精确pending；此前七项已发布，保持身份和清单事实。恢复唤醒已布置。本轮同时到期全局排期复核，星铁半程节点随后串行处理。"
     }
   ]
 }

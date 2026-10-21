@@ -7,7 +7,7 @@
   "node": "version_end",
   "newVersion": "3.3",
   "checkedAt": "2026-10-21T03:13:48.423Z",
-  "status": "pending",
+  "status": "running",
   "auditComplete": false,
   "serverScope": {
     "region": "中国大陆适用官方公告",
@@ -1013,6 +1013,33 @@
         "message": "expected length 19 but got 20; 501 tests passed, 1 failed, 12 skipped; build/consumer skipped after test failure",
         "scopeResolution": "只交付允许的state/研究，清单退回main原始字节；不修改测试或为凑数量删除/复用其他身份。后续读取main测试blob，条件未修复时不盲目重复相同失败CI；记录同节点受阻运行数，连续三轮仍不能交付时按应急报告管理员软件维护。"
       }
+    },
+    {
+      "attempt": 3,
+      "at": "2026-10-21T04:24:36.768Z",
+      "priorStatus": "pending",
+      "priorDelivery": {
+        "stage": "partial_published",
+        "branch": "codex/cloud-baseline/zenless-3-2-version-end",
+        "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/25",
+        "catalogChanged": true,
+        "catalogRevision": "2026-10-21.zenless-3.3-events",
+        "catalogSha256": "1f9ce7e306da392be6f09de446b2626bfe25c7d2426bd56f0fdfef3fa80af8bf",
+        "nodeComplete": false,
+        "resumeAt": "2026-10-21T03:59:00.000Z",
+        "mainReadSha": "cdf509d21f469628621a7d62ccbcc83aeded3453",
+        "mainVerifiedAt": "2026-10-21T03:18:06.114Z",
+        "remainingPendingCount": 5,
+        "receiptPublication": "follow-up restricted state/research PR; exact head CI verified before merge externally",
+        "mirror": {
+          "url": "https://gitee.com/l3rui/Gtask/raw/main/updates/catalog.json",
+          "result": "unreadable_via_public_fetch",
+          "sourceRef": "turn31view0",
+          "mirrorRevisionVerified": false
+        },
+        "clientReceipt": "not_observed; no dependency on player client"
+      },
+      "baseMainSha": "73e298deef998cff0b5b74fa67c9101c5d8beedf"
     }
   ],
   "scheduleResolution": {
