@@ -162,6 +162,24 @@
       "evidencePath": "catalog-research/cloud/zenless-3-2-version-end.json",
       "completedAt": null,
       "notes": "全新放送已按PR27精确head及两项CI合入，main原始字节/revision/SHA256已核对；3个地图独立进度与拟境周期仍缺证据，次日补查，未重复发布先前七项。"
+    },
+    {
+      "key": "star-rail/4.6/first_half_end",
+      "gameId": "star-rail",
+      "periodKey": "4.6",
+      "node": "first_half_end",
+      "boundaryAt": "2026-10-21T11:59:00+08:00",
+      "status": "running",
+      "attempts": 1,
+      "updatedAt": "2026-10-21T04:38:40.591Z",
+      "retryAt": "2026-10-21T05:38:35.000Z",
+      "branch": "codex/cloud-baseline/star-rail-4-6-first-half-end",
+      "pullRequestUrl": null,
+      "catalogRevision": null,
+      "catalogSha256": null,
+      "evidencePath": "catalog-research/cloud/star-rail-4-6-first-half-end.json",
+      "completedAt": null,
+      "notes": "真实上半场结束已到期；全范围核查下半新增，复用既有有效来源与裁决；恢复唤醒及有限租约已保存。"
     }
   ]
 }

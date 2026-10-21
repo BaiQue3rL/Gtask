@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "kind": "business_node_audit",
+  "nodeKey": "star-rail/4.6/first_half_end",
+  "gameId": "star-rail",
+  "periodKey": "4.6",
+  "node": "first_half_end",
+  "checkedAt": "2026-10-21T04:38:40.591Z",
+  "status": "running",
+  "auditComplete": false,
+  "serverScope": {
+    "server": "CN production servers",
+    "timeZone": "Asia/Shanghai"
+  },
+  "baseMainSha": "6560f69890db8d38a41a2cdd6ed56b0754912a53",
+  "priorEvidence": [
+    "docs/catalog-research/star-rail-4.6-2026-09-28.json",
+    "docs/catalog-research/star-rail-4.6-2026-10-01.json",
+    "docs/catalog-research/star-rail-4.6-maps-2026-09-28.json"
+  ],
+  "coverage": [],
+  "sources": [],
+  "decisions": [],
+  "pending": [
+    {
+      "key": "audit:full_scope",
+      "reason": "业务节点已到，研究待完成。"
+    }
+  ],
+  "delivery": {
+    "stage": "running",
+    "branch": "codex/cloud-baseline/star-rail-4-6-first-half-end",
+    "leaseUntil": "2026-10-21T05:38:35.000Z"
+  }
+}
