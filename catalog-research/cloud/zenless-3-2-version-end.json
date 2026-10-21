@@ -6,8 +6,8 @@
   "periodKey": "3.2",
   "node": "version_end",
   "newVersion": "3.3",
-  "checkedAt": "2026-10-21T04:31:38.008Z",
-  "status": "ready",
+  "checkedAt": "2026-10-21T04:35:19.512Z",
+  "status": "pending",
   "auditComplete": false,
   "serverScope": {
     "region": "中国大陆适用官方公告",
@@ -914,11 +914,11 @@
       "realConsumer": "AppDatabase(:memory:) passed",
       "semanticCheck": "only one verified sign-in addition plus revision/publishedAt",
       "rawUtf8Sha256": "6b0a5b24f5230b437c955413ece6238f9df817a807a24ccdae1d8ee498c56aae",
-      "ci": "pending exact final head Verify and Cloud baseline checks; full prescribed checks via CI"
+      "ci": "Verify 39544594215 and Cloud baseline checks 39544594313 succeeded for d20a4373e384ddd42e0b3ce86f96e427c3e2b0d3; raw main bytes matched compiler output"
     }
   },
   "delivery": {
-    "stage": "ready_partial",
+    "stage": "partial_published",
     "branch": "codex/cloud-baseline/zenless-3-2-version-end",
     "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/27",
     "catalogChanged": true,
@@ -926,7 +926,16 @@
     "catalogSha256": "6b0a5b24f5230b437c955413ece6238f9df817a807a24ccdae1d8ee498c56aae",
     "nodeComplete": false,
     "remainingPendingCount": 4,
-    "resumeAt": null
+    "resumeAt": "2026-10-22T01:59:00.000Z",
+    "mainReadSha": "37aa0c97681c21b9e388ce8794591ba778c35415",
+    "mainVerifiedAt": "2026-10-21T04:35:19.512Z",
+    "receiptPublication": "follow-up restricted PR with both exact-head checks; operational evidence stored outside repository",
+    "mirror": {
+      "url": "https://gitee.com/l3rui/Gtask/raw/main/updates/catalog.json",
+      "result": "unreadable_via_public_fetch",
+      "mirrorRevisionVerified": false
+    },
+    "clientReceipt": "not_observed"
   },
   "verifiedCatalogDelta": {
     "schemaVersion": 2,
@@ -1112,6 +1121,31 @@
       "cloudBaselineRun": 39537438860,
       "checks": "success on exact head",
       "nodeComplete": false
+    },
+    {
+      "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/27",
+      "headSha": "d20a4373e384ddd42e0b3ce86f96e427c3e2b0d3",
+      "mergeSha": "37aa0c97681c21b9e388ce8794591ba778c35415",
+      "catalogRevision": "2026-10-21.zenless-3.3-sign-in",
+      "catalogSha256": "6b0a5b24f5230b437c955413ece6238f9df817a807a24ccdae1d8ee498c56aae",
+      "added": 1,
+      "resolvedPending": [
+        "candidate:3.3:all-new-program"
+      ],
+      "ci": [
+        {
+          "id": 39544594313,
+          "name": "Cloud baseline checks",
+          "conclusion": "success"
+        },
+        {
+          "id": 39544594215,
+          "name": "Verify",
+          "conclusion": "success"
+        }
+      ],
+      "mainVerifiedAt": "2026-10-21T04:35:19.512Z",
+      "rawContentEquality": true
     }
   ],
   "progressThisAttempt": {
