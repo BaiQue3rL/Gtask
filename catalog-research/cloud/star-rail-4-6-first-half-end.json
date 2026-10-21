@@ -1,0 +1,970 @@
+{
+  "schemaVersion": 1,
+  "kind": "business_node_audit",
+  "nodeKey": "star-rail/4.6/first_half_end",
+  "gameId": "star-rail",
+  "periodKey": "4.6",
+  "node": "first_half_end",
+  "checkedAt": "2026-10-21T04:41:53.745Z",
+  "status": "verified_unchanged",
+  "auditComplete": true,
+  "serverScope": {
+    "server": "CN production servers",
+    "timeZone": "Asia/Shanghai"
+  },
+  "baseMainSha": "6560f69890db8d38a41a2cdd6ed56b0754912a53",
+  "priorEvidence": [
+    "docs/catalog-research/star-rail-4.6-2026-09-28.json",
+    "docs/catalog-research/star-rail-4.6-2026-10-01.json",
+    "docs/catalog-research/star-rail-4.6-maps-2026-09-28.json"
+  ],
+  "coverage": [
+    {
+      "section": "inventory",
+      "result": "read_complete_public_inventory",
+      "revision": "2026-10-21.zenless-3.3-sign-in",
+      "source": "exact main 6560f69890db8d38a41a2cdd6ed56b0754912a53 and original CLI/AppDatabase(:memory:)",
+      "limitedEvents": 8,
+      "cycleModes": 4,
+      "mapRegions": 8,
+      "mapSubregions": 82,
+      "scheduleRecords": 7,
+      "deadlineReviews": [],
+      "items": [
+        {
+          "remoteKey": "event:4.6:planar-fissure",
+          "title": "位面分裂",
+          "category": "limited_event",
+          "mapNodeKind": null,
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "event:4.6:gift-of-odyssey",
+          "title": "巡星之礼",
+          "category": "limited_event",
+          "mapNodeKind": null,
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "event:4.6:interastral-peace-gala",
+          "title": "星际和平盛典：一镜到底",
+          "category": "limited_event",
+          "mapNodeKind": null,
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "event:4.6:love-ghosts-robots",
+          "title": "爱，幽灵与机器人",
+          "category": "limited_event",
+          "mapNodeKind": null,
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "event:4.4:fate-contract",
+          "title": "命运契约•再启",
+          "category": "limited_event",
+          "mapNodeKind": null,
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "event:4.6:wishpower",
+          "title": "镇伏「贪饕」，汇聚愿力",
+          "category": "limited_event",
+          "mapNodeKind": null,
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "event:4.6:aha-outwits-hoyoverse",
+          "title": "乐子神智取米哈游",
+          "category": "limited_event",
+          "mapNodeKind": null,
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "endgame:pure-fiction",
+          "title": "虚构叙事",
+          "category": "endgame",
+          "mapNodeKind": null,
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "endgame:memory-of-chaos",
+          "title": "混沌回忆",
+          "category": "endgame",
+          "mapNodeKind": null,
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "endgame:anomaly-arbitration",
+          "title": "异相仲裁",
+          "category": "endgame",
+          "mapNodeKind": null,
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "endgame:apocalyptic-shadow",
+          "title": "末日幻影",
+          "category": "endgame",
+          "mapNodeKind": null,
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:region:365f2076f617fc25ee24",
+          "title": "空间站「黑塔」",
+          "category": "exploration",
+          "mapNodeKind": "region",
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:2a081e0a079b179237b7",
+          "title": "主控舱段",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:365f2076f617fc25ee24"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:2982cb4f02d681b110f4",
+          "title": "基座舱段",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:365f2076f617fc25ee24"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:3f71b92d9a0ca22380eb",
+          "title": "收容舱段",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:365f2076f617fc25ee24"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:adc4ab50268393b5d242",
+          "title": "支援舱段",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:365f2076f617fc25ee24"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:fb5252873d739e0fa317",
+          "title": "禁闭舱段",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:365f2076f617fc25ee24"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:region:c7a6a71ab882daa071c3",
+          "title": "雅利洛-Ⅵ",
+          "category": "exploration",
+          "mapNodeKind": "region",
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:d8caa2de9506f00e4296",
+          "title": "行政区",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:c7a6a71ab882daa071c3"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:6f535542903d36a9aa6f",
+          "title": "城郊雪原",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:c7a6a71ab882daa071c3"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:1fe537564231016aac2e",
+          "title": "边缘通路",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:c7a6a71ab882daa071c3"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:d15beb77aa07568232ec",
+          "title": "铁卫禁区",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:c7a6a71ab882daa071c3"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:e5188c4833b73f38360c",
+          "title": "残响回廊",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:c7a6a71ab882daa071c3"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:2b000bbbe9a6cbefe247",
+          "title": "永冬岭",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:c7a6a71ab882daa071c3"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:09a44ab14436a3d67b79",
+          "title": "磐岩镇",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:c7a6a71ab882daa071c3"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:5e824a021051c99adb8c",
+          "title": "大矿区",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:c7a6a71ab882daa071c3"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:1650725440666e01a253",
+          "title": "铆钉镇",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:c7a6a71ab882daa071c3"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:2a35a1a1172492ff408c",
+          "title": "机械聚落",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:c7a6a71ab882daa071c3"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:b1a3688779351876b538",
+          "title": "历史文化博物馆",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:c7a6a71ab882daa071c3"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:7ec73bce93a2dcb2d12a",
+          "title": "造物之柱",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:c7a6a71ab882daa071c3"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:1ac9ebe93478bba41938",
+          "title": "旧武器试验场",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:c7a6a71ab882daa071c3"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:region:51f962fe6bcd036ac105",
+          "title": "仙舟「罗浮」",
+          "category": "exploration",
+          "mapNodeKind": "region",
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:01798a65749a5b7d0703",
+          "title": "星槎海中枢",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:51f962fe6bcd036ac105"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:1ecd3b40a3f90008544a",
+          "title": "流云渡",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:51f962fe6bcd036ac105"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:41933ba5e8dec89f610e",
+          "title": "迴星港",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:51f962fe6bcd036ac105"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:3ff54b2811435f10172e",
+          "title": "长乐天",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:51f962fe6bcd036ac105"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:ae0629d795ab649be577",
+          "title": "太卜司",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:51f962fe6bcd036ac105"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:9e7807818077165f3d66",
+          "title": "工造司",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:51f962fe6bcd036ac105"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:7249e632d546fcc23a20",
+          "title": "丹鼎司",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:51f962fe6bcd036ac105"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:39c713165da87c5d3924",
+          "title": "鳞渊境",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:51f962fe6bcd036ac105"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:76d8871710cd20faa574",
+          "title": "金人巷",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:51f962fe6bcd036ac105"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:75e0266d33931252505c",
+          "title": "绥园",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:51f962fe6bcd036ac105"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:42dda7ed52365248c76b",
+          "title": "幽囚狱",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:51f962fe6bcd036ac105"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:b5f5c2926dfcde7d0ba6",
+          "title": "竞锋舰",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:51f962fe6bcd036ac105"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:region:e84ffecd5975e54f0e9e",
+          "title": "匹诺康尼",
+          "category": "exploration",
+          "mapNodeKind": "region",
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:8eb41e49cf2c6e4a79f7",
+          "title": "「白日梦」酒店-梦境",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:e84ffecd5975e54f0e9e"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:be11e7f282edc0aabe24",
+          "title": "黄金的时刻",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:e84ffecd5975e54f0e9e"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:9ab8b24b6d2ad6688200",
+          "title": "筑梦边境",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:e84ffecd5975e54f0e9e"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:979f5cf286f36f88de45",
+          "title": "稚子的梦",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:e84ffecd5975e54f0e9e"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:0012b096380610e1814b",
+          "title": "「白日梦」酒店-现实",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:e84ffecd5975e54f0e9e"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:b6d6e9175b0570258bbc",
+          "title": "朝露公馆",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:e84ffecd5975e54f0e9e"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:94c1df99738cda42bd36",
+          "title": "克劳克影视乐园",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:e84ffecd5975e54f0e9e"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:852fdb2f42826b272b75",
+          "title": "流梦礁",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:e84ffecd5975e54f0e9e"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:486c8f2c564c7e4fc270",
+          "title": "苏乐达™热砂海选会场",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:e84ffecd5975e54f0e9e"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:b9a0aa56a52c93305812",
+          "title": "匹诺康尼大剧院",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:e84ffecd5975e54f0e9e"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:e1a5d1bd720202285dd6",
+          "title": "晖长石号",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:e84ffecd5975e54f0e9e"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:b4c0767957a5c4c21bf2",
+          "title": "匹诺康尼折纸大学学院",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:e84ffecd5975e54f0e9e"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:d2b089bc3a12e43c8349",
+          "title": "橡木鸣蛀之梦",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:e84ffecd5975e54f0e9e"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:region:9eb0a2a1547a922771da",
+          "title": "翁法罗斯",
+          "category": "exploration",
+          "mapNodeKind": "region",
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:9d413d110203f0bcf6b8",
+          "title": "「永恒圣城」奥赫玛",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:9eb0a2a1547a922771da"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:ddc586c38cb5294d168c",
+          "title": "「纷争荒墟」悬锋城",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:9eb0a2a1547a922771da"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:e67bf4709ef0fa5b944d",
+          "title": "创世涡心",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:9eb0a2a1547a922771da"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:6000fb1e891061313e21",
+          "title": "「浴血战端」悬锋城",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:9eb0a2a1547a922771da"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:658b390b46fa14a29daa",
+          "title": "「命运重渊」雅努萨波利斯",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:9eb0a2a1547a922771da"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:40c4dd504a8523be2b61",
+          "title": "「呓语密林」神悟树庭",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:9eb0a2a1547a922771da"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:510371278039110745cf",
+          "title": "「神谕圣地」雅努萨波利斯",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:9eb0a2a1547a922771da"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:d4813fc2bd5b9a99a35a",
+          "title": "「半神议院」黎明云崖",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:9eb0a2a1547a922771da"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:c54d51ec9c75bdb7bfa5",
+          "title": "「龙骸古城」斯缇科西亚",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:9eb0a2a1547a922771da"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:16e1a1570563f110807a",
+          "title": "「穹顶关塞」晨昏之眼",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:9eb0a2a1547a922771da"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:f5396aee7094625e5e4c",
+          "title": "「云端遗堡」晨昏之眼",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:9eb0a2a1547a922771da"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:42858fa938cbce62984e",
+          "title": "「无晖祈堂」黎明云崖",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:9eb0a2a1547a922771da"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:be14dd1b65b776a32109",
+          "title": "「沉沦暮城」奥赫玛",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:9eb0a2a1547a922771da"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:da795f398cc1081ef931",
+          "title": "哀丽秘榭",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:9eb0a2a1547a922771da"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:30e2a3383601f49c0543",
+          "title": "「酣歌海垠」斯缇科西亚",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:9eb0a2a1547a922771da"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:a290cdbff661e56d5ad9",
+          "title": "「全世矩阵」无名泰坦大墓",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:9eb0a2a1547a922771da"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:1e705dd06e471e122129",
+          "title": "「辉痕圣林」神悟树庭",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:9eb0a2a1547a922771da"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:bfb8956ac429a47b7a43",
+          "title": "「葬忆彼岸」时光归墟",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:9eb0a2a1547a922771da"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:31cbc838765a0bc31615",
+          "title": "「灾梦余温」无名泰坦大墓",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:9eb0a2a1547a922771da"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:cf68f749b5db2bb11a88",
+          "title": "「岁月彼岸」一页永恒",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:9eb0a2a1547a922771da"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:region:406b67ad56fd72dd630b",
+          "title": "二相乐园",
+          "category": "exploration",
+          "mapNodeKind": "region",
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:f0f370155aea6764436d",
+          "title": "二维市",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:406b67ad56fd72dd630b"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:85f52216e4c07a12779d",
+          "title": "绘世学院",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:406b67ad56fd72dd630b"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:5713b509854b342fcfc9",
+          "title": "鸽川区",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:406b67ad56fd72dd630b"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:fa02be05a80848990287",
+          "title": "幻月秘庭",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:406b67ad56fd72dd630b"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:02c5b8347afa794a8ab0",
+          "title": "「世界尽头」酒馆",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:406b67ad56fd72dd630b"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:d85c9d23419de0049234",
+          "title": "珠星大厦",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:406b67ad56fd72dd630b"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:5e07db13d785107accbd",
+          "title": "观览云岛站",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:406b67ad56fd72dd630b"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:6acacd39f2205f5042dc",
+          "title": "海原市",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:406b67ad56fd72dd630b"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:93dd10862fe195bdf08c",
+          "title": "海原电视塔",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:406b67ad56fd72dd630b"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:13861dfb468dbafd0bed",
+          "title": "渡画泉隐",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:406b67ad56fd72dd630b"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:3318110322568bf8dddb",
+          "title": "寂灭空飨妖都",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:406b67ad56fd72dd630b"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:1992b4954531c012ad0f",
+          "title": "坠星的摇篮",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:406b67ad56fd72dd630b"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:region:b3eaf088c36144615244",
+          "title": "星穹列车",
+          "category": "exploration",
+          "mapNodeKind": "region",
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:62035d31add7e11b7dfd",
+          "title": "观景车厢",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:b3eaf088c36144615244"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:4782047de79be74f3a55",
+          "title": "客房车厢",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:b3eaf088c36144615244"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:6a9cfe2f593e8a612ee5",
+          "title": "派对车厢",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:b3eaf088c36144615244"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:region:astropolis",
+          "title": "千星城",
+          "category": "exploration",
+          "mapNodeKind": "region",
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:astropolis-central-district",
+          "title": "千星城中心城区",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:astropolis"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:lodestar-tower",
+          "title": "指针塔",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:astropolis"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:skycall-aery",
+          "title": "空声院",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:astropolis"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:life-sciences-institute",
+          "title": "生研院",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:astropolis"
+        },
+        {
+          "remoteKey": "event:4.6:garden-of-plenty",
+          "title": "花藏繁生",
+          "category": "limited_event",
+          "mapNodeKind": null,
+          "parentRemoteKey": null
+        }
+      ],
+      "schedules": [
+        {
+          "kind": "cycle_rule",
+          "key": "star-rail:anomaly-arbitration:4.6-anchor"
+        },
+        {
+          "kind": "cycle_rule",
+          "key": "star-rail:apocalyptic-shadow:4.6-anchor"
+        },
+        {
+          "kind": "cycle_rule",
+          "key": "star-rail:memory-of-chaos:4.6-anchor"
+        },
+        {
+          "kind": "cycle_rule",
+          "key": "star-rail:pure-fiction:4.6-anchor"
+        },
+        {
+          "kind": "cycle_window",
+          "key": "star-rail:anomaly-arbitration:star-rail:anomaly-arbitration:10"
+        },
+        {
+          "kind": "cycle_window",
+          "key": "star-rail:memory-of-chaos:star-rail:memory-of-chaos:1035"
+        },
+        {
+          "kind": "cycle_window",
+          "key": "star-rail:pure-fiction:predicted:star-rail:pure-fiction:2026-09-13T20:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "section": "events",
+      "result": "verified_unchanged",
+      "note": "当前完整官方更新与最新官方列表覆盖下半一镜到底、当期位面分裂、既有跨版本活动与后续花藏繁生。八项均已在清单；不重复登记内部奖励、抽取池、商店、卡池、常驻玩法或未来4.7赠礼。签到及经营活动的历史冲突已于10/1解决，复用有效来源与名义维护基准，不重开裁决。"
+    },
+    {
+      "section": "cycles",
+      "result": "verified_unchanged",
+      "note": "逐光三模式和随版本的异相仲裁保持既有定义、四条规则及三条例外。当前官方完整公告与已发布规则一致，无新的规则/锚点/资格更正；不发布常规逐期窗口。这里只核查公共规则，不把CLI种子条目的当前投影当官方来源。"
+    },
+    {
+      "section": "maps",
+      "result": "verified_unchanged_with_reused_navigation_evidence",
+      "note": "完整检查8父82子稳定键和父级；本版本唯一新场景生研院已收录，复用9/28、10/1实际官方导航证据。本次官方地图动态页无正文，未声称重新实测导航；当前完整官方版本增量无新的未覆盖场景。真珠的画室沿用既有非独立入口裁决，定向补查仅见珠星大厦内定锚名称，未据场景/联机副本创建地图。"
+    },
+    {
+      "section": "version_and_exceptions",
+      "result": "verified_unchanged",
+      "note": "4.6结束11/11 06:00和已存44天例外保持；上半返场截止10/21 11:59与延长真珠池分别处理。4.7窗口属于全局排期研究的pending，不阻止完成本4.6节点的已覆盖审计。"
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://www.taptap.cn/moment/853326330178046059?group_id=311675",
+      "sourceRef": "turn37view0/turn38view0",
+      "official": true,
+      "publication": {
+        "date": "2026-09-27",
+        "precision": "date"
+      },
+      "readScope": "complete lines 0-449",
+      "use": "完整版本内容、已在清单的一镜到底窗口、生研院、四终局玩法及既有例外。当前正文与既有裁决一致。"
+    },
+    {
+      "url": "https://www.taptap.cn/app/224267/topic?type=official",
+      "sourceRef": "turn39view1",
+      "official": true,
+      "publication": {
+        "coverage": "latest through 2026-09-30",
+        "precision": "per-entry raw display"
+      },
+      "use": "覆盖10/1研究后新增公告：一镜到底、位面分裂、4.7预热漫画及美术展示；没有额外独立限时玩法/地图更正。"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/861273141173815414?group_id=311675",
+      "sourceRef": "turn39view0",
+      "official": true,
+      "publication": {
+        "rawDisplay": "昨天03:00",
+        "date": "2026-10-20",
+        "precision": "relative rendered time; timezone not specified by page"
+      },
+      "use": "新的独立一镜到底宣传，玩法与既有唯一事项一致；时间仍以完整官方公告和已核验秒精度记录为准。"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/857992346241860800?group_id=311675",
+      "sourceRef": "turn40view0",
+      "official": true,
+      "publication": {
+        "date": "2026-10-11",
+        "precision": "date"
+      },
+      "use": "重核位面分裂10/12 04:00至10/25 03:59服务器时间；既有日历秒精度03:59:59保留。"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/853596636167801477",
+      "sourceRef": "turn39view2",
+      "official": true,
+      "publication": {
+        "date": "2026-09-28",
+        "precision": "date"
+      },
+      "use": "乐子神网页事项完整精确窗口与当前条目一致；后续漫画各话不另拆事项。"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/853592474952665210",
+      "sourceRef": "turn39view3",
+      "official": true,
+      "publication": {
+        "date": "2026-09-28",
+        "precision": "date"
+      },
+      "use": "已正式开服及经营/签到开放证明，支持10/1已保存的条件起点裁决。"
+    },
+    {
+      "url": "https://hsr.hoyoverse.com/zh-cn/news/166468",
+      "sourceRef": "turn38search14",
+      "official": true,
+      "result": "direct_loading; indexed official text and official TapTap full text used",
+      "use": "与官方社区完整更新交叉校验。"
+    },
+    {
+      "url": "https://webstatic.mihoyo.com/sr/app/interactive-map/index.html#/map/943",
+      "sourceRef": "turn37view2",
+      "official": true,
+      "result": "empty_dynamic_body",
+      "use": "没有声称本次重测；复用priorEvidence中已实际核验的导航结构。"
+    },
+    {
+      "url": "https://webstatic.mihoyo.com/sr/app/interactive-map/index.html#/map/1014",
+      "sourceRef": "turn37view3",
+      "official": true,
+      "result": "empty_dynamic_body",
+      "use": "复用生研院既有独立官方导航证据；无新地图改动。"
+    }
+  ],
+  "decisions": [
+    {
+      "key": "event:4.6:interastral-peace-gala",
+      "target": "events",
+      "status": "verified_unchanged",
+      "checkedAt": "2026-10-21T04:41:53.745Z",
+      "previousValue": {
+        "startsAt": "2026-10-21T12:00:00+08:00",
+        "endsAt": "2026-11-11T03:59:59+08:00"
+      },
+      "adoptedValue": "keep same remoteKey/title/tags/window",
+      "reason": "完整官方公告精确12:00开始，新的官方宣传无更正；现有秒精度来自已核验第一方日历，公告为分钟精度，不凭抓取时间重写。"
+    },
+    {
+      "key": "permanent-and-internal-containers",
+      "target": "events_and_cycles",
+      "status": "excluded_reused",
+      "checkedAt": "2026-10-21T04:41:53.745Z",
+      "reason": "复用10/1的明确裁决；星际幻宠乐园、星际潮玩、游园伴手礼、星际碰碰好搭档、货币战争赛季轨和4.7赠礼不据宣传容器或领取节点另建独立限时事项；本轮无新事实要求重开。"
+    },
+    {
+      "key": "map-candidate:pearls-studio",
+      "target": "exploration",
+      "status": "excluded_reused",
+      "checkedAt": "2026-10-21T04:41:53.745Z",
+      "reason": "复用10/1非独立地图入口结论。当前完整4.6更新只有已收录生研院，联机生研院属同一场景的联机入口；一次定向补查没有新的独立探索资格证据。"
+    },
+    {
+      "key": "rules-and-stable-identities",
+      "target": "all",
+      "status": "verified_unchanged",
+      "checkedAt": "2026-10-21T04:41:53.745Z",
+      "reason": "四个周期定义与7条既有规则/例外、90地图节点、全部退役及跨版本身份保持。普通滚动由既有消费者负责，不为半程例行发布窗口。"
+    }
+  ],
+  "pending": [],
+  "delivery": {
+    "stage": "verified_unchanged_pending_ci",
+    "branch": "codex/cloud-baseline/star-rail-4-6-first-half-end",
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/29",
+    "catalogChanged": false,
+    "catalogRevision": "2026-10-21.zenless-3.3-sign-in",
+    "catalogSha256": "6b0a5b24f5230b437c955413ece6238f9df817a807a24ccdae1d8ee498c56aae",
+    "revisionAdvanced": false,
+    "publishedAtAdvanced": false,
+    "mainCatalogReadSha": "6560f69890db8d38a41a2cdd6ed56b0754912a53",
+    "rawContentEqualityToVerifiedPublication": true
+  },
+  "catalogChanged": false,
+  "scope": "4.6 first-half boundary: lower-half additions and current full public scope; reuse valid prior facts",
+  "unresolvedDecisionCount": 0,
+  "independentSupplement": {
+    "performed": true,
+    "bounded": true,
+    "queries": [
+      "星穹铁道4.6下半活动",
+      "真珠的画室地图",
+      "4.6生研院地图"
+    ],
+    "officialIndexVerification": "primary publisher full update and fresh official list sufficient; system1 targeted verification returned irrelevant/no additional useful primary evidence",
+    "result": "未发现遗漏的独立限时事项、必要更正或新合格地图。旧候选裁决不因重复抓取重开。"
+  },
+  "reusedEvidence": [
+    {
+      "path": "docs/catalog-research/star-rail-4.6-2026-09-28.json",
+      "blobSha": "a04b682edc125f54ad5e941b9b984593d9de2125",
+      "scope": "public facts only; no personal observations, player database or account access"
+    },
+    {
+      "path": "docs/catalog-research/star-rail-4.6-2026-10-01.json",
+      "blobSha": "be0eed9fbe99b3d33e0bb8549e48ef391c9024f1",
+      "scope": "public facts only; no personal observations, player database or account access"
+    },
+    {
+      "path": "docs/catalog-research/star-rail-4.6-maps-2026-09-28.json",
+      "blobSha": "d9d86fc8d5d2bae8937c9e6de571a149c63f0102",
+      "scope": "public facts only; no personal observations, player database or account access"
+    }
+  ],
+  "validation": {
+    "realConsumer": "fresh main original catalog-maintenance-cli --inventory / AppDatabase(:memory:) passed",
+    "plannerTests": "33 passed earlier in run, same exact planner/test source",
+    "ci": "pending final exact head Verify + Cloud baseline checks; required full tests/build/catalog checks through CI"
+  }
+}
