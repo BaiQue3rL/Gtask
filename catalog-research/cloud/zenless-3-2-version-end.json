@@ -6,8 +6,8 @@
   "periodKey": "3.2",
   "node": "version_end",
   "newVersion": "3.3",
-  "checkedAt": "2026-10-21T03:13:48.423Z",
-  "status": "pending",
+  "checkedAt": "2026-10-21T04:31:38.008Z",
+  "status": "ready",
   "auditComplete": false,
   "serverScope": {
     "region": "中国大陆适用官方公告",
@@ -15,7 +15,7 @@
     "utcOffset": "+08:00",
     "note": "按既有已核验国服范围归一化；不混用其他服务器时间。公告仅到分钟时保留:00秒。"
   },
-  "baseMainSha": "8f72f96de59cdabc38574e217a5423f68af4c877",
+  "baseMainSha": "73e298deef998cff0b5b74fa67c9101c5d8beedf",
   "priorEvidence": [
     "docs/catalog-research/zenless-3.2-2026-10-11.json",
     "catalog-research/cloud/schedule-review-20261019.json",
@@ -297,6 +297,17 @@
       "section": "version_and_exceptions",
       "result": "verified_boundary_added",
       "note": "从完整官方公告直接核验3.3于12/02 06:00结束。仅补云端period事实，现有正常cadence无已核验例外，不发布普通version_window或version_rule。"
+    },
+    {
+      "section": "resumption_attempt_3",
+      "result": "partial",
+      "checkedAt": "2026-10-21T04:31:38.008Z",
+      "inventoryRevision": "2026-10-21.zenless-3.3-events",
+      "method": "fresh exact-main original CLI and real AppDatabase(:memory:)",
+      "actualAddition": "全新放送",
+      "events": "已公布8项活动全部已核验；7项之前发布，本轮仅补已确认开服的签到项。",
+      "maps": "既有6父26子身份与退役保留；3个候选欠独立进度，未新增。",
+      "cycles": "2个稳定模式不发逐期窗口；拟境规则仍pending。"
     }
   ],
   "sources": [
@@ -420,6 +431,38 @@
       "sourceRef": "turn26view2",
       "result": "direct_unavailable_this_attempt",
       "summary": "复用上轮截止；完整更新再次确认条件式起点和12/01截止。"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/861882420356450082?group_id=330333",
+      "sourceRef": "turn34view0",
+      "identity": "official game account",
+      "publication": {
+        "rawDisplay": "更新时间3小时前",
+        "precision": "relative"
+      },
+      "checkedAt": "2026-10-21T04:31:38.008Z",
+      "result": "readable",
+      "summary": "官方明确3.3现已开启，补齐维护后正式服开放证据。"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/861568099537652819?group_id=330333",
+      "sourceRef": "turn33view3",
+      "identity": "official game account",
+      "checkedAt": "2026-10-21T04:31:38.008Z",
+      "result": "readable",
+      "summary": "全新放送：3.3更新后至12月1日03:59，累计七日签到。起点条件与截止独立保留。"
+    },
+    {
+      "url": "https://zenless.hoyoverse.com/m/zh-cn/news/166963",
+      "sourceRef": "turn33search0",
+      "identity": "official publisher site",
+      "publication": {
+        "date": "2026-10-21",
+        "precision": "date"
+      },
+      "checkedAt": "2026-10-21T04:31:38.008Z",
+      "result": "full_indexed_text",
+      "summary": "更新维护6点UTC+8预计5小时；3.3结束12月2日06:00UTC+8；完整活动、地区、玩法更新与前轮记录一致。"
     }
   ],
   "decisions": [
@@ -712,44 +755,80 @@
       "status": "resolved_condition_pending_ci",
       "checkedAt": "2026-10-21T03:13:48.423Z",
       "reason": "管理员PR24已合入main；测试blob由202dc25...变为e8db671...，实时清单增长回归取代固定计数。当前任务不改软件或测试；仍以本PR最终精确head两项CI为合并门槛。"
+    },
+    {
+      "key": "candidate:3.3:all-new-program",
+      "target": "events",
+      "status": "resolved",
+      "checkedAt": "2026-10-21T04:31:38.008Z",
+      "previousValue": "conditional start; awaiting real opening proof",
+      "adoptedValue": {
+        "remoteKey": "event:3.3:all-new-program",
+        "category": "limited_event",
+        "title": "全新放送",
+        "startsAt": "2026-10-21T11:00:00+08:00",
+        "endsAt": "2026-12-01T03:59:00+08:00",
+        "activityTags": [
+          "sign-in"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai",
+        "sourceUrl": "https://www.taptap.cn/moment/861568099537652819?group_id=330333"
+      },
+      "timeBasis": {
+        "start": "nominal_maintenance_completion",
+        "precision": "minute",
+        "scheduledStart": "06:00 UTC+8",
+        "expectedDurationHours": 5,
+        "actualOpenConfirmed": true,
+        "actualOpeningInstantMeasured": false,
+        "sourceEnd": "server time UTC+8"
+      },
+      "reason": "新的官方账号开启公告补齐前轮缺证据项；沿用名义维护完成基准表示条件起点，不声称测量到11:00实际开服。",
+      "sources": [
+        "https://www.taptap.cn/moment/861568099537652819?group_id=330333",
+        "https://www.taptap.cn/moment/861882420356450082?group_id=330333",
+        "https://zenless.hoyoverse.com/m/zh-cn/news/166963"
+      ]
     }
   ],
   "pending": [
     {
-      "key": "candidate:3.3:all-new-program",
-      "target": "events",
-      "reason": "缺正式服已开放的可靠补证；已保存条件起点、预计维护完成11:00与12/01 03:59截止，待补证后再编译。"
-    },
-    {
       "key": "cycles:hollow-annihilation",
       "target": "cycles",
-      "reason": "完整更新和一次独立定向补查没有可用重置锚点、周期长度与开放时长；保留此前裁决。"
+      "reason": "完整更新和一次独立定向补查没有可用重置锚点、周期长度与开放时长；保留此前裁决。",
+      "checkedAt": "2026-10-21T04:31:38.008Z"
     },
     {
       "key": "map-candidate:verum-city",
       "target": "exploration",
-      "reason": "仍缺独立探索进度，复用既有来源与裁决。"
+      "reason": "官方名称/父级及版本已开放已复核；仍无独立探索进度资格的可靠补证。主要公告及一次定向补查无结果，保留pending。",
+      "checkedAt": "2026-10-21T04:31:38.008Z"
     },
     {
       "key": "map-candidate:ningxi-isle",
       "target": "exploration",
-      "reason": "父级和官方简体名称已确认；独立探索进度与当前开放证据缺失。"
+      "reason": "官方名称/父级及版本已开放已复核；仍无独立探索进度资格的可靠补证。主要公告及一次定向补查无结果，保留pending。",
+      "checkedAt": "2026-10-21T04:31:38.008Z"
     },
     {
       "key": "map-candidate:airspace-control-tower",
       "target": "exploration",
-      "reason": "父级和官方简体名称已确认；独立探索进度与当前开放证据缺失。"
+      "reason": "官方名称/父级及版本已开放已复核；仍无独立探索进度资格的可靠补证。主要公告及一次定向补查无结果，保留pending。",
+      "checkedAt": "2026-10-21T04:31:38.008Z"
     }
   ],
   "independentSupplement": {
-    "completed": true,
+    "checkedAt": "2026-10-21T04:31:38.008Z",
+    "performed": true,
+    "bounded": true,
     "queries": [
-      "\"绝区零\" \"重返天空的旅程\" \"现已开启\"",
-      "\"绝区零\" \"宁息屿\" \"探索进度\"",
-      "\"绝区零\" \"空域总控塔\" \"探索进度\"",
-      "\"绝区零\" \"拟境湮灭战\" \"3.3\" \"重置\""
+      "维尔乌姆城区 探索进度",
+      "宁息屿 探索进度",
+      "空域总控塔 探索进度",
+      "拟境湮灭战 3.3 重置"
     ],
-    "result": "主要完整更新+一次定向补查后，开服、地图独立进度和拟境规则未得到可靠新增证据。停止同轮继续搜索；在下一共享业务节点机会续接，避免固定小时循环。"
+    "result": "未取得独立地图进度或可编译重置规则；停止本轮扩大搜索，复用旧来源/裁决。"
   },
   "validation": {
     "inventory": "fresh exact-main actual consumer passed",
@@ -829,130 +908,46 @@
         "conclusion": "success"
       },
       "mainRevisionAndSha256": "matched actual saved main bytes"
+    },
+    "attempt3": {
+      "localCompiler": "passed",
+      "realConsumer": "AppDatabase(:memory:) passed",
+      "semanticCheck": "only one verified sign-in addition plus revision/publishedAt",
+      "rawUtf8Sha256": "6b0a5b24f5230b437c955413ece6238f9df817a807a24ccdae1d8ee498c56aae",
+      "ci": "pending exact final head Verify and Cloud baseline checks; full prescribed checks via CI"
     }
   },
   "delivery": {
-    "stage": "partial_published",
+    "stage": "ready_partial",
     "branch": "codex/cloud-baseline/zenless-3-2-version-end",
-    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/25",
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/27",
     "catalogChanged": true,
-    "catalogRevision": "2026-10-21.zenless-3.3-events",
-    "catalogSha256": "1f9ce7e306da392be6f09de446b2626bfe25c7d2426bd56f0fdfef3fa80af8bf",
+    "catalogRevision": "2026-10-21.zenless-3.3-sign-in",
+    "catalogSha256": "6b0a5b24f5230b437c955413ece6238f9df817a807a24ccdae1d8ee498c56aae",
     "nodeComplete": false,
-    "resumeAt": "2026-10-21T03:59:00.000Z",
-    "mainReadSha": "cdf509d21f469628621a7d62ccbcc83aeded3453",
-    "mainVerifiedAt": "2026-10-21T03:18:06.114Z",
-    "remainingPendingCount": 5,
-    "receiptPublication": "follow-up restricted state/research PR; exact head CI verified before merge externally",
-    "mirror": {
-      "url": "https://gitee.com/l3rui/Gtask/raw/main/updates/catalog.json",
-      "result": "unreadable_via_public_fetch",
-      "sourceRef": "turn31view0",
-      "mirrorRevisionVerified": false
-    },
-    "clientReceipt": "not_observed; no dependency on player client"
+    "remainingPendingCount": 4,
+    "resumeAt": null
   },
   "verifiedCatalogDelta": {
     "schemaVersion": 2,
-    "revision": "2026-10-21.zenless-3.3-events",
-    "publishedAt": "2026-10-21T03:10:40.801Z",
+    "revision": "2026-10-21.zenless-3.3-sign-in",
+    "publishedAt": "2026-10-21T04:30:13.224Z",
     "games": [
       {
         "gameId": "zenless",
         "upserts": [
           {
-            "remoteKey": "event:3.3:haunted-house",
+            "remoteKey": "event:3.3:all-new-program",
             "category": "limited_event",
-            "title": "怪奇诡屋惊魂记",
-            "startsAt": "2026-10-22T10:00:00+08:00",
-            "endsAt": "2026-11-30T03:59:00+08:00",
-            "activityTags": [
-              "challenge"
-            ],
-            "scheduleKind": "fixed_window",
-            "timeZone": "Asia/Shanghai",
-            "sourceUrl": "https://www.taptap.cn/moment/861568981209714673?group_id=330333"
-          },
-          {
-            "remoteKey": "event:3.3:cyber-doctor",
-            "category": "limited_event",
-            "title": "赛博圣手，出诊!",
-            "startsAt": "2026-10-28T10:00:00+08:00",
-            "endsAt": "2026-11-16T03:59:00+08:00",
-            "activityTags": [
-              "quest"
-            ],
-            "scheduleKind": "fixed_window",
-            "timeZone": "Asia/Shanghai",
-            "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
-          },
-          {
-            "remoteKey": "event:3.3:regional-patrol-bounty",
-            "category": "limited_event",
-            "title": "先遣赏金-区域巡防",
-            "startsAt": "2026-11-04T04:00:00+08:00",
-            "endsAt": "2026-11-09T03:59:00+08:00",
-            "activityTags": [
-              "combat",
-              "double-reward"
-            ],
-            "scheduleKind": "fixed_window",
-            "timeZone": "Asia/Shanghai",
-            "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
-          },
-          {
-            "remoteKey": "event:3.3:boopons-from-above",
-            "category": "limited_event",
-            "title": "「嗯呢」从天降",
-            "startsAt": "2026-11-11T10:00:00+08:00",
+            "title": "全新放送",
+            "startsAt": "2026-10-21T11:00:00+08:00",
             "endsAt": "2026-12-01T03:59:00+08:00",
             "activityTags": [
               "sign-in"
             ],
             "scheduleKind": "fixed_window",
             "timeZone": "Asia/Shanghai",
-            "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
-          },
-          {
-            "remoteKey": "event:3.3:hobbling-crow-mystery",
-            "category": "limited_event",
-            "title": "跛脚乌鸦奇踪记",
-            "startsAt": "2026-11-11T10:00:00+08:00",
-            "endsAt": "2026-11-30T03:59:00+08:00",
-            "activityTags": [
-              "puzzle",
-              "quest"
-            ],
-            "scheduleKind": "fixed_window",
-            "timeZone": "Asia/Shanghai",
-            "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
-          },
-          {
-            "remoteKey": "event:3.3:drifting-picture-album",
-            "category": "limited_event",
-            "title": "修复吧！漂流画集",
-            "startsAt": "2026-11-16T10:00:00+08:00",
-            "endsAt": "2026-11-30T03:59:00+08:00",
-            "activityTags": [
-              "puzzle"
-            ],
-            "scheduleKind": "fixed_window",
-            "timeZone": "Asia/Shanghai",
-            "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
-          },
-          {
-            "remoteKey": "event:3.3:combat-simulation-bounty",
-            "category": "limited_event",
-            "title": "数据悬赏-实战模拟",
-            "startsAt": "2026-11-25T04:00:00+08:00",
-            "endsAt": "2026-11-30T03:59:00+08:00",
-            "activityTags": [
-              "combat",
-              "double-reward"
-            ],
-            "scheduleKind": "fixed_window",
-            "timeZone": "Asia/Shanghai",
-            "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
+            "sourceUrl": "https://www.taptap.cn/moment/861568099537652819?group_id=330333"
           }
         ],
         "archives": []
@@ -1013,6 +1008,33 @@
         "message": "expected length 19 but got 20; 501 tests passed, 1 failed, 12 skipped; build/consumer skipped after test failure",
         "scopeResolution": "只交付允许的state/研究，清单退回main原始字节；不修改测试或为凑数量删除/复用其他身份。后续读取main测试blob，条件未修复时不盲目重复相同失败CI；记录同节点受阻运行数，连续三轮仍不能交付时按应急报告管理员软件维护。"
       }
+    },
+    {
+      "attempt": 3,
+      "at": "2026-10-21T04:24:36.768Z",
+      "priorStatus": "pending",
+      "priorDelivery": {
+        "stage": "partial_published",
+        "branch": "codex/cloud-baseline/zenless-3-2-version-end",
+        "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/25",
+        "catalogChanged": true,
+        "catalogRevision": "2026-10-21.zenless-3.3-events",
+        "catalogSha256": "1f9ce7e306da392be6f09de446b2626bfe25c7d2426bd56f0fdfef3fa80af8bf",
+        "nodeComplete": false,
+        "resumeAt": "2026-10-21T03:59:00.000Z",
+        "mainReadSha": "cdf509d21f469628621a7d62ccbcc83aeded3453",
+        "mainVerifiedAt": "2026-10-21T03:18:06.114Z",
+        "remainingPendingCount": 5,
+        "receiptPublication": "follow-up restricted state/research PR; exact head CI verified before merge externally",
+        "mirror": {
+          "url": "https://gitee.com/l3rui/Gtask/raw/main/updates/catalog.json",
+          "result": "unreadable_via_public_fetch",
+          "sourceRef": "turn31view0",
+          "mirrorRevisionVerified": false
+        },
+        "clientReceipt": "not_observed; no dependency on player client"
+      },
+      "baseMainSha": "73e298deef998cff0b5b74fa67c9101c5d8beedf"
     }
   ],
   "scheduleResolution": {
@@ -1054,17 +1076,15 @@
     }
   },
   "scheduleReviewThisAttempt": {
-    "required": false,
-    "performed": false,
-    "nextScheduleReviewAt": "2026-10-21T03:59:00.000Z",
-    "note": "仅处理到期绝区零节点；不刷新其他游戏period/gap checkedAt，不延后尚未到期的全局复核。"
+    "checkedAt": "2026-10-21T04:31:38.008Z",
+    "evidencePath": "catalog-research/cloud/schedule-review-20261021-midday.json",
+    "nextScheduleReviewAt": "2026-10-22T01:59:00.000Z"
   },
   "currentAttempt": {
-    "attempt": 2,
-    "checkedAt": "2026-10-21T03:13:48.423Z",
+    "attempt": 3,
+    "checkedAt": "2026-10-21T04:31:38.008Z",
     "officialUpdateFullyRead": true,
-    "sourceLinesCovered": "0-473",
-    "proposedCatalogAdded": 7,
+    "proposedCatalogAdded": 1,
     "allExpectedActivities": 8,
     "allCurrentMapRowsInspected": 32,
     "auditComplete": false
@@ -1095,9 +1115,11 @@
     }
   ],
   "progressThisAttempt": {
-    "catalogPublished": true,
-    "added": 7,
-    "scheduleGapResolved": "zenless/3.3/endsAt"
+    "catalogAdditions": 1,
+    "resolvedPending": [
+      "candidate:3.3:all-new-program"
+    ],
+    "remainingPending": 4
   },
   "consecutiveRunsWithoutProgress": 0
 }

@@ -1,0 +1,217 @@
+{
+  "schemaVersion": 1,
+  "kind": "schedule_review",
+  "checkedAt": "2026-10-21T04:31:38.008Z",
+  "baseMainSha": "73e298deef998cff0b5b74fa67c9101c5d8beedf",
+  "scheduleReviewDue": true,
+  "previousNextScheduleReviewAt": "2026-10-21T03:59:00.000Z",
+  "serverScope": {
+    "server": "CN official production servers",
+    "timeZone": "Asia/Shanghai",
+    "offset": "+08:00"
+  },
+  "coverage": [
+    "genshin",
+    "star-rail",
+    "zenless",
+    "wuthering-waves"
+  ],
+  "results": [
+    {
+      "gameId": "genshin",
+      "result": "pending",
+      "newOfficialInformation": "7.2前瞻10月23日20:00；仅节目时间",
+      "sources": [
+        "https://www.taptap.cn/app/168332/topic?type=official",
+        "https://www.taptap.cn/moment/861928431204435494?group_id=201765",
+        "https://ys.mihoyo.com/main/"
+      ],
+      "publication": {
+        "rawDisplay": "19分钟前",
+        "precision": "relative; checkedAt is retrieval time"
+      },
+      "decision": "不据前瞻推算版本窗口，上半历史不补做。"
+    },
+    {
+      "gameId": "star-rail",
+      "result": "current_half_reconfirmed_next_pending",
+      "sources": [
+        "https://www.taptap.cn/app/224267/topic?type=official",
+        "https://www.taptap.cn/moment/852211155802787824?group_id=311675",
+        "https://hsr.hoyoverse.com/zh-cn/news/166468"
+      ],
+      "publication": {
+        "upperSourceDate": "2026-09-27",
+        "precision": "date"
+      },
+      "adoptedFirstHalfEndsAt": "2026-10-21T11:59:00+08:00",
+      "decision": "上期返场绯英截止为半程；真珠延长不替代。新到期节点随后串行处理。"
+    },
+    {
+      "gameId": "zenless",
+      "result": "3.3_window_reconfirmed",
+      "sources": [
+        "https://www.taptap.cn/moment/861197641654994725?group_id=330333",
+        "https://zenless.hoyoverse.com/m/zh-cn/news/166963",
+        "https://www.taptap.cn/moment/861882420356450082?group_id=330333"
+      ],
+      "publication": {
+        "updateDate": "2026-10-21",
+        "precision": "date",
+        "upperRawDisplay": "前天06:00"
+      },
+      "startsAt": "2026-10-21T11:00:00+08:00",
+      "endsAt": "2026-12-02T06:00:00+08:00",
+      "firstHalfEndsAt": "2026-11-11T11:59:00+08:00",
+      "decision": "官网完整索引明确UTC+8，开始为6点起预计5小时名义维护基准，另有正式开启补证；结束独立明确12/2 06:00。旧来源与裁决保留。"
+    },
+    {
+      "gameId": "wuthering-waves",
+      "result": "current_half_reconfirmed_version_end_pending",
+      "sources": [
+        "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
+        "https://www.taptap.cn/moment/853756601964691535",
+        "https://mc.kurogames.com/main/news/detail/5569"
+      ],
+      "publication": {
+        "upperSourceDate": "2026-09-29",
+        "precision": "date"
+      },
+      "firstHalfEndsAt": "2026-10-22T09:59:00+08:00",
+      "endsAt": null,
+      "decision": "只保留独立已证实半程；3.7结束和3.8窗口仍缺。"
+    }
+  ],
+  "independentSupplement": {
+    "performed": true,
+    "bounded": true,
+    "queries": [
+      "原神7.2更新维护",
+      "星穹铁道4.7版本更新维护",
+      "鸣潮3.8维护"
+    ],
+    "engines": [
+      "system2",
+      "system1_primary_verification"
+    ],
+    "result": "未取得适用的完整精确官方缺失字段；不采纳无关旧版本、爆料或第三方固定42天。"
+  },
+  "previousScheduleGaps": [
+    {
+      "gameId": "genshin",
+      "periodKey": "7.1",
+      "reason": "10月20日已查国服官方最新列表、主站和7.1版本结束/下版维护定向补查，未取得可靠精确版本结束边界；主站仍为空壳。保留10月19日已确认的历史上半截止，不补做activatedAt之前节点；不以活动、祈愿或赛季截止推断版本结束。 2026-10-21本轮已查官方列表、主来源及一次定向补查：仍未得到该缺失字段的适用明确公告，保留null；未检得不等于官方尚未公告。",
+      "checkedSources": [
+        "https://www.taptap.cn/app/168332/topic?type=official",
+        "https://ys.mihoyo.com/main/"
+      ],
+      "checkedAt": "2026-10-20T22:10:34.669Z"
+    },
+    {
+      "gameId": "genshin",
+      "periodKey": null,
+      "reason": "10月20日主要官方列表与下一版本维护的独立定向补查未取得下一版本精确开始、结束、上半截止。未检出不证明官方尚未发布；保持缺口，不推算42天或21天。 2026-10-21本轮已查官方列表、主来源及一次定向补查：仍未得到该缺失字段的适用明确公告，保留null；未检得不等于官方尚未公告。",
+      "checkedSources": [
+        "https://www.taptap.cn/app/168332/topic?type=official",
+        "https://ys.mihoyo.com/main/"
+      ],
+      "checkedAt": "2026-10-20T22:10:34.669Z"
+    },
+    {
+      "gameId": "star-rail",
+      "periodKey": "4.7",
+      "reason": "10月20日官方最新列表主要是活动/预热，新闻页仍为Loading；4.7的完整窗口及上半截止本轮未取得可靠精确证据。4.6上期返场截止10月21日11:59已重核，延长的新角色池仍不代替半程。 2026-10-21本轮已查官方列表、主来源及一次定向补查：仍未得到该缺失字段的适用明确公告，保留null；未检得不等于官方尚未公告。",
+      "checkedSources": [
+        "https://www.taptap.cn/app/224267/topic?type=official",
+        "https://hsr.hoyoverse.com/zh-cn/news/166468",
+        "https://www.taptap.cn/moment/852211155802787824?group_id=311675"
+      ],
+      "checkedAt": "2026-10-20T22:10:34.669Z"
+    },
+    {
+      "gameId": "wuthering-waves",
+      "periodKey": "3.7",
+      "reason": "10月20日重核官方版主上期唤取公告，10月22日09:59（国服服务器时间）边界保留。官网仍为空壳；官方最新列表与下一版维护/当前版本结束的独立补查未取得明确3.7版本结束维护边界；不采纳第三方固定42天或11月11日活动截止。 2026-10-21本轮已查官方列表、主来源及一次定向补查：仍未得到该缺失字段的适用明确公告，保留null；未检得不等于官方尚未公告。",
+      "checkedSources": [
+        "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
+        "https://mc.kurogames.com/main/news/detail/5569",
+        "https://www.taptap.cn/moment/853756601964691535"
+      ],
+      "checkedAt": "2026-10-20T22:10:34.669Z"
+    },
+    {
+      "gameId": "wuthering-waves",
+      "periodKey": null,
+      "reason": "10月20日已查官方最新列表、主站及3.8维护独立定向补查，下一版本精确开始、结束及上半截止仍缺可靠可读官方证据；不以其他版本公告或第三方攻略填值。 2026-10-21本轮已查官方列表、主来源及一次定向补查：仍未得到该缺失字段的适用明确公告，保留null；未检得不等于官方尚未公告。",
+      "checkedSources": [
+        "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
+        "https://mc.kurogames.com/main/news/detail/5569",
+        "https://www.taptap.cn/moment/853756601964691535"
+      ],
+      "checkedAt": "2026-10-20T22:10:34.669Z"
+    }
+  ],
+  "scheduleGaps": [
+    {
+      "gameId": "genshin",
+      "periodKey": "7.1",
+      "reason": "本轮读取国服官方列表、7.2前瞻预告与官网，并作一次独立维护定向补查；7.2前瞻仅公告10月23日20:00节目，不给7.1结束维护边界。保留endsAt=null；不采纳第三方42天/活动截止推断。",
+      "checkedSources": [
+        "https://www.taptap.cn/app/168332/topic?type=official",
+        "https://ys.mihoyo.com/main/",
+        "https://www.taptap.cn/moment/861928431204435494?group_id=201765"
+      ],
+      "checkedAt": "2026-10-21T04:31:38.008Z"
+    },
+    {
+      "gameId": "genshin",
+      "periodKey": null,
+      "reason": "本轮官方7.2前瞻预告未给版本开始、结束或上半截止；主站空壳，独立定向补查无可靠完整窗口。继续pending，未检得不等于尚未公告。",
+      "checkedSources": [
+        "https://www.taptap.cn/app/168332/topic?type=official",
+        "https://ys.mihoyo.com/main/",
+        "https://www.taptap.cn/moment/861928431204435494?group_id=201765"
+      ],
+      "checkedAt": "2026-10-21T04:31:38.008Z"
+    },
+    {
+      "gameId": "star-rail",
+      "periodKey": "4.7",
+      "reason": "本轮官方列表为4.7预热与当期活动；主站Loading，一次独立定向补查未补齐4.7完整窗口及上半截止。4.6返场池10月21日11:59上半边界保留，延长真珠池不替代。",
+      "checkedSources": [
+        "https://www.taptap.cn/app/224267/topic?type=official",
+        "https://hsr.hoyoverse.com/zh-cn/news/166468",
+        "https://www.taptap.cn/moment/852211155802787824?group_id=311675"
+      ],
+      "checkedAt": "2026-10-21T04:31:38.008Z"
+    },
+    {
+      "gameId": "wuthering-waves",
+      "periodKey": "3.7",
+      "reason": "本轮重核官方上期唤取10月22日09:59国服服务器边界；官网空壳，官方列表及独立定向补查仍未取得3.7明确结束维护边界，保留null。",
+      "checkedSources": [
+        "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
+        "https://mc.kurogames.com/main/news/detail/5569",
+        "https://www.taptap.cn/moment/853756601964691535"
+      ],
+      "checkedAt": "2026-10-21T04:31:38.008Z"
+    },
+    {
+      "gameId": "wuthering-waves",
+      "periodKey": null,
+      "reason": "本轮官方列表、官网和一次3.8维护定向补查未取得下一版本开始、结束及上半截止的可靠完整公告；不采用第三方11月中旬推测、42天或单项活动截止。",
+      "checkedSources": [
+        "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
+        "https://mc.kurogames.com/main/news/detail/5569",
+        "https://www.taptap.cn/moment/853756601964691535"
+      ],
+      "checkedAt": "2026-10-21T04:31:38.008Z"
+    }
+  ],
+  "nextReviewAfterVerification": {
+    "at": "2026-10-22T01:59:00.000Z",
+    "reason": "missing_schedule"
+  },
+  "auditScope": "schedule only for all games; only due node catalog audits",
+  "catalogChangedByReview": false
+}
