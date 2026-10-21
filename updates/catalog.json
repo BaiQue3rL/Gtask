@@ -1,60 +1,61 @@
 {
   "schemaVersion": 2,
-  "revision": "2026-10-11.zenless-3.2-event-completion",
-  "publishedAt": "2026-10-11T11:02:00.000Z",
+  "revision": "2026-10-21.zenless-3.3-events",
+  "publishedAt": "2026-10-21T03:10:40.801Z",
   "games": [
     {
       "gameId": "genshin",
       "upserts": [
         {
           "remoteKey": "event:7.0:seasonal-training",
-          "category": "limited_event",
           "title": "砺行修远",
           "startsAt": "2026-08-10T04:00:00+08:00",
           "endsAt": "2026-11-02T03:59:59+08:00",
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165613",
+          "category": "limited_event",
           "activityTags": [
             "quest",
             "material-reward"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165613"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "event:7.0:sprout-mutual-aid-snowfield",
-          "category": "limited_event",
           "title": "新芽相助·初探雪原",
           "startsAt": "2026-08-12T11:00:00+08:00",
           "endsAt": "2026-08-24T03:59:59+08:00",
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165629",
+          "category": "limited_event",
           "activityTags": [
             "exploration",
             "photography",
             "collection"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165629"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "event:7.0:forge-realm-strategic-battle",
-          "category": "limited_event",
           "title": "铸境研炼·奕思巧战",
           "startsAt": "2026-08-11T23:00:00Z",
           "endsAt": "2026-09-22T23:00:00Z",
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165634",
+          "category": "limited_event",
           "activityTags": [
             "card",
             "challenge"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165634"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "event:7.0:frontier-challenger-championship",
-          "category": "limited_event",
           "title": "险境征者竞锋大赛",
           "startsAt": "2026-08-28T10:00:00+08:00",
           "endsAt": "2026-09-14T03:59:59+08:00",
+          "sourceUrl": "https://wiki.biligame.com/ys/%E3%80%8C%E9%99%A9%E5%A2%83%E5%BE%81%E8%80%85%E7%AB%9E%E9%94%8B%E5%A4%A7%E8%B5%9B%E3%80%8D",
+          "category": "limited_event",
           "activityTags": [
             "racing",
             "combat",
@@ -62,99 +63,98 @@
             "shooting"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://wiki.biligame.com/ys/「险境征者竞锋大赛」"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "web-event:7.0:snezhnaya-travel-handbook",
-          "category": "limited_event",
           "title": "至冬漫游手册",
           "startsAt": "2026-08-12T14:00:00+08:00",
           "endsAt": "2026-08-25T23:59:59+08:00",
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165696",
+          "category": "limited_event",
           "activityTags": [
             "web-event",
             "quest"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165696"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "endgame:stygian-onslaught",
-          "category": "endgame",
           "title": "幽境危战",
           "startsAt": "2026-08-19T10:00:00+08:00",
           "endsAt": "2026-09-22T04:00:00+08:00",
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165630",
+          "category": "endgame",
           "modeKey": "stygian-onslaught",
           "periodKey": "genshin:stygian-onslaught:2026-08-19",
           "scheduleKind": "remote_schedule",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165630"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "map-catalog:genshin:region:414719b0efe139ee12c9",
-          "category": "exploration",
           "title": "至冬",
-          "mapNodeKind": "region",
-          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165682"
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165682",
+          "category": "exploration",
+          "mapNodeKind": "region"
         },
         {
           "remoteKey": "map-catalog:genshin:subregion:966d5a84a8df97be95fa",
-          "category": "exploration",
           "title": "古兽冰原",
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165682",
+          "category": "exploration",
           "mapNodeKind": "subregion",
           "parentRemoteKey": "map-catalog:genshin:region:414719b0efe139ee12c9",
-          "parentTitle": "至冬",
-          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165682"
+          "parentTitle": "至冬"
         },
         {
           "remoteKey": "map-catalog:genshin:subregion:f96b05e8ce3e7dcd302f",
-          "category": "exploration",
           "title": "白桦雪葬地",
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165682",
+          "category": "exploration",
           "mapNodeKind": "subregion",
           "parentRemoteKey": "map-catalog:genshin:region:414719b0efe139ee12c9",
-          "parentTitle": "至冬",
-          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165682"
+          "parentTitle": "至冬"
         },
         {
           "remoteKey": "map-catalog:genshin:subregion:a95bf7d90dd03042b6ab",
-          "category": "exploration",
           "title": "永凝冻土",
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165682",
+          "category": "exploration",
           "mapNodeKind": "subregion",
           "parentRemoteKey": "map-catalog:genshin:region:414719b0efe139ee12c9",
-          "parentTitle": "至冬",
-          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165682"
+          "parentTitle": "至冬"
         },
         {
           "remoteKey": "map-catalog:genshin:subregion:a34445f05d0911c8b815",
-          "category": "exploration",
           "title": "焰羽谷",
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165682",
+          "category": "exploration",
           "mapNodeKind": "subregion",
           "parentRemoteKey": "map-catalog:genshin:region:414719b0efe139ee12c9",
-          "parentTitle": "至冬",
-          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165682"
+          "parentTitle": "至冬"
         },
         {
           "remoteKey": "map-catalog:genshin:subregion:7ca6fa77db78fc351386",
-          "category": "exploration",
           "title": "霜殛寒峰",
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165682",
+          "category": "exploration",
           "mapNodeKind": "subregion",
           "parentRemoteKey": "map-catalog:genshin:region:414719b0efe139ee12c9",
-          "parentTitle": "至冬",
-          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/165682"
+          "parentTitle": "至冬"
         },
         {
           "remoteKey": "event:7.0:overflowing-abundance",
-          "category": "limited_event",
           "title": "盛材移涌",
           "startsAt": "2026-09-14T04:00:00+08:00",
           "endsAt": "2026-09-21T03:59:59+08:00",
+          "sourceUrl": "https://wiki.biligame.com/ys/%E3%80%8C%E7%9B%9B%E6%9D%90%E7%A7%BB%E6%B6%8C%E3%80%8D",
+          "category": "limited_event",
           "activityTags": [
             "double-drop"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://wiki.biligame.com/ys/「盛材移涌」"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "event:7.1:moonchase-festival",
@@ -221,81 +221,81 @@
       "upserts": [
         {
           "remoteKey": "event:4.5:minuscule-great-adventure",
-          "category": "limited_event",
           "title": "方寸大冒险",
           "startsAt": "2026-09-12T12:00:00+08:00",
           "endsAt": "2026-09-28T03:59:59+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/841375445998898274",
+          "category": "limited_event",
           "activityTags": [
             "combat",
             "challenge"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://www.taptap.cn/moment/841375445998898274"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "event:4.5:overdrive-whirlwind-grand-prix",
-          "category": "limited_event",
           "title": "超限：狂飙大奖赛",
           "startsAt": "2026-08-26T11:00:00+08:00",
           "endsAt": "2026-09-28T03:59:59+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/841375445998898274",
+          "category": "limited_event",
           "activityTags": [
             "racing",
             "management"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://www.taptap.cn/moment/841375445998898274"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "event:4.5:gift-of-odyssey",
-          "category": "limited_event",
           "title": "巡星之礼",
           "startsAt": "2026-08-26T11:00:00+08:00",
           "endsAt": "2026-09-28T03:59:59+08:00",
+          "sourceUrl": "https://wiki.biligame.com/sr/%E3%80%8C%E5%B7%A1%E6%98%9F%E4%B9%8B%E7%A4%BC%E3%80%8D%E7%AC%AC%E4%BA%8C%E5%8D%81%E5%85%AD%E6%9C%9F",
+          "category": "limited_event",
           "activityTags": [
             "sign-in"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://wiki.biligame.com/sr/%E3%80%8C%E5%B7%A1%E6%98%9F%E4%B9%8B%E7%A4%BC%E3%80%8D%E7%AC%AC%E4%BA%8C%E5%8D%81%E5%85%AD%E6%9C%9F"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "event:4.5:planar-fissure",
-          "category": "limited_event",
           "title": "位面分裂",
           "startsAt": "2026-09-07T04:00:00+08:00",
           "endsAt": "2026-09-21T03:59:59+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/838381735841369581",
+          "category": "limited_event",
           "activityTags": [
             "double-drop"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://www.taptap.cn/moment/838381735841369581"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "endgame:anomaly-arbitration",
-          "category": "endgame",
           "title": "异相仲裁",
           "startsAt": "2026-08-25T23:00:00.000Z",
           "endsAt": "2026-09-27T22:00:00.000Z",
+          "sourceUrl": "https://news.4399.com/bhxqtd/zixun/m/1014938.html",
+          "category": "endgame",
           "modeKey": "anomaly-arbitration",
           "periodKey": "predicted:star-rail:anomaly-arbitration:2026-08-25T22:00:00.000Z",
           "scheduleKind": "remote_schedule",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://news.4399.com/bhxqtd/zixun/m/1014938.html"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "endgame:apocalyptic-shadow",
-          "category": "endgame",
           "title": "末日幻影",
           "startsAt": "2026-08-30T20:00:00.000Z",
           "endsAt": "2026-10-04T20:00:00.000Z",
+          "sourceUrl": "https://news.4399.com/bhxqtd/zixun/m/1014938.html",
+          "category": "endgame",
           "modeKey": "apocalyptic-shadow",
           "periodKey": "predicted:star-rail:apocalyptic-shadow:2026-08-30T20:00:00.000Z",
           "scheduleKind": "remote_schedule",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://news.4399.com/bhxqtd/zixun/m/1014938.html"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "event:4.4:fate-contract",
@@ -364,86 +364,86 @@
         },
         {
           "remoteKey": "map-catalog:star-rail:region:astropolis",
-          "category": "exploration",
           "title": "千星城",
-          "mapNodeKind": "region",
-          "sourceUrl": "https://webstatic.mihoyo.com/sr/app/interactive-map/index.html#/map/943"
+          "sourceUrl": "https://webstatic.mihoyo.com/sr/app/interactive-map/index.html#/map/943",
+          "category": "exploration",
+          "mapNodeKind": "region"
         },
         {
           "remoteKey": "map-catalog:star-rail:subregion:astropolis-central-district",
-          "category": "exploration",
           "title": "千星城中心城区",
+          "sourceUrl": "https://webstatic.mihoyo.com/sr/app/interactive-map/index.html#/map/943",
+          "category": "exploration",
           "mapNodeKind": "subregion",
           "parentRemoteKey": "map-catalog:star-rail:region:astropolis",
-          "parentTitle": "千星城",
-          "sourceUrl": "https://webstatic.mihoyo.com/sr/app/interactive-map/index.html#/map/943"
+          "parentTitle": "千星城"
         },
         {
           "remoteKey": "map-catalog:star-rail:subregion:lodestar-tower",
-          "category": "exploration",
           "title": "指针塔",
+          "sourceUrl": "https://webstatic.mihoyo.com/sr/app/interactive-map/index.html#/map/946",
+          "category": "exploration",
           "mapNodeKind": "subregion",
           "parentRemoteKey": "map-catalog:star-rail:region:astropolis",
-          "parentTitle": "千星城",
-          "sourceUrl": "https://webstatic.mihoyo.com/sr/app/interactive-map/index.html#/map/946"
+          "parentTitle": "千星城"
         },
         {
           "remoteKey": "map-catalog:star-rail:subregion:skycall-aery",
-          "category": "exploration",
           "title": "空声院",
+          "sourceUrl": "https://webstatic.mihoyo.com/sr/app/interactive-map/index.html#/map/948",
+          "category": "exploration",
           "mapNodeKind": "subregion",
           "parentRemoteKey": "map-catalog:star-rail:region:astropolis",
-          "parentTitle": "千星城",
-          "sourceUrl": "https://webstatic.mihoyo.com/sr/app/interactive-map/index.html#/map/948"
+          "parentTitle": "千星城"
         },
         {
           "remoteKey": "map-catalog:star-rail:subregion:life-sciences-institute",
-          "category": "exploration",
           "title": "生研院",
+          "sourceUrl": "https://webstatic.mihoyo.com/sr/app/interactive-map/index.html#/map/1014",
+          "category": "exploration",
           "mapNodeKind": "subregion",
           "parentRemoteKey": "map-catalog:star-rail:region:astropolis",
-          "parentTitle": "千星城",
-          "sourceUrl": "https://webstatic.mihoyo.com/sr/app/interactive-map/index.html#/map/1014"
+          "parentTitle": "千星城"
         },
         {
           "remoteKey": "event:4.6:aha-outwits-hoyoverse",
-          "category": "limited_event",
           "title": "乐子神智取米哈游",
           "startsAt": "2026-09-28T10:00:00+08:00",
           "endsAt": "2026-11-11T06:00:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/853596636167801477",
+          "category": "limited_event",
           "activityTags": [
             "web-event"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://www.taptap.cn/moment/853596636167801477"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "event:4.6:gift-of-odyssey",
-          "category": "limited_event",
           "title": "巡星之礼",
           "startsAt": "2026-09-28T11:00:00+08:00",
           "endsAt": "2026-11-10T03:59:59+08:00",
+          "sourceUrl": "https://prtimes.jp/main/html/rd/p/000000451.000096124.html",
+          "category": "limited_event",
           "activityTags": [
             "sign-in"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://prtimes.jp/main/html/rd/p/000000451.000096124.html"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "event:4.6:love-ghosts-robots",
-          "category": "limited_event",
           "title": "爱，幽灵与机器人",
           "startsAt": "2026-09-28T11:00:00+08:00",
           "endsAt": "2026-11-11T03:59:59+08:00",
+          "sourceUrl": "https://hsr.hoyoverse.com/zh-cn/news/166468",
+          "category": "limited_event",
           "activityTags": [
             "management",
             "story"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://hsr.hoyoverse.com/zh-cn/news/166468"
+          "timeZone": "Asia/Shanghai"
         }
       ],
       "archives": [
@@ -558,246 +558,340 @@
       "upserts": [
         {
           "remoteKey": "event:3.1:return-to-ridu",
-          "category": "limited_event",
           "title": "回归丽都：羽落重逢",
           "startsAt": "2026-07-17T20:30:00+08:00",
           "endsAt": "2026-09-09T05:59:59+08:00",
+          "sourceUrl": "https://zzz.mihoyo.com/news/165267?category=278",
+          "category": "limited_event",
           "activityTags": [
             "web-event"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://zzz.mihoyo.com/news/165267?category=278"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "event:3.1:cloud-gift",
-          "category": "limited_event",
           "title": "云端礼赠",
           "startsAt": "2026-07-29T11:00:00+08:00",
           "endsAt": "2026-09-08T03:59:59+08:00",
+          "sourceUrl": "https://wiki.biligame.com/zzz/%E3%80%8C%E4%BA%91%E7%AB%AF%E7%A4%BC%E8%B5%A0%E3%80%8D",
+          "category": "limited_event",
           "activityTags": [
             "sign-in"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://wiki.biligame.com/zzz/「云端礼赠」"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "event:3.1:crispy-meal-plan",
-          "category": "limited_event",
           "title": "咔滋酥脆出餐计划",
           "startsAt": "2026-08-19T10:00:00+08:00",
           "endsAt": "2026-09-07T03:59:59+08:00",
+          "sourceUrl": "https://www.sina.cn/news/detail/5332647255477173.html",
+          "category": "limited_event",
           "activityTags": [
             "management"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://www.sina.cn/news/detail/5332647255477173.html"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "event:3.1:combat-training-triple",
-          "category": "limited_event",
           "title": "实战特训-三倍悬赏",
           "startsAt": "2026-09-02T04:00:00+08:00",
           "endsAt": "2026-09-07T03:59:59+08:00",
+          "sourceUrl": "https://www.sina.cn/news/detail/5337945315479062.html",
+          "category": "limited_event",
           "activityTags": [
             "combat",
             "material-reward"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://www.sina.cn/news/detail/5337945315479062.html"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "endgame:shiyu-defense",
-          "category": "endgame",
           "title": "式舆防卫战",
           "startsAt": "2026-09-04T04:00:00+08:00",
           "endsAt": "2026-09-18T04:00:00+08:00",
+          "sourceUrl": "https://wikiwiki.jp/zenless/%E5%BC%8F%E8%BC%BF%E9%98%B2%E8%A1%9B%E6%88%A6",
+          "category": "endgame",
           "modeKey": "shiyu-defense",
           "periodKey": "zenless:shiyu-defense:2026-09-04",
           "scheduleKind": "remote_schedule",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://wikiwiki.jp/zenless/式輿防衛戦"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "endgame:deadly-assault",
-          "category": "endgame",
           "title": "危局强袭战",
           "startsAt": "2026-08-28T04:00:00+08:00",
           "endsAt": "2026-09-11T04:00:00+08:00",
+          "sourceUrl": "https://wikiwiki.jp/zenless/%E5%8D%B1%E5%B1%80%E5%BC%B7%E8%A5%B2%E6%88%A6",
+          "category": "endgame",
           "modeKey": "deadly-assault",
           "periodKey": "zenless:deadly-assault:2026-08-28",
           "scheduleKind": "remote_schedule",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://wikiwiki.jp/zenless/危局強襲戦"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "event:3.2:pinball-knight",
-          "category": "limited_event",
           "title": "「弹球勇者」哐哐当！",
           "startsAt": "2026-09-10T10:00:00+08:00",
           "endsAt": "2026-10-18T19:59:59.000Z",
+          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000",
+          "category": "limited_event",
           "activityTags": [
             "combat",
             "challenge"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "event:3.2:shadow-chase-showdown",
-          "category": "limited_event",
           "title": "虚境逐影争锋",
           "startsAt": "2026-09-16T10:00:00+08:00",
           "endsAt": "2026-10-05T03:59:00+08:00",
+          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000",
+          "category": "limited_event",
           "activityTags": [
             "combat",
             "challenge"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "event:3.2:surprise-screening-plan",
-          "category": "limited_event",
           "title": "惊喜放映企划",
           "startsAt": "2026-09-23T10:00:00+08:00",
           "endsAt": "2026-10-19T19:59:59.000Z",
+          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000",
+          "category": "limited_event",
           "activityTags": [
             "sign-in"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "event:3.2:regional-patrol-bounty",
-          "category": "limited_event",
           "title": "先遣赏金-区域巡防",
           "startsAt": "2026-09-23T04:00:00+08:00",
           "endsAt": "2026-09-28T03:59:00+08:00",
+          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000",
+          "category": "limited_event",
           "activityTags": [
             "combat",
             "double-reward"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "event:3.2:orbie-parent-diary",
-          "category": "limited_event",
           "title": "锵锵！球仔成长日记",
           "startsAt": "2026-09-30T10:00:00+08:00",
           "endsAt": "2026-10-18T19:59:59.000Z",
+          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000",
+          "category": "limited_event",
           "activityTags": [
             "management"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "event:3.2:boopons-from-above",
-          "category": "limited_event",
           "title": "「嗯呢」从天降",
           "startsAt": "2026-09-30T10:00:00+08:00",
           "endsAt": "2026-10-20T03:59:00+08:00",
+          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000",
+          "category": "limited_event",
           "activityTags": [
             "sign-in"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "event:3.2:hobbling-crow-chronicles",
-          "category": "limited_event",
           "title": "跛脚乌鸦奇探录",
           "startsAt": "2026-10-03T10:00:00+08:00",
           "endsAt": "2026-10-18T19:59:59.000Z",
+          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000",
+          "category": "limited_event",
           "activityTags": [
             "puzzle",
             "quest"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "event:3.2:combat-simulation-bounty",
-          "category": "limited_event",
           "title": "数据悬赏-实战模拟",
           "startsAt": "2026-10-14T04:00:00+08:00",
           "endsAt": "2026-10-19T03:59:00+08:00",
+          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000",
+          "category": "limited_event",
           "activityTags": [
             "combat",
             "double-reward"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:7372102af1cb93aa3443",
-          "category": "exploration",
           "title": "[管制区]辉金研究所",
+          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000",
+          "category": "exploration",
           "mapNodeKind": "subregion",
           "parentRemoteKey": "map-catalog:zenless:region:e27477172b3cccb95766",
-          "parentTitle": "罗斯凯利法",
-          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000"
+          "parentTitle": "罗斯凯利法"
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:db10be5016e1854c34a7",
-          "category": "exploration",
           "title": "[管制区]隐礁中转站",
+          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000",
+          "category": "exploration",
           "mapNodeKind": "subregion",
           "parentRemoteKey": "map-catalog:zenless:region:e27477172b3cccb95766",
-          "parentTitle": "罗斯凯利法",
-          "sourceUrl": "https://zenless.hoyoverse.com/m/zh-cn/news/166000"
+          "parentTitle": "罗斯凯利法"
         },
         {
           "remoteKey": "event:3.2:all-new-program",
-          "category": "limited_event",
           "title": "全新放送",
           "startsAt": "2026-09-09T11:00:00+08:00",
           "endsAt": "2026-10-20T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/846338875205881053",
+          "category": "limited_event",
           "activityTags": [
             "sign-in"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://www.taptap.cn/moment/846338875205881053"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "event:3.2:angels-cheering-operation",
-          "category": "limited_event",
           "title": "天使应援大作战",
           "startsAt": "2026-09-09T11:00:00+08:00",
           "endsAt": "2026-11-30T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/845970778565380091",
+          "category": "limited_event",
           "activityTags": [
             "quest"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://www.taptap.cn/moment/845970778565380091"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "event:3.2:potential-preview-fiery-hammer",
-          "category": "limited_event",
           "title": "潜能预演·烈火重锤",
           "startsAt": "2026-09-09T11:00:00+08:00",
           "endsAt": "2026-10-21T06:00:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/846338342462163795",
+          "category": "limited_event",
           "activityTags": [
             "combat"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://www.taptap.cn/moment/846338342462163795"
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:3.3:haunted-house",
+          "title": "怪奇诡屋惊魂记",
+          "startsAt": "2026-10-22T10:00:00+08:00",
+          "endsAt": "2026-11-30T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/861568981209714673?group_id=330333",
+          "category": "limited_event",
+          "activityTags": [
+            "challenge"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:3.3:cyber-doctor",
+          "title": "赛博圣手，出诊!",
+          "startsAt": "2026-10-28T10:00:00+08:00",
+          "endsAt": "2026-11-16T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+          "category": "limited_event",
+          "activityTags": [
+            "quest"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:3.3:regional-patrol-bounty",
+          "title": "先遣赏金-区域巡防",
+          "startsAt": "2026-11-04T04:00:00+08:00",
+          "endsAt": "2026-11-09T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+          "category": "limited_event",
+          "activityTags": [
+            "combat",
+            "double-reward"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:3.3:boopons-from-above",
+          "title": "「嗯呢」从天降",
+          "startsAt": "2026-11-11T10:00:00+08:00",
+          "endsAt": "2026-12-01T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+          "category": "limited_event",
+          "activityTags": [
+            "sign-in"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:3.3:hobbling-crow-mystery",
+          "title": "跛脚乌鸦奇踪记",
+          "startsAt": "2026-11-11T10:00:00+08:00",
+          "endsAt": "2026-11-30T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+          "category": "limited_event",
+          "activityTags": [
+            "puzzle",
+            "quest"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:3.3:drifting-picture-album",
+          "title": "修复吧！漂流画集",
+          "startsAt": "2026-11-16T10:00:00+08:00",
+          "endsAt": "2026-11-30T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+          "category": "limited_event",
+          "activityTags": [
+            "puzzle"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:3.3:combat-simulation-bounty",
+          "title": "数据悬赏-实战模拟",
+          "startsAt": "2026-11-25T04:00:00+08:00",
+          "endsAt": "2026-11-30T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+          "category": "limited_event",
+          "activityTags": [
+            "combat",
+            "double-reward"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
         }
       ],
       "archives": [
@@ -819,68 +913,69 @@
       "upserts": [
         {
           "remoteKey": "ww:event:3.6:qunsheng-gongzhen-moniyu",
-          "category": "limited_event",
           "title": "群声共振模拟域",
           "startsAt": "2026-08-22T10:00:00+08:00",
           "endsAt": "2026-09-29T11:59:59+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/839214754839921356?group_id=330015",
+          "category": "limited_event",
           "activityTags": [
             "combat",
             "challenge"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://www.taptap.cn/moment/839214754839921356?group_id=330015"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "ww:event:3.6:dier-suola-guiying-mizong",
-          "category": "limited_event",
           "title": "第二索拉・诡影迷踪",
           "startsAt": "2026-08-27T04:00:00+08:00",
           "endsAt": "2026-09-14T03:59:59+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/841418821855084797",
+          "category": "limited_event",
           "activityTags": [
             "puzzle",
             "photography",
             "exploration"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://www.taptap.cn/moment/841418821855084797"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "ww:event:3.6:qingxian-ji-liunian",
-          "category": "limited_event",
           "title": "清弦纪流年",
           "startsAt": "2026-09-03T04:00:00+08:00",
           "endsAt": "2026-09-21T03:59:59+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/839214754839921356?group_id=330015",
+          "category": "limited_event",
           "activityTags": [
             "rhythm",
             "story"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://www.taptap.cn/moment/839214754839921356?group_id=330015"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "ww:event:3.6:ruomeng-rengyou-huisheng",
-          "category": "limited_event",
           "title": "若梦仍有回声",
           "startsAt": "2026-09-10T10:00:00+08:00",
           "endsAt": "2026-09-29T03:59:59+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/839214754839921356?group_id=330015",
+          "category": "limited_event",
           "activityTags": [
             "combat",
             "challenge",
             "co-op"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://www.taptap.cn/moment/839214754839921356?group_id=330015"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "ww:event:3.6:chaoxi-miwen-wuyinge",
-          "category": "limited_event",
           "title": "潮汐觅闻",
           "startsAt": "2026-09-17T04:00:00+08:00",
           "endsAt": "2026-09-29T03:59:59+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/839214754839921356?group_id=330015",
+          "category": "limited_event",
           "activityTags": [
             "quest",
             "exploration",
@@ -888,49 +983,48 @@
             "combat"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://www.taptap.cn/moment/839214754839921356?group_id=330015"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "ww:event:3.6:yanyun-zengli",
-          "category": "limited_event",
           "title": "烟云赠礼",
           "startsAt": "2026-08-20T11:00:00+08:00",
           "endsAt": "2026-09-29T03:59:59+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/839214754839921356?group_id=330015",
+          "category": "limited_event",
           "activityTags": [
             "sign-in"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://www.taptap.cn/moment/839214754839921356?group_id=330015"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "ww:event:3.6:echoing-realm",
-          "category": "limited_event",
           "title": "回音盈域",
           "startsAt": "2026-09-03T04:00:00+08:00",
           "endsAt": "2026-09-10T03:59:59+08:00",
+          "sourceUrl": "https://wuwa.huijiwiki.com/wiki/%E9%A6%96%E9%A1%B5",
+          "category": "limited_event",
           "activityTags": [
             "double-drop",
             "material-reward"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://wuwa.huijiwiki.com/wiki/首页"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "ww:event:3.6:tacet-field-double-drop",
-          "category": "limited_event",
           "title": "声弦涤荡",
           "startsAt": "2026-09-22T04:00:00+08:00",
           "endsAt": "2026-09-29T03:59:59+08:00",
+          "sourceUrl": "https://wiki.biligame.com/wutheringwaves/%E9%A6%96%E9%A1%B5/%E6%B4%BB%E5%8A%A8%E6%97%A5%E5%8E%86",
+          "category": "limited_event",
           "activityTags": [
             "double-drop",
             "material-reward"
           ],
           "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai",
-          "sourceUrl": "https://wiki.biligame.com/wutheringwaves/首页/活动日历"
+          "timeZone": "Asia/Shanghai"
         },
         {
           "remoteKey": "ww:event:3.7:tuantuan-yongzhe-daluandou",

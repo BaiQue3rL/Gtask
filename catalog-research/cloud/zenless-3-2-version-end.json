@@ -6,8 +6,8 @@
   "periodKey": "3.2",
   "node": "version_end",
   "newVersion": "3.3",
-  "checkedAt": "2026-10-20T22:10:34.669Z",
-  "status": "pending",
+  "checkedAt": "2026-10-21T03:13:48.423Z",
+  "status": "ready",
   "auditComplete": false,
   "serverScope": {
     "region": "中国大陆适用官方公告",
@@ -15,7 +15,7 @@
     "utcOffset": "+08:00",
     "note": "按既有已核验国服范围归一化；不混用其他服务器时间。公告仅到分钟时保留:00秒。"
   },
-  "baseMainSha": "a4be2f45a8a3a22e649a28a0eabd6fd83ee2910f",
+  "baseMainSha": "8f72f96de59cdabc38574e217a5423f68af4c877",
   "priorEvidence": [
     "docs/catalog-research/zenless-3.2-2026-10-11.json",
     "catalog-research/cloud/schedule-review-20261019.json",
@@ -25,239 +25,278 @@
     {
       "section": "inventory",
       "result": "read_complete_public_inventory",
-      "method": "最新main的既有catalog-maintenance-cli + AppDatabase(:memory:)；无玩家库",
-      "historicalCumulativeUpserts": 19,
-      "currentEvents": [
+      "method": "fresh exact-main source CLI and AppDatabase(:memory:)",
+      "revision": "2026-10-11.zenless-3.2-event-completion",
+      "items": [
         {
           "remoteKey": "event:3.2:angels-cheering-operation",
-          "title": "天使应援大作战"
-        }
-      ],
-      "cycleModes": [
+          "title": "天使应援大作战",
+          "category": "limited_event",
+          "kind": null,
+          "parent": null
+        },
         {
           "remoteKey": "endgame:deadly-assault",
-          "title": "危局强袭战"
+          "title": "危局强袭战",
+          "category": "endgame",
+          "kind": null,
+          "parent": null
         },
         {
           "remoteKey": "endgame:shiyu-defense",
-          "title": "式舆防卫战"
-        }
-      ],
-      "maps": [
+          "title": "式舆防卫战",
+          "category": "endgame",
+          "kind": null,
+          "parent": null
+        },
         {
           "remoteKey": "map-catalog:zenless:region:e27477172b3cccb95766",
           "title": "罗斯凯利法",
-          "mapNodeKind": "region",
-          "parentRemoteKey": null
+          "category": "exploration",
+          "kind": "region",
+          "parent": null
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:d1c7b5c23900d7417271",
           "title": "布亚斯特城区",
-          "mapNodeKind": "subregion",
-          "parentRemoteKey": "map-catalog:zenless:region:e27477172b3cccb95766"
+          "category": "exploration",
+          "kind": "subregion",
+          "parent": "map-catalog:zenless:region:e27477172b3cccb95766"
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:8cf4b2bbbc47b79e4457",
           "title": "[管制区]算枢局",
-          "mapNodeKind": "subregion",
-          "parentRemoteKey": "map-catalog:zenless:region:e27477172b3cccb95766"
+          "category": "exploration",
+          "kind": "subregion",
+          "parent": "map-catalog:zenless:region:e27477172b3cccb95766"
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:e26a00ef376ae32529b6",
           "title": "[管制区]能源区",
-          "mapNodeKind": "subregion",
-          "parentRemoteKey": "map-catalog:zenless:region:e27477172b3cccb95766"
+          "category": "exploration",
+          "kind": "subregion",
+          "parent": "map-catalog:zenless:region:e27477172b3cccb95766"
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:7372102af1cb93aa3443",
           "title": "[管制区]辉金研究所",
-          "mapNodeKind": "subregion",
-          "parentRemoteKey": "map-catalog:zenless:region:e27477172b3cccb95766"
+          "category": "exploration",
+          "kind": "subregion",
+          "parent": "map-catalog:zenless:region:e27477172b3cccb95766"
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:db10be5016e1854c34a7",
           "title": "[管制区]隐礁中转站",
-          "mapNodeKind": "subregion",
-          "parentRemoteKey": "map-catalog:zenless:region:e27477172b3cccb95766"
+          "category": "exploration",
+          "kind": "subregion",
+          "parent": "map-catalog:zenless:region:e27477172b3cccb95766"
         },
         {
           "remoteKey": "map-catalog:zenless:region:57f4db4e1db0a037aacb",
           "title": "斯卡莫空洞",
-          "mapNodeKind": "region",
-          "parentRemoteKey": null
+          "category": "exploration",
+          "kind": "region",
+          "parent": null
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:424ae5121350b8cf9252",
           "title": "[空洞]沉没回廊",
-          "mapNodeKind": "subregion",
-          "parentRemoteKey": "map-catalog:zenless:region:57f4db4e1db0a037aacb"
+          "category": "exploration",
+          "kind": "subregion",
+          "parent": "map-catalog:zenless:region:57f4db4e1db0a037aacb"
         },
         {
           "remoteKey": "map-catalog:zenless:region:df6cca14b5f0f16d29d2",
           "title": "卫非地",
-          "mapNodeKind": "region",
-          "parentRemoteKey": null
+          "category": "exploration",
+          "kind": "region",
+          "parent": null
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:567dfb8ce11d4c4c2e67",
           "title": "澄辉坪",
-          "mapNodeKind": "subregion",
-          "parentRemoteKey": "map-catalog:zenless:region:df6cca14b5f0f16d29d2"
+          "category": "exploration",
+          "kind": "subregion",
+          "parent": "map-catalog:zenless:region:df6cca14b5f0f16d29d2"
         },
         {
           "remoteKey": "map-catalog:zenless:region:5f012354ef6d4d68f7d2",
           "title": "莱姆尼安空洞",
-          "mapNodeKind": "region",
-          "parentRemoteKey": null
+          "category": "exploration",
+          "kind": "region",
+          "parent": null
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:738d57fa28159bb6e8ba",
           "title": "[空洞]中央制造区",
-          "mapNodeKind": "subregion",
-          "parentRemoteKey": "map-catalog:zenless:region:5f012354ef6d4d68f7d2"
+          "category": "exploration",
+          "kind": "subregion",
+          "parent": "map-catalog:zenless:region:5f012354ef6d4d68f7d2"
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:c677b80782cf2f7172fc",
           "title": "[空洞]职工社区旧址",
-          "mapNodeKind": "subregion",
-          "parentRemoteKey": "map-catalog:zenless:region:5f012354ef6d4d68f7d2"
+          "category": "exploration",
+          "kind": "subregion",
+          "parent": "map-catalog:zenless:region:5f012354ef6d4d68f7d2"
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:90a7a0b370e37577b60f",
           "title": "[空洞]科研院旧址",
-          "mapNodeKind": "subregion",
-          "parentRemoteKey": "map-catalog:zenless:region:5f012354ef6d4d68f7d2"
+          "category": "exploration",
+          "kind": "subregion",
+          "parent": "map-catalog:zenless:region:5f012354ef6d4d68f7d2"
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:eae9a9b4fbd871bc560e",
           "title": "[空洞]粗加工中心",
-          "mapNodeKind": "subregion",
-          "parentRemoteKey": "map-catalog:zenless:region:5f012354ef6d4d68f7d2"
+          "category": "exploration",
+          "kind": "subregion",
+          "parent": "map-catalog:zenless:region:5f012354ef6d4d68f7d2"
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:3b50c9430d1aa4807c0d",
           "title": "[空洞]轻松公寓",
-          "mapNodeKind": "subregion",
-          "parentRemoteKey": "map-catalog:zenless:region:5f012354ef6d4d68f7d2"
+          "category": "exploration",
+          "kind": "subregion",
+          "parent": "map-catalog:zenless:region:5f012354ef6d4d68f7d2"
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:c0f36ba8a6a3a2a97fe6",
           "title": "[空洞]航天科学站",
-          "mapNodeKind": "subregion",
-          "parentRemoteKey": "map-catalog:zenless:region:5f012354ef6d4d68f7d2"
+          "category": "exploration",
+          "kind": "subregion",
+          "parent": "map-catalog:zenless:region:5f012354ef6d4d68f7d2"
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:ef8572e277c7b9b1b1bf",
           "title": "[空洞]旧建筑群",
-          "mapNodeKind": "subregion",
-          "parentRemoteKey": "map-catalog:zenless:region:5f012354ef6d4d68f7d2"
+          "category": "exploration",
+          "kind": "subregion",
+          "parent": "map-catalog:zenless:region:5f012354ef6d4d68f7d2"
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:2882c1ae0f7167855d0f",
           "title": "[空洞]社区储运站",
-          "mapNodeKind": "subregion",
-          "parentRemoteKey": "map-catalog:zenless:region:5f012354ef6d4d68f7d2"
+          "category": "exploration",
+          "kind": "subregion",
+          "parent": "map-catalog:zenless:region:5f012354ef6d4d68f7d2"
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:c501d8c01ac4e330e6ca",
           "title": "[空洞]昔丘",
-          "mapNodeKind": "subregion",
-          "parentRemoteKey": "map-catalog:zenless:region:5f012354ef6d4d68f7d2"
+          "category": "exploration",
+          "kind": "subregion",
+          "parent": "map-catalog:zenless:region:5f012354ef6d4d68f7d2"
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:113d15195f3f74b2276d",
           "title": "[空洞]港口工厂旧址",
-          "mapNodeKind": "subregion",
-          "parentRemoteKey": "map-catalog:zenless:region:5f012354ef6d4d68f7d2"
+          "category": "exploration",
+          "kind": "subregion",
+          "parent": "map-catalog:zenless:region:5f012354ef6d4d68f7d2"
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:b824483157416fcfe112",
           "title": "[空洞]辉瓷加工基地",
-          "mapNodeKind": "subregion",
-          "parentRemoteKey": "map-catalog:zenless:region:5f012354ef6d4d68f7d2"
+          "category": "exploration",
+          "kind": "subregion",
+          "parent": "map-catalog:zenless:region:5f012354ef6d4d68f7d2"
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:fd7271bf79edf0d15f7d",
           "title": "[空洞]辉岭石矿场",
-          "mapNodeKind": "subregion",
-          "parentRemoteKey": "map-catalog:zenless:region:5f012354ef6d4d68f7d2"
+          "category": "exploration",
+          "kind": "subregion",
+          "parent": "map-catalog:zenless:region:5f012354ef6d4d68f7d2"
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:c2d19223d4ba00aa3193",
           "title": "[空洞]青溟秘境",
-          "mapNodeKind": "subregion",
-          "parentRemoteKey": "map-catalog:zenless:region:5f012354ef6d4d68f7d2"
+          "category": "exploration",
+          "kind": "subregion",
+          "parent": "map-catalog:zenless:region:5f012354ef6d4d68f7d2"
         },
         {
           "remoteKey": "map-catalog:zenless:region:d9cbfb493efb71db19bf",
           "title": "雅努斯区",
-          "mapNodeKind": "region",
-          "parentRemoteKey": null
+          "category": "exploration",
+          "kind": "region",
+          "parent": null
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:d956abc6988a6cd84f1b",
           "title": "六分街",
-          "mapNodeKind": "subregion",
-          "parentRemoteKey": "map-catalog:zenless:region:d9cbfb493efb71db19bf"
+          "category": "exploration",
+          "kind": "subregion",
+          "parent": "map-catalog:zenless:region:d9cbfb493efb71db19bf"
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:85eb1cc0b787aa046328",
           "title": "光映广场",
-          "mapNodeKind": "subregion",
-          "parentRemoteKey": "map-catalog:zenless:region:d9cbfb493efb71db19bf"
+          "category": "exploration",
+          "kind": "subregion",
+          "parent": "map-catalog:zenless:region:d9cbfb493efb71db19bf"
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:bd9a63d564c6f6f85b15",
           "title": "黑雁工地旧址",
-          "mapNodeKind": "subregion",
-          "parentRemoteKey": "map-catalog:zenless:region:d9cbfb493efb71db19bf"
+          "category": "exploration",
+          "kind": "subregion",
+          "parent": "map-catalog:zenless:region:d9cbfb493efb71db19bf"
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:e232df2c00196f737946",
           "title": "芭莱大厦前",
-          "mapNodeKind": "subregion",
-          "parentRemoteKey": "map-catalog:zenless:region:d9cbfb493efb71db19bf"
+          "category": "exploration",
+          "kind": "subregion",
+          "parent": "map-catalog:zenless:region:d9cbfb493efb71db19bf"
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:5847195e29b229d28c19",
           "title": "厄匹斯港",
-          "mapNodeKind": "subregion",
-          "parentRemoteKey": "map-catalog:zenless:region:d9cbfb493efb71db19bf"
+          "category": "exploration",
+          "kind": "subregion",
+          "parent": "map-catalog:zenless:region:d9cbfb493efb71db19bf"
         },
         {
           "remoteKey": "map-catalog:zenless:region:29d7d66a143b75b23b0d",
           "title": "外环地带",
-          "mapNodeKind": "region",
-          "parentRemoteKey": null
+          "category": "exploration",
+          "kind": "region",
+          "parent": null
         },
         {
           "remoteKey": "map-catalog:zenless:subregion:3c8f1f4e2aa46eb66598",
           "title": "野火镇",
-          "mapNodeKind": "subregion",
-          "parentRemoteKey": "map-catalog:zenless:region:29d7d66a143b75b23b0d"
+          "category": "exploration",
+          "kind": "subregion",
+          "parent": "map-catalog:zenless:region:29d7d66a143b75b23b0d"
         }
       ],
-      "deadlineReviews": []
+      "schedules": [],
+      "deadlineReviews": [],
+      "note": "当前1个跨版本活动、2个稳定周期模式、6父26子地图；累计清单含19项upsert。"
     },
     {
       "section": "events",
       "result": "partial",
-      "note": "核查最新官方列表、3.3前瞻总览与独立活动公告。15条既有累计活动差异保留；已过截止由现有消费者处理。跨版本天使应援大作战保留至11/30。新固定档期活动可预告发布，不声称已开放；条件式更新后开启活动等待开服证据。"
+      "note": "完整3.3官方更新枚举八项活动。七项明确固定档期可预告发布；全新放送起点为版本更新后，本轮尚未独立确认开服，继续pending。沿用3.2跨版本天使应援大作战截止11/30，过期记录由现有消费者处理，旧身份/退役不改。"
     },
     {
       "section": "maps",
-      "result": "pending",
-      "note": "完整读取地图规范并检查6个region/26个subregion。没有足够新版已开放及独立探索进度证据；不添加场景、第三层或重复父级自身行，不刷新旧种子全量核查时间。"
+      "result": "partial",
+      "note": "完整读取规范并检查32既有节点。官方新地区[管制区]宁息屿、[管制区]空域总控塔的父级罗斯凯利法已确认；没有独立探索进度/当前正式服开放的可靠补证，暂不写入。旧维尔乌姆城区缺口继续保留。"
     },
     {
       "section": "cycles",
-      "result": "pending",
-      "note": "保留式舆/危局稳定身份和现有双周规则，不发布例行逐期窗口。拟境湮灭战缺官方可用重置锚点/持续时长；迷宫诡域介绍正文为玩法介绍、核心规则在图片中未完整提取，不能据此建立周期卡。"
+      "result": "partial",
+      "note": "完整更新仅列式舆增益和危局首领/子难度，无可靠规则/锚点变更，保留两个稳定定义、不发例行窗口。拟境只有勋章等更新，重置锚点/持续时长仍缺。迷宫诡域古怪试炼为常驻玩法赛季更新，内部容器/限购/主题事件不据此新建独立周期/限时任务。"
     },
     {
       "section": "version_and_exceptions",
-      "result": "partial",
-      "note": "3.2明确结束10/21 06:00，3.3维护预告原已确认同刻开始预计5小时，11:00只是名义完成基准。3.3已确认上半结束11/11 11:59复用旧证据，结束仍null；无新的已核验例外，不重复发versionWindow。"
+      "result": "verified_boundary_added",
+      "note": "从完整官方公告直接核验3.3于12/02 06:00结束。仅补云端period事实，现有正常cadence无已核验例外，不发布普通version_window或version_rule。"
     }
   ],
   "sources": [
@@ -326,6 +365,61 @@
       "sourceRef": "turn20view0",
       "result": "fetch_timeout",
       "summary": "官网直接访问超时。搜索标题与正文3.2缓存不一致，不据标题宣称3.3已开服。"
+    },
+    {
+      "url": "https://www.taptap.cn/app/234493/topic?type=official",
+      "sourceRef": "turn26view0",
+      "result": "official_listing_reviewed",
+      "checkedAt": "2026-10-21T03:13:48.423Z",
+      "summary": "新出现3.3完整更新公告；本轮正文全量读取。"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+      "sourceRef": "turn27view0",
+      "otherRefs": [
+        "turn28view0",
+        "turn28view1",
+        "turn28view2",
+        "turn29view0"
+      ],
+      "result": "full_update_read",
+      "checkedAt": "2026-10-21T03:13:48.423Z",
+      "publisher": "绝区零官方账号",
+      "publishedAt": null,
+      "displayedPublication": "正文为“昨天23:00”，列表为“3小时前”，未把相对展示归一化为精确时区发布时间",
+      "summary": "同一3.3正式更新的完整详细规则覆盖前瞻缺失字段；明确版本结束、八项活动排期、两个新地区及永久/周期内容。精确发布时刻不用于本轮不必要排序。"
+    },
+    {
+      "url": "https://zenless.hoyoverse.com/m/zh-cn/news/166963",
+      "sourceRef": "turn29search4",
+      "directRef": "turn30view0",
+      "result": "official_index_but_direct_unavailable",
+      "summary": "官方移动页索引确认同题3.3更新；直接正文仍不可访问，不伪称读过官网全文。"
+    },
+    {
+      "url": "https://www.gamespress.com/zh-TW/Zenless-Zone-Zero-Version-33-Journey-to-the-Sky-Coming-Soon-S-Rank-Age",
+      "sourceRef": "turn30view1",
+      "result": "publisher_official_press_release_reviewed",
+      "publishedDate": "2026-10-09",
+      "summary": "HoYoverse官方新闻补证修复邦布、追寻凶手、复原画作碎片的玩法语义，并明确迷宫为常驻玩法赛季更新；国服时间和简体名称以当前中文更新公告为准。"
+    },
+    {
+      "url": "https://zzz.mihoyo.com/",
+      "sourceRef": "turn29view1",
+      "result": "empty_body",
+      "summary": "只有3.3现已上线标题，没有可读正文；因上一轮维护前就已存在该标题，不把它独立作为开服证据。"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/861568981209714673?group_id=330333",
+      "sourceRef": "turn26view1",
+      "result": "direct_unavailable_this_attempt",
+      "summary": "复用上一轮已核验独立活动来源；本轮完整更新再次支持相同档期。"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/861568099537652819?group_id=330333",
+      "sourceRef": "turn26view2",
+      "result": "direct_unavailable_this_attempt",
+      "summary": "复用上轮截止；完整更新再次确认条件式起点和12/01截止。"
     }
   ],
   "decisions": [
@@ -375,91 +469,295 @@
       "status": "resolved",
       "adoptedValue": "retain existing rules",
       "reason": "本轮无已核验规则或锚点例外，不以逐期窗口代替规则。"
-    }
-  ],
-  "pending": [
-    {
-      "key": "cycles:hollow-annihilation",
-      "target": "cycles",
-      "reason": "已检查官方3.0玩法说明与3.3更新预告；能确认独立高难玩法，但缺少可核验的当前轮换规则、重置锚点及开放/结算窗口。第三方两周轮换说法与官方模式描述不一致，不能据此建立周期卡片。",
-      "priorEvidence": "docs/catalog-research/zenless-3.2-2026-10-11.json"
     },
     {
-      "key": "candidate:3.3:all-new-program",
+      "key": "candidate:3.3:haunted-house",
       "target": "events",
-      "reason": "截止已补齐12/01 03:59，等待开服证据后采用有依据的nominal维护完成起点。",
-      "priorEvidence": "docs/catalog-research/zenless-3.2-2026-10-11.json"
-    },
-    {
-      "key": "candidate:3.3:boopons-from-above",
-      "target": "events",
-      "reason": "「嗯呢」从天降已在官方3.3总览预告中列名，但尚未取得完整起止时间；当前未开放，不使用缺截止时间例外。检查总览及独立定向排期检索后无可靠新增时间。",
-      "priorEvidence": "docs/catalog-research/zenless-3.2-2026-10-11.json"
+      "status": "resolved",
+      "checkedAt": "2026-10-21T03:13:48.423Z",
+      "previousValue": "前轮pending/待交付差异",
+      "adoptedValue": {
+        "remoteKey": "event:3.3:haunted-house",
+        "category": "limited_event",
+        "title": "怪奇诡屋惊魂记",
+        "startsAt": "2026-10-22T10:00:00+08:00",
+        "endsAt": "2026-11-30T03:59:00+08:00",
+        "activityTags": [
+          "challenge"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai",
+        "sourceUrl": "https://www.taptap.cn/moment/861568981209714673?group_id=330333"
+      },
+      "timeBasis": "official_fixed_window_minute_precision",
+      "reason": "当前完整官方3.3公告补齐固定起止。作为已公告未来活动；并不声称当前开放。标签由官方玩法语义判定，沿用既有词表。",
+      "sources": [
+        {
+          "url": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+          "sourceRef": "turn29view0"
+        }
+      ]
     },
     {
       "key": "candidate:3.3:cyber-doctor",
       "target": "events",
-      "reason": "赛博圣手，出诊！已在官方3.3总览预告中列名，但尚未取得完整起止时间；当前未开放，不使用缺截止时间例外。检查总览及独立定向排期检索后无可靠新增时间。",
-      "priorEvidence": "docs/catalog-research/zenless-3.2-2026-10-11.json"
-    },
-    {
-      "key": "candidate:3.3:hobbling-crow-mystery",
-      "target": "events",
-      "reason": "跛脚乌鸦奇踪记已在官方3.3总览预告中列名，但尚未取得完整起止时间；当前未开放，不使用缺截止时间例外。检查总览及独立定向排期检索后无可靠新增时间。",
-      "priorEvidence": "docs/catalog-research/zenless-3.2-2026-10-11.json"
-    },
-    {
-      "key": "candidate:3.3:drifting-picture-album",
-      "target": "events",
-      "reason": "修复吧！漂流画集已在官方3.3总览预告中列名，但尚未取得完整起止时间；当前未开放，不使用缺截止时间例外。检查总览及独立定向排期检索后无可靠新增时间。",
-      "priorEvidence": "docs/catalog-research/zenless-3.2-2026-10-11.json"
+      "status": "resolved",
+      "checkedAt": "2026-10-21T03:13:48.423Z",
+      "previousValue": "前轮pending/待交付差异",
+      "adoptedValue": {
+        "remoteKey": "event:3.3:cyber-doctor",
+        "category": "limited_event",
+        "title": "赛博圣手，出诊!",
+        "startsAt": "2026-10-28T10:00:00+08:00",
+        "endsAt": "2026-11-16T03:59:00+08:00",
+        "activityTags": [
+          "quest"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai",
+        "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
+      },
+      "timeBasis": "official_fixed_window_minute_precision",
+      "reason": "当前完整官方3.3公告补齐固定起止。作为已公告未来活动；并不声称当前开放。标签由官方玩法语义判定，沿用既有词表。",
+      "sources": [
+        {
+          "url": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+          "sourceRef": "turn29view0"
+        }
+      ]
     },
     {
       "key": "candidate:3.3:regional-patrol-bounty",
       "target": "events",
-      "reason": "先遣赏金-区域巡防已在官方3.3总览预告中列名，但尚未取得完整起止时间；当前未开放，不使用缺截止时间例外。检查总览及独立定向排期检索后无可靠新增时间。",
-      "priorEvidence": "docs/catalog-research/zenless-3.2-2026-10-11.json"
+      "status": "resolved",
+      "checkedAt": "2026-10-21T03:13:48.423Z",
+      "previousValue": "前轮pending/待交付差异",
+      "adoptedValue": {
+        "remoteKey": "event:3.3:regional-patrol-bounty",
+        "category": "limited_event",
+        "title": "先遣赏金-区域巡防",
+        "startsAt": "2026-11-04T04:00:00+08:00",
+        "endsAt": "2026-11-09T03:59:00+08:00",
+        "activityTags": [
+          "combat",
+          "double-reward"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai",
+        "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
+      },
+      "timeBasis": "official_fixed_window_minute_precision",
+      "reason": "当前完整官方3.3公告补齐固定起止。作为已公告未来活动；并不声称当前开放。标签由官方玩法语义判定，沿用既有词表。",
+      "sources": [
+        {
+          "url": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+          "sourceRef": "turn29view0"
+        }
+      ]
+    },
+    {
+      "key": "candidate:3.3:boopons-from-above",
+      "target": "events",
+      "status": "resolved",
+      "checkedAt": "2026-10-21T03:13:48.423Z",
+      "previousValue": "前轮pending/待交付差异",
+      "adoptedValue": {
+        "remoteKey": "event:3.3:boopons-from-above",
+        "category": "limited_event",
+        "title": "「嗯呢」从天降",
+        "startsAt": "2026-11-11T10:00:00+08:00",
+        "endsAt": "2026-12-01T03:59:00+08:00",
+        "activityTags": [
+          "sign-in"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai",
+        "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
+      },
+      "timeBasis": "official_fixed_window_minute_precision",
+      "reason": "当前完整官方3.3公告补齐固定起止。作为已公告未来活动；并不声称当前开放。标签由官方玩法语义判定，沿用既有词表。",
+      "sources": [
+        {
+          "url": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+          "sourceRef": "turn29view0"
+        }
+      ]
+    },
+    {
+      "key": "candidate:3.3:hobbling-crow-mystery",
+      "target": "events",
+      "status": "resolved",
+      "checkedAt": "2026-10-21T03:13:48.423Z",
+      "previousValue": "前轮pending/待交付差异",
+      "adoptedValue": {
+        "remoteKey": "event:3.3:hobbling-crow-mystery",
+        "category": "limited_event",
+        "title": "跛脚乌鸦奇踪记",
+        "startsAt": "2026-11-11T10:00:00+08:00",
+        "endsAt": "2026-11-30T03:59:00+08:00",
+        "activityTags": [
+          "puzzle",
+          "quest"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai",
+        "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
+      },
+      "timeBasis": "official_fixed_window_minute_precision",
+      "reason": "当前完整官方3.3公告补齐固定起止。作为已公告未来活动；并不声称当前开放。标签由官方玩法语义判定，沿用既有词表。",
+      "sources": [
+        {
+          "url": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+          "sourceRef": "turn29view0"
+        }
+      ]
+    },
+    {
+      "key": "candidate:3.3:drifting-picture-album",
+      "target": "events",
+      "status": "resolved",
+      "checkedAt": "2026-10-21T03:13:48.423Z",
+      "previousValue": "前轮pending/待交付差异",
+      "adoptedValue": {
+        "remoteKey": "event:3.3:drifting-picture-album",
+        "category": "limited_event",
+        "title": "修复吧！漂流画集",
+        "startsAt": "2026-11-16T10:00:00+08:00",
+        "endsAt": "2026-11-30T03:59:00+08:00",
+        "activityTags": [
+          "puzzle"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai",
+        "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
+      },
+      "timeBasis": "official_fixed_window_minute_precision",
+      "reason": "当前完整官方3.3公告补齐固定起止。作为已公告未来活动；并不声称当前开放。标签由官方玩法语义判定，沿用既有词表。",
+      "sources": [
+        {
+          "url": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+          "sourceRef": "turn29view0"
+        }
+      ]
     },
     {
       "key": "candidate:3.3:combat-simulation-bounty",
       "target": "events",
-      "reason": "数据悬赏-实战模拟已在官方3.3总览预告中列名，但尚未取得完整起止时间；当前未开放，不使用缺截止时间例外。检查总览及独立定向排期检索后无可靠新增时间。",
-      "priorEvidence": "docs/catalog-research/zenless-3.2-2026-10-11.json"
+      "status": "resolved",
+      "checkedAt": "2026-10-21T03:13:48.423Z",
+      "previousValue": "前轮pending/待交付差异",
+      "adoptedValue": {
+        "remoteKey": "event:3.3:combat-simulation-bounty",
+        "category": "limited_event",
+        "title": "数据悬赏-实战模拟",
+        "startsAt": "2026-11-25T04:00:00+08:00",
+        "endsAt": "2026-11-30T03:59:00+08:00",
+        "activityTags": [
+          "combat",
+          "double-reward"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai",
+        "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
+      },
+      "timeBasis": "official_fixed_window_minute_precision",
+      "reason": "当前完整官方3.3公告补齐固定起止。作为已公告未来活动；并不声称当前开放。标签由官方玩法语义判定，沿用既有词表。",
+      "sources": [
+        {
+          "url": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+          "sourceRef": "turn29view0"
+        }
+      ]
     },
     {
-      "key": "map-candidate:verum-city",
+      "key": "candidate:3.3:all-new-program",
+      "target": "events",
+      "status": "pending",
+      "checkedAt": "2026-10-21T03:13:48.423Z",
+      "adoptedValue": {
+        "startsAt": null,
+        "endsAt": "2026-12-01T03:59:00+08:00"
+      },
+      "reason": "官网标题早于维护完成已显示3.3，主要官方列表/更新与一次独立开服检索未取得可确证正式服已开放的公告。11:00仍是名义维护完成基准，不能仅凭当前时钟推出已开放。"
+    },
+    {
+      "key": "mode-season:labyrinth-eccentric-trials",
+      "target": "events_and_cycles",
+      "status": "excluded",
+      "checkedAt": "2026-10-21T03:13:48.423Z",
+      "reason": "官方新闻明确为常驻迷宫玩法的赛季更新；内部试炼、集市、限购和容器不单独创建限时事项或无依据周期定义。"
+    },
+    {
+      "key": "maps:3.3-new-scenes",
       "target": "exploration",
-      "reason": "官方3.2确认维尔乌姆城区归属罗斯凯利法，复核完整32节点目录及新增地区后，该候选仍缺独立探索进度依据。独立全收集资料仅列宝箱、布连币与交互点，不能证明独立探索百分比；保留既有稳定键和父子关系。",
-      "priorEvidence": "docs/catalog-research/zenless-3.2-2026-10-11.json"
-    },
-    {
-      "key": "version-3.3-full-announcement",
-      "target": "all",
-      "reason": "完整3.3更新公告与地图开放/独立进度证据未覆盖。主公告入口及一次定向补查无可靠完整正文；待名义开服后续接。"
+      "status": "pending",
+      "checkedAt": "2026-10-21T03:13:48.423Z",
+      "adoptedValue": [
+        {
+          "title": "[管制区]宁息屿",
+          "parentTitle": "罗斯凯利法",
+          "parentRemoteKey": "map-catalog:zenless:region:e27477172b3cccb95766"
+        },
+        {
+          "title": "[管制区]空域总控塔",
+          "parentTitle": "罗斯凯利法",
+          "parentRemoteKey": "map-catalog:zenless:region:e27477172b3cccb95766"
+        }
+      ],
+      "reason": "官方地区归属已明确，主要公告与一次独立定向补查未补齐独立进度/当前开放证据。不能仅凭可探索场景或宝箱加入。"
     },
     {
       "key": "catalog-delivery-test-assumption",
       "target": "delivery",
-      "reason": "已验证差异保存，但现有数量断言阻止任何净增的绝区零条目通过Verify。保留固定公开身份与累积退役，等待授权范围之外的软件测试修复；定时任务继续维护其他游戏和公开研究。"
+      "status": "resolved_condition_pending_ci",
+      "checkedAt": "2026-10-21T03:13:48.423Z",
+      "reason": "管理员PR24已合入main；测试blob由202dc25...变为e8db671...，实时清单增长回归取代固定计数。当前任务不改软件或测试；仍以本PR最终精确head两项CI为合并门槛。"
+    }
+  ],
+  "pending": [
+    {
+      "key": "candidate:3.3:all-new-program",
+      "target": "events",
+      "reason": "缺正式服已开放的可靠补证；已保存条件起点、预计维护完成11:00与12/01 03:59截止，待补证后再编译。"
+    },
+    {
+      "key": "cycles:hollow-annihilation",
+      "target": "cycles",
+      "reason": "完整更新和一次独立定向补查没有可用重置锚点、周期长度与开放时长；保留此前裁决。"
+    },
+    {
+      "key": "map-candidate:verum-city",
+      "target": "exploration",
+      "reason": "仍缺独立探索进度，复用既有来源与裁决。"
+    },
+    {
+      "key": "map-candidate:ningxi-isle",
+      "target": "exploration",
+      "reason": "父级和官方简体名称已确认；独立探索进度与当前开放证据缺失。"
+    },
+    {
+      "key": "map-candidate:airspace-control-tower",
+      "target": "exploration",
+      "reason": "父级和官方简体名称已确认；独立探索进度与当前开放证据缺失。"
     }
   ],
   "independentSupplement": {
     "completed": true,
     "queries": [
-      "site.taptap.cn/moment 3.3版本 更新公告 2026/10/21",
-      "绝区零 重返天空的旅程 更新 全新活动",
-      "绝区零 拟境湮灭战 周期",
-      "绝区零 维尔乌姆城区 探索进度"
+      "\"绝区零\" \"重返天空的旅程\" \"现已开启\"",
+      "\"绝区零\" \"宁息屿\" \"探索进度\"",
+      "\"绝区零\" \"空域总控塔\" \"探索进度\"",
+      "\"绝区零\" \"拟境湮灭战\" \"3.3\" \"重置\""
     ],
-    "result": "无可靠补齐完整新版本公告、周期锚点或地图独立进度；第三方泛化、旧版及创作体验服内容不作正式服事实。停止同轮搜索，pending续接。"
+    "result": "主要完整更新+一次定向补查后，开服、地图独立进度和拟境规则未得到可靠新增证据。停止同轮继续搜索；在下一共享业务节点机会续接，避免固定小时循环。"
   },
   "validation": {
-    "inventory": "actual consumer passed",
+    "inventory": "fresh exact-main actual consumer passed",
     "compilation": {
       "ok": true,
-      "output": "/workspace/scratch/9fa58b576113/cloud-run-20261021/compiled-catalog.json",
+      "output": "/workspace/scratch/9fa58b576113/cloud-run-20261021-1100/compiled-catalog.json",
       "changed": true,
-      "revision": "2026-10-21.zenless-3.3-partial",
+      "revision": "2026-10-21.zenless-3.3-events",
       "schemaVersion": 2,
       "games": [
         {
@@ -480,7 +778,7 @@
         },
         {
           "gameId": "zenless",
-          "upserts": 20,
+          "upserts": 26,
           "archives": 3,
           "versionException": false,
           "scheduleUpdates": 0,
@@ -496,46 +794,44 @@
         }
       ],
       "applied": {
-        "added": 60,
+        "added": 66,
         "updated": 10,
         "preserved": 5,
         "archived": 0,
         "expiredRemoved": 33
       },
       "receipt": {
-        "revision": "2026-10-21.zenless-3.3-partial",
-        "publishedAt": "2026-10-20T22:08:40.339Z",
-        "contentHash": "ece9d7053fa300e644da4bc575d3eba612dc616118bc4656c83c8ec502d85572"
+        "revision": "2026-10-21.zenless-3.3-events",
+        "publishedAt": "2026-10-21T03:10:40.801Z",
+        "contentHash": "b5b700fc37d7df8c8c10477002fc7504637c37714ba2d4a5b249ecea415fe0d7"
       }
     },
-    "sourceExecution": "Node 24 --experimental-transform-types 加只读扩展名解析钩子，运行未改动main的现有编译器和真实AppDatabase；只用:memory:。锁定zod4.0.0。生产构建/全量测试由最终head Verify承担。",
-    "semanticDiff": "已断言仅新活动和revision/publishedAt发生语义变化，其余仅真实编译器URL规范化；稳定键、全部退役、地图/规则和其他游戏保持。",
-    "finalHeadChecks": "拟新增清单head的Cloud baseline checks成功、Verify失败；失败结果见publicationBlock。状态/研究提交另由最终head两项CI验证后交付。"
+    "semanticInvariant": {
+      "ok": true,
+      "added": 7,
+      "otherSemanticsPreserved": true,
+      "sha256": "1f9ce7e306da392be6f09de446b2626bfe25c7d2426bd56f0fdfef3fa80af8bf",
+      "revision": "2026-10-21.zenless-3.3-events",
+      "baseSha256": "f078d01d82dd7375c6533970717a3634cedef6f4d9238abdce6d668ff75ee9e5"
+    },
+    "plannerTests": "33 passed",
+    "sourceExecution": "Node24 --experimental-transform-types + extension loader，执行新main未改动源码与AppDatabase(:memory:)；生产完整测试/构建由最终head Verify验证。",
+    "finalHeadChecks": "pending exact final head Verify and Cloud baseline checks"
   },
   "delivery": {
-    "stage": "pending_catalog_delivery",
+    "stage": "ready",
     "branch": "codex/cloud-baseline/zenless-3-2-version-end",
-    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/23",
-    "catalogChanged": false,
-    "catalogRevision": "2026-10-11.zenless-3.2-event-completion",
-    "catalogSha256": "f078d01d82dd7375c6533970717a3634cedef6f4d9238abdce6d668ff75ee9e5",
-    "proposedRevision": "2026-10-21.zenless-3.3-partial",
-    "compiledProposalSha256": "67868a39b4e1e8eb05e7bede22177f227568e6383e3728086a4e7a524f2a50a5",
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/25",
+    "catalogChanged": true,
+    "catalogRevision": "2026-10-21.zenless-3.3-events",
+    "catalogSha256": "1f9ce7e306da392be6f09de446b2626bfe25c7d2426bd56f0fdfef3fa80af8bf",
     "nodeComplete": false,
-    "resumeAt": "2026-10-21T03:00:00.000Z"
-  },
-  "scheduleReview": {
-    "completed": true,
-    "checkedAt": "2026-10-20T22:10:34.669Z",
-    "nextReviewAfterVerification": {
-      "at": "2026-10-21T03:59:00.000Z",
-      "reason": "missing_schedule"
-    }
+    "resumeAt": "2026-10-21T03:59:00.000Z"
   },
   "verifiedCatalogDelta": {
     "schemaVersion": 2,
-    "revision": "2026-10-21.zenless-3.3-partial",
-    "publishedAt": "2026-10-20T22:08:40.339Z",
+    "revision": "2026-10-21.zenless-3.3-events",
+    "publishedAt": "2026-10-21T03:10:40.801Z",
     "games": [
       {
         "gameId": "zenless",
@@ -552,6 +848,87 @@
             "scheduleKind": "fixed_window",
             "timeZone": "Asia/Shanghai",
             "sourceUrl": "https://www.taptap.cn/moment/861568981209714673?group_id=330333"
+          },
+          {
+            "remoteKey": "event:3.3:cyber-doctor",
+            "category": "limited_event",
+            "title": "赛博圣手，出诊!",
+            "startsAt": "2026-10-28T10:00:00+08:00",
+            "endsAt": "2026-11-16T03:59:00+08:00",
+            "activityTags": [
+              "quest"
+            ],
+            "scheduleKind": "fixed_window",
+            "timeZone": "Asia/Shanghai",
+            "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
+          },
+          {
+            "remoteKey": "event:3.3:regional-patrol-bounty",
+            "category": "limited_event",
+            "title": "先遣赏金-区域巡防",
+            "startsAt": "2026-11-04T04:00:00+08:00",
+            "endsAt": "2026-11-09T03:59:00+08:00",
+            "activityTags": [
+              "combat",
+              "double-reward"
+            ],
+            "scheduleKind": "fixed_window",
+            "timeZone": "Asia/Shanghai",
+            "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
+          },
+          {
+            "remoteKey": "event:3.3:boopons-from-above",
+            "category": "limited_event",
+            "title": "「嗯呢」从天降",
+            "startsAt": "2026-11-11T10:00:00+08:00",
+            "endsAt": "2026-12-01T03:59:00+08:00",
+            "activityTags": [
+              "sign-in"
+            ],
+            "scheduleKind": "fixed_window",
+            "timeZone": "Asia/Shanghai",
+            "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
+          },
+          {
+            "remoteKey": "event:3.3:hobbling-crow-mystery",
+            "category": "limited_event",
+            "title": "跛脚乌鸦奇踪记",
+            "startsAt": "2026-11-11T10:00:00+08:00",
+            "endsAt": "2026-11-30T03:59:00+08:00",
+            "activityTags": [
+              "puzzle",
+              "quest"
+            ],
+            "scheduleKind": "fixed_window",
+            "timeZone": "Asia/Shanghai",
+            "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
+          },
+          {
+            "remoteKey": "event:3.3:drifting-picture-album",
+            "category": "limited_event",
+            "title": "修复吧！漂流画集",
+            "startsAt": "2026-11-16T10:00:00+08:00",
+            "endsAt": "2026-11-30T03:59:00+08:00",
+            "activityTags": [
+              "puzzle"
+            ],
+            "scheduleKind": "fixed_window",
+            "timeZone": "Asia/Shanghai",
+            "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
+          },
+          {
+            "remoteKey": "event:3.3:combat-simulation-bounty",
+            "category": "limited_event",
+            "title": "数据悬赏-实战模拟",
+            "startsAt": "2026-11-25T04:00:00+08:00",
+            "endsAt": "2026-11-30T03:59:00+08:00",
+            "activityTags": [
+              "combat",
+              "double-reward"
+            ],
+            "scheduleKind": "fixed_window",
+            "timeZone": "Asia/Shanghai",
+            "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
           }
         ],
         "archives": []
@@ -570,6 +947,100 @@
     "jobId": 118915954076,
     "url": "https://github.com/BaiQue3rL/Gtask/actions/runs/39506298443",
     "message": "expected length 19 but got 20; 501 tests passed, 1 failed, 12 skipped; build/consumer skipped after test failure",
-    "scopeResolution": "只交付允许的state/研究，清单退回main原始字节；不修改测试或为凑数量删除/复用其他身份。后续读取main测试blob，条件未修复时不盲目重复相同失败CI；记录同节点受阻运行数，连续三轮仍不能交付时按应急报告管理员软件维护。"
+    "scopeResolution": "只交付允许的state/研究，清单退回main原始字节；不修改测试或为凑数量删除/复用其他身份。后续读取main测试blob，条件未修复时不盲目重复相同失败CI；记录同节点受阻运行数，连续三轮仍不能交付时按应急报告管理员软件维护。",
+    "status": "admin_fix_observed_waiting_final_ci",
+    "fixPullRequest": "https://github.com/BaiQue3rL/Gtask/pull/24",
+    "fixHead": "e4ea8bc05b37da80c1c27550c1fc7743991ce29c",
+    "observedMain": "8f72f96de59cdabc38574e217a5423f68af4c877",
+    "observedTestBlob": "e8db6712de723f526d6b39db78179c479f0f99f6"
+  },
+  "resumptionHistory": [
+    {
+      "at": "2026-10-21T03:07:09.580Z",
+      "baseMainSha": "8f72f96de59cdabc38574e217a5423f68af4c877",
+      "attempt": 2,
+      "priorPullRequest": "https://github.com/BaiQue3rL/Gtask/pull/23",
+      "priorStatus": "pending",
+      "priorDelivery": {
+        "stage": "pending_catalog_delivery",
+        "branch": "codex/cloud-baseline/zenless-3-2-version-end",
+        "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/23",
+        "catalogChanged": false,
+        "catalogRevision": "2026-10-11.zenless-3.2-event-completion",
+        "catalogSha256": "f078d01d82dd7375c6533970717a3634cedef6f4d9238abdce6d668ff75ee9e5",
+        "proposedRevision": "2026-10-21.zenless-3.3-partial",
+        "compiledProposalSha256": "67868a39b4e1e8eb05e7bede22177f227568e6383e3728086a4e7a524f2a50a5",
+        "nodeComplete": false,
+        "resumeAt": "2026-10-21T03:00:00.000Z"
+      },
+      "priorPublicationBlock": {
+        "kind": "deterministic_existing_test_assertion",
+        "firstDetectedAt": "2026-10-20T22:14:46.424Z",
+        "consecutiveBlockedRuns": 1,
+        "file": "tests/remote-catalog-update.test.ts",
+        "line": 142,
+        "blobSha": "202dc25f43d0d1d2ef86d4bbcd6300c416f5de2a",
+        "failedHead": "1c0c31218b9676d515da2bb4fa306e846723423c",
+        "workflowRunId": 39506298443,
+        "jobId": 118915954076,
+        "url": "https://github.com/BaiQue3rL/Gtask/actions/runs/39506298443",
+        "message": "expected length 19 but got 20; 501 tests passed, 1 failed, 12 skipped; build/consumer skipped after test failure",
+        "scopeResolution": "只交付允许的state/研究，清单退回main原始字节；不修改测试或为凑数量删除/复用其他身份。后续读取main测试blob，条件未修复时不盲目重复相同失败CI；记录同节点受阻运行数，连续三轮仍不能交付时按应急报告管理员软件维护。"
+      }
+    }
+  ],
+  "scheduleResolution": {
+    "checkedAt": "2026-10-21T03:13:48.423Z",
+    "trigger": "incidental finding in due version-end audit; no global schedule review",
+    "previous": {
+      "startsAt": "2026-10-21T11:00:00+08:00",
+      "endsAt": null,
+      "firstHalfEndsAt": "2026-11-11T11:59:00+08:00",
+      "checkedAt": "2026-10-19T15:14:21.971Z"
+    },
+    "adopted": {
+      "startsAt": "2026-10-21T11:00:00+08:00",
+      "endsAt": "2026-12-02T06:00:00+08:00",
+      "firstHalfEndsAt": "2026-11-11T11:59:00+08:00"
+    },
+    "previousGap": {
+      "gameId": "zenless",
+      "periodKey": "3.3",
+      "reason": "10月20日3.3主维护通知及对应官网链接本轮不可访问；复用10月19日已保存维护开始、nominal开服和上半截止，不重写已确认字段。当前官方列表及一次独立定向补查仍无明确3.3版本结束；商城、活动或丽都城募的单项截止不足以填充endsAt。最近3.2版更边界10月21日06:00已从官方更新公告再次核验，到点再执行全量维护。 2026-10-21本轮已查官方列表、主来源及一次定向补查：仍未得到该缺失字段的适用明确公告，保留null；未检得不等于官方尚未公告。",
+      "checkedSources": [
+        "https://www.taptap.cn/app/234493/topic?type=official",
+        "https://www.taptap.cn/moment/861195006294099434",
+        "https://zenless.hoyoverse.com/m/zh-cn/news/166925",
+        "https://www.taptap.cn/moment/846454619398734794"
+      ],
+      "checkedAt": "2026-10-20T22:10:34.669Z"
+    },
+    "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+    "sourceRef": "turn27view0",
+    "reason": "完整官方3.3更新公告直接给出12/02 06:00的版本结束；不再为该字段留null。原上半截止复用，startsAt仍是已有名义维护完成基准；不以商城05:59或42天计算取代明确版本字段。"
+  },
+  "scheduleReviewHistory": {
+    "completed": true,
+    "checkedAt": "2026-10-20T22:10:34.669Z",
+    "nextReviewAfterVerification": {
+      "at": "2026-10-21T03:59:00.000Z",
+      "reason": "missing_schedule"
+    }
+  },
+  "scheduleReviewThisAttempt": {
+    "required": false,
+    "performed": false,
+    "nextScheduleReviewAt": "2026-10-21T03:59:00.000Z",
+    "note": "仅处理到期绝区零节点；不刷新其他游戏period/gap checkedAt，不延后尚未到期的全局复核。"
+  },
+  "currentAttempt": {
+    "attempt": 2,
+    "checkedAt": "2026-10-21T03:13:48.423Z",
+    "officialUpdateFullyRead": true,
+    "sourceLinesCovered": "0-473",
+    "proposedCatalogAdded": 7,
+    "allExpectedActivities": 8,
+    "allCurrentMapRowsInspected": 32,
+    "auditComplete": false
   }
 }
