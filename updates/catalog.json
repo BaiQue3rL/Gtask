@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "revision": "2026-10-21.zenless-3.3-events",
-  "publishedAt": "2026-10-21T03:10:40.801Z",
+  "revision": "2026-10-21.zenless-3.3-sign-in",
+  "publishedAt": "2026-10-21T04:30:13.224Z",
   "games": [
     {
       "gameId": "genshin",
@@ -889,6 +889,19 @@
           "activityTags": [
             "combat",
             "double-reward"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:3.3:all-new-program",
+          "title": "全新放送",
+          "startsAt": "2026-10-21T11:00:00+08:00",
+          "endsAt": "2026-12-01T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/861568099537652819?group_id=330333",
+          "category": "limited_event",
+          "activityTags": [
+            "sign-in"
           ],
           "scheduleKind": "fixed_window",
           "timeZone": "Asia/Shanghai"
