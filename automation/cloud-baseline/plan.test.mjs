@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { planMaintenance, validateState, runKey, assertCloudPublicationPaths, planCloudRearm, verifyCloudRearm,
-  planNextScheduleReview, CLOUD_EXECUTION_PROFILE, verifyCloudExecutionProfile } from './plan.mjs'
+  planNextScheduleReview, CLOUD_EXECUTION_PROFILE, verifyCloudExecutionProfile, verifyAnnouncementReview } from './plan.mjs'
 
 const at = day => `2026-11-${String(day).padStart(2, '0')}T11:00:00+08:00`
 const source = 'https://example.com/official-fixture'
@@ -42,6 +42,54 @@ test('a recorded scheduling gap waits until its review time without inventing mi
   assert.equal(result.scheduleReviewDue, false)
   assert.deepEqual(result.unconfiguredGames, ['pending-game'])
   assert.equal(result.due.length, 0)
+  assert.deepEqual(result.announcementReviewTargets, [])
+})
+test('the first review covers current activities in every game even when activation follows the half boundary', () => {
+  const state = fixture()
+  state.games = ['genshin', 'star-rail', 'zenless', 'wuthering-waves']
+  state.activatedAt = at(13)
+  state.nextScheduleReviewAt = null
+  const plan = planMaintenance(state, at(15))
+  assert.deepEqual(plan.due, [])
+  assert.deepEqual(plan.announcementReviewTargets, state.games)
+  assert.deepEqual(plan.nextWake, { at: new Date(Date.parse(at(15)) + 3_600_000).toISOString(), reasons: [{ type: 'schedule_review' }] })
+})
+test('completed business nodes and missing next-version times do not suppress the next announcement review', () => {
+  const state = fixture()
+  state.periods[0].endsAt = null
+  state.runs = [receipt('verified_unchanged')]
+  state.nextScheduleReviewAt = at(15)
+  assert.deepEqual(planMaintenance(state, at(14)).announcementReviewTargets, [])
+  const plan = planMaintenance(state, at(15))
+  assert.deepEqual(plan.due, [])
+  assert.deepEqual(plan.announcementReviewTargets, ['genshin'])
+})
+function reviewReceipt(state) {
+  return { checkedAt: at(15), games: state.games.map(gameId => ({ gameId, coverage: 'complete',
+    checkedSources: [source], evidencePath: 'catalog-research/cloud/review-fixture.json', pending: [] })) }
+}
+test('announcement readback requires evidence for all games and keeps partial work distinct', () => {
+  const state = fixture(); state.games.push('star-rail')
+  const review = reviewReceipt(state)
+  assert.deepEqual(verifyAnnouncementReview(state, review), { ok: true, coveredGames: state.games, auditComplete: true, unresolvedCount: 0 })
+  review.games[0].coverage = 'partial'; review.games[0].pending = ['Official rules could not be read']
+  assert.equal(verifyAnnouncementReview(state, review).auditComplete, false)
+  assert.equal(verifyAnnouncementReview(state, review).unresolvedCount, 1)
+  review.games[0].coverage = 'complete'
+  assert.throws(() => verifyAnnouncementReview(state, review), /Pending research/)
+})
+test('announcement readback rejects omitted games, duplicates, missing sources and historical receipts', () => {
+  const state = fixture(); state.games.push('star-rail')
+  for (const change of [
+    review => review.games.pop(),
+    review => review.games[1] = { ...review.games[0] },
+    review => review.games[0].checkedSources = [],
+    review => review.games[0].evidencePath = '',
+    review => review.checkedAt = '2026-10-01T00:00:00Z'
+  ]) {
+    const review = reviewReceipt(state); change(review)
+    assert.throws(() => verifyAnnouncementReview(state, review))
+  }
 })
 test('ignores boundaries before activation rather than replaying historical versions', () => {
   const state = fixture(); state.activatedAt = at(13)

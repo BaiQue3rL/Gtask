@@ -130,12 +130,38 @@ export function planMaintenance(input, reference = new Date()) {
   wakeCandidates.sort((a, b) => a.at - b.at || JSON.stringify(a.reason).localeCompare(JSON.stringify(b.reason)))
   const next = wakeCandidates[0]
   return { checkedAt: new Date(now).toISOString(), scheduleReviewDue,
+    announcementReviewTargets: scheduleReviewDue ? [...state.games] : [],
     unconfiguredGames: state.games.filter(game => !state.periods.some(p => p.gameId === game && p.endsAt !== null && timestamp(p.endsAt) > now)),
     due: due.sort(byTime), upcoming: upcoming.sort(byTime),
     nextWake: { at: new Date(next.at).toISOString(), reasons: wakeCandidates.filter(x => x.at === next.at).map(x => x.reason) } }
 }
 
-/** Call after a real scheduling review, then persist this deadline with its evidence.
+/** Coverage is Agent-reported public research, never inferred from personal data or
+ * the existence of a version boundary. Missing sources remain explicit gaps. */
+export function verifyAnnouncementReview(input, receipt) {
+  const state = validateState(input)
+  fields(receipt, ['checkedAt', 'games'])
+  assert(timestamp(receipt.checkedAt) >= timestamp(state.activatedAt), 'Review predates cloud activation')
+  assert(Array.isArray(receipt.games), 'Per-game announcement coverage is required')
+  const covered = new Set()
+  let unresolvedCount = 0
+  for (const game of receipt.games) {
+    fields(game, ['gameId', 'coverage', 'checkedSources', 'evidencePath', 'pending'])
+    assert(state.games.includes(game.gameId), 'Unknown review game')
+    assert(!covered.has(game.gameId), 'Duplicate review game'); covered.add(game.gameId)
+    assert(['complete', 'partial'].includes(game.coverage), 'Unknown review coverage')
+    sources(game.checkedSources)
+    assert(/^catalog-research\/cloud\/[a-zA-Z0-9_-]+\.json$/.test(game.evidencePath), 'Public review evidence is required')
+    assert(Array.isArray(game.pending), 'Pending gaps must be explicit')
+    for (const gap of game.pending) text(gap)
+    assert.equal(game.pending.length === 0, game.coverage === 'complete', 'Pending research is not verified unchanged')
+    unresolvedCount += game.pending.length
+  }
+  assert.equal(covered.size, state.games.length, 'Every configured game needs announcement coverage')
+  return { ok: true, coveredGames: [...state.games], auditComplete: unresolvedCount === 0, unresolvedCount }
+}
+
+/** Call after the real schedule and announcement review, then persist this deadline with its evidence.
  * Merely reading a plan must never postpone an outstanding review. */
 export function planNextScheduleReview(input, reference = new Date()) {
   const state = validateState(input), now = new Date(reference).getTime()
@@ -246,6 +272,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       assertCloudPublicationPaths(output.trim().split('\n').filter(Boolean).map(line => {
         const [status, path] = line.split('\t'); return { status, path }
       }))
+    } else if (args[0] === '--verify-review') {
+      assert.equal(args.length, 2, 'Expected a review receipt JSON path')
+      const document = JSON.parse(readFileSync(args[1], 'utf8'))
+      process.stdout.write(`${JSON.stringify(verifyAnnouncementReview(state, document.announcementReview ?? document))}\n`)
+      process.exit(0)
     } else if (args[0] === '--verify-rearm' || args[0] === '--verify-profile') {
       assert.equal(args.length, 2, 'Expected a receipt JSON path')
       const { automationId, expected, receipt } = JSON.parse(readFileSync(args[1], 'utf8'))
@@ -255,7 +286,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       process.exit(0)
     } else {
       assert(args.length % 2 === 0 && args.every((arg, i) => i % 2 !== 0 || ['--at', '--last-run', '--timing-mode'].includes(arg)),
-        'Usage: plan.mjs [--at timestamp] [--last-run timestamp] [--timing-mode mode] | --guard base-sha | --verify-rearm receipt.json | --verify-profile receipt.json')
+        'Usage: plan.mjs [--at timestamp] [--last-run timestamp] [--timing-mode mode] | --guard base-sha | --verify-rearm receipt.json | --verify-profile receipt.json | --verify-review receipt.json')
       assert.equal(new Set(args.filter((_, i) => i % 2 === 0)).size, args.length / 2, 'Duplicate CLI option')
     }
     const options = Object.fromEntries(args[0] === '--guard' ? [] : args.reduce((all, value, i) => i % 2 === 0 ? [...all, [value, args[i + 1]]] : all, []))

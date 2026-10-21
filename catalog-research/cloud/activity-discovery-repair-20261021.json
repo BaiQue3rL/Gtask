@@ -1,0 +1,208 @@
+{
+  "schemaVersion": 1,
+  "kind": "activity_discovery_coverage_repair",
+  "checkedAt": "2026-10-21T10:45:41.830Z",
+  "baseMainSha": "c502d412effb7d5b6069fb7607fd9bc1f01be54f",
+  "serverScope": {
+    "region": "中国大陆",
+    "timeZone": "Asia/Shanghai"
+  },
+  "rootCause": {
+    "activatedAt": "2026-10-18T17:55:26+08:00",
+    "genshinFirstHalfEndsAt": "2026-10-13T17:59:00+08:00",
+    "evidence": [
+      "automation/cloud-baseline/plan.mjs",
+      "automation/cloud-baseline/README.md",
+      "catalog-research/cloud/schedule-review-20261021-midday.json"
+    ],
+    "findings": [
+      "原神上半结束早于自动化接管，规划器有意不回放历史节点，但首次接管也未补查当前活动。",
+      "后续 scheduleReviewDue 只核查版本窗口，已有研究明确写 schedule only for all games; only due node catalog audits。",
+      "官方10月19日公告大雪仗、10月8日公告自行巧局，最新公开清单均没有相应身份；与当天早间已修复的固定总数断言是不同问题。"
+    ],
+    "affectedGames": [
+      "genshin",
+      "star-rail",
+      "zenless",
+      "wuthering-waves"
+    ],
+    "scope": "四游戏共用调度与维护提示；代码路径均存在风险，不把它当作已证明每个游戏当前都有漏项。"
+  },
+  "remediation": {
+    "planner": "到期复核显式输出全部 announcementReviewTargets，不依赖当前版本窗口完整或业务节点存在。",
+    "coverage": "--verify-review 校验逐游戏来源、证据路径与未决记录；partial 不能充当无变化。",
+    "cadence": "沿用既有排期复核和恢复唤醒；两个全量节点、完成身份和历史节点排除保持。"
+  },
+  "announcementReview": {
+    "checkedAt": "2026-10-21T10:45:41.830Z",
+    "games": [
+      {
+        "gameId": "genshin",
+        "coverage": "partial",
+        "checkedSources": [
+          "https://www.taptap.cn/app/168332/topic?type=official",
+          "https://www.taptap.cn/app/168332/topic?page=2&type=official",
+          "https://www.taptap.cn/app/168332/topic?page=3&type=official",
+          "https://www.taptap.cn/moment/861196152035348213?group_id=201765",
+          "https://www.taptap.cn/moment/857211203124986045?group_id=201765",
+          "https://www.taptap.cn/moment/860111862446949870?group_id=201765"
+        ],
+        "evidencePath": "catalog-research/cloud/activity-discovery-repair-20261021.json",
+        "pending": [
+          "游赏耀星·畅怀的正文明确任务窗口与奖励，但主要玩法尚不足以选择准确主标签，补查未解决，保留候选。",
+          "复用9月24日研究：三项角色自选/胜负竞猜本机已存在，远端 custom.* 标签分发兼容性未解决；不换成错误标签凑发布。",
+          "绮星盛会、绮衣珍赏·晴暖的旧候选需重核独立活动资格、玩法和名义开服起点，旧的缺精确起点理由不能作为永久排除。"
+        ]
+      },
+      {
+        "gameId": "star-rail",
+        "coverage": "complete",
+        "checkedSources": [
+          "https://www.taptap.cn/app/224267/topic?type=official"
+        ],
+        "evidencePath": "catalog-research/cloud/activity-discovery-repair-20261021.json",
+        "pending": []
+      },
+      {
+        "gameId": "zenless",
+        "coverage": "complete",
+        "checkedSources": [
+          "https://www.taptap.cn/app/234493/topic?type=official",
+          "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
+        ],
+        "evidencePath": "catalog-research/cloud/activity-discovery-repair-20261021.json",
+        "pending": []
+      },
+      {
+        "gameId": "wuthering-waves",
+        "coverage": "partial",
+        "checkedSources": [
+          "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
+          "https://www.taptap.cn/moment/861573019909227891?group_id=330015"
+        ],
+        "evidencePath": "catalog-research/cloud/activity-discovery-repair-20261021.json",
+        "pending": [
+          "新近期活动汇总为图片，本轮未完整解码核对；保留既有3.7已核验活动，不宣称图片没有新增。明日上半结束节点继续全量审计。"
+        ]
+      }
+    ]
+  },
+  "comparisons": {
+    "genshin": {
+      "currentLocalBaselineCount": 5,
+      "currentRemoteActiveKnownItems": [
+        "砺行修远",
+        "铸境研炼·巧策进斗"
+      ],
+      "newVerifiedItems": [
+        "event:7.1:carefree-snowball-fight",
+        "event:7.1:heated-battle-auto-chess"
+      ],
+      "retainedLocalCustomTaggedItems": 3,
+      "sourceObservations": "专用维护接口提供脱敏官方档期观察，确认大雪仗和自行巧局均缺于本机基准；未读取账号、完成状态或原始个人接口。"
+    },
+    "star-rail": {
+      "reuse": "catalog-research/cloud/star-rail-4-6-first-half-end.json",
+      "note": "当天完整活动范围已核验；最新列表的一镜到底与位面分裂已在累计清单。4.7赠礼预热没有可靠独立参与窗口，不将预告或剧情漫画建成活动。"
+    },
+    "zenless": {
+      "reuse": "catalog-research/cloud/zenless-3-2-version-end.json",
+      "note": "完整3.3更新和当天活动公告对应已发布八项新活动；当前地图/拟境未决属于其他版块，不冒充本次解决。"
+    },
+    "wuthering-waves": {
+      "reuse": "docs/catalog-research/wuthering-waves-3.7-2026-09-30.json",
+      "note": "已公布3.7活动仍在累计清单；下半角色/武器唤取不是清单活动，最新汇总图片另列partial。"
+    }
+  },
+  "decisions": [
+    {
+      "key": "event:7.1:carefree-snowball-fight",
+      "status": "resolved",
+      "previousValue": null,
+      "adoptedValue": {
+        "remoteKey": "event:7.1:carefree-snowball-fight",
+        "category": "limited_event",
+        "title": "无忧无虑大雪仗",
+        "startsAt": "2026-10-21T10:00:00+08:00",
+        "endsAt": "2026-11-02T03:59:00+08:00",
+        "activityTags": [
+          "shooting",
+          "challenge"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai",
+        "sourceUrl": "https://www.taptap.cn/moment/861196152035348213?group_id=201765"
+      },
+      "timeBasis": "exact",
+      "precision": "official minute precision normalized with seconds 00",
+      "publishedAt": "2026-10-19",
+      "sourceStatement": "10月21日10:00至11月2日03:59；匹配进入关卡投掷雪球打倒目标。",
+      "reason": "独立官方限时活动容器；沿用国服时区，不拆分内部关卡或奖励。"
+    },
+    {
+      "key": "event:7.1:heated-battle-auto-chess",
+      "status": "resolved",
+      "previousValue": null,
+      "adoptedValue": {
+        "remoteKey": "event:7.1:heated-battle-auto-chess",
+        "category": "limited_event",
+        "title": "「七圣召唤」热斗模式：自行巧局",
+        "startsAt": "2026-10-10T10:00:00+08:00",
+        "endsAt": "2026-10-26T03:59:00+08:00",
+        "activityTags": [
+          "card"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai",
+        "sourceUrl": "https://www.taptap.cn/moment/857211203124986045?group_id=201765"
+      },
+      "timeBasis": "exact",
+      "precision": "official minute precision normalized with seconds 00",
+      "publishedAt": "2026-10-08",
+      "sourceStatement": "10月10日10:00至10月26日03:59；选取角色牌、装备与事件牌，调整站位后自动对战。",
+      "reason": "独立官方限时活动容器；沿用国服时区，不拆分内部关卡或奖励。"
+    }
+  ],
+  "verifiedCatalogDelta": {
+    "schemaVersion": 2,
+    "revision": "2026-10-21.genshin-7.1-event-discovery",
+    "publishedAt": "2026-10-21T10:45:41.830Z",
+    "games": [
+      {
+        "gameId": "genshin",
+        "upserts": [
+          {
+            "remoteKey": "event:7.1:carefree-snowball-fight",
+            "category": "limited_event",
+            "title": "无忧无虑大雪仗",
+            "startsAt": "2026-10-21T10:00:00+08:00",
+            "endsAt": "2026-11-02T03:59:00+08:00",
+            "activityTags": [
+              "shooting",
+              "challenge"
+            ],
+            "scheduleKind": "fixed_window",
+            "timeZone": "Asia/Shanghai",
+            "sourceUrl": "https://www.taptap.cn/moment/861196152035348213?group_id=201765"
+          },
+          {
+            "remoteKey": "event:7.1:heated-battle-auto-chess",
+            "category": "limited_event",
+            "title": "「七圣召唤」热斗模式：自行巧局",
+            "startsAt": "2026-10-10T10:00:00+08:00",
+            "endsAt": "2026-10-26T03:59:00+08:00",
+            "activityTags": [
+              "card"
+            ],
+            "scheduleKind": "fixed_window",
+            "timeZone": "Asia/Shanghai",
+            "sourceUrl": "https://www.taptap.cn/moment/857211203124986045?group_id=201765"
+          }
+        ],
+        "archives": []
+      }
+    ]
+  },
+  "auditComplete": false,
+  "scopeBoundary": "本轮覆盖活动发现机制与明确活动差异，不等于所有游戏全部版块审计完成；不改产品版本、客户端引擎、账户、凭据和个人进度。"
+}
