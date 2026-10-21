@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import catalogHistory from './fixtures/catalog-publication-history.json'
 import { AppDatabase } from '../src/main/database'
 import { getBundledMapCatalog } from '../src/main/sync/map-catalog'
 import { buildMapTreeRows, filterIncompleteMapTreeRows, isChecklistRowComplete } from '../src/renderer/src/map-tree'
@@ -23,6 +24,7 @@ let database: AppDatabase | null = null
 const temporaryDirectories: string[] = []
 
 afterEach(() => {
+  vi.useRealTimers()
   database?.close()
   database = null
   for (const directory of temporaryDirectories.splice(0)) {
@@ -63,9 +65,7 @@ function feed(
 
 describe('remote catalog update', () => {
   it('applies the compatible Genshin 7.1 events without duplicating locally maintained rows or resetting progress', () => {
-    const checkedIn = parseRemoteCatalogFeed(JSON.parse(
-      readFileSync(join(process.cwd(), 'updates', 'catalog.json'), 'utf8')
-    ))
+    const checkedIn = parseRemoteCatalogFeed(catalogHistory)
     const events = checkedIn.games.find((game) => game.gameId === 'genshin')!.upserts
       .filter((item) => item.category === 'limited_event' && item.remoteKey.startsWith('event:7.1:'))
     expect(events.map((item) => item.remoteKey)).toEqual([
@@ -88,108 +88,65 @@ describe('remote catalog update', () => {
     expect(database.listChecklistItems('genshin').filter((item) => item.remoteKey?.startsWith('event:7.1:'))).toHaveLength(3)
   })
 
-  it('publishes only the verified cross-game deltas and retracts invalid period-scoped cycle cards', () => {
-    const checkedIn = parseRemoteCatalogFeed(JSON.parse(
-      readFileSync(join(process.cwd(), 'updates', 'catalog.json'), 'utf8')
-    ))
-    expect(checkedIn.games).toHaveLength(4)
-    const archivedKeys = new Set<string>()
-    for (const game of checkedIn.games) {
-      if (game.gameId === 'star-rail') {
-        expect(game.versionWindow).toMatchObject({ endsAt: '2026-11-11T06:00:00+08:00', confidence: 1 })
-      } else if (game.gameId === 'wuthering-waves') {
-        expect(game.versionWindow).toMatchObject({
-          startsAt: '2026-09-30T11:00:00+08:00',
-          endsAt: '2026-11-12T04:00:00+08:00',
-          confidence: 0.85
-        })
-      } else {
-        expect(game.versionWindow).toBeUndefined()
+  it.each(['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const)(
+    'consumes a growing current catalog for %s without resetting existing progress', (gameId) => {
+      const checkedIn = parseRemoteCatalogFeed(JSON.parse(
+        readFileSync(join(process.cwd(), 'updates', 'catalog.json'), 'utf8')
+      ))
+      // Catalog contents and schedules change through data-only maintenance.
+      // Keep historical scenarios in catalogHistory; exercise the live feed through its consumer.
+      for (const game of checkedIn.games) {
+        const expectedArchives = [
+          `hot-update-test:${game.gameId}:events:v1`,
+          `hot-update-test:${game.gameId}:cycles:v1`,
+          `hot-update-test:${game.gameId}:exploration:v1`
+        ]
+        if (game.gameId === 'genshin') {
+          expectedArchives.push(
+            'endgame:spiral-abyss:2026-08-16',
+            'endgame:imaginarium-theater:2026-09-01'
+          )
+        }
+        expect(game.archives).toEqual(expect.arrayContaining(expectedArchives))
       }
-      const expectedArchives = [
-        `hot-update-test:${game.gameId}:events:v1`,
-        `hot-update-test:${game.gameId}:cycles:v1`,
-        `hot-update-test:${game.gameId}:exploration:v1`
-      ]
-      if (game.gameId === 'genshin') {
-        expectedArchives.push(
-          'endgame:spiral-abyss:2026-08-16',
-          'endgame:imaginarium-theater:2026-09-01'
-        )
-      }
-      expect(game.archives).toEqual(expectedArchives)
-      for (const remoteKey of game.archives) archivedKeys.add(remoteKey)
 
-      if (game.gameId === 'genshin') {
-        expect(game.upserts).toEqual(expect.arrayContaining([
-          expect.objectContaining({ title: '砺行修远', category: 'limited_event' }),
-          expect.objectContaining({ title: '新芽相助·初探雪原', category: 'limited_event' }),
-          expect.objectContaining({ title: '险境征者竞锋大赛', category: 'limited_event' }),
-          expect.objectContaining({ title: '至冬', mapNodeKind: 'region' }),
-          expect.objectContaining({
-            title: '古兽冰原',
-            mapNodeKind: 'subregion',
-            parentTitle: '至冬'
-          })
-        ]))
-        expect(game.upserts.filter((item) => item.category === 'endgame')).toEqual([
-          expect.objectContaining({
-            remoteKey: 'endgame:stygian-onslaught',
-            modeKey: 'stygian-onslaught'
-          })
-        ])
-      } else if (game.gameId === 'zenless') {
-        expect(game.upserts).toHaveLength(19)
-        expect(game.upserts).toEqual(expect.arrayContaining([
-          expect.objectContaining({
-            remoteKey: 'event:3.1:return-to-ridu',
-            title: '回归丽都：羽落重逢'
-          })
-        ]))
-      } else if (game.gameId === 'wuthering-waves') {
-        expect(game.upserts).toHaveLength(20)
-        expect(game.upserts.filter((item) => item.remoteKey.startsWith('ww:event:3.6:'))
-          .map((item) => item.title)).toEqual([
-          '群声共振模拟域',
-          '第二索拉・诡影迷踪',
-          '清弦纪流年',
-          '若梦仍有回声',
-          '潮汐觅闻',
-          '烟云赠礼',
-          '回音盈域',
-          '声弦涤荡'
-        ])
-        const currentEvents = game.upserts.filter((item) => item.remoteKey.startsWith('ww:event:3.7:'))
-        expect(currentEvents).toHaveLength(11)
-        expect(currentEvents.map((item) => item.title).sort()).toEqual([
-          '团团勇者大乱斗', '梦构匣中', '朝月赠礼', '索拉里斯回归邀约', '天工寻物',
-          '朝月鱼涌', '回音盈域', '无音消除', '凭栏听雨之礼', '踏潮探历・玄方地界', '声弦涤荡'
-        ].sort())
-        expect(game.upserts.filter((item) => item.category === 'limited_event')).toHaveLength(19)
-        expect(game.upserts.filter((item) => item.category === 'endgame')).toEqual([])
-        expect(game.upserts.filter((item) => item.category === 'exploration')).toEqual([
-          expect.objectContaining({
-            remoteKey: 'map-catalog:wuthering-waves:subregion:1aa2be50a8f6bec9153b',
-            title: '梦枢天罗',
-            mapNodeKind: 'subregion',
-            parentRemoteKey: 'map-catalog:wuthering-waves:region:46d939ba62197e5a32ca',
-            parentTitle: '瑝珑'
-          })
-        ])
-      } else {
-        expect(game.upserts).toHaveLength(19)
-        expect(game.upserts.filter((item) => item.category === 'endgame').map((item) => item.remoteKey))
-          .toEqual(['endgame:anomaly-arbitration', 'endgame:apocalyptic-shadow'])
-        expect(game.scheduleUpdates).toHaveLength(7)
+      const reference = new Date(checkedIn.publishedAt)
+      vi.useFakeTimers()
+      vi.setSystemTime(reference)
+      database = new AppDatabase(':memory:')
+      database.applyRemoteCatalogFeed(checkedIn, reference)
+      const existing = database.listChecklistItems(gameId, { category: 'exploration' })
+        .find((item) => item.mapNodeKind === 'subregion')!
+      expect(existing).toBeDefined()
+      database.setChecklistCompletion(existing.id, true)
+      const custom = database.createChecklistItem({ gameId, category: 'custom', title: '保留的手动事项' })
+      const addedEvent = {
+        ...event(`event:catalog-growth:${gameId}`),
+        startsAt: reference.toISOString(),
+        endsAt: new Date(reference.getTime() + 7 * 86_400_000).toISOString()
       }
-    }
-    expect(archivedKeys.size).toBe(14)
-  })
+      const expanded = parseRemoteCatalogFeed({
+        ...checkedIn,
+        revision: 'fixture.catalog-growth',
+        games: checkedIn.games.map((game) => game.gameId === gameId
+          ? { ...game, upserts: [...game.upserts, addedEvent] } : game)
+      })
+      database.applyRemoteCatalogFeed(expanded, reference)
+      const added = database.listChecklistItems(gameId).find((item) => item.remoteKey === addedEvent.remoteKey)!
+      expect(added).toMatchObject({ title: addedEvent.title, source: 'public_schedule', completed: false })
+      database.setChecklistCompletion(added.id, true)
+      database.applyRemoteCatalogFeed(expanded, reference)
+      expect(database.listChecklistItems(gameId).filter((item) => item.remoteKey === addedEvent.remoteKey))
+        .toHaveLength(1)
+      expect(database.getChecklistItem(added.id)).toMatchObject({ completed: true, manualCompletionLocked: true })
+      expect(database.getChecklistItem(existing.id)).toMatchObject({
+        remoteKey: existing.remoteKey, completed: true, manualCompletionLocked: true
+      })
+      expect(database.getChecklistItem(custom.id)).toMatchObject({ source: 'manual', title: custom.title })
+    })
 
   it('applies the verified Zenless additions to an older catalog without replacing existing identities or completion', () => {
-    const checkedIn = parseRemoteCatalogFeed(JSON.parse(
-      readFileSync(join(process.cwd(), 'updates', 'catalog.json'), 'utf8')
-    ))
+    const checkedIn = parseRemoteCatalogFeed(catalogHistory)
     const zenless = checkedIn.games.find((game) => game.gameId === 'zenless')!
     const newMaps = ['[管制区]辉金研究所', '[管制区]隐礁中转站']
     const newEvents = zenless.upserts.filter((item) => item.remoteKey.startsWith('event:3.2:'))
@@ -238,9 +195,7 @@ describe('remote catalog update', () => {
   })
 
   it('applies the published Wuthering Waves map addition while preserving old leaves and reopening their completed parent', () => {
-    const checkedIn = parseRemoteCatalogFeed(JSON.parse(
-      readFileSync(join(process.cwd(), 'updates', 'catalog.json'), 'utf8')
-    ))
+    const checkedIn = parseRemoteCatalogFeed(catalogHistory)
     const wutheringWaves = checkedIn.games.find((game) => game.gameId === 'wuthering-waves')!
     const parentKey = 'map-catalog:wuthering-waves:region:46d939ba62197e5a32ca'
     const newMapKey = 'map-catalog:wuthering-waves:subregion:1aa2be50a8f6bec9153b'
@@ -335,9 +290,7 @@ describe('remote catalog update', () => {
   })
 
   it('removes only the explicitly retracted public cards', () => {
-    const checkedIn = parseRemoteCatalogFeed(JSON.parse(
-      readFileSync(join(process.cwd(), 'updates', 'catalog.json'), 'utf8')
-    ))
+    const checkedIn = parseRemoteCatalogFeed(catalogHistory)
     const retraction = parseRemoteCatalogFeed({
       schemaVersion: 1,
       revision: 'hot-update-test-retraction-only',

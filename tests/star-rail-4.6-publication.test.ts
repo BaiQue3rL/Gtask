@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import catalog from '../updates/catalog.json'
+import catalog from './fixtures/catalog-publication-history.json'
 import { AppDatabase } from '../src/main/database'
 import { parseRemoteCatalogFeed } from '../src/main/remote-catalog-update'
 
