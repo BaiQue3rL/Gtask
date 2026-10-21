@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "revision": "2026-10-21.zenless-3.3-sign-in",
-  "publishedAt": "2026-10-21T04:30:13.224Z",
+  "revision": "2026-10-21.genshin-7.1-event-discovery",
+  "publishedAt": "2026-10-21T10:45:41.830Z",
   "games": [
     {
       "gameId": "genshin",
@@ -195,6 +195,33 @@
           "category": "limited_event",
           "activityTags": [
             "sign-in"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:7.1:carefree-snowball-fight",
+          "title": "无忧无虑大雪仗",
+          "startsAt": "2026-10-21T10:00:00+08:00",
+          "endsAt": "2026-11-02T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/861196152035348213?group_id=201765",
+          "category": "limited_event",
+          "activityTags": [
+            "shooting",
+            "challenge"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:7.1:heated-battle-auto-chess",
+          "title": "「七圣召唤」热斗模式：自行巧局",
+          "startsAt": "2026-10-10T10:00:00+08:00",
+          "endsAt": "2026-10-26T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/857211203124986045?group_id=201765",
+          "category": "limited_event",
+          "activityTags": [
+            "card"
           ],
           "scheduleKind": "fixed_window",
           "timeZone": "Asia/Shanghai"
