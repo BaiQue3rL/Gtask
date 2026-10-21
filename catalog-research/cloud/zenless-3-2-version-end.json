@@ -7,7 +7,7 @@
   "node": "version_end",
   "newVersion": "3.3",
   "checkedAt": "2026-10-20T22:10:34.669Z",
-  "status": "pending",
+  "status": "running",
   "auditComplete": false,
   "serverScope": {
     "region": "中国大陆适用官方公告",
@@ -513,16 +513,9 @@
     "finalHeadChecks": "拟新增清单head的Cloud baseline checks成功、Verify失败；失败结果见publicationBlock。状态/研究提交另由最终head两项CI验证后交付。"
   },
   "delivery": {
-    "stage": "pending_catalog_delivery",
+    "stage": "resumed",
     "branch": "codex/cloud-baseline/zenless-3-2-version-end",
-    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/23",
-    "catalogChanged": false,
-    "catalogRevision": "2026-10-11.zenless-3.2-event-completion",
-    "catalogSha256": "f078d01d82dd7375c6533970717a3634cedef6f4d9238abdce6d668ff75ee9e5",
-    "proposedRevision": "2026-10-21.zenless-3.3-partial",
-    "compiledProposalSha256": "67868a39b4e1e8eb05e7bede22177f227568e6383e3728086a4e7a524f2a50a5",
-    "nodeComplete": false,
-    "resumeAt": "2026-10-21T03:00:00.000Z"
+    "nodeComplete": false
   },
   "scheduleReview": {
     "completed": true,
@@ -571,5 +564,40 @@
     "url": "https://github.com/BaiQue3rL/Gtask/actions/runs/39506298443",
     "message": "expected length 19 but got 20; 501 tests passed, 1 failed, 12 skipped; build/consumer skipped after test failure",
     "scopeResolution": "只交付允许的state/研究，清单退回main原始字节；不修改测试或为凑数量删除/复用其他身份。后续读取main测试blob，条件未修复时不盲目重复相同失败CI；记录同节点受阻运行数，连续三轮仍不能交付时按应急报告管理员软件维护。"
-  }
+  },
+  "resumptionHistory": [
+    {
+      "at": "2026-10-21T03:07:09.580Z",
+      "baseMainSha": "8f72f96de59cdabc38574e217a5423f68af4c877",
+      "attempt": 2,
+      "priorPullRequest": "https://github.com/BaiQue3rL/Gtask/pull/23",
+      "priorStatus": "pending",
+      "priorDelivery": {
+        "stage": "pending_catalog_delivery",
+        "branch": "codex/cloud-baseline/zenless-3-2-version-end",
+        "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/23",
+        "catalogChanged": false,
+        "catalogRevision": "2026-10-11.zenless-3.2-event-completion",
+        "catalogSha256": "f078d01d82dd7375c6533970717a3634cedef6f4d9238abdce6d668ff75ee9e5",
+        "proposedRevision": "2026-10-21.zenless-3.3-partial",
+        "compiledProposalSha256": "67868a39b4e1e8eb05e7bede22177f227568e6383e3728086a4e7a524f2a50a5",
+        "nodeComplete": false,
+        "resumeAt": "2026-10-21T03:00:00.000Z"
+      },
+      "priorPublicationBlock": {
+        "kind": "deterministic_existing_test_assertion",
+        "firstDetectedAt": "2026-10-20T22:14:46.424Z",
+        "consecutiveBlockedRuns": 1,
+        "file": "tests/remote-catalog-update.test.ts",
+        "line": 142,
+        "blobSha": "202dc25f43d0d1d2ef86d4bbcd6300c416f5de2a",
+        "failedHead": "1c0c31218b9676d515da2bb4fa306e846723423c",
+        "workflowRunId": 39506298443,
+        "jobId": 118915954076,
+        "url": "https://github.com/BaiQue3rL/Gtask/actions/runs/39506298443",
+        "message": "expected length 19 but got 20; 501 tests passed, 1 failed, 12 skipped; build/consumer skipped after test failure",
+        "scopeResolution": "只交付允许的state/研究，清单退回main原始字节；不修改测试或为凑数量删除/复用其他身份。后续读取main测试blob，条件未修复时不盲目重复相同失败CI；记录同节点受阻运行数，连续三轮仍不能交付时按应急报告管理员软件维护。"
+      }
+    }
+  ]
 }
