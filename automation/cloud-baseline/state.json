@@ -169,17 +169,17 @@
       "periodKey": "4.6",
       "node": "first_half_end",
       "boundaryAt": "2026-10-21T11:59:00+08:00",
-      "status": "running",
+      "status": "verified_unchanged",
       "attempts": 1,
-      "updatedAt": "2026-10-21T04:38:40.591Z",
-      "retryAt": "2026-10-21T05:38:35.000Z",
+      "updatedAt": "2026-10-21T04:41:53.745Z",
+      "retryAt": null,
       "branch": "codex/cloud-baseline/star-rail-4-6-first-half-end",
-      "pullRequestUrl": null,
-      "catalogRevision": null,
-      "catalogSha256": null,
+      "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/29",
+      "catalogRevision": "2026-10-21.zenless-3.3-sign-in",
+      "catalogSha256": "6b0a5b24f5230b437c955413ece6238f9df817a807a24ccdae1d8ee498c56aae",
       "evidencePath": "catalog-research/cloud/star-rail-4-6-first-half-end.json",
-      "completedAt": null,
-      "notes": "真实上半场结束已到期；全范围核查下半新增，复用既有有效来源与裁决；恢复唤醒及有限租约已保存。"
+      "completedAt": "2026-10-21T04:41:53.745Z",
+      "notes": "到期下半增量与完整既有范围已核查：8活动、4稳定周期、8父82子地图；一镜到底已在清单，不重复发布。沿用10/1已核验来源与裁决，当前完整官方更新/最新公告无新增差异；不推进revision/publishedAt。"
     }
   ]
 }
