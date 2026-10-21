@@ -149,9 +149,9 @@
       "periodKey": "3.2",
       "node": "version_end",
       "boundaryAt": "2026-10-21T06:00:00+08:00",
-      "status": "ready",
+      "status": "pending",
       "attempts": 2,
-      "updatedAt": "2026-10-21T03:13:48.423Z",
+      "updatedAt": "2026-10-21T03:18:06.114Z",
       "retryAt": "2026-10-21T03:59:00.000Z",
       "branch": "codex/cloud-baseline/zenless-3-2-version-end",
       "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/25",
@@ -159,7 +159,7 @@
       "catalogSha256": "1f9ce7e306da392be6f09de446b2626bfe25c7d2426bd56f0fdfef3fa80af8bf",
       "evidencePath": "catalog-research/cloud/zenless-3-2-version-end.json",
       "completedAt": null,
-      "notes": "七项独立固定档期活动已编译并经真实消费器校验；管理员PR24修复历史数量断言，等最终head两项CI。3.3版本结束已从完整公告直接补齐。地图独立进度、全新放送开服和拟境周期仍pending；ready非完成，合入后读回main再记部分发布并续接。"
+      "notes": "七项固定档期活动已由PR25精确head 5786faf819f54ddbf387d88b91390694074cf0c7通过Verify/Cloud baseline checks合入；main已读回revision和UTF-8 SHA256一致。完整审计尚有5项pending（开服、地图资格、拟境规则），不记完成；下一共享业务节点续接。当前取得实际交付进展，连续无法推进计数归零。"
     }
   ]
 }

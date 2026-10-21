@@ -7,7 +7,7 @@
   "node": "version_end",
   "newVersion": "3.3",
   "checkedAt": "2026-10-21T03:13:48.423Z",
-  "status": "ready",
+  "status": "pending",
   "auditComplete": false,
   "serverScope": {
     "region": "中国大陆适用官方公告",
@@ -816,17 +816,41 @@
     },
     "plannerTests": "33 passed",
     "sourceExecution": "Node24 --experimental-transform-types + extension loader，执行新main未改动源码与AppDatabase(:memory:)；生产完整测试/构建由最终head Verify验证。",
-    "finalHeadChecks": "pending exact final head Verify and Cloud baseline checks"
+    "finalHeadChecks": {
+      "head": "5786faf819f54ddbf387d88b91390694074cf0c7",
+      "Verify": {
+        "runId": 39537439216,
+        "status": "completed",
+        "conclusion": "success"
+      },
+      "CloudBaselineChecks": {
+        "runId": 39537438860,
+        "status": "completed",
+        "conclusion": "success"
+      },
+      "mainRevisionAndSha256": "matched actual saved main bytes"
+    }
   },
   "delivery": {
-    "stage": "ready",
+    "stage": "partial_published",
     "branch": "codex/cloud-baseline/zenless-3-2-version-end",
     "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/25",
     "catalogChanged": true,
     "catalogRevision": "2026-10-21.zenless-3.3-events",
     "catalogSha256": "1f9ce7e306da392be6f09de446b2626bfe25c7d2426bd56f0fdfef3fa80af8bf",
     "nodeComplete": false,
-    "resumeAt": "2026-10-21T03:59:00.000Z"
+    "resumeAt": "2026-10-21T03:59:00.000Z",
+    "mainReadSha": "cdf509d21f469628621a7d62ccbcc83aeded3453",
+    "mainVerifiedAt": "2026-10-21T03:18:06.114Z",
+    "remainingPendingCount": 5,
+    "receiptPublication": "follow-up restricted state/research PR; exact head CI verified before merge externally",
+    "mirror": {
+      "url": "https://gitee.com/l3rui/Gtask/raw/main/updates/catalog.json",
+      "result": "unreadable_via_public_fetch",
+      "sourceRef": "turn31view0",
+      "mirrorRevisionVerified": false
+    },
+    "clientReceipt": "not_observed; no dependency on player client"
   },
   "verifiedCatalogDelta": {
     "schemaVersion": 2,
@@ -938,7 +962,7 @@
   "publicationBlock": {
     "kind": "deterministic_existing_test_assertion",
     "firstDetectedAt": "2026-10-20T22:14:46.424Z",
-    "consecutiveBlockedRuns": 1,
+    "consecutiveBlockedRuns": 0,
     "file": "tests/remote-catalog-update.test.ts",
     "line": 142,
     "blobSha": "202dc25f43d0d1d2ef86d4bbcd6300c416f5de2a",
@@ -948,11 +972,13 @@
     "url": "https://github.com/BaiQue3rL/Gtask/actions/runs/39506298443",
     "message": "expected length 19 but got 20; 501 tests passed, 1 failed, 12 skipped; build/consumer skipped after test failure",
     "scopeResolution": "只交付允许的state/研究，清单退回main原始字节；不修改测试或为凑数量删除/复用其他身份。后续读取main测试blob，条件未修复时不盲目重复相同失败CI；记录同节点受阻运行数，连续三轮仍不能交付时按应急报告管理员软件维护。",
-    "status": "admin_fix_observed_waiting_final_ci",
+    "status": "resolved",
     "fixPullRequest": "https://github.com/BaiQue3rL/Gtask/pull/24",
     "fixHead": "e4ea8bc05b37da80c1c27550c1fc7743991ce29c",
     "observedMain": "8f72f96de59cdabc38574e217a5423f68af4c877",
-    "observedTestBlob": "e8db6712de723f526d6b39db78179c479f0f99f6"
+    "observedTestBlob": "e8db6712de723f526d6b39db78179c479f0f99f6",
+    "resolvedAt": "2026-10-21T03:18:06.114Z",
+    "reason": "新main的管理员修复已被实际新清单精确head CI成功和main读回证明可交付。"
   },
   "resumptionHistory": [
     {
@@ -1042,5 +1068,36 @@
     "allExpectedActivities": 8,
     "allCurrentMapRowsInspected": 32,
     "auditComplete": false
-  }
+  },
+  "partialPublications": [
+    {
+      "revision": "2026-10-21.zenless-3.3-events",
+      "catalogPublishedAt": "2026-10-21T03:10:40.801Z",
+      "addedRemoteKeys": [
+        "event:3.3:haunted-house",
+        "event:3.3:cyber-doctor",
+        "event:3.3:regional-patrol-bounty",
+        "event:3.3:boopons-from-above",
+        "event:3.3:hobbling-crow-mystery",
+        "event:3.3:drifting-picture-album",
+        "event:3.3:combat-simulation-bounty"
+      ],
+      "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/25",
+      "head": "5786faf819f54ddbf387d88b91390694074cf0c7",
+      "mergeCommit": "cdf509d21f469628621a7d62ccbcc83aeded3453",
+      "mainReadSha": "cdf509d21f469628621a7d62ccbcc83aeded3453",
+      "mainVerifiedAt": "2026-10-21T03:18:06.114Z",
+      "catalogSha256": "1f9ce7e306da392be6f09de446b2626bfe25c7d2426bd56f0fdfef3fa80af8bf",
+      "verifyRun": 39537439216,
+      "cloudBaselineRun": 39537438860,
+      "checks": "success on exact head",
+      "nodeComplete": false
+    }
+  ],
+  "progressThisAttempt": {
+    "catalogPublished": true,
+    "added": 7,
+    "scheduleGapResolved": "zenless/3.3/endsAt"
+  },
+  "consecutiveRunsWithoutProgress": 0
 }
