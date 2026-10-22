@@ -318,6 +318,14 @@
       "maps": "既有6父26子稳定键/退役保留，三候选尚缺资格",
       "cycles": "两个现行稳定模式保持；拟境定义仍缺",
       "events": "先前八项已发布保持；最新介绍及全局announcementReview另行保存，不把地图pending混为活动pending"
+    },
+    {
+      "section": "administrator_admission_repair",
+      "checkedAt": "2026-10-22T09:00:31.554Z",
+      "result": "maps_complete",
+      "before": "6 regions, 26 subregions",
+      "after": "6 regions, 29 subregions",
+      "note": "官方3.2与3.3地区范围相对完整公共基准仅新增三项；旧稳定键、退役与个人状态保持。"
     }
   ],
   "sources": [
@@ -758,8 +766,8 @@
     {
       "key": "maps:3.3-new-scenes",
       "target": "exploration",
-      "status": "pending",
-      "checkedAt": "2026-10-21T03:13:48.423Z",
+      "status": "resolved",
+      "checkedAt": "2026-10-22T09:00:31.554Z",
       "adoptedValue": [
         {
           "title": "[管制区]宁息屿",
@@ -772,7 +780,8 @@
           "parentRemoteKey": "map-catalog:zenless:region:e27477172b3cccb95766"
         }
       ],
-      "reason": "官方地区归属已明确，主要公告与一次独立定向补查未补齐独立进度/当前开放证据。不能仅凭可探索场景或宝箱加入。"
+      "reason": "两处3.3地区已与3.2旧漏项维尔乌姆城区一起编译发布；无需个人探索百分比。",
+      "correctionReason": "旧标准错误地把独立探索进度补证设为必要条件；官方新增地区与父级、主线解锁已足以确认。"
     },
     {
       "key": "catalog-delivery-test-assumption",
@@ -815,6 +824,54 @@
         "https://www.taptap.cn/moment/861882420356450082?group_id=330333",
         "https://zenless.hoyoverse.com/m/zh-cn/news/166963"
       ]
+    },
+    {
+      "key": "map-candidate:verum-city",
+      "target": "exploration",
+      "status": "resolved",
+      "previousValue": "官方地区已确认；因未取得独立探索百分比补证而暂缓收录",
+      "adoptedValue": "{\"remoteKey\":\"map-catalog:zenless:subregion:verum-city\",\"title\":\"维尔乌姆城区\",\"parentRemoteKey\":\"map-catalog:zenless:region:e27477172b3cccb95766\",\"parentTitle\":\"罗斯凯利法\"}",
+      "correctionReason": "用户2026-10-22明确要求所有游戏和版块由Agent裁决收录；独立探索百分比不是收录硬门槛。旧规则把补充证据错误提升为必要条件。",
+      "reason": "完整官方更新公告明确列为新地区、指定父级与主线解锁条件；相关正式版本已开放，既有证据足以确认本条公开目录事实。",
+      "sources": [
+        {
+          "url": "https://www.taptap.cn/moment/846454619398734794?group_id=330333",
+          "statement": "3.2完整更新公告“全新地区”明确：新增「罗斯凯利法」-「维尔乌姆城区」，并列出主线解锁条件。"
+        }
+      ],
+      "checkedAt": "2026-10-22T09:00:31.554Z"
+    },
+    {
+      "key": "map-candidate:ningxi-isle",
+      "target": "exploration",
+      "status": "resolved",
+      "previousValue": "官方地区已确认；因未取得独立探索百分比补证而暂缓收录",
+      "adoptedValue": "{\"remoteKey\":\"map-catalog:zenless:subregion:ningxi-isle\",\"title\":\"[管制区]宁息屿\",\"parentRemoteKey\":\"map-catalog:zenless:region:e27477172b3cccb95766\",\"parentTitle\":\"罗斯凯利法\"}",
+      "correctionReason": "用户2026-10-22明确要求所有游戏和版块由Agent裁决收录；独立探索百分比不是收录硬门槛。旧规则把补充证据错误提升为必要条件。",
+      "reason": "完整官方更新公告明确列为新地区、指定父级与主线解锁条件；相关正式版本已开放，既有证据足以确认本条公开目录事实。",
+      "sources": [
+        {
+          "url": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+          "statement": "3.3完整更新公告“全新地区”明确：新增「罗斯凯利法」-「[管制区]宁息屿」，并列出主线解锁条件。"
+        }
+      ],
+      "checkedAt": "2026-10-22T09:00:31.554Z"
+    },
+    {
+      "key": "map-candidate:airspace-control-tower",
+      "target": "exploration",
+      "status": "resolved",
+      "previousValue": "官方地区已确认；因未取得独立探索百分比补证而暂缓收录",
+      "adoptedValue": "{\"remoteKey\":\"map-catalog:zenless:subregion:airspace-control-tower\",\"title\":\"[管制区]空域总控塔\",\"parentRemoteKey\":\"map-catalog:zenless:region:e27477172b3cccb95766\",\"parentTitle\":\"罗斯凯利法\"}",
+      "correctionReason": "用户2026-10-22明确要求所有游戏和版块由Agent裁决收录；独立探索百分比不是收录硬门槛。旧规则把补充证据错误提升为必要条件。",
+      "reason": "完整官方更新公告明确列为新地区、指定父级与主线解锁条件；相关正式版本已开放，既有证据足以确认本条公开目录事实。",
+      "sources": [
+        {
+          "url": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+          "statement": "3.3完整更新公告“全新地区”明确：新增「罗斯凯利法」-「[管制区]空域总控塔」，并列出主线解锁条件。"
+        }
+      ],
+      "checkedAt": "2026-10-22T09:00:31.554Z"
     }
   ],
   "pending": [
@@ -822,24 +879,6 @@
       "key": "cycles:hollow-annihilation",
       "target": "cycles",
       "reason": "官方完整更新仍只列拟境相关更新，没有可靠重置锚点、周期长度和开放时长；一次独立定向补查无补证，继续pending。",
-      "checkedAt": "2026-10-22T02:03:15.293Z"
-    },
-    {
-      "key": "map-candidate:verum-city",
-      "target": "exploration",
-      "reason": "官方3.3名称、父级与开放条件仍有效；独立探索进度资格经主要公告与一次定向补查仍无可靠补证，不据场景/宝箱/攻略推定。",
-      "checkedAt": "2026-10-22T02:03:15.293Z"
-    },
-    {
-      "key": "map-candidate:ningxi-isle",
-      "target": "exploration",
-      "reason": "官方3.3名称、父级与开放条件仍有效；独立探索进度资格经主要公告与一次定向补查仍无可靠补证，不据场景/宝箱/攻略推定。",
-      "checkedAt": "2026-10-22T02:03:15.293Z"
-    },
-    {
-      "key": "map-candidate:airspace-control-tower",
-      "target": "exploration",
-      "reason": "官方3.3名称、父级与开放条件仍有效；独立探索进度资格经主要公告与一次定向补查仍无可靠补证，不据场景/宝箱/攻略推定。",
       "checkedAt": "2026-10-22T02:03:15.293Z"
     }
   ],
@@ -948,17 +987,20 @@
     }
   },
   "delivery": {
-    "stage": "research_only",
+    "stage": "ready",
     "branch": "codex/cloud-baseline/zenless-3-2-version-end",
     "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/31",
-    "catalogChanged": false,
+    "catalogChanged": true,
     "referenceCatalogRevision": "2026-10-21.genshin-7.1-event-discovery",
     "referenceCatalogSha256": "48e679e8b75e1c7b3bbca685d4fa46d540403a770fe830c4aa901405420c5bd7",
     "lastPublishedCatalogRevision": "2026-10-21.zenless-3.3-sign-in",
     "lastPublishedCatalogSha256": "6b0a5b24f5230b437c955413ece6238f9df817a807a24ccdae1d8ee498c56aae",
     "nodeComplete": false,
-    "remainingPendingCount": 4,
-    "resumeAt": "2026-10-23T01:59:25.209Z"
+    "remainingPendingCount": 1,
+    "resumeAt": "2026-10-23T01:59:25.209Z",
+    "catalogRevision": "2026-10-22.zenless-map-admission",
+    "catalogSha256": "d2a930d0519c76780900084190b15b057f1395a33afada17c79bd8e573beb75c",
+    "evidencePath": "catalog-research/cloud/admission-authority-repair-20261022.json"
   },
   "verifiedCatalogDelta": {
     "schemaVersion": 2,
@@ -1129,9 +1171,15 @@
     "attempt": 4,
     "checkedAt": "2026-10-22T02:03:15.293Z",
     "scope": "resume exact pending; current official updates and bounded supplement",
-    "catalogAdded": 0,
-    "resolvedPending": [],
-    "auditComplete": false
+    "catalogAdded": 3,
+    "resolvedPending": [
+      "map-candidate:verum-city",
+      "map-candidate:ningxi-isle",
+      "map-candidate:airspace-control-tower"
+    ],
+    "auditComplete": false,
+    "administratorRepairAt": "2026-10-22T09:00:31.554Z",
+    "remainingPending": 1
   },
   "partialPublications": [
     {
@@ -1188,5 +1236,54 @@
     "resolvedPending": [],
     "remainingPending": 4
   },
-  "consecutiveRunsWithoutProgress": 1
+  "consecutiveRunsWithoutProgress": 1,
+  "resolvedPendingHistory": [
+    {
+      "at": "2026-10-22T09:00:31.554Z",
+      "previousPending": [
+        {
+          "key": "map-candidate:verum-city",
+          "target": "exploration",
+          "reason": "官方3.3名称、父级与开放条件仍有效；独立探索进度资格经主要公告与一次定向补查仍无可靠补证，不据场景/宝箱/攻略推定。",
+          "checkedAt": "2026-10-22T02:03:15.293Z"
+        },
+        {
+          "key": "map-candidate:ningxi-isle",
+          "target": "exploration",
+          "reason": "官方3.3名称、父级与开放条件仍有效；独立探索进度资格经主要公告与一次定向补查仍无可靠补证，不据场景/宝箱/攻略推定。",
+          "checkedAt": "2026-10-22T02:03:15.293Z"
+        },
+        {
+          "key": "map-candidate:airspace-control-tower",
+          "target": "exploration",
+          "reason": "官方3.3名称、父级与开放条件仍有效；独立探索进度资格经主要公告与一次定向补查仍无可靠补证，不据场景/宝箱/攻略推定。",
+          "checkedAt": "2026-10-22T02:03:15.293Z"
+        }
+      ],
+      "correctionReason": "用户明确要求全游戏全版块由Agent裁决；独立探索百分比不是必要证据。",
+      "evidencePath": "catalog-research/cloud/admission-authority-repair-20261022.json"
+    }
+  ],
+  "decisionHistory": [
+    {
+      "key": "maps:3.3-new-scenes",
+      "target": "exploration",
+      "status": "pending",
+      "checkedAt": "2026-10-21T03:13:48.423Z",
+      "adoptedValue": [
+        {
+          "title": "[管制区]宁息屿",
+          "parentTitle": "罗斯凯利法",
+          "parentRemoteKey": "map-catalog:zenless:region:e27477172b3cccb95766"
+        },
+        {
+          "title": "[管制区]空域总控塔",
+          "parentTitle": "罗斯凯利法",
+          "parentRemoteKey": "map-catalog:zenless:region:e27477172b3cccb95766"
+        }
+      ],
+      "reason": "官方地区归属已明确，主要公告与一次独立定向补查未补齐独立进度/当前开放证据。不能仅凭可探索场景或宝箱加入。",
+      "supersededAt": "2026-10-22T09:00:31.554Z"
+    }
+  ]
 }

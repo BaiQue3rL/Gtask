@@ -3,7 +3,7 @@ import { writeFileAtomically } from './atomic-file'
 import { readBoundedJson, type BoundedResponse } from './bounded-response'
 import { createHash } from 'node:crypto'
 import { z } from 'zod'
-import { activityTagsMeetQualityContract } from './activity-tags'
+import { areValidActivityTags } from './activity-tags'
 import type { SoftwareUpdateSource } from '../shared/contracts'
 import { findCycleMode } from './sync/cycle-catalog'
 import { deadlineReviewSchema, publishedScheduleSchema, scheduleArchiveSchema } from './published-schedules'
@@ -84,9 +84,9 @@ const remoteCatalogItemSchema = z.discriminatedUnion('category', [
   }
   if (
     item.category === 'limited_event' &&
-    !activityTagsMeetQualityContract(item.activityTags)
+    !areValidActivityTags(item.activityTags)
   ) {
-    context.addIssue({ code: 'custom', message: '活动必须包含有效玩法标签' })
+    context.addIssue({ code: 'custom', message: '活动标签必须引用不重复的已注册 ID' })
   }
 })
 

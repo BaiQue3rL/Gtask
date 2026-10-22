@@ -24,11 +24,11 @@ There are exactly two levels:
 - `region`: first-level region, without a parent.
 - `subregion`: exactly one verified region parent, specified by parentRemoteKey.
 
-There is no third level or independent-map node type. A scene, dungeon, chest, achievement, or repeatable entrance does not by itself prove independent exploration progress. 鸣潮“玄元境” has no independent exploration percentage and must stay out (user clarification, 2026-09-05).
+There is no third level or independent-map node type. The Agent decides whether a location belongs in the exploration checklist from reliable evidence. An applicable official announcement that establishes a newly opened region's name and parent can be sufficient; a separate exploration percentage, achievement, battle-record entry, screenshot, or second source is not a mandatory admission condition. Evaluate scenes, dungeons and repeatable entrances by their actual role rather than by a software blacklist. 鸣潮“玄元境” remains excluded by the user's specific decision (2026-09-05); do not generalize that individual decision into a percentage requirement for every region.
 
 For a region with no catalog children, the renderer shows a same-name second-level self row, backed by the original region's progress and completion action. This is a view projection, not an additional public map: never publish a duplicate row merely to reproduce it. The region shows `0/1` or `1/1`; a later publication of real children replaces the self row. This applies to every game, including 原神“空之神殿”.
 
-Examples: 璃月 → 沉玉谷/层岩巨渊·地下矿区; 匹诺康尼 → 黄金的时刻/筑梦边境; 瑝珑 → 今州城/云陵谷. If reliable sources do not establish the parent or independent progress eligibility, retain the candidate in research records without guessing.
+Examples: 璃月 → 沉玉谷/层岩巨渊·地下矿区; 匹诺康尼 → 黄金的时刻/筑梦边境; 瑝珑 → 今州城/云陵谷. If the parent or opening is genuinely unresolved, retain that specific gap in research records without guessing. Do not retain a confirmed region as pending solely because optional progress evidence is absent.
 
 ## Verified delta workflow
 

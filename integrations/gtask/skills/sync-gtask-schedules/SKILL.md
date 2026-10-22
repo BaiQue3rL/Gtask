@@ -9,6 +9,8 @@ description: "Maintain Gtask public baselines when a baseline job is queued or t
 
 Codex verifies public facts; programs validate and apply a batch; Gtask reads the published catalog and synchronizes personal progress itself. Normal application use never waits for Codex.
 
+For every game and section, the Agent decides admission, classification, source credibility and evidence sufficiency. Software checks permissions, data shape, identities, references, coverage records and transactions. Evidence examples do not require a fixed source count, page format, tag quality tier or separate exploration percentage. Submit confirmed facts without unnecessary extra proof; keep genuinely unresolved facts explicit. An unresolved gameplay description may use the registered `unknown` tag rather than blocking a verified activity.
+
 This workflow applies to **baseline maintenance**. Explicit requests to repair software, data handling, deployment, or UI authorize software maintenance under the user's scope; do not silently expand a baseline job into that mode.
 
 - Maintain only public item identity, names, tags, hierarchy, official times, and published rules. Never submit completion, scores, exploration percentages, account identifiers, credentials, or custom items.
