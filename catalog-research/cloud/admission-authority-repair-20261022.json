@@ -180,11 +180,44 @@
   },
   "catalogSha256": "d2a930d0519c76780900084190b15b057f1395a33afada17c79bd8e573beb75c",
   "delivery": {
-    "stage": "ready",
+    "stage": "published",
     "branch": "codex/cloud-map-coverage-fix",
     "localApplied": true,
     "version": "1.2.2",
     "releaseCreated": false,
-    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/34"
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/34",
+    "headSha": "55d41bd31abcd18c19f415a97911d1d8229941dd",
+    "mergeSha": "455f8504f487a59b5e88b24200494cfa5b53d0c1",
+    "publishedVerifiedAt": "2026-10-22T09:19:44.078Z",
+    "exactHeadCi": [
+      {
+        "name": "Verify",
+        "id": 39754160824,
+        "conclusion": "success"
+      },
+      {
+        "name": "Cloud baseline checks",
+        "id": 39754160779,
+        "conclusion": "success"
+      }
+    ],
+    "onlineReadback": [
+      {
+        "name": "github",
+        "status": 200,
+        "revision": "2026-10-22.zenless-map-admission",
+        "sha256": "d2a930d0519c76780900084190b15b057f1395a33afada17c79bd8e573beb75c",
+        "matches": true,
+        "url": "https://raw.githubusercontent.com/BaiQue3rL/Gtask/main/updates/catalog.json"
+      },
+      {
+        "name": "gitee",
+        "status": 200,
+        "revision": "2026-10-22.genshin-7.1-activity-review",
+        "sha256": "7c79052acf4a4037dff722ed5284e30f5c2cc8ebd8f89592071bf81119c2ebe3",
+        "matches": false,
+        "url": "https://gitee.com/l3rui/Gtask/raw/main/updates/catalog.json"
+      }
+    ]
   }
 }
