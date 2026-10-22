@@ -987,7 +987,7 @@
     }
   },
   "delivery": {
-    "stage": "ready",
+    "stage": "partial_published",
     "branch": "codex/cloud-map-coverage-fix",
     "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/34",
     "catalogChanged": true,
@@ -1001,7 +1001,9 @@
     "catalogRevision": "2026-10-22.zenless-map-admission",
     "catalogSha256": "d2a930d0519c76780900084190b15b057f1395a33afada17c79bd8e573beb75c",
     "evidencePath": "catalog-research/cloud/admission-authority-repair-20261022.json",
-    "resumeBranch": "codex/cloud-baseline/zenless-3-2-version-end"
+    "resumeBranch": "codex/cloud-baseline/zenless-3-2-version-end",
+    "mainReadSha": "455f8504f487a59b5e88b24200494cfa5b53d0c1",
+    "mainVerifiedAt": "2026-10-22T09:19:44.078Z"
   },
   "verifiedCatalogDelta": {
     "schemaVersion": 2,
@@ -1286,5 +1288,19 @@
       "reason": "官方地区归属已明确，主要公告与一次独立定向补查未补齐独立进度/当前开放证据。不能仅凭可探索场景或宝箱加入。",
       "supersededAt": "2026-10-22T09:00:31.554Z"
     }
-  ]
+  ],
+  "administratorPublication": {
+    "evidencePath": "catalog-research/cloud/admission-authority-repair-20261022.json",
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/34",
+    "mergeSha": "455f8504f487a59b5e88b24200494cfa5b53d0c1",
+    "catalogRevision": "2026-10-22.zenless-map-admission",
+    "catalogSha256": "d2a930d0519c76780900084190b15b057f1395a33afada17c79bd8e573beb75c",
+    "added": 3,
+    "resolvedPending": [
+      "map-candidate:verum-city",
+      "map-candidate:ningxi-isle",
+      "map-candidate:airspace-control-tower"
+    ],
+    "verifiedAt": "2026-10-22T09:19:44.078Z"
+  }
 }
