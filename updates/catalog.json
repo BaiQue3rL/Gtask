@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "revision": "2026-10-21.genshin-7.1-event-discovery",
-  "publishedAt": "2026-10-21T10:45:41.830Z",
+  "revision": "2026-10-22.genshin-7.1-activity-review",
+  "publishedAt": "2026-10-22T02:19:43Z",
   "games": [
     {
       "gameId": "genshin",
@@ -222,6 +222,61 @@
           "category": "limited_event",
           "activityTags": [
             "card"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:7.1:qixing-festival-web",
+          "title": "「绮星盛会」网页特别活动",
+          "startsAt": "2026-10-01T12:00:00+08:00",
+          "endsAt": "2026-11-03T04:00:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/854673845603273392",
+          "category": "limited_event",
+          "activityTags": [
+            "web-event",
+            "quest"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:7.1:qiyi-treasure-qingnuan",
+          "title": "绮衣珍赏·晴暖",
+          "startsAt": "2026-09-23T11:00:00+08:00",
+          "endsAt": "2026-11-04T05:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/851174279427917260",
+          "category": "limited_event",
+          "activityTags": [
+            "quest"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:7.1:overflowing-abundance-artifacts",
+          "title": "祝圣移涌",
+          "startsAt": "2026-10-26T04:00:00+08:00",
+          "endsAt": "2026-11-02T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/858661606224038474?group_id=201765",
+          "category": "limited_event",
+          "activityTags": [
+            "combat",
+            "double-drop"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:7.0:godless-tundra-exploration-rewards",
+          "title": "「无神怜爱的冻土」区域探索限时奖励",
+          "startsAt": "2026-08-12T11:00:00+08:00",
+          "endsAt": "2026-11-03T14:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/835831203461334278",
+          "category": "limited_event",
+          "activityTags": [
+            "exploration",
+            "quest"
           ],
           "scheduleKind": "fixed_window",
           "timeZone": "Asia/Shanghai"

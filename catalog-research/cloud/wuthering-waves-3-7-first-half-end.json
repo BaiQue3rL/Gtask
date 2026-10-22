@@ -1,0 +1,718 @@
+{
+  "schemaVersion": 1,
+  "kind": "business_node_audit",
+  "nodeKey": "wuthering-waves/3.7/first_half_end",
+  "gameId": "wuthering-waves",
+  "periodKey": "3.7",
+  "node": "first_half_end",
+  "checkedAt": "2026-10-22T02:20:47.389Z",
+  "status": "pending",
+  "auditComplete": false,
+  "serverScope": {
+    "server": "CN production",
+    "timeZone": "Asia/Shanghai"
+  },
+  "baseMainSha": "429a18f3354ae9090e3211e62cf6d45d5b1b4ab0",
+  "priorEvidence": [
+    "docs/catalog-research/wuthering-waves-3.7-2026-09-30.json",
+    "catalog-research/cloud/activity-discovery-repair-20261021.json"
+  ],
+  "coverage": [
+    {
+      "section": "inventory",
+      "result": "read_complete_public_inventory",
+      "revision": "2026-10-21.genshin-7.1-event-discovery",
+      "rawUtf8Sha256": "48e679e8b75e1c7b3bbca685d4fa46d540403a770fe830c4aa901405420c5bd7",
+      "consumer": "fresh exact-main original CLI and AppDatabase(:memory:)",
+      "limitedEventsCurrentOrFuture": 10,
+      "cycleModes": 3,
+      "mapRegions": 4,
+      "mapSubregions": 51,
+      "scheduleRecords": 0,
+      "items": [
+        {
+          "remoteKey": "ww:event:3.7:tiangong-xunwu",
+          "title": "天工寻物",
+          "category": "limited_event",
+          "mapNodeKind": null,
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "ww:event:3.7:chaoyue-yuyong",
+          "title": "朝月鱼涌",
+          "category": "limited_event",
+          "mapNodeKind": null,
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "ww:event:3.7:wuyin-xiaochu",
+          "title": "无音消除",
+          "category": "limited_event",
+          "mapNodeKind": null,
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "ww:event:3.7:menggou-xiazhong",
+          "title": "梦构匣中",
+          "category": "limited_event",
+          "mapNodeKind": null,
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "ww:event:3.7:chaoyue-zengli",
+          "title": "朝月赠礼",
+          "category": "limited_event",
+          "mapNodeKind": null,
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "ww:event:3.7:pinglan-tingyu-zhili",
+          "title": "凭栏听雨之礼",
+          "category": "limited_event",
+          "mapNodeKind": null,
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "ww:event:3.7:tuantuan-yongzhe-daluandou",
+          "title": "团团勇者大乱斗",
+          "category": "limited_event",
+          "mapNodeKind": null,
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "ww:event:3.7:solaris-return-invitation",
+          "title": "索拉里斯回归邀约",
+          "category": "limited_event",
+          "mapNodeKind": null,
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "endgame:whimpering-wastes",
+          "title": "冥歌海墟",
+          "category": "endgame",
+          "mapNodeKind": null,
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "endgame:tower-of-adversity",
+          "title": "逆境深塔",
+          "category": "endgame",
+          "mapNodeKind": null,
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "endgame:endstate-matrix",
+          "title": "终焉矩阵",
+          "category": "endgame",
+          "mapNodeKind": null,
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:region:46d939ba62197e5a32ca",
+          "title": "瑝珑",
+          "category": "exploration",
+          "mapNodeKind": "region",
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:81c291fad106f8637243",
+          "title": "云陵谷",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:46d939ba62197e5a32ca"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:8428348a709898d3be8a",
+          "title": "今州城",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:46d939ba62197e5a32ca"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:9114d4b9d7d103069bf0",
+          "title": "中曲台地",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:46d939ba62197e5a32ca"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:e2b6dc63633dfd7af96e",
+          "title": "荒石高地",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:46d939ba62197e5a32ca"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:553c17d45e08923da540",
+          "title": "归墟港市",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:46d939ba62197e5a32ca"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:5a90a4c2d9230eb1e320",
+          "title": "无光之森",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:46d939ba62197e5a32ca"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:c822b08adbbc941dc4ee",
+          "title": "无明湾",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:46d939ba62197e5a32ca"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:7f138182cddf6bb882c8",
+          "title": "北落野",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:46d939ba62197e5a32ca"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:014e5ac4ca1238bcae7b",
+          "title": "怨鸟泽",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:46d939ba62197e5a32ca"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:6cb5105817e70d563961",
+          "title": "虎口山脉",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:46d939ba62197e5a32ca"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:b589b83727324014bd09",
+          "title": "乘霄山",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:46d939ba62197e5a32ca"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:3c1a2923568a045cea61",
+          "title": "玄方城",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:46d939ba62197e5a32ca"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:0f0a0db0009e477ffccf",
+          "title": "方擎西峰",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:46d939ba62197e5a32ca"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:ff574bc38c8f807aaf91",
+          "title": "落渊南丘",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:46d939ba62197e5a32ca"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:a1ba57958bf4f00e2724",
+          "title": "玄幽东岳",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:46d939ba62197e5a32ca"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:region:2c98904a996835946465",
+          "title": "黑海岸",
+          "category": "exploration",
+          "mapNodeKind": "region",
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:d58eab37d2c3ab6f4a13",
+          "title": "黑海岸群岛",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:2c98904a996835946465"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:538e168f6e88ab415839",
+          "title": "泰缇斯之底",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:2c98904a996835946465"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:region:73c1442019a4bf46b575",
+          "title": "黎那汐塔",
+          "category": "exploration",
+          "mapNodeKind": "region",
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:210da0d684f675b4ebc5",
+          "title": "拉古那城",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:73c1442019a4bf46b575"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:5a0d850b32734ca381e1",
+          "title": "埃弗拉德金库",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:73c1442019a4bf46b575"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:4568fef05f2631a2a7d0",
+          "title": "悲叹墓岛",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:73c1442019a4bf46b575"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:b6d37afefdcaaf4b8768",
+          "title": "赞悼圣迹",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:73c1442019a4bf46b575"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:d5c0f62269244149aa96",
+          "title": "拂风水畔",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:73c1442019a4bf46b575"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:ffd33ab34fc205dfa612",
+          "title": "氤柔水境",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:73c1442019a4bf46b575"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:e9f676f4ed41e3ecfa0d",
+          "title": "槲生半岛",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:73c1442019a4bf46b575"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:fc7b1ebc91dd6c62ad7c",
+          "title": "狄萨莱海脊",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:73c1442019a4bf46b575"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:f547631085020bc35f1c",
+          "title": "下层金库",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:73c1442019a4bf46b575"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:19b76a3244818de4f18b",
+          "title": "黎乔利群岛",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:73c1442019a4bf46b575"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:52f7b97f9cd289f4ee85",
+          "title": "阿维纽林",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:73c1442019a4bf46b575"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:9ac1d0963931f3a2b152",
+          "title": "贝奥海域",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:73c1442019a4bf46b575"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:abf24645e41f04d42ed3",
+          "title": "七丘",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:73c1442019a4bf46b575"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:0b8a713728c8ced825e9",
+          "title": "隐海试验场",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:73c1442019a4bf46b575"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:3b1172d068fba485955f",
+          "title": "桑古伊斯狩原",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:73c1442019a4bf46b575"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:region:e0e0bd2c572abfbc7ceb",
+          "title": "罗伊冰原",
+          "category": "exploration",
+          "mapNodeKind": "region",
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:14fed31096182cd22a02",
+          "title": "联运椎骨",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:e0e0bd2c572abfbc7ceb"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:8ea18191d20093bc05c5",
+          "title": "牙列石壑",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:e0e0bd2c572abfbc7ceb"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:23d3848670aa885c0fb4",
+          "title": "陷足流川",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:e0e0bd2c572abfbc7ceb"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:420d2550a6866fd7f134",
+          "title": "复生丘原",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:e0e0bd2c572abfbc7ceb"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:caf5bfc548d5a98e463e",
+          "title": "蚀刻平原",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:e0e0bd2c572abfbc7ceb"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:b3cfeffdda18fbc3627c",
+          "title": "星炬学院",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:e0e0bd2c572abfbc7ceb"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:b8aee91657a853efa9e0",
+          "title": "隐喙深腹",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:e0e0bd2c572abfbc7ceb"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:077b9928f6eef4c84dcf",
+          "title": "巨目远野",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:e0e0bd2c572abfbc7ceb"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:dbd65eeca4c0ca2c938d",
+          "title": "浮光林",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:e0e0bd2c572abfbc7ceb"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:83c75bad7012e4ab8989",
+          "title": "冰原运输港",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:e0e0bd2c572abfbc7ceb"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:206975ddc5b148bd110d",
+          "title": "加拉尔冠阶",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:e0e0bd2c572abfbc7ceb"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:a1efa0660f179e457f9a",
+          "title": "盲望之塌",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:e0e0bd2c572abfbc7ceb"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:7eac96ab8f032177cf56",
+          "title": "元林遗址",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:e0e0bd2c572abfbc7ceb"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:9ecc147cbb6f4d6407d8",
+          "title": "覆海原",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:e0e0bd2c572abfbc7ceb"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:2655dcfffbaabb8504a2",
+          "title": "落日堤屿",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:e0e0bd2c572abfbc7ceb"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:4a6e1afb79847ec0a794",
+          "title": "封存地",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:e0e0bd2c572abfbc7ceb"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:556b5a1c9850d70a6cd0",
+          "title": "寂静断崖",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:e0e0bd2c572abfbc7ceb"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:b694066accd6c0fd3f41",
+          "title": "恒黯之原",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:e0e0bd2c572abfbc7ceb"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:1aa2be50a8f6bec9153b",
+          "title": "梦枢天罗",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:46d939ba62197e5a32ca"
+        },
+        {
+          "remoteKey": "ww:event:3.7:tachao-tanli-xuanfang-dijie",
+          "title": "踏潮探历・玄方地界",
+          "category": "limited_event",
+          "mapNodeKind": null,
+          "parentRemoteKey": null
+        },
+        {
+          "remoteKey": "ww:event:3.7:tacet-field-double-drop",
+          "title": "声弦涤荡",
+          "category": "limited_event",
+          "mapNodeKind": null,
+          "parentRemoteKey": null
+        }
+      ]
+    },
+    {
+      "section": "limited_events",
+      "result": "complete_no_catalog_delta",
+      "periodEventsChecked": 11,
+      "findings": "整版更新、版本活动日历、最新两页官方公告和下半两张原图逐项对照；凭栏听雨之礼、无音消除、踏潮探历・玄方地界、声弦涤荡均已收录。回音盈域今晨03:59:59到期由消费者处理；其他永久故梦/心影不新建。",
+      "announcementReviewEvidencePath": "catalog-research/cloud/announcement-review-20261022.json"
+    },
+    {
+      "section": "exploration",
+      "result": "complete_no_catalog_delta",
+      "retainedRegions": 4,
+      "retainedSubregions": 51,
+      "liveCountryRegions": 4,
+      "liveCountryLevel2": 52,
+      "unmatchedPublishedChildren": [],
+      "findings": "从实时官方地图脚本只读定位匿名公共资源配置，取得当前country.json；全部51既有子区名称/父级匹配，唯一额外level2时隙废都沿用已核验排除。梦枢天罗已开放、已收录，公共912点位支持；内部7场景不加第三级。玄元境按既有用户排除继续排除。未访问账号、令牌或个人地图。"
+    },
+    {
+      "section": "cycles",
+      "result": "partial",
+      "modes": [
+        "逆境深塔",
+        "冥歌海墟",
+        "终焉矩阵"
+      ],
+      "findings": "逆境深塔日历10/12至11/9与28日规则一致；冥歌海墟9/28至10/26、10/26至11/23与规则一致。矩阵日历10/07至11/12只有日期，精确时分未核实，不把周期推算或wiki时分当官方事实。"
+    },
+    {
+      "section": "official_schedule_boundary",
+      "result": "verified",
+      "firstHalfEndsAt": "2026-10-22T09:59:00+08:00",
+      "endsAt": null,
+      "findings": "旧上半唤取公告原时刻复核；下半唤取和版本日历不充当下一次结束维护的时分依据。"
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://www.taptap.cn/moment/854139064348051537",
+      "identity": "鸣潮官方小助手",
+      "publishedOrUpdated": "2026-09-30",
+      "scope": "CN UTC+8",
+      "read": "current full version update; activities/maps/mode updates"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/853756601964691535",
+      "identity": "鸣潮官方小助手",
+      "publishedOrUpdated": "2026-09-29",
+      "scope": "CN server time UTC+8",
+      "read": "upper phase official exact cutoff"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+      "identity": "鸣潮官方小助手",
+      "publishedOrUpdated": "2026-09-28",
+      "read": "actual original version activity calendar, including cycles"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/861573019909227891?group_id=330015",
+      "identity": "鸣潮官方小助手",
+      "publishedOrUpdated": "页面仅相对更新时间2小时前，不伪造绝对发布时间",
+      "read": "both lower-half activity and banner/shop images visually read"
+    },
+    {
+      "url": "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
+      "identity": "official publisher list",
+      "read": "current independent无音消除 and other fresh announcements"
+    },
+    {
+      "url": "https://www.taptap.cn/app/234280/topic?page=2&type=official",
+      "identity": "official publisher list",
+      "read": "independent older supplement; lore, PV and community raffles excluded"
+    },
+    {
+      "url": "https://www.kurobbs.com/mc/map/",
+      "identity": "official public map",
+      "read": "anonymous entry and public configuration only"
+    },
+    {
+      "url": "https://api.kurobbs.com/map/core/config/getMapResource",
+      "identity": "public map navigation configuration",
+      "method": "POST with empty public form; no cookies/token",
+      "httpStatus": 200,
+      "sha256": "14b0371f81a8371d635bcdae585203fd5b4fd23ef55d35c01289f5014c25179d"
+    },
+    {
+      "url": "https://web-static.kurobbs.com/mcmap/country/C0B10EA53A0E4A84B600C2360CF76966/country.json",
+      "identity": "live public country map resource",
+      "httpStatus": 200,
+      "sha256": "3e2744d36834c53de8cad66ab9acfbb623c8d5f301f7739387cd8c72391366db"
+    },
+    {
+      "url": "https://web-static.kurobbs.com/mcmap/position/912/position.json",
+      "identity": "public points only",
+      "sha256": "716c2bf7e81822b2c8071ebcb6f5a67896bdd8ff6f605d90ad60ae5a380af8a4",
+      "read": "only public type names/counts"
+    },
+    {
+      "url": "https://web-static.kurobbs.com/mcmap/position/910/position.json",
+      "identity": "public points only",
+      "sha256": "9362dc70711680f399c7c91ed250276ee3caede3123604776c9012cf0d535d2c",
+      "read": "no independent exploration progress evidence; retain exclusion"
+    },
+    {
+      "url": "https://web-static.kurobbs.com/mcmap/country/13CCF182D6AF491CA1AC2A02754E5345/country.json",
+      "identity": "old public configuration URL",
+      "httpStatus": 404,
+      "read": "replaced by live configuration above, not treated as no map changes"
+    }
+  ],
+  "decisions": [
+    {
+      "key": "cycles:terminus-matrix:3.7",
+      "decision": "pending",
+      "oldResearch": {
+        "sourcePath": "docs/catalog-research/wuthering-waves-3.7-2026-09-30.json",
+        "dateOnlyStartsAt": "2026-10-08",
+        "dateOnlyEndsAt": "2026-11-12"
+      },
+      "adoptedDateOnly": {
+        "startsAt": "2026-10-07",
+        "endsAt": "2026-11-12"
+      },
+      "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+      "sourcePublishedOrUpdated": "2026-09-28",
+      "correctionReason": "本轮实际读取原始日历，起点清楚为10.07；旧研究的10.08是读图错误，不能继续照抄。该更正不提供小时。",
+      "timePrecision": "official_calendar_date_only",
+      "currentGeneratedWindow": {
+        "startsAt": "2026-10-07T04:00:00+08:00",
+        "endsAt": "2026-11-11T04:00:00+08:00"
+      },
+      "rationale": "结束日与现有生成窗口不同，必须核实准确时分才能用既有窗口结构更正。不得机械填04:00、改长期规则或常规逐期发布。",
+      "supplementQueries": [
+        "\"终焉矩阵\" \"险境强袭\" \"10月8日\"",
+        "\"终焉矩阵\" \"2026/10/08\" \"04:00\"",
+        "\"鸣潮\" \"3.7\" \"终焉矩阵\" \"11月12日\""
+      ],
+      "supplementResult": "一次定向补查仅有wiki提供精确时分及不相关旧版官方资料，不足以采用；本轮停止搜索并安排日更补查。"
+    },
+    {
+      "key": "map:all-published",
+      "decision": "retain",
+      "reason": "复用已验证开放与独立探索资格，最新完整更新未新增下半地图；当前官方导航完整覆盖全部已收录子区。"
+    },
+    {
+      "key": "map:timeslip-ruins",
+      "decision": "excluded",
+      "reason": "沿用前次排除：当前910点位只有作战准备、素材和信标等，未补足独立探索进度资格；不将目录存在当资格。"
+    },
+    {
+      "key": "events:lower-half",
+      "decision": "verified_no_delta",
+      "reason": "四项下半独立事项窗口与已有清单一致；不因今日开始重复发布，不因自然到期清理累计upserts。"
+    }
+  ],
+  "pending": [
+    {
+      "key": "cycles:terminus-matrix:3.7:precise-window",
+      "target": "cycles",
+      "reason": "官方当前日历仅10/07至11/12日期；缺适用国服的精确开始/结束时分，尤其结束日与已生成11/11窗口不同。保留既有规则并按日补查，不采纳wiki推断。",
+      "checkedAt": "2026-10-22T02:20:47.389Z",
+      "retryAt": "2026-10-23T02:20:47.389Z"
+    }
+  ],
+  "delivery": {
+    "stage": "research_only",
+    "branch": "codex/cloud-baseline/wuthering-waves-3-7-first-half-end",
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/32",
+    "catalogChanged": false,
+    "batchCatalogChanged": true,
+    "batchEvidencePath": "catalog-research/cloud/announcement-review-20261022.json",
+    "referenceCatalogRevision": "2026-10-21.genshin-7.1-event-discovery",
+    "referenceCatalogSha256": "48e679e8b75e1c7b3bbca685d4fa46d540403a770fe830c4aa901405420c5bd7",
+    "nodeComplete": false,
+    "remainingPendingCount": 1,
+    "resumeAt": "2026-10-23T02:20:47.389Z"
+  },
+  "unresolvedDecisionCount": 1,
+  "sourceImages": [
+    {
+      "url": "https://img2-tc.tapimg.com/moment/etag/luOY-ru-b9PO3EvJcGk8DYMwjdpV_20261020114201.png/_tap_ugc.jpg",
+      "sha256": "1f34fa3b30cdba01ccc51d0f8f4184b8f14026ff7e9e134c4cd4a6de460e43cc",
+      "read": "original full lower-half activities image visually read"
+    },
+    {
+      "url": "https://img2-tc.tapimg.com/moment/etag/llaQ0JVbkIM6lADiSS6dAPrwr1uT_20261021154757.png/_tap_ugc.jpg",
+      "read": "original banner/shop image visually read; excluded"
+    },
+    {
+      "url": "https://img2-tc.tapimg.com/moment/etag/lpJnw3863W7WH0PyL_0cjG0EQJuT_20260928174320.png/_tap_ugc.jpg",
+      "sha256": "69f515d3490a723c2884c372afaad051cc11e2d2795ae00a4b05de89e3a12ce0",
+      "read": "original version calendar visually read"
+    }
+  ],
+  "progress": {
+    "attempts": 1,
+    "consecutiveRunsWithoutProgress": 1,
+    "advanceThisRun": "完整下半、所有既有地图和3周期范围已核查；修复旧研究日期误读，精确时分缺口仍在。",
+    "emergency": false
+  },
+  "validation": {
+    "plannerTests": {
+      "passed": 37,
+      "failed": 0
+    },
+    "originalConsumerInventory": true,
+    "requiredCI": "Verify and Cloud baseline checks for final PR head still required"
+  }
+}

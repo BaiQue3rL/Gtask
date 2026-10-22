@@ -9,7 +9,7 @@
     "zenless",
     "wuthering-waves"
   ],
-  "nextScheduleReviewAt": "2026-10-22T01:59:00.000Z",
+  "nextScheduleReviewAt": "2026-10-23T02:20:47.389Z",
   "periods": [
     {
       "gameId": "star-rail",
@@ -53,7 +53,7 @@
       "firstHalfSources": [
         "https://www.taptap.cn/moment/853756601964691535"
       ],
-      "checkedAt": "2026-10-21T04:31:38.008Z"
+      "checkedAt": "2026-10-22T02:20:47.389Z"
     },
     {
       "gameId": "genshin",
@@ -84,64 +84,72 @@
       "firstHalfSources": [
         "https://www.taptap.cn/moment/861197641654994725?group_id=330333"
       ],
-      "checkedAt": "2026-10-21T04:31:38.008Z"
+      "checkedAt": "2026-10-22T02:20:47.389Z"
     }
   ],
   "scheduleGaps": [
     {
       "gameId": "genshin",
       "periodKey": "7.1",
-      "reason": "本轮读取国服官方列表、7.2前瞻预告与官网，并作一次独立维护定向补查；7.2前瞻仅公告10月23日20:00节目，不给7.1结束维护边界。保留endsAt=null；不采纳第三方42天/活动截止推断。",
+      "reason": "2026-10-22实际复核：当前读取国服官方列表、7.2前瞻预告与官网，并作一次独立维护定向补查；7.2前瞻仅公告10月23日20:00节目，不给7.1结束维护边界。保留endsAt=null；不采纳第三方42天/活动截止推断。",
       "checkedSources": [
         "https://www.taptap.cn/app/168332/topic?type=official",
         "https://ys.mihoyo.com/main/",
-        "https://www.taptap.cn/moment/861928431204435494?group_id=201765"
+        "https://www.taptap.cn/moment/861928431204435494?group_id=201765",
+        "https://www.taptap.cn/app/168332/topic?page=2&type=official"
       ],
-      "checkedAt": "2026-10-21T04:31:38.008Z"
+      "checkedAt": "2026-10-22T02:20:47.389Z"
     },
     {
       "gameId": "genshin",
       "periodKey": null,
-      "reason": "本轮官方7.2前瞻预告未给版本开始、结束或上半截止；主站空壳，独立定向补查无可靠完整窗口。继续pending，未检得不等于尚未公告。",
+      "reason": "2026-10-22实际复核：当前官方7.2前瞻预告未给版本开始、结束或上半截止；主站空壳，独立定向补查无可靠完整窗口。继续pending，未检得不等于尚未公告。",
       "checkedSources": [
         "https://www.taptap.cn/app/168332/topic?type=official",
         "https://ys.mihoyo.com/main/",
-        "https://www.taptap.cn/moment/861928431204435494?group_id=201765"
+        "https://www.taptap.cn/moment/861928431204435494?group_id=201765",
+        "https://www.taptap.cn/app/168332/topic?page=2&type=official"
       ],
-      "checkedAt": "2026-10-21T04:31:38.008Z"
+      "checkedAt": "2026-10-22T02:20:47.389Z"
     },
     {
       "gameId": "star-rail",
       "periodKey": "4.7",
-      "reason": "本轮官方列表为4.7预热与当期活动；主站Loading，一次独立定向补查未补齐4.7完整窗口及上半截止。4.6返场池10月21日11:59上半边界保留，延长真珠池不替代。",
+      "reason": "2026-10-22实际复核：当前官方列表为4.7预热与当期活动；主站Loading，一次独立定向补查未补齐4.7完整窗口及上半截止。4.6返场池10月21日11:59上半边界保留，延长真珠池不替代。",
       "checkedSources": [
         "https://www.taptap.cn/app/224267/topic?type=official",
         "https://hsr.hoyoverse.com/zh-cn/news/166468",
         "https://www.taptap.cn/moment/852211155802787824?group_id=311675"
       ],
-      "checkedAt": "2026-10-21T04:31:38.008Z"
+      "checkedAt": "2026-10-22T02:20:47.389Z"
     },
     {
       "gameId": "wuthering-waves",
       "periodKey": "3.7",
-      "reason": "本轮重核官方上期唤取10月22日09:59国服服务器边界；官网空壳，官方列表及独立定向补查仍未取得3.7明确结束维护边界，保留null。",
+      "reason": "2026-10-22实际复核：当前重核官方上期唤取10月22日09:59国服服务器边界；官网空壳，官方列表及独立定向补查仍未取得3.7明确结束维护边界，保留null。 官方版本日历只给11月12日日期，下半卡池11月11日11:59也不是结束维护边界；不补造时分。",
       "checkedSources": [
         "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
         "https://mc.kurogames.com/main/news/detail/5569",
-        "https://www.taptap.cn/moment/853756601964691535"
+        "https://www.taptap.cn/moment/853756601964691535",
+        "https://www.taptap.cn/moment/854139064348051537",
+        "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+        "https://www.taptap.cn/moment/861573019909227891?group_id=330015"
       ],
-      "checkedAt": "2026-10-21T04:31:38.008Z"
+      "checkedAt": "2026-10-22T02:20:47.389Z"
     },
     {
       "gameId": "wuthering-waves",
       "periodKey": null,
-      "reason": "本轮官方列表、官网和一次3.8维护定向补查未取得下一版本开始、结束及上半截止的可靠完整公告；不采用第三方11月中旬推测、42天或单项活动截止。",
+      "reason": "2026-10-22实际复核：当前官方列表、官网和一次3.8维护定向补查未取得下一版本开始、结束及上半截止的可靠完整公告；不采用第三方11月中旬推测、42天或单项活动截止。",
       "checkedSources": [
         "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
         "https://mc.kurogames.com/main/news/detail/5569",
-        "https://www.taptap.cn/moment/853756601964691535"
+        "https://www.taptap.cn/moment/853756601964691535",
+        "https://www.taptap.cn/moment/854139064348051537",
+        "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+        "https://www.taptap.cn/moment/861573019909227891?group_id=330015"
       ],
-      "checkedAt": "2026-10-21T04:31:38.008Z"
+      "checkedAt": "2026-10-22T02:20:47.389Z"
     }
   ],
   "runs": [
@@ -180,6 +188,24 @@
       "evidencePath": "catalog-research/cloud/star-rail-4-6-first-half-end.json",
       "completedAt": "2026-10-21T04:41:53.745Z",
       "notes": "到期下半增量与完整既有范围已核查：8活动、4稳定周期、8父82子地图；一镜到底已在清单，不重复发布。沿用10/1已核验来源与裁决，当前完整官方更新/最新公告无新增差异；不推进revision/publishedAt。"
+    },
+    {
+      "key": "wuthering-waves/3.7/first_half_end",
+      "gameId": "wuthering-waves",
+      "periodKey": "3.7",
+      "node": "first_half_end",
+      "boundaryAt": "2026-10-22T09:59:00+08:00",
+      "status": "pending",
+      "attempts": 1,
+      "updatedAt": "2026-10-22T02:20:47.389Z",
+      "retryAt": "2026-10-23T02:20:47.389Z",
+      "branch": "codex/cloud-baseline/wuthering-waves-3-7-first-half-end",
+      "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/32",
+      "catalogRevision": null,
+      "catalogSha256": null,
+      "evidencePath": "catalog-research/cloud/wuthering-waves-3-7-first-half-end.json",
+      "completedAt": null,
+      "notes": "下半新增与完整范围已核查：11项3.7活动均已入累计清单（回音盈域已自动到期）、4父51子地图匹配实时公共目录、3周期模式。无鸣潮清单差异；终焉矩阵官方日历更正旧研究10/08为10/07，但11/12结束仅有日期，无可靠时分，不发布猜测窗口。节点保持pending，按日补查；同PR交付四游戏公告复核及4项原神真实差异。"
     }
   ]
 }

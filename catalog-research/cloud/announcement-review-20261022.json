@@ -1,0 +1,361 @@
+{
+  "schemaVersion": 1,
+  "kind": "schedule_and_activity_announcement_review",
+  "checkedAt": "2026-10-22T02:20:47.389Z",
+  "status": "ready",
+  "auditComplete": false,
+  "serverScope": {
+    "server": "CN production; each game announcement independently scoped",
+    "timeZone": "Asia/Shanghai"
+  },
+  "baseMainSha": "429a18f3354ae9090e3211e62cf6d45d5b1b4ab0",
+  "priorEvidence": [
+    "catalog-research/cloud/activity-discovery-repair-20261021.json",
+    "docs/catalog-research/genshin-7.1-2026-09-24.json",
+    "catalog-research/cloud/star-rail-4-6-first-half-end.json"
+  ],
+  "announcementReview": {
+    "checkedAt": "2026-10-22T02:20:47.389Z",
+    "games": [
+      {
+        "gameId": "genshin",
+        "coverage": "partial",
+        "checkedSources": [
+          "https://www.taptap.cn/app/168332/topic?type=official",
+          "https://www.taptap.cn/app/168332/topic?page=2&type=official",
+          "https://www.taptap.cn/moment/858661606224038474?group_id=201765",
+          "https://www.taptap.cn/moment/854673845603273392",
+          "https://www.taptap.cn/moment/851174639563443486",
+          "https://www.taptap.cn/moment/851174279427917260",
+          "https://www.taptap.cn/moment/850781129639202732?group_id=201765",
+          "https://www.taptap.cn/moment/851520146462737868?group_id=201765",
+          "https://www.taptap.cn/moment/835831203461334278",
+          "https://www.taptap.cn/moment/836309619453201032",
+          "https://www.taptap.cn/moment/860111862446949870?group_id=201765"
+        ],
+        "evidencePath": "catalog-research/cloud/announcement-review-20261022.json",
+        "pending": [
+          "event:7.1:outcome-prediction：custom.outcome-prediction 标签不能由现有公共协议分发；保留判测胜券本征，不能用无关标签替代。",
+          "event:7.1:standard-character-invitation：custom.character-invitation 标签分发不兼容；保留巡历雪境，凝铸锋锐，不修改程序。",
+          "event:7.1:limited-character-invitation：custom.character-invitation 标签分发不兼容；保留桌上剧团·冒险的前夜会。",
+          "游赏耀星·畅怀：主公告及一次独立玩法定向补查仍不足以确定准确玩法标签；保持pending，不将代币/礼盒当玩法。"
+        ]
+      },
+      {
+        "gameId": "star-rail",
+        "coverage": "complete",
+        "checkedSources": [
+          "https://www.taptap.cn/app/224267/topic?type=official"
+        ],
+        "evidencePath": "catalog-research/cloud/announcement-review-20261022.json",
+        "pending": []
+      },
+      {
+        "gameId": "zenless",
+        "coverage": "complete",
+        "checkedSources": [
+          "https://www.taptap.cn/app/234493/topic?type=official",
+          "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+          "https://www.taptap.cn/moment/861927647574230093?group_id=330333",
+          "https://zenless.hoyoverse.com/m/zh-cn/news/166963"
+        ],
+        "evidencePath": "catalog-research/cloud/announcement-review-20261022.json",
+        "pending": []
+      },
+      {
+        "gameId": "wuthering-waves",
+        "coverage": "complete",
+        "checkedSources": [
+          "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
+          "https://www.taptap.cn/app/234280/topic?page=2&type=official",
+          "https://www.taptap.cn/moment/861573019909227891?group_id=330015",
+          "https://www.taptap.cn/moment/854139064348051537",
+          "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+          "https://www.taptap.cn/moment/853756601964691535"
+        ],
+        "evidencePath": "catalog-research/cloud/wuthering-waves-3-7-first-half-end.json",
+        "pending": []
+      }
+    ]
+  },
+  "coverage": [
+    {
+      "gameId": "genshin",
+      "scope": "当前有效、已公告、历史未决活动；不提前做地图/周期全量节点审计",
+      "newlyVerifiedRemoteKeys": [
+        "event:7.1:qixing-festival-web",
+        "event:7.1:qiyi-treasure-qingnuan",
+        "event:7.1:overflowing-abundance-artifacts",
+        "event:7.0:godless-tundra-exploration-rewards"
+      ],
+      "alreadyPublished": [
+        "无忧无虑大雪仗",
+        "七圣召唤·自行巧局",
+        "砺行修远",
+        "铸境研炼·巧策进斗"
+      ],
+      "excluded": [
+        "卡池、商城、纪游、角色/武器/装扮宣传、创作赛、兑换码",
+        "已于10月22日03:59结束的奇域佳选不新建过期活动",
+        "永久魔神/世界任务不作为限时活动"
+      ],
+      "unresolvedCount": 4
+    },
+    {
+      "gameId": "star-rail",
+      "scope": "复用昨日已完成节点的有效目录，读当前官方新增公告",
+      "findings": "最新列表仍为一镜到底、位面分裂及4.7预热；已入清单，未发现需新增或改时的独立参与事项。4.7完整排期缺口另记，不冒充活动缺口。",
+      "terminalNodeRepeated": false
+    },
+    {
+      "gameId": "zenless",
+      "scope": "读当前新公告并实际看怪奇诡屋规则图片",
+      "findings": "八项3.3活动及跨版本天使应援已收录；怪奇诡屋10月22日10:00至11月30日03:59服务器时间与现有条目一致。拟境及三地图资格pending在业务研究中另记。",
+      "catalogChanged": false
+    },
+    {
+      "gameId": "wuthering-waves",
+      "scope": "实际看最新下半活动与唤取图片；同轮完整业务审计见独立记录",
+      "findings": "凭栏听雨之礼、无音消除、踏潮探历・玄方地界、声弦涤荡均已收录。唤取、商店、社区抽奖不收录；回音盈域今晨到期由既有消费者处理，保留累计记录。",
+      "catalogChanged": false
+    }
+  ],
+  "decisions": [
+    {
+      "key": "event:7.1:qixing-festival-web",
+      "decision": "publish",
+      "sourceUrl": "https://www.taptap.cn/moment/854673845603273392",
+      "sourcePublishedAt": "2026-10-02",
+      "sourceIdentity": "原神官方账号/西风快报员",
+      "adopted": {
+        "remoteKey": "event:7.1:qixing-festival-web",
+        "category": "limited_event",
+        "title": "「绮星盛会」网页特别活动",
+        "startsAt": "2026-10-01T12:00:00+08:00",
+        "endsAt": "2026-11-03T04:00:00+08:00",
+        "activityTags": [
+          "web-event",
+          "quest"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai",
+        "sourceUrl": "https://www.taptap.cn/moment/854673845603273392"
+      },
+      "rationale": "从营销总汇拆出独立网页特别活动；官方独立规则给出精确窗口，主要交互是网页任务。未将创作赛、赠礼或商城混作活动。",
+      "correctionReason": "旧研究只读营销汇总并以更新后起点暂缓；本轮找到且读到独立网页规则，事实范围与时限已足。"
+    },
+    {
+      "key": "event:7.1:qiyi-treasure-qingnuan",
+      "decision": "publish",
+      "sourceUrl": "https://www.taptap.cn/moment/851174279427917260",
+      "sourcePublishedAt": "2026-09-22",
+      "sourceIdentity": "原神官方账号/西风快报员",
+      "adopted": {
+        "remoteKey": "event:7.1:qiyi-treasure-qingnuan",
+        "category": "limited_event",
+        "title": "绮衣珍赏·晴暖",
+        "startsAt": "2026-09-23T11:00:00+08:00",
+        "endsAt": "2026-11-04T05:59:00+08:00",
+        "activityTags": [
+          "quest"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai",
+        "sourceUrl": "https://www.taptap.cn/moment/851174279427917260"
+      },
+      "rationale": "独立命名、有结束边界的珍赏任务系列；按任务活动整体收录，不拆装扮奖励档位。更新维护06:00加预计5小时的11:00是公告排期基准；当前7.1已开放有官方现行更新和下半公告支持。不是实测开服时刻。",
+      "timePrecision": {
+        "startsAt": "official_nominal_maintenance_completion",
+        "endsAt": "official_minute"
+      },
+      "supportingSources": [
+        "https://www.taptap.cn/moment/850781129639202732?group_id=201765",
+        "https://www.taptap.cn/moment/851520146462737868?group_id=201765"
+      ],
+      "correctionReason": "旧条件式起点被错误当成永久阻塞；按现行维护标准及已开放版本事实归一化，不能因同一条件句持续遗漏。"
+    },
+    {
+      "key": "event:7.1:overflowing-abundance-artifacts",
+      "decision": "publish",
+      "sourceUrl": "https://www.taptap.cn/moment/858661606224038474?group_id=201765",
+      "sourcePublishedAt": "2026-10-12",
+      "sourceIdentity": "原神官方第二期活动速递",
+      "adopted": {
+        "remoteKey": "event:7.1:overflowing-abundance-artifacts",
+        "category": "limited_event",
+        "title": "祝圣移涌",
+        "startsAt": "2026-10-26T04:00:00+08:00",
+        "endsAt": "2026-11-02T03:59:00+08:00",
+        "activityTags": [
+          "combat",
+          "double-drop"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai",
+        "sourceUrl": "https://www.taptap.cn/moment/858661606224038474?group_id=201765"
+      },
+      "rationale": "图片规则给出10月26日04:00至11月2日03:59；祝圣秘境战斗和双倍掉落有对应内置标签。未来已公告限时活动可收录，由客户端按窗口显示。",
+      "imageEvidence": "g-summary-3",
+      "timePrecision": "official_minute"
+    },
+    {
+      "key": "event:7.0:godless-tundra-exploration-rewards",
+      "decision": "publish",
+      "sourceUrl": "https://www.taptap.cn/moment/835831203461334278",
+      "sourcePublishedAt": "2026-08-10",
+      "sourceIdentity": "原神官方账号/西风快报员",
+      "adopted": {
+        "remoteKey": "event:7.0:godless-tundra-exploration-rewards",
+        "category": "limited_event",
+        "title": "「无神怜爱的冻土」区域探索限时奖励",
+        "startsAt": "2026-08-12T11:00:00+08:00",
+        "endsAt": "2026-11-03T14:59:00+08:00",
+        "activityTags": [
+          "exploration",
+          "quest"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai",
+        "sourceUrl": "https://www.taptap.cn/moment/835831203461334278"
+      },
+      "rationale": "10月12日官方速递仍将其列为独立区域探索限时奖励活动；原独立公告给出探索任务和11月3日14:59截止。收录整体限时探索目标，不拆400原石档位或永久地区。8月12日06:00加预计5小时为公告开始基准，非实测开服。",
+      "supportingSources": [
+        "https://www.taptap.cn/moment/836309619453201032",
+        "https://www.taptap.cn/moment/858661606224038474?group_id=201765"
+      ],
+      "timePrecision": {
+        "startsAt": "official_nominal_maintenance_completion",
+        "endsAt": "official_minute"
+      },
+      "correctionReason": "当期公告复核新发现的跨版本有效漏项；不回放接管前业务节点，也不创建已过期活动。"
+    },
+    {
+      "key": "genshin:pending-reuse",
+      "decision": "pending",
+      "reason": "三项custom.*分发边界保留原裁决；游赏玩法主要公告与一次独立补查仍无补证。未修改执行代码或替换为不准确标签。"
+    }
+  ],
+  "pending": [
+    {
+      "gameId": "genshin",
+      "key": "event:7.1:outcome-prediction",
+      "reason": "event:7.1:outcome-prediction：custom.outcome-prediction 标签不能由现有公共协议分发；保留判测胜券本征，不能用无关标签替代。"
+    },
+    {
+      "gameId": "genshin",
+      "key": "event:7.1:standard-character-invitation",
+      "reason": "event:7.1:standard-character-invitation：custom.character-invitation 标签分发不兼容；保留巡历雪境，凝铸锋锐，不修改程序。"
+    },
+    {
+      "gameId": "genshin",
+      "key": "event:7.1:limited-character-invitation",
+      "reason": "event:7.1:limited-character-invitation：custom.character-invitation 标签分发不兼容；保留桌上剧团·冒险的前夜会。"
+    },
+    {
+      "gameId": "genshin",
+      "key": "candidate:youshang-yaoxing-changhuai",
+      "reason": "游赏耀星·畅怀：主公告及一次独立玩法定向补查仍不足以确定准确玩法标签；保持pending，不将代币/礼盒当玩法。"
+    }
+  ],
+  "sourceImages": [
+    {
+      "id": "g-summary-1",
+      "url": "https://img2-tc.tapimg.com/moment/etag/FhOVNc3g0rPeIVZ-3HESB4i5164N_20261012105355.jpg/_tap_ugc.jpg",
+      "sha256": "d51c7cafdf1d6a6a65a7fcb5f1def817f528d8e3008b4a73d7c2e3cde0361368",
+      "read": "original_image_visually_read"
+    },
+    {
+      "id": "g-summary-2",
+      "url": "https://img2-tc.tapimg.com/moment/etag/6abd6eb8550f593ce137cb3b99dd87b0.jpg/_tap_ugc.jpg",
+      "sha256": "eb5ae5e450177ae19d075affcc7109a3109d20d6d0c9a3b8fcb4ad10ed15f670",
+      "read": "original_image_visually_read"
+    },
+    {
+      "id": "g-summary-3",
+      "url": "https://img2-tc.tapimg.com/moment/etag/lgz5ZlBS6xX3QjW7PbHzLlK8IS0F_20261012105404.jpg/_tap_ugc.jpg",
+      "sha256": "0d743dedfbb920f77f5d5e9b8f5d52477bb6721b93ffcbfaeccb8de958194bff",
+      "read": "original_image_visually_read"
+    }
+  ],
+  "scheduleReview": {
+    "checkedAt": "2026-10-22T02:20:47.389Z",
+    "primaryAndOneIndependentSupplementCompleted": true,
+    "changes": [],
+    "preserveUnknownFields": true,
+    "gaps": [
+      {
+        "gameId": "genshin",
+        "periodKey": "7.1",
+        "missing": "完整版本边界/下一版窗口，见state具体reason"
+      },
+      {
+        "gameId": "genshin",
+        "periodKey": null,
+        "missing": "完整版本边界/下一版窗口，见state具体reason"
+      },
+      {
+        "gameId": "star-rail",
+        "periodKey": "4.7",
+        "missing": "完整版本边界/下一版窗口，见state具体reason"
+      },
+      {
+        "gameId": "wuthering-waves",
+        "periodKey": "3.7",
+        "missing": "完整版本边界/下一版窗口，见state具体reason"
+      },
+      {
+        "gameId": "wuthering-waves",
+        "periodKey": null,
+        "missing": "完整版本边界/下一版窗口，见state具体reason"
+      }
+    ],
+    "notes": "7.2前瞻10月23日20:00是节目而非维护；下版公告未检得不等于未公布。HSR4.6和ZZZ3.3已有独立完整窗口沿用；鸣潮11月12日日期/卡池11月11日11:59不补成版更时分。",
+    "supplementQueries": [
+      "site:taptap.cn 原神 7.2 更新维护",
+      "site:taptap.cn 崩坏星穹铁道 4.7 更新维护",
+      "site:taptap.cn 鸣潮 3.8 更新维护"
+    ],
+    "nextReviewAfterVerification": {
+      "at": "2026-10-23T02:20:47.389Z",
+      "reason": "missing_schedule"
+    }
+  },
+  "validation": {
+    "originalCompilerAndConsumer": {
+      "ok": true,
+      "revision": "2026-10-22.genshin-7.1-activity-review",
+      "rawUtf8Sha256": "7c79052acf4a4037dff722ed5284e30f5c2cc8ebd8f89592071bf81119c2ebe3",
+      "receiptContentHash": "8518ec1dc97afc46151e9405eb2322e3d17f88e940d712e8339292331a4bb6cf",
+      "consumer": "unchanged main CLI; AppDatabase(:memory:)",
+      "addedCount": 4,
+      "semanticReview": "only four stated genshin upserts plus revision/publishedAt; every prior upsert/archive/rule and other game object unchanged"
+    },
+    "plannerTests": {
+      "passed": 37,
+      "failed": 0
+    },
+    "requiredCI": "Verify and Cloud baseline checks for final head still required",
+    "announcementReview": {
+      "ok": true,
+      "coveredGames": [
+        "genshin",
+        "star-rail",
+        "zenless",
+        "wuthering-waves"
+      ],
+      "auditComplete": false,
+      "unresolvedCount": 4
+    }
+  },
+  "delivery": {
+    "stage": "ready",
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/32",
+    "branch": "codex/cloud-baseline/wuthering-waves-3-7-first-half-end",
+    "catalogChanged": true,
+    "catalogRevision": "2026-10-22.genshin-7.1-activity-review",
+    "catalogSha256": "7c79052acf4a4037dff722ed5284e30f5c2cc8ebd8f89592071bf81119c2ebe3",
+    "mainVerified": false,
+    "nodeComplete": false,
+    "remainingPendingCount": 4
+  }
+}
