@@ -290,14 +290,13 @@ export interface SyncRequestContext {
 export interface ActivityTagContractEntry {
   id: string
   dimension: 'gameplay' | 'format' | 'content' | 'reward'
-  qualityRole: 'primary' | 'supporting' | 'fallback'
   label: string
   description: string
 }
 
 export interface PublicSyncContract {
   maintenancePolicy?: { version: string; rules: string[] }
-  schemaVersion: 16
+  schemaVersion: 17
   jobKind: 'public_catalog'
   authority: 'interface_contract'
   decisionAuthority: 'codex'

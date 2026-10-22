@@ -536,7 +536,7 @@ describe('AppDatabase', () => {
     expect(database.listChecklistItems('star-rail')).toEqual([])
   })
 
-  it('四款游戏的活动同步都会把有效未知活动列为强制标签补全目标', () => {
+  it('四款游戏只补齐缺失标签，不把已保存的未知描述当作入库失败', () => {
     database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const reference = new Date('2026-07-26T00:00:00.000Z')
     database.registerAiScheduleAgent('tag-target-agent', '标签补全 Agent', reference)
@@ -584,8 +584,7 @@ describe('AppDatabase', () => {
       const claimed = database.claimAiScheduleJob('tag-target-agent', reference)!
       expect(claimed.id).toBe(queued.id)
       expect(claimed.activityTagTargets.map((target) => target.title)).toEqual([
-        `${gameId} 有效未知活动`,
-        `${gameId} 泛化占位活动`
+        `${gameId} 有效未知活动`
       ])
       database.failAiScheduleJob(queued.id, 'tag-target-agent', '测试结束', reference)
     }
@@ -730,7 +729,7 @@ describe('AppDatabase', () => {
     expect(database.getSyncSettings('star-rail')).toMatchObject({ status: 'success' })
   })
 
-  it('无法确认的活动不能用未知标签结束任务，必须继续检索', () => {
+  it('活动已存在时允许 Agent 用未知标签保存尚未明确的玩法描述', () => {
     database = new AppDatabase(':memory:', { seedBundledBaselines: false })
     const reference = new Date('2026-07-26T00:00:00.000Z')
     database.mergeSyncedItems('zenless', 'public_schedule', [{
@@ -750,7 +749,7 @@ describe('AppDatabase', () => {
     )
     const target = database.claimAiScheduleJob('unresolved-tag-agent', reference)!.activityTagTargets[0]
 
-    expect(() => database!.applyAiScheduleJob(
+    const result = database!.applyAiScheduleJob(
       queued.id,
       'unresolved-tag-agent',
       [],
@@ -764,9 +763,10 @@ describe('AppDatabase', () => {
         confidence: 0.95,
         unresolvedReason: '已交叉检索官方公告和中文社区，但均未公布具体玩法'
       }]
-    )).toThrow('必须提供 1 到 5 个有证据、含核心玩法的标签')
-    expect(database.getActiveAiScheduleJob('zenless', 'events', 'public_catalog'))
-      .toMatchObject({ id: queued.id, status: 'claimed' })
+    )
+    expect(result.job).toMatchObject({ id: queued.id, status: 'completed' })
+    expect(database.listChecklistItems('zenless').find(item => item.id === target.itemId))
+      .toMatchObject({ activityTags: ['未知', '任务', '节庆'] })
   })
 
   it('启动时把旧限时活动的空标签、待识别和英文分类键统一为中文', () => {
@@ -816,7 +816,7 @@ describe('AppDatabase', () => {
     expect(database.listChecklistItems('genshin').find((item) => item.id === english.id))
       .toMatchObject({ activityTags: ['射击', '解谜'] })
     expect(database.listChecklistItems('genshin').find((item) => item.id === structural.id))
-      .toMatchObject({ activityTags: ['战斗'] })
+      .toMatchObject({ activityTags: ['未知', '战斗'] })
   })
 
   it('关闭并重新打开数据库后保留数据且迁移可重复执行', () => {
@@ -2867,7 +2867,7 @@ describe('AppDatabase', () => {
         userTimeZone: 'America/Los_Angeles'
       },
       contract: {
-        schemaVersion: 16,
+        schemaVersion: 17,
         decisionAuthority: 'codex',
         executorPolicy: 'mechanical_validation_only'
       }

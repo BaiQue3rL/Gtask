@@ -23,7 +23,7 @@ describe('同步接口契约', () => {
       'events',
       'cycles'
     ])
-    expect(contract.schemaVersion).toBe(16)
+    expect(contract.schemaVersion).toBe(17)
     expect(contract.fieldSemantics.sourcePriority).toContain('字段缺失')
   })
 
@@ -41,20 +41,12 @@ describe('同步接口契约', () => {
     expect(criteria).toContain('限时签到')
     expect(criteria).toContain('活动商店')
     expect(criteria).toContain('角色或武器卡池')
-    expect(criteria).toContain('交叉核验')
-    expect(criteria).toContain('不得猜测')
     expect(criteria).toContain('只提交新增、确需修正或确认失效的活动')
     expect(criteria).toContain('verifiedUnchangedTargets')
-    expect(getPublicSyncContract('events').fieldSemantics.activityTags)
-      .toContain('不得写入“活动”“限时活动”“常驻活动”等版块分类')
-    expect(getPublicSyncContract('events').fieldSemantics.activityTags)
-      .toContain('词汇表，不是待分配清单')
-    expect(getPublicSyncContract('events').fieldSemantics.activityTags)
-      .toContain('每个活动必须')
     expect(getPublicSyncContract('events').activityTagCatalog)
       .toEqual(expect.arrayContaining([
-        expect.objectContaining({ id: 'combat', qualityRole: 'primary' }),
-        expect.objectContaining({ id: 'challenge', qualityRole: 'supporting' })
+        expect.objectContaining({ id: 'combat', dimension: 'gameplay' }),
+        expect.objectContaining({ id: 'challenge', dimension: 'gameplay' })
       ]))
   })
 

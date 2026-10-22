@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "revision": "2026-10-22.genshin-7.1-activity-review",
-  "publishedAt": "2026-10-22T02:19:43Z",
+  "revision": "2026-10-22.zenless-map-admission",
+  "publishedAt": "2026-10-22T09:00:31.554Z",
   "games": [
     {
       "gameId": "genshin",
@@ -987,6 +987,33 @@
           ],
           "scheduleKind": "fixed_window",
           "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "map-catalog:zenless:subregion:verum-city",
+          "title": "维尔乌姆城区",
+          "sourceUrl": "https://www.taptap.cn/moment/846454619398734794?group_id=330333",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:zenless:region:e27477172b3cccb95766",
+          "parentTitle": "罗斯凯利法"
+        },
+        {
+          "remoteKey": "map-catalog:zenless:subregion:ningxi-isle",
+          "title": "[管制区]宁息屿",
+          "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:zenless:region:e27477172b3cccb95766",
+          "parentTitle": "罗斯凯利法"
+        },
+        {
+          "remoteKey": "map-catalog:zenless:subregion:airspace-control-tower",
+          "title": "[管制区]空域总控塔",
+          "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:zenless:region:e27477172b3cccb95766",
+          "parentTitle": "罗斯凯利法"
         }
       ],
       "archives": [

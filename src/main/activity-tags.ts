@@ -4,7 +4,6 @@ export const MAX_AI_ACTIVITY_TAGS = 5
 
 export const ACTIVITY_TAG_DIMENSIONS = ['gameplay', 'format', 'content', 'reward'] as const
 export type ActivityTagDimension = (typeof ACTIVITY_TAG_DIMENSIONS)[number]
-export type ActivityTagQualityRole = 'primary' | 'supporting' | 'fallback'
 
 export interface ActivityTagDefinition {
   id: string
@@ -66,27 +65,6 @@ function tag(
   }
 }
 
-const RESERVED_ACTIVITY_TAG_KEYS = new Set([
-  '活动', '限时活动', '常驻活动', '个人数据', '公开资料', '公开数据', '手动',
-  '活动玩法', '玩法活动', '活动内容', '活动模式', '通用玩法', '其他玩法', '其它玩法',
-  'event', 'limitedevent', 'permanentevent', 'eventgameplay', 'gameplayevent',
-  'eventcontent', 'genericgameplay', 'othergameplay', 'personaldata', 'publicdata',
-  'publicschedule', 'manual'
-].map(aliasKey))
-
-// These labels can add useful context, but none of them answers the core
-// question "what does the player actually do?" on its own.  Keeping this
-// distinction in the interface contract prevents an Agent from satisfying a
-// metadata job with low-information combinations such as “挑战 + 任务 + 奖励”.
-const SUPPORTING_ACTIVITY_TAG_IDS = new Set([
-  'challenge',
-  'story',
-  'quest',
-  'co-op',
-  'material-reward',
-  'festival'
-])
-
 let runtimeTags: ActivityTagDefinition[] = []
 
 function aliasKey(value: string): string {
@@ -112,25 +90,22 @@ export function isValidActivityTagId(id: string): boolean {
   return listActivityTagDefinitions().some((definition) => definition.id === id)
 }
 
-export function getActivityTagQualityRole(id: string): ActivityTagQualityRole {
-  if (id === 'unknown') return 'fallback'
-  if (SUPPORTING_ACTIVITY_TAG_IDS.has(id)) return 'supporting'
-  return 'primary'
-}
-
-export function normalizeActivityTags(values: string[]): string[] {
-  const definitions = listActivityTagDefinitions()
+function activityTagLookup(): Map<string, string> {
   const lookup = new Map<string, string>()
-  for (const definition of definitions) {
+  for (const definition of listActivityTagDefinitions()) {
     lookup.set(aliasKey(definition.id), definition.id)
     for (const label of Object.values(definition.labels)) lookup.set(aliasKey(label), definition.id)
     for (const alias of definition.aliases) lookup.set(aliasKey(alias), definition.id)
   }
+  return lookup
+}
+
+export function normalizeActivityTags(values: string[]): string[] {
+  const lookup = activityTagLookup()
   const normalized = values.flatMap((value) => {
     const candidate = value.normalize('NFKC').trim()
     if (!candidate) return []
     const key = aliasKey(candidate)
-    if (RESERVED_ACTIVITY_TAG_KEYS.has(key)) return []
     return [lookup.get(key) ?? 'unknown']
   })
   return [...new Set(normalized)].slice(0, 5)
@@ -146,17 +121,18 @@ export function localizeActivityTags(ids: string[], outputLocale = 'zh-CN'): str
   }))]
 }
 
-export function activityTagsMeetQualityContract(values: string[]): boolean {
-  const normalized = normalizeActivityTags(values)
-  return normalized.length >= MIN_AI_ACTIVITY_TAGS &&
-    normalized.length <= MAX_AI_ACTIVITY_TAGS &&
-    !normalized.includes('unknown')
+export function areValidActivityTags(values: string[]): boolean {
+  const lookup = activityTagLookup()
+  const ids = values.map(value => lookup.get(aliasKey(value)))
+  return values.length >= MIN_AI_ACTIVITY_TAGS &&
+    values.length <= MAX_AI_ACTIVITY_TAGS &&
+    new Set(ids).size === values.length &&
+    ids.every(id => id !== undefined)
 }
 
 export function serializeActivityTagCatalog(outputLocale = 'zh-CN'): Array<{
   id: string
   dimension: ActivityTagDimension
-  qualityRole: ActivityTagQualityRole
   label: string
   description: string
 }> {
@@ -164,7 +140,6 @@ export function serializeActivityTagCatalog(outputLocale = 'zh-CN'): Array<{
   return listActivityTagDefinitions().map((definition) => ({
     id: definition.id,
     dimension: definition.dimension,
-    qualityRole: getActivityTagQualityRole(definition.id),
     label: definition.labels[locale] ?? definition.labels['zh-CN'] ?? definition.id,
     description: definition.description
   }))

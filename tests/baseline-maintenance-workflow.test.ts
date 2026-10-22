@@ -6,6 +6,7 @@ import type { AiScheduleJob, AiScheduleResearchDecision } from '../src/shared/co
 import { AppDatabase } from '../src/main/database'
 import { createLocalMcpServer } from '../src/main/local-mcp-server'
 import { selectCodexWorkerRoutes } from '../src/main/ai/codex-schedule-worker'
+import { parseRemoteCatalogFeed } from '../src/main/remote-catalog-update'
 
 let database: AppDatabase
 let server: McpServer
@@ -59,6 +60,64 @@ async function checkpoint(jobId: string, researchDecisions: AiScheduleResearchDe
 }
 
 describe('维护流程：单一执行方、裁决续接和有界状态', () => {
+  it.each(['genshin', 'star-rail', 'zenless', 'wuthering-waves'] as const)(
+    '%s 的全部版块接受 Agent 裁决，未知玩法不拦截活动且远程消费保留同一事实', async (gameId) => {
+      await connect()
+      const now = new Date()
+      const startsAt = new Date(now.getTime() - 86_400_000).toISOString()
+      const endsAt = new Date(now.getTime() + 7 * 86_400_000).toISOString()
+      const sourceUrl = 'https://example.com/research'
+      const versionWindow = { startsAt, endsAt, periodKey: 'agent-decided-version',
+        timeZone: 'Asia/Shanghai', sourceUrl, confidence: 0.4 }
+      const common = { titleSourceUrl: sourceUrl, sourceUrl, confidence: 0.4 }
+      const event = { ...common, remoteKey: 'agent:event', category: 'limited_event' as const,
+        title: 'Agent 已确认的活动商店限时玩法', startsAt, endsAt, activityTags: ['unknown'] }
+      const cycle = { ...common, remoteKey: 'agent:cycle', category: 'endgame' as const,
+        title: 'Agent 已确认的新挑战', modeKey: 'agent-new-mode', periodKey: 'first-period', startsAt, endsAt }
+      const parent = { ...common, remoteKey: 'agent:region', category: 'exploration' as const,
+        title: 'Agent 已确认的主地区', mapNodeKind: 'region' as const }
+      const child = { ...common, remoteKey: 'agent:subregion', category: 'exploration' as const,
+        title: 'Agent 已确认的地下区域', mapNodeKind: 'subregion' as const,
+        parentRemoteKey: parent.remoteKey, parentTitle: parent.title }
+      for (const target of ['tasks', 'events', 'cycles', 'exploration'] as const) {
+        const queued = await client.callTool({ name: 'queue_gtask_baseline_maintenance', arguments: {
+          agentId: 'direct', gameId, target
+        } })
+        expect(queued.isError).not.toBe(true)
+        const job = (queued.structuredContent as { job: AiScheduleJob }).job
+        const result = await client.callTool({ name: 'apply_gtask_public_schedule', arguments: {
+          agentId: 'direct', jobId: job.id, contentLocale: 'zh-CN', retrievedAt: now.toISOString(),
+          items: target === 'events' ? [event] : target === 'cycles' ? [cycle]
+            : target === 'exploration' ? [parent, child] : [],
+          ...(target === 'tasks' ? { versionWindow } : {}),
+          evidence: [{ kind: 'web', url: sourceUrl, platform: 'research', publisher: 'fixture',
+            official: false, language: 'zh-CN', note: '测试中的 Agent 裁决；软件不抓取或按标题重判资格' }]
+        } })
+        expect(result.isError, JSON.stringify(result)).not.toBe(true)
+        expect(database.getAiScheduleJobSummary(job.id)).toMatchObject({ status: 'completed', auditComplete: true })
+      }
+      const upserts = [event, cycle, parent, child].map(({ titleSourceUrl: _, confidence: __, ...item }) => item)
+      const feed = parseRemoteCatalogFeed({ schemaVersion: 2, revision: 'agent-decisions',
+        publishedAt: now.toISOString(), games: [{ gameId, versionWindow, upserts }] })
+      const consumer = new AppDatabase(':memory:', { seedBundledBaselines: false })
+      try {
+        consumer.applyRemoteCatalogFeed(feed, now)
+        for (const catalog of [database, consumer]) {
+          const rows = catalog.listChecklistItems(gameId)
+          expect(rows).toHaveLength(4)
+          expect(rows.find(row => row.remoteKey === event.remoteKey)).toMatchObject({
+            title: event.title, activityTags: ['未知'], category: 'limited_event'
+          })
+          expect(rows.find(row => row.remoteKey === child.remoteKey)).toMatchObject({
+            parentRemoteKey: parent.remoteKey, mapNodeKind: 'subregion'
+          })
+        }
+      } finally {
+        consumer.close()
+      }
+    }
+  )
+
   it('既有证据已经足够时，明确纠错理由允许修复旧解读，不能把流程变成新的死锁', async () => {
     await connect()
     const job = await start()

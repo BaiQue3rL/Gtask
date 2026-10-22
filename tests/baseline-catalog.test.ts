@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppDatabase } from '../src/main/database'
-import { activityTagsMeetQualityContract } from '../src/main/activity-tags'
+import { areValidActivityTags } from '../src/main/activity-tags'
 import { SUPPORTED_GAME_IDS } from '../src/shared/contracts'
 import {
   BUNDLED_BASELINE_VERIFIED_AT,
@@ -56,7 +56,7 @@ describe('bundled baseline catalog', () => {
         Date.parse(item.startsAt!) < Date.parse(item.endsAt!)
       )).toBe(true)
       expect(activities.every((item) =>
-        activityTagsMeetQualityContract(item.activityTags ?? [])
+        areValidActivityTags(item.activityTags ?? [])
       )).toBe(true)
     }
 

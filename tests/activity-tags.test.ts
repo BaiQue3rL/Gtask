@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  activityTagsMeetQualityContract,
-  getActivityTagQualityRole,
+  areValidActivityTags,
   localizeActivityTags,
   normalizeActivityTags
 } from '../src/main/activity-tags'
@@ -27,32 +26,32 @@ describe('活动玩法标签中文规范化', () => {
       .toEqual(['shooting', 'puzzle'])
   })
 
-  it('移除版块分类和数据来源，只保留实际玩法标签', () => {
+  it('旧数据中未注册的文字统一展示未知，不按语义黑名单丢弃', () => {
     expect(normalizeActivityTags([
       '限时活动',
       '战斗',
       '个人数据',
       '网页活动'
-    ])).toEqual(['combat', 'web-event'])
+    ])).toEqual(['unknown', 'combat', 'web-event'])
   })
 
-  it('移除看似非空但没有玩法语义的泛化占位标签', () => {
+  it('未注册的泛化词按同一 ID 解析规则处理', () => {
     expect(normalizeActivityTags([
       '活动玩法',
       '活动内容',
       '通用玩法',
       '战斗'
-    ])).toEqual(['combat'])
+    ])).toEqual(['unknown', 'combat'])
   })
 
-  it('英文结构标签同样被移除，保留实际玩法标签', () => {
+  it('未注册的英文文字同样解析为未知', () => {
     expect(normalizeActivityTags([
       'limited_event',
       'shooting',
       'personal data',
       'event gameplay',
       'puzzle'
-    ])).toEqual(['shooting', 'puzzle'])
+    ])).toEqual(['unknown', 'shooting', 'puzzle'])
   })
 
   it('稳定 ID 按界面语言本地化展示', () => {
@@ -60,16 +59,16 @@ describe('活动玩法标签中文规范化', () => {
     expect(localizeActivityTags(['combat', 'puzzle'], 'en-US')).toEqual(['Combat', 'Puzzle'])
   })
 
-  it('AI 标签以准确性优先，允许模型按活动语义自主选择最小准确标签集', () => {
-    expect(activityTagsMeetQualityContract(['combat', 'challenge', 'story'])).toBe(true)
-    expect(activityTagsMeetQualityContract(['challenge', 'story', 'quest'])).toBe(true)
-    expect(activityTagsMeetQualityContract(['sign-in'])).toBe(true)
-    expect(activityTagsMeetQualityContract(['story'])).toBe(true)
-    expect(activityTagsMeetQualityContract(['combat', 'challenge'])).toBe(true)
-    expect(activityTagsMeetQualityContract(['unknown', 'challenge', 'story'])).toBe(false)
-    expect(getActivityTagQualityRole('combat')).toBe('primary')
-    expect(getActivityTagQualityRole('challenge')).toBe('supporting')
-    expect(getActivityTagQualityRole('unknown')).toBe('fallback')
-    expect(getActivityTagQualityRole('custom.new-mode')).toBe('primary')
+  it('只校验标签 ID、数量与重复，Agent 可使用未知或任意已注册组合', () => {
+    expect(areValidActivityTags(['combat', 'challenge', 'story'])).toBe(true)
+    expect(areValidActivityTags(['challenge', 'story', 'quest'])).toBe(true)
+    expect(areValidActivityTags(['sign-in'])).toBe(true)
+    expect(areValidActivityTags(['story'])).toBe(true)
+    expect(areValidActivityTags(['unknown'])).toBe(true)
+    expect(areValidActivityTags(['unknown', 'challenge', 'story'])).toBe(true)
+    expect(areValidActivityTags(['unregistered'])).toBe(false)
+    expect(areValidActivityTags([])).toBe(false)
+    expect(areValidActivityTags(['story', 'story'])).toBe(false)
+    expect(areValidActivityTags(['combat', 'challenge', 'story', 'quest', 'unknown', 'sign-in'])).toBe(false)
   })
 })

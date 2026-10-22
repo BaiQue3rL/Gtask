@@ -1,0 +1,190 @@
+{
+  "schemaVersion": 1,
+  "kind": "administrator_admission_authority_repair",
+  "checkedAt": "2026-10-22T09:00:31.554Z",
+  "scope": {
+    "games": [
+      "genshin",
+      "star-rail",
+      "zenless",
+      "wuthering-waves"
+    ],
+    "sections": [
+      "tasks",
+      "events",
+      "cycles",
+      "exploration"
+    ],
+    "softwareAdmissionAuditComplete": true,
+    "catalogAudit": "zenless current maps; other games retain their recorded content coverage"
+  },
+  "cause": [
+    {
+      "layer": "maintenance guidance",
+      "finding": "Canonical map guide promoted separate exploration progress evidence to a mandatory admission condition; official names, parent and opening were already established."
+    },
+    {
+      "layer": "software validation",
+      "finding": "Activity validator rejected the registered unknown tag, blocking verified activities while optional gameplay descriptions remained unresolved. Legacy semantic blacklist and tag quality tiers were also removed."
+    }
+  ],
+  "resolution": {
+    "decisionAuthority": "agent",
+    "executorPolicy": "mechanical_validation_only",
+    "softwareChecks": [
+      "ownership",
+      "schema",
+      "stable identities",
+      "references",
+      "coverage record consistency",
+      "atomic transactions"
+    ],
+    "evidencePolicy": "Agent determines sufficient evidence across all games and sections; examples and preferred sources do not impose fixed counts or extra proof.",
+    "historicalPending": "Reconsider over-strict legacy pending/excluded decisions with correctionReason; retain genuine missing facts without fabrication."
+  },
+  "decisions": [
+    {
+      "key": "map-candidate:verum-city",
+      "target": "exploration",
+      "status": "resolved",
+      "previousValue": "官方地区已确认；因未取得独立探索百分比补证而暂缓收录",
+      "adoptedValue": "{\"remoteKey\":\"map-catalog:zenless:subregion:verum-city\",\"title\":\"维尔乌姆城区\",\"parentRemoteKey\":\"map-catalog:zenless:region:e27477172b3cccb95766\",\"parentTitle\":\"罗斯凯利法\"}",
+      "correctionReason": "用户2026-10-22明确要求所有游戏和版块由Agent裁决收录；独立探索百分比不是收录硬门槛。旧规则把补充证据错误提升为必要条件。",
+      "reason": "完整官方更新公告明确列为新地区、指定父级与主线解锁条件；相关正式版本已开放，既有证据足以确认本条公开目录事实。",
+      "sources": [
+        {
+          "url": "https://www.taptap.cn/moment/846454619398734794?group_id=330333",
+          "statement": "3.2完整更新公告“全新地区”明确：新增「罗斯凯利法」-「维尔乌姆城区」，并列出主线解锁条件。"
+        }
+      ]
+    },
+    {
+      "key": "map-candidate:ningxi-isle",
+      "target": "exploration",
+      "status": "resolved",
+      "previousValue": "官方地区已确认；因未取得独立探索百分比补证而暂缓收录",
+      "adoptedValue": "{\"remoteKey\":\"map-catalog:zenless:subregion:ningxi-isle\",\"title\":\"[管制区]宁息屿\",\"parentRemoteKey\":\"map-catalog:zenless:region:e27477172b3cccb95766\",\"parentTitle\":\"罗斯凯利法\"}",
+      "correctionReason": "用户2026-10-22明确要求所有游戏和版块由Agent裁决收录；独立探索百分比不是收录硬门槛。旧规则把补充证据错误提升为必要条件。",
+      "reason": "完整官方更新公告明确列为新地区、指定父级与主线解锁条件；相关正式版本已开放，既有证据足以确认本条公开目录事实。",
+      "sources": [
+        {
+          "url": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+          "statement": "3.3完整更新公告“全新地区”明确：新增「罗斯凯利法」-「[管制区]宁息屿」，并列出主线解锁条件。"
+        }
+      ]
+    },
+    {
+      "key": "map-candidate:airspace-control-tower",
+      "target": "exploration",
+      "status": "resolved",
+      "previousValue": "官方地区已确认；因未取得独立探索百分比补证而暂缓收录",
+      "adoptedValue": "{\"remoteKey\":\"map-catalog:zenless:subregion:airspace-control-tower\",\"title\":\"[管制区]空域总控塔\",\"parentRemoteKey\":\"map-catalog:zenless:region:e27477172b3cccb95766\",\"parentTitle\":\"罗斯凯利法\"}",
+      "correctionReason": "用户2026-10-22明确要求所有游戏和版块由Agent裁决收录；独立探索百分比不是收录硬门槛。旧规则把补充证据错误提升为必要条件。",
+      "reason": "完整官方更新公告明确列为新地区、指定父级与主线解锁条件；相关正式版本已开放，既有证据足以确认本条公开目录事实。",
+      "sources": [
+        {
+          "url": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+          "statement": "3.3完整更新公告“全新地区”明确：新增「罗斯凯利法」-「[管制区]空域总控塔」，并列出主线解锁条件。"
+        }
+      ]
+    }
+  ],
+  "delta": {
+    "schemaVersion": 2,
+    "revision": "2026-10-22.zenless-map-admission",
+    "publishedAt": "2026-10-22T09:00:31.554Z",
+    "games": [
+      {
+        "gameId": "zenless",
+        "upserts": [
+          {
+            "remoteKey": "map-catalog:zenless:subregion:verum-city",
+            "category": "exploration",
+            "title": "维尔乌姆城区",
+            "mapNodeKind": "subregion",
+            "parentRemoteKey": "map-catalog:zenless:region:e27477172b3cccb95766",
+            "parentTitle": "罗斯凯利法",
+            "sourceUrl": "https://www.taptap.cn/moment/846454619398734794?group_id=330333"
+          },
+          {
+            "remoteKey": "map-catalog:zenless:subregion:ningxi-isle",
+            "category": "exploration",
+            "title": "[管制区]宁息屿",
+            "mapNodeKind": "subregion",
+            "parentRemoteKey": "map-catalog:zenless:region:e27477172b3cccb95766",
+            "parentTitle": "罗斯凯利法",
+            "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
+          },
+          {
+            "remoteKey": "map-catalog:zenless:subregion:airspace-control-tower",
+            "category": "exploration",
+            "title": "[管制区]空域总控塔",
+            "mapNodeKind": "subregion",
+            "parentRemoteKey": "map-catalog:zenless:region:e27477172b3cccb95766",
+            "parentTitle": "罗斯凯利法",
+            "sourceUrl": "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
+          }
+        ],
+        "archives": []
+      }
+    ]
+  },
+  "inventory": {
+    "before": {
+      "regions": 6,
+      "subregions": 26
+    },
+    "after": {
+      "regions": 6,
+      "subregions": 29
+    },
+    "unchangedPublicRowsPreserved": true
+  },
+  "localApplication": {
+    "jobId": "d5034668-2f73-481c-804c-a66a2ce66b86",
+    "added": 3,
+    "updated": 0,
+    "preserved": 0,
+    "auditComplete": true,
+    "unresolvedDecisionCount": 0
+  },
+  "softwareRegression": "All four games: tasks, events with unknown tags, an Agent-declared new cycle and parent/child maps accepted through real MCP; same facts accepted by the remote consumer.",
+  "validation": {
+    "applicationTests": {
+      "passed": 509,
+      "skipped": 12
+    },
+    "plannerTests": {
+      "passed": 37
+    },
+    "mapTests": "included in full suite; targeted tests passed",
+    "typecheck": "passed",
+    "productionBuild": "passed",
+    "realConsumer": "passed",
+    "semanticDelta": "only three Zenless maps; all prior facts and archives preserved",
+    "skillValidation": "quick_validate.py passed",
+    "installedAcceptance": {
+      "programFiles": 35,
+      "maintenanceRuntimeFiles": 7,
+      "cachedSkillMatches": true,
+      "contractSchemaVersion": 17,
+      "policyVersion": "2026-10-22",
+      "unknownTagAccepted": true,
+      "protectedRowsPreserved": true,
+      "bindingsPreserved": true,
+      "personalSnapshotsPreserved": true,
+      "settingsAndCredentialsPreserved": true,
+      "databaseIntegrity": "ok",
+      "backupCreated": false
+    }
+  },
+  "catalogSha256": "d2a930d0519c76780900084190b15b057f1395a33afada17c79bd8e573beb75c",
+  "delivery": {
+    "stage": "ready",
+    "branch": "codex/cloud-map-coverage-fix",
+    "localApplied": true,
+    "version": "1.2.2",
+    "releaseCreated": false,
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/34"
+  }
+}

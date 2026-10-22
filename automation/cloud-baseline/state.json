@@ -161,15 +161,15 @@
       "boundaryAt": "2026-10-21T06:00:00+08:00",
       "status": "pending",
       "attempts": 4,
-      "updatedAt": "2026-10-22T02:03:15.293Z",
+      "updatedAt": "2026-10-22T09:00:31.554Z",
       "retryAt": "2026-10-23T01:59:25.209Z",
       "branch": "codex/cloud-baseline/zenless-3-2-version-end",
       "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/31",
-      "catalogRevision": "2026-10-21.zenless-3.3-sign-in",
-      "catalogSha256": "6b0a5b24f5230b437c955413ece6238f9df817a807a24ccdae1d8ee498c56aae",
+      "catalogRevision": "2026-10-22.zenless-map-admission",
+      "catalogSha256": "d2a930d0519c76780900084190b15b057f1395a33afada17c79bd8e573beb75c",
       "evidencePath": "catalog-research/cloud/zenless-3-2-version-end.json",
       "completedAt": null,
-      "notes": "四项精确pending已复核主要官方更新与一次定向补查，无新增可靠独立探索进度或可编译周期锚点；保留3地图/拟境待查，按日续接。当前参考清单已含管理员原神活动修复；本轮无清单差异。"
+      "notes": "管理员按用户全游戏全版块Agent裁决要求修复过严收录标准；三项地图已先在本机应用并编译，只有拟境湮灭战的周期锚点等真实未知继续pending。新裁决见admission-authority-repair-20261022.json；保持原恢复调度。"
     },
     {
       "key": "star-rail/4.6/first_half_end",

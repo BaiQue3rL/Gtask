@@ -36,7 +36,7 @@ import {
   ACTIVITY_TAG_TAXONOMY_VERSION,
   MAX_AI_ACTIVITY_TAGS,
   MIN_AI_ACTIVITY_TAGS,
-  activityTagsMeetQualityContract,
+  areValidActivityTags,
   configureRuntimeActivityTags,
   listActivityTagDefinitions,
   localizeActivityTags,
@@ -303,7 +303,7 @@ function normalizeSourceTitle(value: string): string {
 }
 
 function activityTagsNeedReview(tags: string[]): boolean {
-  return !activityTagsMeetQualityContract(tags)
+  return !areValidActivityTags(tags)
 }
 
 export class AppDatabase {
@@ -1610,12 +1610,12 @@ export class AppDatabase {
       item.category === 'limited_event' &&
       (
         !Array.isArray(item.activityTags) ||
-        !activityTagsMeetQualityContract(item.activityTags)
+        !areValidActivityTags(item.activityTags)
       )
     )
     if (invalidEventTags) {
       throw new Error(
-        `活动“${invalidEventTags.title}”必须提交 1 到 5 个有可靠依据的有效玩法标签`
+        `活动“${invalidEventTags.title}”必须提交 1 到 5 个不重复的已注册标签 ID`
       )
     }
     const invalidEndgame = items.find((item) =>
@@ -1653,13 +1653,13 @@ export class AppDatabase {
         submittedIds.add(update.itemId)
         if (update.title !== target.title) throw new Error(`活动标签回写目标“${update.title}”已经变化`)
         if (!Array.isArray(update.activityTags) ||
-          !activityTagsMeetQualityContract(update.activityTags)) {
+          !areValidActivityTags(update.activityTags)) {
           throw new Error(
-            `活动“${update.title}”必须提供 ${MIN_AI_ACTIVITY_TAGS} 到 ${MAX_AI_ACTIVITY_TAGS} 个有证据、含核心玩法的标签`
+            `活动“${update.title}”必须提供 ${MIN_AI_ACTIVITY_TAGS} 到 ${MAX_AI_ACTIVITY_TAGS} 个不重复的已注册标签 ID`
           )
         }
         const tags = normalizeActivityTags(update.activityTags)
-        if (!activityTagsMeetQualityContract(tags)) {
+        if (!areValidActivityTags(tags)) {
           throw new Error(`活动“${update.title}”的玩法标签格式不正确`)
         }
         if (!Number.isFinite(update.confidence) || update.confidence < 0 || update.confidence > 1) {

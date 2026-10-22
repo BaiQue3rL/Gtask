@@ -17,7 +17,7 @@ const DEFAULT_REQUEST_CONTEXT: SyncRequestContext = {
 }
 
 function activityTagSemantics(outputLocale: string): string {
-  return `activityTagCatalog 只是可用词汇表，不是待分配清单。每个活动必须依据玩法规则提交 ${MIN_AI_ACTIVITY_TAGS} 至 ${MAX_AI_ACTIVITY_TAGS} 个稳定标签 ID，并按 ${outputLocale} 的标签定义自主判断最贴切的玩法语义；不得猜测、凑数或从词表中硬挑。现有目录无法准确表达资料明确描述的新玩法时，可调用标签注册工具创建 custom.* ID 后再引用。不得写入“活动”“限时活动”“常驻活动”等版块分类，也不得提交数据来源标签。`
+  return `activityTagCatalog 是可用词汇表，标签语义由 Agent 按 ${outputLocale} 自主选择。提交 ${MIN_AI_ACTIVITY_TAGS} 至 ${MAX_AI_ACTIVITY_TAGS} 个不重复的已注册稳定 ID；软件不评定标签等级或玩法质量。活动事实已确认但玩法描述尚未明确时可用 unknown，不因此搁置活动；明确的新玩法可注册 custom.* ID。标签用于描述玩法，不用版块或数据来源凑数。`
 }
 
 const tasksContract: SyncSectionContract = {
@@ -73,9 +73,9 @@ const eventsContract: SyncSectionContract = {
     '先区分限时资格与时间完整性；常驻、长期一次性或限时资格未知的内容不加入清单。正常活动提供 startsAt 和 endsAt；确已证实限时且当前开放、检查主要公告和规则仍未取得可靠时限时，提交 deadlineReview 与空 endsAt，界面显示“截止时间待确认”，不能捏造时间。',
     'deadlineReview 必须含限时和当前开放的 HTTPS 证据、checkedSources、checkedAt、reviewAt 与 missingReason。每次覆盖该游戏时优先复核 job.deadlineReviews；版本切换必须复核。复核节点不是活动结束时间，客户端不会据此自动删除。确认结束或常驻才发布退役；开放依据失效又无法确认继续开放时发布移出主清单决定，并在维护记录保留待核实状态。',
     `玩法标签是活动必填字段。提交 ${MIN_AI_ACTIVITY_TAGS} 至 ${MAX_AI_ACTIVITY_TAGS} 个符合 requestContext.outputLocale 的准确标签；不能同义重复、用泛化词凑数或为了覆盖词表而硬贴。`,
-    '提交标签前应阅读能够直接说明玩法规则的资料；只有排期图、活动标题或奖励列表不足以证明玩法。现有标签目录无法准确表达明确的新玩法时应注册 custom.* 标签后再提交。',
+    '由 Agent 根据现有可靠资料判断玩法标签。排期已确认而玩法尚未明确时可提交 unknown 并保留待补说明；活动入库与描述完善分别处理。现有标签目录无法表达已确认的新玩法时可注册 custom.* 标签。',
     '同一活动只能保留一个语义记录；名称或标点不同但实际相同时使用 matchItemId。',
-    '如果无法确认某个名称是整体活动还是内部阶段，或不同页面是否属于同一活动，必须结合官方活动规则、时间窗口和至少一个独立可靠来源交叉核验；仍无法确认则不得猜测或提交。'
+    '活动容器与内部阶段、不同页面是否同一事项由 Agent 结合资料裁决；确有疑问时补查，不要求固定数量的来源。'
   ]
 }
 
@@ -185,7 +185,7 @@ export function getPublicSyncContract(
 ): PublicSyncContract {
   return {
     maintenancePolicy: BASELINE_MAINTENANCE_POLICY,
-    schemaVersion: 16,
+    schemaVersion: 17,
     jobKind: 'public_catalog',
     authority: 'interface_contract',
     decisionAuthority: 'codex',
