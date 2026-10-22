@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "kind": "business_node_audit",
+  "nodeKey": "wuthering-waves/3.7/first_half_end",
+  "gameId": "wuthering-waves",
+  "periodKey": "3.7",
+  "node": "first_half_end",
+  "checkedAt": "2026-10-22T02:06:57.162Z",
+  "status": "running",
+  "auditComplete": false,
+  "serverScope": {
+    "server": "CN production",
+    "timeZone": "Asia/Shanghai"
+  },
+  "baseMainSha": "429a18f3354ae9090e3211e62cf6d45d5b1b4ab0",
+  "priorEvidence": [
+    "docs/catalog-research/wuthering-waves-3.7-2026-09-30.json",
+    "catalog-research/cloud/activity-discovery-repair-20261021.json"
+  ],
+  "coverage": [],
+  "sources": [],
+  "decisions": [],
+  "pending": [
+    {
+      "key": "audit:full_scope",
+      "reason": "业务节点已到；研究待完成。"
+    }
+  ],
+  "delivery": {
+    "stage": "running",
+    "branch": "codex/cloud-baseline/wuthering-waves-3-7-first-half-end",
+    "leaseUntil": "2026-10-22T02:59:26.000Z"
+  }
+}

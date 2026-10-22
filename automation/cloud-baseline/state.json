@@ -180,6 +180,24 @@
       "evidencePath": "catalog-research/cloud/star-rail-4-6-first-half-end.json",
       "completedAt": "2026-10-21T04:41:53.745Z",
       "notes": "到期下半增量与完整既有范围已核查：8活动、4稳定周期、8父82子地图；一镜到底已在清单，不重复发布。沿用10/1已核验来源与裁决，当前完整官方更新/最新公告无新增差异；不推进revision/publishedAt。"
+    },
+    {
+      "key": "wuthering-waves/3.7/first_half_end",
+      "gameId": "wuthering-waves",
+      "periodKey": "3.7",
+      "node": "first_half_end",
+      "boundaryAt": "2026-10-22T09:59:00+08:00",
+      "status": "running",
+      "attempts": 1,
+      "updatedAt": "2026-10-22T02:06:57.162Z",
+      "retryAt": "2026-10-22T02:59:26.000Z",
+      "branch": "codex/cloud-baseline/wuthering-waves-3-7-first-half-end",
+      "pullRequestUrl": null,
+      "catalogRevision": null,
+      "catalogSha256": null,
+      "evidencePath": "catalog-research/cloud/wuthering-waves-3-7-first-half-end.json",
+      "completedAt": null,
+      "notes": "实际官方上半结束节点已到期；下半活动、完整地图、三周期模式与历史矩阵时分缺口待核查。保存有限租约；同时交付本轮四游戏公告复核。"
     }
   ]
 }
