@@ -6,8 +6,8 @@
   "periodKey": "3.2",
   "node": "version_end",
   "newVersion": "3.3",
-  "checkedAt": "2026-10-22T02:00:18.093Z",
-  "status": "running",
+  "checkedAt": "2026-10-22T02:03:15.293Z",
+  "status": "pending",
   "auditComplete": false,
   "serverScope": {
     "region": "中国大陆适用官方公告",
@@ -308,6 +308,16 @@
       "events": "已公布8项活动全部已核验；7项之前发布，本轮仅补已确认开服的签到项。",
       "maps": "既有6父26子身份与退役保留；3个候选欠独立进度，未新增。",
       "cycles": "2个稳定模式不发逐期窗口；拟境规则仍pending。"
+    },
+    {
+      "section": "resumption_attempt_4",
+      "checkedAt": "2026-10-22T02:03:15.293Z",
+      "result": "partial",
+      "referenceCatalogRevision": "2026-10-21.genshin-7.1-event-discovery",
+      "realConsumer": "fresh main source; AppDatabase(:memory:) inventory passed",
+      "maps": "既有6父26子稳定键/退役保留，三候选尚缺资格",
+      "cycles": "两个现行稳定模式保持；拟境定义仍缺",
+      "events": "先前八项已发布保持；最新介绍及全局announcementReview另行保存，不把地图pending混为活动pending"
     }
   ],
   "sources": [
@@ -463,6 +473,21 @@
       "checkedAt": "2026-10-21T04:31:38.008Z",
       "result": "full_indexed_text",
       "summary": "更新维护6点UTC+8预计5小时；3.3结束12月2日06:00UTC+8；完整活动、地区、玩法更新与前轮记录一致。"
+    },
+    {
+      "url": "https://www.taptap.cn/app/234493/topic?type=official",
+      "sourceRef": "turn41view0",
+      "checkedAt": "2026-10-22T02:03:15.293Z",
+      "result": "readable",
+      "identity": "official game account list",
+      "summary": "最新活动介绍仍为已收录怪奇诡屋惊魂记；3.3开启公告和完整更新仍有效，未取得4项pending所缺证据。"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+      "sourceRef": "turn41view1",
+      "checkedAt": "2026-10-22T02:03:15.293Z",
+      "result": "readable",
+      "summary": "直接复核新地区名称/父级/剧情解锁条件和玩法部分；有效旧裁决复用。3.3公开内容不足以建立三个独立进度资格或拟境重置规则。"
     }
   ],
   "decisions": [
@@ -796,30 +821,30 @@
     {
       "key": "cycles:hollow-annihilation",
       "target": "cycles",
-      "reason": "完整更新和一次独立定向补查没有可用重置锚点、周期长度与开放时长；保留此前裁决。",
-      "checkedAt": "2026-10-21T04:31:38.008Z"
+      "reason": "官方完整更新仍只列拟境相关更新，没有可靠重置锚点、周期长度和开放时长；一次独立定向补查无补证，继续pending。",
+      "checkedAt": "2026-10-22T02:03:15.293Z"
     },
     {
       "key": "map-candidate:verum-city",
       "target": "exploration",
-      "reason": "官方名称/父级及版本已开放已复核；仍无独立探索进度资格的可靠补证。主要公告及一次定向补查无结果，保留pending。",
-      "checkedAt": "2026-10-21T04:31:38.008Z"
+      "reason": "官方3.3名称、父级与开放条件仍有效；独立探索进度资格经主要公告与一次定向补查仍无可靠补证，不据场景/宝箱/攻略推定。",
+      "checkedAt": "2026-10-22T02:03:15.293Z"
     },
     {
       "key": "map-candidate:ningxi-isle",
       "target": "exploration",
-      "reason": "官方名称/父级及版本已开放已复核；仍无独立探索进度资格的可靠补证。主要公告及一次定向补查无结果，保留pending。",
-      "checkedAt": "2026-10-21T04:31:38.008Z"
+      "reason": "官方3.3名称、父级与开放条件仍有效；独立探索进度资格经主要公告与一次定向补查仍无可靠补证，不据场景/宝箱/攻略推定。",
+      "checkedAt": "2026-10-22T02:03:15.293Z"
     },
     {
       "key": "map-candidate:airspace-control-tower",
       "target": "exploration",
-      "reason": "官方名称/父级及版本已开放已复核；仍无独立探索进度资格的可靠补证。主要公告及一次定向补查无结果，保留pending。",
-      "checkedAt": "2026-10-21T04:31:38.008Z"
+      "reason": "官方3.3名称、父级与开放条件仍有效；独立探索进度资格经主要公告与一次定向补查仍无可靠补证，不据场景/宝箱/攻略推定。",
+      "checkedAt": "2026-10-22T02:03:15.293Z"
     }
   ],
   "independentSupplement": {
-    "checkedAt": "2026-10-21T04:31:38.008Z",
+    "checkedAt": "2026-10-22T02:03:15.293Z",
     "performed": true,
     "bounded": true,
     "queries": [
@@ -828,7 +853,7 @@
       "空域总控塔 探索进度",
       "拟境湮灭战 3.3 重置"
     ],
-    "result": "未取得独立地图进度或可编译重置规则；停止本轮扩大搜索，复用旧来源/裁决。"
+    "result": "公开结果为官方完整更新及转述、旧Steam公告或无关内容，没有补齐具体字段；本轮收敛为pending，不无限搜索。"
   },
   "validation": {
     "inventory": "fresh exact-main actual consumer passed",
@@ -915,27 +940,25 @@
       "semanticCheck": "only one verified sign-in addition plus revision/publishedAt",
       "rawUtf8Sha256": "6b0a5b24f5230b437c955413ece6238f9df817a807a24ccdae1d8ee498c56aae",
       "ci": "Verify 39544594215 and Cloud baseline checks 39544594313 succeeded for d20a4373e384ddd42e0b3ce86f96e427c3e2b0d3; raw main bytes matched compiler output"
+    },
+    "attempt4": {
+      "realConsumer": "fresh exact-main CLI public inventory passed",
+      "planner": "latest main plan contract checked",
+      "ci": "final exact head Verify and Cloud baseline checks required before merge; results outside repository"
     }
   },
   "delivery": {
-    "stage": "partial_published",
+    "stage": "research_only",
     "branch": "codex/cloud-baseline/zenless-3-2-version-end",
-    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/27",
-    "catalogChanged": true,
-    "catalogRevision": "2026-10-21.zenless-3.3-sign-in",
-    "catalogSha256": "6b0a5b24f5230b437c955413ece6238f9df817a807a24ccdae1d8ee498c56aae",
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/31",
+    "catalogChanged": false,
+    "referenceCatalogRevision": "2026-10-21.genshin-7.1-event-discovery",
+    "referenceCatalogSha256": "48e679e8b75e1c7b3bbca685d4fa46d540403a770fe830c4aa901405420c5bd7",
+    "lastPublishedCatalogRevision": "2026-10-21.zenless-3.3-sign-in",
+    "lastPublishedCatalogSha256": "6b0a5b24f5230b437c955413ece6238f9df817a807a24ccdae1d8ee498c56aae",
     "nodeComplete": false,
     "remainingPendingCount": 4,
-    "resumeAt": "2026-10-22T01:59:00.000Z",
-    "mainReadSha": "37aa0c97681c21b9e388ce8794591ba778c35415",
-    "mainVerifiedAt": "2026-10-21T04:35:19.512Z",
-    "receiptPublication": "follow-up restricted PR with both exact-head checks; operational evidence stored outside repository",
-    "mirror": {
-      "url": "https://gitee.com/l3rui/Gtask/raw/main/updates/catalog.json",
-      "result": "unreadable_via_public_fetch",
-      "mirrorRevisionVerified": false
-    },
-    "clientReceipt": "not_observed"
+    "resumeAt": "2026-10-23T01:59:25.209Z"
   },
   "verifiedCatalogDelta": {
     "schemaVersion": 2,
@@ -1103,12 +1126,11 @@
     "nextScheduleReviewAt": "2026-10-22T01:59:00.000Z"
   },
   "currentAttempt": {
-    "attempt": 3,
-    "checkedAt": "2026-10-21T04:31:38.008Z",
-    "officialUpdateFullyRead": true,
-    "proposedCatalogAdded": 1,
-    "allExpectedActivities": 8,
-    "allCurrentMapRowsInspected": 32,
+    "attempt": 4,
+    "checkedAt": "2026-10-22T02:03:15.293Z",
+    "scope": "resume exact pending; current official updates and bounded supplement",
+    "catalogAdded": 0,
+    "resolvedPending": [],
     "auditComplete": false
   },
   "partialPublications": [
@@ -1162,11 +1184,9 @@
     }
   ],
   "progressThisAttempt": {
-    "catalogAdditions": 1,
-    "resolvedPending": [
-      "candidate:3.3:all-new-program"
-    ],
+    "catalogAdditions": 0,
+    "resolvedPending": [],
     "remainingPending": 4
   },
-  "consecutiveRunsWithoutProgress": 0
+  "consecutiveRunsWithoutProgress": 1
 }
