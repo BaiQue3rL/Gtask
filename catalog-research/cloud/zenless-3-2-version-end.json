@@ -988,8 +988,8 @@
   },
   "delivery": {
     "stage": "ready",
-    "branch": "codex/cloud-baseline/zenless-3-2-version-end",
-    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/31",
+    "branch": "codex/cloud-map-coverage-fix",
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/34",
     "catalogChanged": true,
     "referenceCatalogRevision": "2026-10-21.genshin-7.1-event-discovery",
     "referenceCatalogSha256": "48e679e8b75e1c7b3bbca685d4fa46d540403a770fe830c4aa901405420c5bd7",
@@ -1000,7 +1000,8 @@
     "resumeAt": "2026-10-23T01:59:25.209Z",
     "catalogRevision": "2026-10-22.zenless-map-admission",
     "catalogSha256": "d2a930d0519c76780900084190b15b057f1395a33afada17c79bd8e573beb75c",
-    "evidencePath": "catalog-research/cloud/admission-authority-repair-20261022.json"
+    "evidencePath": "catalog-research/cloud/admission-authority-repair-20261022.json",
+    "resumeBranch": "codex/cloud-baseline/zenless-3-2-version-end"
   },
   "verifiedCatalogDelta": {
     "schemaVersion": 2,
