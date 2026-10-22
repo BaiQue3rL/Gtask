@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "kind": "schedule_and_activity_announcement_review",
   "checkedAt": "2026-10-22T02:20:47.389Z",
-  "status": "ready",
+  "status": "published",
   "auditComplete": false,
   "serverScope": {
     "server": "CN production; each game announcement independently scoped",
@@ -334,7 +334,24 @@
       "passed": 37,
       "failed": 0
     },
-    "requiredCI": "Verify and Cloud baseline checks for final head still required",
+    "requiredCI": [
+      {
+        "name": "Verify",
+        "runId": 39711337008,
+        "headSha": "3bb769cadc888828b48c4cb8f5dbdea29cb32c97",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/BaiQue3rL/Gtask/actions/runs/39711337008"
+      },
+      {
+        "name": "Cloud baseline checks",
+        "runId": 39711336876,
+        "headSha": "3bb769cadc888828b48c4cb8f5dbdea29cb32c97",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/BaiQue3rL/Gtask/actions/runs/39711336876"
+      }
+    ],
     "announcementReview": {
       "ok": true,
       "coveredGames": [
@@ -348,14 +365,44 @@
     }
   },
   "delivery": {
-    "stage": "ready",
+    "stage": "published",
     "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/32",
     "branch": "codex/cloud-baseline/wuthering-waves-3-7-first-half-end",
     "catalogChanged": true,
     "catalogRevision": "2026-10-22.genshin-7.1-activity-review",
     "catalogSha256": "7c79052acf4a4037dff722ed5284e30f5c2cc8ebd8f89592071bf81119c2ebe3",
-    "mainVerified": false,
+    "mainVerified": true,
     "nodeComplete": false,
-    "remainingPendingCount": 4
+    "remainingPendingCount": 4,
+    "publishedAt": "2026-10-22T02:31:36Z",
+    "publicationHeadSha": "3bb769cadc888828b48c4cb8f5dbdea29cb32c97",
+    "mergedMainSha": "7977fa8e30586521d19e7ff70fa8896c18ff2454",
+    "savedMainVerification": {
+      "sha": "7977fa8e30586521d19e7ff70fa8896c18ff2454",
+      "revision": "2026-10-22.genshin-7.1-activity-review",
+      "rawUtf8Sha256": "7c79052acf4a4037dff722ed5284e30f5c2cc8ebd8f89592071bf81119c2ebe3",
+      "allFourFilesExactMatch": true,
+      "checkedAt": "2026-10-22 02:30:29 UTC"
+    },
+    "publicChannels": [
+      {
+        "source": "github",
+        "url": "https://raw.githubusercontent.com/BaiQue3rL/Gtask/main/updates/catalog.json",
+        "httpStatus": 200,
+        "revision": "2026-10-22.genshin-7.1-activity-review",
+        "rawUtf8Sha256": "7c79052acf4a4037dff722ed5284e30f5c2cc8ebd8f89592071bf81119c2ebe3",
+        "bytes": 49004
+      },
+      {
+        "source": "gitee",
+        "url": "https://gitee.com/l3rui/Gtask/raw/main/updates/catalog.json",
+        "httpStatus": 200,
+        "revision": "2026-10-21.genshin-7.1-event-discovery",
+        "rawUtf8Sha256": "48e679e8b75e1c7b3bbca685d4fa46d540403a770fe830c4aa901405420c5bd7",
+        "bytes": 46947
+      }
+    ],
+    "clientReceipt": "not_read_or_claimed",
+    "activityPublicationComplete": true
   }
 }
