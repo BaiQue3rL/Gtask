@@ -151,17 +151,17 @@
       "periodKey": "3.2",
       "node": "version_end",
       "boundaryAt": "2026-10-21T06:00:00+08:00",
-      "status": "pending",
-      "attempts": 3,
-      "updatedAt": "2026-10-21T04:35:19.512Z",
-      "retryAt": "2026-10-22T01:59:00.000Z",
+      "status": "running",
+      "attempts": 4,
+      "updatedAt": "2026-10-22T02:00:18.093Z",
+      "retryAt": "2026-10-22T02:59:26.000Z",
       "branch": "codex/cloud-baseline/zenless-3-2-version-end",
       "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/27",
       "catalogRevision": "2026-10-21.zenless-3.3-sign-in",
       "catalogSha256": "6b0a5b24f5230b437c955413ece6238f9df817a807a24ccdae1d8ee498c56aae",
       "evidencePath": "catalog-research/cloud/zenless-3-2-version-end.json",
       "completedAt": null,
-      "notes": "全新放送已按PR27精确head及两项CI合入，main原始字节/revision/SHA256已核对；3个地图独立进度与拟境周期仍缺证据，次日补查，未重复发布先前七项。"
+      "notes": "续接4项精确pending；此前8项活动已发布不重复。main已含管理员活动发现修复；本轮恢复唤醒已读回验证。"
     },
     {
       "key": "star-rail/4.6/first_half_end",
