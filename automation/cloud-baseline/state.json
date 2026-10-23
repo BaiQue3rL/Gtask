@@ -191,7 +191,7 @@
       "catalogSha256": "8f61275ae7258e2ccaf7cd59929f63cf4fa0389faba940c6f7bc371a6b056d42",
       "evidencePath": "catalog-research/cloud/wuthering-waves-3-7-first-half-end.json",
       "completedAt": null,
-      "notes": "3.7下半既有完整研究续接；新main取消可选探索百分比门槛，按实时官方导航重新裁决并交付黑海岸→时隙废都；其他51子区、11活动、既有周期不重复发布。终焉矩阵精确时分仍缺，主要公告及一次独立定向补查不足，节点保持pending，按日续接；同PR含三项原神真实活动差异。"
+      "notes": "已通过PR37发布黑海岸→时隙废都，官方导航名称/父级有据，纠正旧可选探索百分比门槛；合并main清单revision与原始UTF-8 SHA256已核对。终焉矩阵精确时分仍缺，保持pending每日续接。三项原神活动同批已发布；绝区零及成功星铁节点未重复。"
     }
   ]
 }
