@@ -462,7 +462,6 @@ async function checkForSoftwareUpdate(automatic: boolean): Promise<SoftwareUpdat
     type: 'info',
     title: '发现 Gtask 新版本',
     message: result.message,
-    detail: '也可以稍后到设置里再检查。',
     buttons: hasReleaseUrl ? ['稍后', '查看更新'] : ['知道了'],
     defaultId: hasReleaseUrl ? 1 : 0,
     cancelId: 0,
@@ -1142,7 +1141,7 @@ function registerIpcHandlers(): void {
       {
         title: '库街区安全验证',
         heading: '库街区安全验证',
-        description: '请完成官方滑块验证。Gtask 只会接收这次验证结果，不会保存滑块内容。',
+        description: '请完成滑块验证。',
         includeSessionUserInfo: false,
         showMethod: 'showBox'
       }

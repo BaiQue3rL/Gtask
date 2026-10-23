@@ -86,8 +86,8 @@ try {
   await page.waitForFunction((count) => document.querySelectorAll('[data-panel-section="exploration"] .checklist-row').length === count, beforeExpand)
   checks.push('map hierarchy collapse and expand')
   await page.getByTitle('设置', { exact: true }).click()
-  await page.getByRole('checkbox', { name: '显示还没开始的活动', exact: true }).locator('..').click()
-  assert.equal(await page.getByRole('checkbox', { name: '显示还没开始的活动', exact: true }).isChecked(), true)
+  await page.getByRole('checkbox', { name: '提前显示未开始的活动与周期挑战', exact: true }).locator('..').click()
+  assert.equal(await page.getByRole('checkbox', { name: '提前显示未开始的活动与周期挑战', exact: true }).isChecked(), true)
   assert.equal(await page.evaluate(() => localStorage.getItem('gtask.show-upcoming-baseline-items.v1')), 'true')
   for (const name of ['外观', '账号与数据', '软件更新', '游戏与同步']) {
     await page.getByRole('navigation', { name: '设置分类' }).getByRole('button', { name, exact: true }).click()
@@ -106,7 +106,7 @@ try {
   await page.locator('.game-button').first().click()
   await page.locator('.checklist-row').filter({ hasText: title }).getByRole('button', { name: '标为未完成', exact: true }).waitFor()
   await page.getByTitle('设置', { exact: true }).click()
-  assert.equal(await page.getByRole('checkbox', { name: '显示还没开始的活动', exact: true }).isChecked(), true)
+  assert.equal(await page.getByRole('checkbox', { name: '提前显示未开始的活动与周期挑战', exact: true }).isChecked(), true)
   checks.push('restart retains completion and preferences')
   await page.getByRole('button', { name: '关闭设置' }).click()
   // Publish a synthetic public exception only into this script's own database.
@@ -167,7 +167,7 @@ try {
   for (const enabled of [false, true, false]) {
     await page.getByTitle('设置', { exact: true }).click()
     await page.getByRole('button', { name: '游戏与同步', exact: true }).click()
-    const preference = page.getByRole('checkbox', { name: '显示还没开始的活动', exact: true })
+    const preference = page.getByRole('checkbox', { name: '提前显示未开始的活动与周期挑战', exact: true })
     await preference.locator('..').click()
     assert.equal(await preference.isChecked(), enabled)
     await page.getByRole('button', { name: '关闭设置' }).click()

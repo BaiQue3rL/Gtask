@@ -72,21 +72,18 @@
 
       !insertmacro EnsureGtaskInstallDirectory $INSTDIR $0 $1
 
-      ${NSD_CreateLabel} 0 0 100% 28u "请选择安装位置。选择父文件夹后，Gtask 会安装到其中的 Gtask 子文件夹。"
+      ${NSD_CreateLabel} 0 0 100% 18u "选择父文件夹，程序将安装到其中的 Gtask 文件夹。"
       Pop $0
 
-      ${NSD_CreateGroupBox} 0 36u 100% 55u "目标文件夹"
+      ${NSD_CreateGroupBox} 0 26u 100% 42u "目标文件夹"
       Pop $0
 
-      ${NSD_CreateDirRequest} 10u 56u -78u 13u "$INSTDIR"
+      ${NSD_CreateDirRequest} 10u 46u -78u 13u "$INSTDIR"
       Pop $GtaskDirectoryInput
 
-      ${NSD_CreateBrowseButton} -68u 55u 58u 15u "浏览(B)..."
+      ${NSD_CreateBrowseButton} -68u 45u 58u 15u "浏览(B)..."
       Pop $GtaskDirectoryBrowseButton
       ${NSD_OnClick} $GtaskDirectoryBrowseButton GtaskDirectoryBrowse
-
-      ${NSD_CreateLabel} 10u 73u -20u 10u "最终安装目录始终以 \Gtask 结尾。"
-      Pop $0
 
       GetDlgItem $0 $HWNDPARENT 1
       SendMessage $0 ${WM_SETTEXT} 0 "STR:$(^InstallBtn)"

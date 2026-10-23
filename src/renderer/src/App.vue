@@ -107,13 +107,6 @@ const panelBySection = new Map(panels.map((panel) => [panel.section, panel]))
 
 const workspaceElement = ref<HTMLElement | null>(null)
 
-const categoryLabels: Record<ChecklistCategory, string> = {
-  limited_event: '限时活动',
-  endgame: '深渊/挑战模式',
-  exploration: '地图',
-  custom: '自定义事项'
-}
-
 const games = ref<GameSummary[]>([])
 const gameVersionSummaries = ref<GameVersionSummary[]>([])
 const gameIcons: Record<GameId, string> = {
@@ -980,7 +973,7 @@ async function closeKuroCommunityLogin(): Promise<void> {
 async function sendKuroCommunitySms(): Promise<void> {
   if (kuroCredentialBusy.value) return
   kuroCredentialBusy.value = true
-  kuroCredentialMessage.value = '请在弹出的窗口中完成官方滑块验证…'
+  kuroCredentialMessage.value = '请在弹窗中完成滑块验证'
   try {
     const state = await window.gtask.sendKuroCommunitySms(kuroLoginPhone.value)
     kuroLoginSessionId.value = state.sessionId
@@ -997,7 +990,7 @@ async function sendKuroCommunitySms(): Promise<void> {
 async function completeKuroCommunityLogin(): Promise<void> {
   if (kuroCredentialBusy.value || !kuroLoginSessionId.value) return
   kuroCredentialBusy.value = true
-  kuroCredentialMessage.value = '正在登录库街区并读取鸣潮角色…'
+  kuroCredentialMessage.value = '正在读取角色…'
   try {
     const result = await window.gtask.completeKuroCommunityLogin(
       kuroLoginSessionId.value,
@@ -1006,9 +999,7 @@ async function completeKuroCommunityLogin(): Promise<void> {
     kuroCredentialRoles.value = result.roles
     kuroSelectedRoleKey.value = result.roles.length === 1 ? kuroRoleKey(result.roles[0]) : ''
     kuroLoginPhase.value = 'role'
-    kuroCredentialMessage.value = result.roles.length === 1
-      ? '已经找到角色，确认后就能保存'
-      : `找到了 ${result.roles.length} 个角色，请选择要同步的角色`
+    kuroCredentialMessage.value = ''
   } catch (error) {
     kuroCredentialMessage.value = ''
     showError(error)
@@ -1023,11 +1014,11 @@ async function saveKuroCommunityLogin(): Promise<void> {
     (candidate) => kuroRoleKey(candidate) === kuroSelectedRoleKey.value
   )
   if (!role) {
-    kuroCredentialMessage.value = '角色选择失效了，请重新登录后再选一次'
+    kuroCredentialMessage.value = '角色已失效，请重新登录'
     return
   }
   kuroCredentialBusy.value = true
-  kuroCredentialMessage.value = '正在确认库街区能否读取这个角色…'
+  kuroCredentialMessage.value = '正在验证角色…'
   try {
     await window.gtask.storeKuroCommunityLogin(
       kuroLoginSessionId.value,
@@ -1085,7 +1076,7 @@ async function saveRenderingMode(): Promise<void> {
     const state = await window.gtask.updateRenderingMode(renderingModeSelection.value)
     renderingModeState.value = state
     if (!state.restartRequired) {
-      renderingModeMessage.value = '已经在使用这个模式。'
+      renderingModeMessage.value = '设置已保存'
       return
     }
     renderingModeMessage.value = '已保存，正在重启 Gtask…'
@@ -1387,8 +1378,8 @@ function archiveItem(item: ChecklistItem): void {
   openConfirmationDialog({
     eyebrow: selectedGame.value?.name ?? '自定义清单',
     title: '删除事项',
-    message: `确定删除“${item.title}”吗？`,
-    detail: '删除后可以从回收站恢复。',
+    message: `删除“${item.title}”？`,
+    detail: '将移入回收站，可恢复。',
     confirmLabel: '删除',
     onConfirm: async () => {
       await window.gtask.archiveChecklistItem(item.id)
@@ -1415,8 +1406,8 @@ function archiveCompletedSection(
   openConfirmationDialog({
     eyebrow: selectedGame.value?.name ?? '自定义清单',
     title: '删除已完成事项',
-    message: `确定删除“${sectionTitle}”中的 ${completedItems.length} 个已完成事项吗？`,
-    detail: '删除后可以从回收站恢复。',
+    message: `删除“${sectionTitle}”中 ${completedItems.length} 个已完成事项？`,
+    detail: '将移入回收站，可恢复。',
     confirmLabel: '删除已完成',
     onConfirm: async () => {
       await window.gtask.archiveCompletedSection({ gameId, section })
@@ -1446,7 +1437,7 @@ function emptyRecycleBin(): void {
   openConfirmationDialog({
     eyebrow: selectedGame.value?.name ?? '游戏',
     title: '清空回收站',
-    message: `确定永久删除回收站中的 ${count} 个事项吗？`,
+    message: `永久删除回收站中的 ${count} 个事项？`,
     detail: '删除后无法恢复。',
     confirmLabel: '永久删除',
     onConfirm: async () => {
@@ -1525,7 +1516,6 @@ function showError(error: unknown): void {
         <img class="brand-mark" :src="appIcon" alt="" aria-hidden="true">
         <span>Gtask</span>
       </div>
-      <p class="section-label">游戏</p>
       <nav class="game-list" aria-label="支持的游戏">
         <button
           v-for="game in visibleGames"
@@ -1563,7 +1553,7 @@ function showError(error: unknown): void {
             <span>设置</span>
           </span>
         </button>
-        <p v-if="appInfo" class="sidebar-meta">v{{ appInfo.version }} · 数据仅保存在本机</p>
+        <p v-if="appInfo" class="sidebar-meta">v{{ appInfo.version }}</p>
       </div>
     </aside>
 
@@ -1578,7 +1568,6 @@ function showError(error: unknown): void {
             aria-hidden="true"
           >
           <div class="page-heading-copy">
-            <p class="eyebrow">任务清单</p>
             <div class="page-title-line">
               <h1>{{ selectedGame?.name ?? 'Gtask' }}</h1>
               <span
@@ -1612,7 +1601,7 @@ function showError(error: unknown): void {
         class="panel centered"
         role="status"
         aria-live="polite"
-      >{{ restoringGameView ? '正在切换游戏…' : '正在读取本地清单…' }}</section>
+      >{{ restoringGameView ? '切换中…' : '加载中…' }}</section>
       <div
         v-else
         class="checklist-content-frame"
@@ -1670,7 +1659,7 @@ function showError(error: unknown): void {
                     :class="syncStateClass(syncTargetState(panel.syncTarget))"
                     :title="syncStateTimestamp(syncTargetState(panel.syncTarget))
                       ? `同步时间：${new Date(syncStateTimestamp(syncTargetState(panel.syncTarget))!).toLocaleString()}`
-                      : '这个版块还没同步'"
+                      : '未同步'"
                   >
                     {{ syncStateLabel(syncTargetState(panel.syncTarget)) }}
                     <time v-if="syncStateTimestamp(syncTargetState(panel.syncTarget))">
@@ -1767,7 +1756,7 @@ function showError(error: unknown): void {
                     <button v-if="panel.section === 'custom'" class="more-button" type="button" aria-label="编辑" @click="openEdit(row.item)">⋮</button>
                   </div>
                 </ChecklistRows>
-                <p v-if="panelItems(panel).length === 0" class="empty-text">这里还没有事项</p>
+                <p v-if="panelItems(panel).length === 0" class="empty-text">暂无事项</p>
               </div>
               <button v-if="panel.allowCreate === true" class="add-button" type="button" @click="openCreate(panel.defaultCategory)">
                 <span class="add-button-label"><span class="add-button-icon" aria-hidden="true">＋</span>新增{{ panel.createLabel ?? panel.title }}</span>
@@ -1788,7 +1777,7 @@ function showError(error: unknown): void {
           <button class="close-button" type="button" aria-label="关闭事项编辑器" @click="editorOpen = false">×</button>
         </div>
 
-        <label>事项名称<input v-model="form.title" maxlength="100" autofocus placeholder="例如：刷角色突破素材" /></label>
+        <label>事项名称<input v-model="form.title" maxlength="100" autofocus /></label>
 
         <div class="modal-actions">
           <button v-if="editingItem?.source === 'manual'" class="danger-button" type="button" @click="archiveItem(editingItem)">删除</button>
@@ -1814,16 +1803,14 @@ function showError(error: unknown): void {
             <button class="close-button" type="button" aria-label="关闭回收站" @click="recycleBinOpen = false">×</button>
           </div>
         </div>
-        <p class="recycle-hint">删除的自定义事项会先放在这里，随时可以恢复。</p>
         <div class="recycle-list">
           <div v-for="item in archivedItems" :key="item.id" class="recycle-row">
             <div>
               <strong>{{ item.title }}</strong>
-              <span>{{ categoryLabels[item.category] }} · 手动事项</span>
             </div>
             <button class="secondary-button" type="button" @click="restoreItem(item)">恢复</button>
           </div>
-          <p v-if="archivedItems.length === 0" class="empty-text">回收站里还没有内容</p>
+          <p v-if="archivedItems.length === 0" class="empty-text">回收站为空</p>
         </div>
       </section>
     </div>
@@ -1836,7 +1823,7 @@ function showError(error: unknown): void {
         aria-label="设置"
       >
         <div class="modal-header">
-          <div><p class="eyebrow">本机设置</p><h2>设置</h2></div>
+          <h2>设置</h2>
           <button class="close-button" type="button" aria-label="关闭设置" @click="closeSettings">×</button>
         </div>
         <div class="settings-layout">
@@ -1870,13 +1857,11 @@ function showError(error: unknown): void {
           <div class="settings-content">
             <section v-if="settingsSection === 'games'" class="settings-page">
               <div class="settings-page-header">
-                <p class="eyebrow">游戏与同步</p>
                 <h3>管理游戏</h3>
-                <p>选择侧栏显示的游戏，以及打开 Gtask 后是否自动同步进度。</p>
               </div>
               <div class="game-preference-table">
                 <div class="game-preference-header" aria-hidden="true">
-                  <span>游戏</span><span>显示</span><span>自动同步</span>
+                  <span>游戏</span><span>显示</span><span>启动时同步</span>
                 </div>
                 <div v-for="game in games" :key="game.id" class="game-preference-row">
                   <span class="settings-game-label"><img class="game-icon" :src="gameIcons[game.id]" alt="" aria-hidden="true">{{ game.name }}</span>
@@ -1905,18 +1890,17 @@ function showError(error: unknown): void {
               </div>
 
               <div class="settings-section-block">
-                <h3 class="settings-heading">显示还没开始的活动</h3>
+                <h3 class="settings-heading">提前显示</h3>
                 <div class="settings-box">
                   <label class="software-update-toggle">
                     <span>
-                      <strong>提前显示</strong>
-                      <small>开启后提前显示尚未开始的限时活动和周期挑战；关闭后等到开始时再显示。</small>
+                      <strong>未开始的活动与周期挑战</strong>
                     </span>
                     <input
                       class="toggle-switch-input"
                       type="checkbox"
                       :checked="showUpcomingBaselineItems"
-                      aria-label="显示还没开始的活动"
+                      aria-label="提前显示未开始的活动与周期挑战"
                       @change="saveUpcomingBaselineVisibility(($event.target as HTMLInputElement).checked)"
                     >
                     <span class="toggle-switch" aria-hidden="true"><span class="toggle-switch-thumb"></span></span>
@@ -1929,7 +1913,7 @@ function showError(error: unknown): void {
                 <div class="panel-order-setting">
                   <div>
                     <strong>{{ selectedGame?.name }}</strong>
-                    <span>在任务页拖动版块标题旁的手柄即可排序。</span>
+                    <span>拖动任务页版块标题旁的手柄排序。</span>
                   </div>
                   <button class="secondary-button" type="button" :disabled="panelOrderIsDefault" @click="resetPanelOrder">恢复默认</button>
                 </div>
@@ -1938,22 +1922,18 @@ function showError(error: unknown): void {
 
             <section v-else-if="settingsSection === 'appearance'" class="settings-page">
               <div class="settings-page-header">
-                <p class="eyebrow">外观</p>
                 <h3>显示效果</h3>
-                <p>默认使用兼容模式；只有在界面运行稳定时才建议启用 GPU 加速。</p>
               </div>
               <div class="settings-box rendering-provider-box">
                 <label class="rendering-mode-field">
                   <span>显示模式</span>
                   <select v-model="renderingModeSelection">
-                    <option value="compatibility">兼容模式（推荐）· 和游戏一起运行更稳定</option>
-                    <option value="accelerated">GPU 加速 · 更流畅</option>
+                    <option value="compatibility">兼容模式</option>
+                    <option value="accelerated">GPU 加速</option>
                   </select>
                 </label>
                 <div class="settings-control-footer">
-                  <span>{{ renderingModeMessage || (renderingModeState?.active === 'compatibility'
-                    ? '现在使用兼容模式，可以减少游戏、显卡驱动或叠加工具造成的残影。'
-                    : '现在使用 GPU 加速；如果和游戏一起运行时出现残影，请改回兼容模式。') }}</span>
+                  <span v-if="renderingModeMessage || renderingModeState">{{ renderingModeMessage || `当前：${renderingModeState?.active === 'compatibility' ? '兼容模式' : 'GPU 加速'}` }}</span>
                   <button class="primary-button" type="button" :disabled="renderingModeBusy" @click="saveRenderingMode">{{ renderingModeBusy ? '保存中…' : renderingModeSelection === renderingModeState?.active ? '保存设置' : '保存并重启' }}</button>
                 </div>
               </div>
@@ -1961,15 +1941,13 @@ function showError(error: unknown): void {
 
             <section v-else-if="settingsSection === 'account-data'" class="settings-page">
               <div class="settings-page-header">
-                <p class="eyebrow">账号与数据</p>
                 <h3>登录信息</h3>
-                <p>不登录也能正常使用；登录信息由 Windows 加密后保存在本机。</p>
               </div>
               <div class="account-list">
                 <div v-for="status in gameCredentialStatuses" :key="status.provider" class="account-row" :data-credential-provider="status.provider">
                   <div>
                     <strong>{{ status.provider === 'miyoushe' ? '米游社' : '库街区' }}</strong>
-                    <span>{{ status.stored ? `已安全保存 · ${formatLocalTime(status.updatedAt!)}` : '未登录' }}</span>
+                    <span>{{ status.stored ? `已保存 · ${formatLocalTime(status.updatedAt!)}` : '未登录' }}</span>
                   </div>
                   <div class="credential-actions">
                     <button v-if="status.provider === 'miyoushe'" class="secondary-button" type="button" :disabled="startingMiyousheLogin" @click="startMiyousheLogin">{{ startingMiyousheLogin ? '获取中…' : status.stored ? '重新登录' : '扫码登录' }}</button>
@@ -1988,7 +1966,7 @@ function showError(error: unknown): void {
                     <button class="secondary-button" type="button" @click="openDataDirectory">打开目录</button>
                   </div>
                 </div>
-                <p class="settings-help">自动保留最近 30 份每日备份。</p>
+                <p class="settings-help">每日备份保留最近 30 份。</p>
                 <div class="backup-list">
                   <div v-for="backup in backups" :key="backup.fileName" class="backup-row">
                     <div><strong>{{ backup.fileName }}</strong><span>{{ formatLocalTime(backup.updatedAt) }}</span></div>
@@ -1998,18 +1976,15 @@ function showError(error: unknown): void {
                   <p v-if="backups.length === 0" class="empty-text">还没有备份</p>
                 </div>
               </div>
-              <p class="settings-note">米游社支持扫码登录，库街区支持手机号登录；登录信息只会加密保存在本机。</p>
             </section>
 
             <section v-else class="settings-page">
               <div class="settings-page-header">
-                <p class="eyebrow">软件更新</p>
-                <h3>保持 Gtask 最新</h3>
-                <p>在这里检查软件版本，以及活动和任务更新。</p>
+                <h3>软件更新</h3>
               </div>
               <div class="settings-box software-update-box">
                 <label class="software-update-toggle">
-                  <span><strong>启动后自动检查更新</strong><small>24 小时内不会重复检查。</small></span>
+                  <span><strong>启动后自动检查更新</strong></span>
                   <input v-model="softwareUpdateSettings.autoCheckEnabled" class="toggle-switch-input" type="checkbox" :disabled="softwareUpdateBusy || remoteCatalogUpdateBusy" aria-label="启动后自动检查更新" @change="saveSoftwareUpdatePreference">
                   <span class="toggle-switch" aria-hidden="true"><span class="toggle-switch-thumb"></span></span>
                 </label>
@@ -2037,7 +2012,7 @@ function showError(error: unknown): void {
     <div v-if="loginRequiredOpen" class="modal-backdrop login-backdrop" @click.self="loginRequiredOpen = false">
       <section class="prompt-modal login-required-modal" role="dialog" aria-modal="true" aria-labelledby="login-required-title">
         <div class="modal-header">
-          <div><p class="eyebrow">同步进度</p><h2 id="login-required-title">需要登录</h2></div>
+          <h2 id="login-required-title">需要登录</h2>
           <button class="close-button" type="button" aria-label="取消登录" @click="loginRequiredOpen = false; pendingPersonalSyncIntent = null">×</button>
         </div>
         <p>同步进度需要登录{{ pendingPersonalSyncIntent && credentialProviderForGame(pendingPersonalSyncIntent.gameId) === 'kuro-community' ? '库街区' : '米游社' }}。</p>
@@ -2050,7 +2025,7 @@ function showError(error: unknown): void {
     <div v-if="miyousheLoginOpen" class="modal-backdrop login-backdrop" @click.self="closeMiyousheLogin">
       <section class="editor-modal login-modal" role="dialog" aria-modal="true" aria-label="米游社扫码登录">
         <div class="modal-header">
-          <div><h2>米游社扫码登录</h2><p>登录信息只保存在本机</p></div>
+          <h2>米游社扫码登录</h2>
           <button class="close-button" type="button" aria-label="关闭米游社登录" @click="closeMiyousheLogin">×</button>
         </div>
         <div v-if="miyousheLoginState" class="qr-login-content">
@@ -2065,10 +2040,6 @@ function showError(error: unknown): void {
             {{ miyousheLoginState.status === 'confirmed' ? '✓' : '!' }}
           </div>
           <strong>{{ miyousheLoginState.message }}</strong>
-          <p v-if="miyousheLoginState.status === 'waiting_confirmation'">请回到米游社 App 完成授权，窗口会自动更新。</p>
-          <p v-else-if="miyousheLoginState.status === 'confirmed'">登录成功，现在可以同步进度了。</p>
-          <p v-else-if="miyousheLoginState.status === 'expired'">为了安全，二维码过期后需要手动重新获取。</p>
-          <p v-else>二维码大约 5 分钟内有效；Gtask 不会读取浏览器 Cookie。</p>
         </div>
         <div class="login-actions">
           <button
@@ -2086,7 +2057,7 @@ function showError(error: unknown): void {
     <div v-if="kuroCredentialOpen" class="modal-backdrop login-backdrop" @click.self="closeKuroCommunityLogin">
       <section class="editor-modal kuro-credential-modal" role="dialog" aria-modal="true" aria-label="登录库街区">
         <div class="modal-header">
-          <div><h2>登录库街区</h2><p>登录后可同步鸣潮挑战与地图进度</p></div>
+          <h2>登录库街区</h2>
           <button
             class="close-button"
             type="button"
@@ -2105,7 +2076,7 @@ function showError(error: unknown): void {
               maxlength="11"
               autocomplete="tel"
               spellcheck="false"
-              placeholder="请输入库街区绑定的手机号"
+              placeholder="库街区绑定的手机号"
               :disabled="kuroCredentialBusy"
             >
           </label>
@@ -2125,7 +2096,7 @@ function showError(error: unknown): void {
               maxlength="6"
               autocomplete="one-time-code"
               spellcheck="false"
-              placeholder="请输入 6 位验证码"
+              placeholder="6 位验证码"
               :disabled="kuroCredentialBusy"
             >
           </label>
@@ -2135,7 +2106,7 @@ function showError(error: unknown): void {
             type="button"
             :disabled="kuroCredentialBusy || !/^\d{6}$/.test(kuroLoginCode.trim())"
             @click="completeKuroCommunityLogin"
-          >{{ kuroCredentialBusy ? '登录中…' : '登录并选择角色' }}</button>
+          >{{ kuroCredentialBusy ? '登录中…' : '登录' }}</button>
           <label v-if="kuroLoginPhase === 'role'">
             选择角色
             <select v-model="kuroSelectedRoleKey" :disabled="kuroCredentialBusy">
@@ -2148,7 +2119,6 @@ function showError(error: unknown): void {
             </select>
           </label>
           <p v-if="kuroCredentialMessage" class="credential-import-message">{{ kuroCredentialMessage }}</p>
-          <p class="recycle-hint">确认角色后，登录信息会加密保存在本机。</p>
         </div>
         <div class="login-actions">
           <button
@@ -2157,7 +2127,7 @@ function showError(error: unknown): void {
             type="button"
             :disabled="kuroCredentialBusy || !kuroSelectedRoleKey"
             @click="saveKuroCommunityLogin"
-          >{{ kuroCredentialBusy ? '验证中…' : '确认并保存' }}</button>
+          >{{ kuroCredentialBusy ? '验证中…' : '确认角色' }}</button>
           <button
             class="secondary-button"
             type="button"
@@ -2231,10 +2201,7 @@ function showError(error: unknown): void {
         <svg v-else-if="draggingPanel.section === 'exploration'" viewBox="0 0 24 24"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Z"/><path d="M9 3v15M15 6v15"/></svg>
         <svg v-else viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="m8 9 2 2 4-4M8 15h8"/></svg>
       </span>
-      <span class="panel-drag-preview-copy">
-        <strong>{{ draggingPanel.title }}</strong>
-        <small>拖动调整位置</small>
-      </span>
+      <strong class="panel-drag-preview-title">{{ draggingPanel.title }}</strong>
     </div>
   </main>
 </template>
