@@ -714,7 +714,7 @@
     }
   ],
   "delivery": {
-    "stage": "ready_partial",
+    "stage": "published_partial",
     "branch": "codex/cloud-baseline/wuthering-waves-3-7-first-half-end",
     "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/37",
     "catalogChanged": true,
@@ -725,10 +725,22 @@
     "nodeComplete": false,
     "remainingPendingCount": 1,
     "resumeAt": "2026-10-24T03:23:58.715Z",
-    "batchPublicationVerified": false,
+    "batchPublicationVerified": true,
     "catalogRevision": "2026-10-23.genshin-activities-wuwa-map",
     "catalogSha256": "8f61275ae7258e2ccaf7cd59929f63cf4fa0389faba940c6f7bc371a6b056d42",
-    "mainVerified": false
+    "mainVerified": true,
+    "publishedAt": "2026-10-23T03:31:20Z",
+    "publicationHeadSha": "59df803d7ceb28a98850197e9dedab433fc0fd8c",
+    "mergedMainSha": "fb9bebb26e2a15bdedcad055875a0ba751d11ada",
+    "savedMainVerification": {
+      "sha": "fb9bebb26e2a15bdedcad055875a0ba751d11ada",
+      "allFourFilesExactMatch": true,
+      "revision": "2026-10-23.genshin-activities-wuwa-map",
+      "rawUtf8Sha256": "8f61275ae7258e2ccaf7cd59929f63cf4fa0389faba940c6f7bc371a6b056d42",
+      "checkedAt": "2026-10-23 03:31:37 UTC"
+    },
+    "batchPublicationMainSha": "fb9bebb26e2a15bdedcad055875a0ba751d11ada",
+    "batchPublicationCheckedAt": "2026-10-23 03:31:37 UTC"
   },
   "unresolvedDecisionCount": 1,
   "sourceImages": [
@@ -812,7 +824,24 @@
         "contentHash": "5cab9f1b38befe660b24ee3acc7abbf627c50a7aed9f7424406190955b55ab06"
       }
     },
-    "requiredCI": "pending final exact-head Verify and Cloud baseline checks"
+    "requiredCI": [
+      {
+        "name": "Verify",
+        "runId": 39895275502,
+        "headSha": "59df803d7ceb28a98850197e9dedab433fc0fd8c",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/BaiQue3rL/Gtask/actions/runs/39895275502"
+      },
+      {
+        "name": "Cloud baseline checks",
+        "runId": 39895275492,
+        "headSha": "59df803d7ceb28a98850197e9dedab433fc0fd8c",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/BaiQue3rL/Gtask/actions/runs/39895275492"
+      }
+    ]
   },
   "resumeHistory": [
     {

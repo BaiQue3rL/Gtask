@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "kind": "schedule_and_activity_announcement_review",
   "checkedAt": "2026-10-23T03:23:58.715Z",
-  "status": "ready",
+  "status": "published",
   "auditComplete": true,
   "serverScope": {
     "server": "CN production; each announcement independently scoped",
@@ -409,7 +409,24 @@
       "rawUtf8Sha256": "8f61275ae7258e2ccaf7cd59929f63cf4fa0389faba940c6f7bc371a6b056d42",
       "semanticReview": "仅新增3项原神活动和1项鸣潮地图，加revision/publishedAt；所有既有条目、退役、规则和其他游戏对象保持相同"
     },
-    "requiredCI": "pending final exact-head Verify and Cloud baseline checks",
+    "requiredCI": [
+      {
+        "name": "Verify",
+        "runId": 39895275502,
+        "headSha": "59df803d7ceb28a98850197e9dedab433fc0fd8c",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/BaiQue3rL/Gtask/actions/runs/39895275502"
+      },
+      {
+        "name": "Cloud baseline checks",
+        "runId": 39895275492,
+        "headSha": "59df803d7ceb28a98850197e9dedab433fc0fd8c",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/BaiQue3rL/Gtask/actions/runs/39895275492"
+      }
+    ],
     "announcementReview": {
       "ok": true,
       "coveredGames": [
@@ -427,13 +444,42 @@
     }
   },
   "delivery": {
-    "stage": "ready",
+    "stage": "published",
     "branch": "codex/cloud-baseline/wuthering-waves-3-7-first-half-end",
     "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/37",
     "catalogChanged": true,
     "catalogRevision": "2026-10-23.genshin-activities-wuwa-map",
     "catalogSha256": "8f61275ae7258e2ccaf7cd59929f63cf4fa0389faba940c6f7bc371a6b056d42",
-    "mainVerified": false,
-    "activityPublicationComplete": false
+    "mainVerified": true,
+    "activityPublicationComplete": true,
+    "publishedAt": "2026-10-23T03:31:20Z",
+    "publicationHeadSha": "59df803d7ceb28a98850197e9dedab433fc0fd8c",
+    "mergedMainSha": "fb9bebb26e2a15bdedcad055875a0ba751d11ada",
+    "savedMainVerification": {
+      "sha": "fb9bebb26e2a15bdedcad055875a0ba751d11ada",
+      "allFourFilesExactMatch": true,
+      "revision": "2026-10-23.genshin-activities-wuwa-map",
+      "rawUtf8Sha256": "8f61275ae7258e2ccaf7cd59929f63cf4fa0389faba940c6f7bc371a6b056d42",
+      "checkedAt": "2026-10-23 03:31:37 UTC"
+    },
+    "publicChannels": [
+      {
+        "source": "github",
+        "url": "https://raw.githubusercontent.com/BaiQue3rL/Gtask/main/updates/catalog.json",
+        "httpStatus": 200,
+        "revision": "2026-10-23.genshin-activities-wuwa-map",
+        "rawUtf8Sha256": "8f61275ae7258e2ccaf7cd59929f63cf4fa0389faba940c6f7bc371a6b056d42",
+        "bytes": 52122
+      },
+      {
+        "source": "gitee",
+        "url": "https://gitee.com/l3rui/Gtask/raw/main/updates/catalog.json",
+        "httpStatus": 200,
+        "revision": "2026-10-22.zenless-map-admission",
+        "rawUtf8Sha256": "d2a930d0519c76780900084190b15b057f1395a33afada17c79bd8e573beb75c",
+        "bytes": 50276
+      }
+    ],
+    "clientReceipt": "not_read_or_claimed"
   }
 }
