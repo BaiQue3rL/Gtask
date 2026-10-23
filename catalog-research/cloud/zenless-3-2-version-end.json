@@ -6,8 +6,8 @@
   "periodKey": "3.2",
   "node": "version_end",
   "newVersion": "3.3",
-  "checkedAt": "2026-10-22T02:03:15.293Z",
-  "status": "pending",
+  "checkedAt": "2026-10-23T02:05:03Z",
+  "status": "running",
   "auditComplete": false,
   "serverScope": {
     "region": "中国大陆适用官方公告",
@@ -15,7 +15,7 @@
     "utcOffset": "+08:00",
     "note": "按既有已核验国服范围归一化；不混用其他服务器时间。公告仅到分钟时保留:00秒。"
   },
-  "baseMainSha": "73e298deef998cff0b5b74fa67c9101c5d8beedf",
+  "baseMainSha": "397e892bf30fa515a1f54a2467611404bbe5def7",
   "priorEvidence": [
     "docs/catalog-research/zenless-3.2-2026-10-11.json",
     "catalog-research/cloud/schedule-review-20261019.json",
@@ -987,23 +987,16 @@
     }
   },
   "delivery": {
-    "stage": "partial_published",
-    "branch": "codex/cloud-map-coverage-fix",
-    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/34",
-    "catalogChanged": true,
-    "referenceCatalogRevision": "2026-10-21.genshin-7.1-event-discovery",
-    "referenceCatalogSha256": "48e679e8b75e1c7b3bbca685d4fa46d540403a770fe830c4aa901405420c5bd7",
-    "lastPublishedCatalogRevision": "2026-10-21.zenless-3.3-sign-in",
-    "lastPublishedCatalogSha256": "6b0a5b24f5230b437c955413ece6238f9df817a807a24ccdae1d8ee498c56aae",
+    "stage": "running",
+    "branch": "codex/cloud-baseline/zenless-3-2-version-end",
+    "leaseUntil": "2026-10-23T03:02:21.000Z",
     "nodeComplete": false,
+    "catalogChanged": false,
+    "referenceCatalogRevision": "2026-10-22.zenless-map-admission",
+    "referenceCatalogSha256": "d2a930d0519c76780900084190b15b057f1395a33afada17c79bd8e573beb75c",
+    "resumeAt": "2026-10-23T03:02:21.000Z",
     "remainingPendingCount": 1,
-    "resumeAt": "2026-10-23T01:59:25.209Z",
-    "catalogRevision": "2026-10-22.zenless-map-admission",
-    "catalogSha256": "d2a930d0519c76780900084190b15b057f1395a33afada17c79bd8e573beb75c",
-    "evidencePath": "catalog-research/cloud/admission-authority-repair-20261022.json",
-    "resumeBranch": "codex/cloud-baseline/zenless-3-2-version-end",
-    "mainReadSha": "455f8504f487a59b5e88b24200494cfa5b53d0c1",
-    "mainVerifiedAt": "2026-10-22T09:19:44.078Z"
+    "priorAdministratorPublication": "catalog-research/cloud/admission-authority-repair-20261022.json"
   },
   "verifiedCatalogDelta": {
     "schemaVersion": 2,
@@ -1125,6 +1118,52 @@
       ],
       "status": "running",
       "leaseUntil": "2026-10-22T02:59:26.000Z"
+    },
+    {
+      "attempt": 5,
+      "startedAt": "2026-10-23T02:05:03Z",
+      "baseMainSha": "397e892bf30fa515a1f54a2467611404bbe5def7",
+      "pendingAtStart": [
+        "cycles:hollow-annihilation"
+      ],
+      "priorCurrentAttempt": {
+        "attempt": 4,
+        "checkedAt": "2026-10-22T02:03:15.293Z",
+        "scope": "resume exact pending; current official updates and bounded supplement",
+        "catalogAdded": 3,
+        "resolvedPending": [
+          "map-candidate:verum-city",
+          "map-candidate:ningxi-isle",
+          "map-candidate:airspace-control-tower"
+        ],
+        "auditComplete": false,
+        "administratorRepairAt": "2026-10-22T09:00:31.554Z",
+        "remainingPending": 1
+      },
+      "priorDelivery": {
+        "stage": "partial_published",
+        "branch": "codex/cloud-map-coverage-fix",
+        "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/34",
+        "catalogChanged": true,
+        "referenceCatalogRevision": "2026-10-21.genshin-7.1-event-discovery",
+        "referenceCatalogSha256": "48e679e8b75e1c7b3bbca685d4fa46d540403a770fe830c4aa901405420c5bd7",
+        "lastPublishedCatalogRevision": "2026-10-21.zenless-3.3-sign-in",
+        "lastPublishedCatalogSha256": "6b0a5b24f5230b437c955413ece6238f9df817a807a24ccdae1d8ee498c56aae",
+        "nodeComplete": false,
+        "remainingPendingCount": 1,
+        "resumeAt": "2026-10-23T01:59:25.209Z",
+        "catalogRevision": "2026-10-22.zenless-map-admission",
+        "catalogSha256": "d2a930d0519c76780900084190b15b057f1395a33afada17c79bd8e573beb75c",
+        "evidencePath": "catalog-research/cloud/admission-authority-repair-20261022.json",
+        "resumeBranch": "codex/cloud-baseline/zenless-3-2-version-end",
+        "mainReadSha": "455f8504f487a59b5e88b24200494cfa5b53d0c1",
+        "mainVerifiedAt": "2026-10-22T09:19:44.078Z"
+      },
+      "priorProgress": {
+        "catalogAdditions": 0,
+        "resolvedPending": [],
+        "remainingPending": 4
+      }
     }
   ],
   "scheduleResolution": {
@@ -1171,17 +1210,9 @@
     "nextScheduleReviewAt": "2026-10-22T01:59:00.000Z"
   },
   "currentAttempt": {
-    "attempt": 4,
-    "checkedAt": "2026-10-22T02:03:15.293Z",
-    "scope": "resume exact pending; current official updates and bounded supplement",
-    "catalogAdded": 3,
-    "resolvedPending": [
-      "map-candidate:verum-city",
-      "map-candidate:ningxi-isle",
-      "map-candidate:airspace-control-tower"
-    ],
-    "auditComplete": false,
-    "administratorRepairAt": "2026-10-22T09:00:31.554Z",
+    "attempt": 5,
+    "startedAt": "2026-10-23T02:05:03Z",
+    "scope": "only due unresolved cycle fact; preserve completed administrator map publication",
     "remainingPending": 1
   },
   "partialPublications": [
