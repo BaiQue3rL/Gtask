@@ -159,17 +159,17 @@
       "periodKey": "3.2",
       "node": "version_end",
       "boundaryAt": "2026-10-21T06:00:00+08:00",
-      "status": "running",
+      "status": "pending",
       "attempts": 5,
-      "updatedAt": "2026-10-23T02:05:03Z",
-      "retryAt": "2026-10-23T03:02:21.000Z",
+      "updatedAt": "2026-10-23T02:08:24.805Z",
+      "retryAt": "2026-10-24T02:08:24.805Z",
       "branch": "codex/cloud-baseline/zenless-3-2-version-end",
-      "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/31",
+      "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/36",
       "catalogRevision": "2026-10-22.zenless-map-admission",
       "catalogSha256": "d2a930d0519c76780900084190b15b057f1395a33afada17c79bd8e573beb75c",
       "evidencePath": "catalog-research/cloud/zenless-3-2-version-end.json",
       "completedAt": null,
-      "notes": "续接唯一未决拟境湮灭战周期必要字段；管理员已发布三地图，沿用最新裁决和既有稳定键。本轮排期/公告复核未到期，不刷新其核验时间。"
+      "notes": "仅拟境湮灭战周期必要字段仍待核验；主要官方更新/当前列表及一次独立定向补查未取得可靠重置锚点、开启间隔或开放时长。保持pending，已发表三地图与管理员新裁决不重复、不回退；本轮无清单差异，排期和四游戏公告复核时间保留。"
     },
     {
       "key": "star-rail/4.6/first_half_end",
