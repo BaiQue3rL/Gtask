@@ -291,7 +291,62 @@
     "nextReviewAfterVerification": {
       "at": "2026-10-24T03:23:58.715Z",
       "reason": "missing_schedule"
-    }
+    },
+    "previousGaps": [
+      {
+        "checkedAt": "2026-10-22T02:20:47.389Z",
+        "reason": "2026-10-22实际复核：当前读取国服官方列表、7.2前瞻预告与官网，并作一次独立维护定向补查；7.2前瞻仅公告10月23日20:00节目，不给7.1结束维护边界。保留endsAt=null；不采纳第三方42天/活动截止推断。",
+        "checkedSources": [
+          "https://www.taptap.cn/app/168332/topic?type=official",
+          "https://ys.mihoyo.com/main/",
+          "https://www.taptap.cn/moment/861928431204435494?group_id=201765",
+          "https://www.taptap.cn/app/168332/topic?page=2&type=official"
+        ]
+      },
+      {
+        "checkedAt": "2026-10-22T02:20:47.389Z",
+        "reason": "2026-10-22实际复核：当前官方7.2前瞻预告未给版本开始、结束或上半截止；主站空壳，独立定向补查无可靠完整窗口。继续pending，未检得不等于尚未公告。",
+        "checkedSources": [
+          "https://www.taptap.cn/app/168332/topic?type=official",
+          "https://ys.mihoyo.com/main/",
+          "https://www.taptap.cn/moment/861928431204435494?group_id=201765",
+          "https://www.taptap.cn/app/168332/topic?page=2&type=official"
+        ]
+      },
+      {
+        "checkedAt": "2026-10-22T02:20:47.389Z",
+        "reason": "2026-10-22实际复核：当前官方列表为4.7预热与当期活动；主站Loading，一次独立定向补查未补齐4.7完整窗口及上半截止。4.6返场池10月21日11:59上半边界保留，延长真珠池不替代。",
+        "checkedSources": [
+          "https://www.taptap.cn/app/224267/topic?type=official",
+          "https://hsr.hoyoverse.com/zh-cn/news/166468",
+          "https://www.taptap.cn/moment/852211155802787824?group_id=311675"
+        ]
+      },
+      {
+        "checkedAt": "2026-10-22T02:20:47.389Z",
+        "reason": "2026-10-22实际复核：当前重核官方上期唤取10月22日09:59国服服务器边界；官网空壳，官方列表及独立定向补查仍未取得3.7明确结束维护边界，保留null。 官方版本日历只给11月12日日期，下半卡池11月11日11:59也不是结束维护边界；不补造时分。",
+        "checkedSources": [
+          "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
+          "https://mc.kurogames.com/main/news/detail/5569",
+          "https://www.taptap.cn/moment/853756601964691535",
+          "https://www.taptap.cn/moment/854139064348051537",
+          "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+          "https://www.taptap.cn/moment/861573019909227891?group_id=330015"
+        ]
+      },
+      {
+        "checkedAt": "2026-10-22T02:20:47.389Z",
+        "reason": "2026-10-22实际复核：当前官方列表、官网和一次3.8维护定向补查未取得下一版本开始、结束及上半截止的可靠完整公告；不采用第三方11月中旬推测、42天或单项活动截止。",
+        "checkedSources": [
+          "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
+          "https://mc.kurogames.com/main/news/detail/5569",
+          "https://www.taptap.cn/moment/853756601964691535",
+          "https://www.taptap.cn/moment/854139064348051537",
+          "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+          "https://www.taptap.cn/moment/861573019909227891?group_id=330015"
+        ]
+      }
+    ]
   },
   "validation": {
     "plannerTests": {
@@ -365,6 +420,10 @@
       ],
       "auditComplete": true,
       "unresolvedCount": 0
+    },
+    "retryCorrection": {
+      "initialFailedHead": "2197f7222347aa2b065a61f345f23e80e5799f0b",
+      "reason": "state.scheduleGaps为严格字段协议；历史来源移至研究记录，不增加state字段。仅修正数据结构后重新运行规划器与最终head CI。"
     }
   },
   "delivery": {
