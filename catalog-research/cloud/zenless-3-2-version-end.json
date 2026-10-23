@@ -6,7 +6,7 @@
   "periodKey": "3.2",
   "node": "version_end",
   "newVersion": "3.3",
-  "checkedAt": "2026-10-22T02:03:15.293Z",
+  "checkedAt": "2026-10-23T02:08:24.805Z",
   "status": "pending",
   "auditComplete": false,
   "serverScope": {
@@ -15,7 +15,7 @@
     "utcOffset": "+08:00",
     "note": "按既有已核验国服范围归一化；不混用其他服务器时间。公告仅到分钟时保留:00秒。"
   },
-  "baseMainSha": "73e298deef998cff0b5b74fa67c9101c5d8beedf",
+  "baseMainSha": "397e892bf30fa515a1f54a2467611404bbe5def7",
   "priorEvidence": [
     "docs/catalog-research/zenless-3.2-2026-10-11.json",
     "catalog-research/cloud/schedule-review-20261019.json",
@@ -326,6 +326,17 @@
       "before": "6 regions, 26 subregions",
       "after": "6 regions, 29 subregions",
       "note": "官方3.2与3.3地区范围相对完整公共基准仅新增三项；旧稳定键、退役与个人状态保持。"
+    },
+    {
+      "section": "resumption_attempt_5",
+      "result": "partial",
+      "checkedAt": "2026-10-23T02:08:24.805Z",
+      "scope": "only remaining cycle gap due; completed evidence and admin map publication reused",
+      "cycleFieldsVerified": false,
+      "publishedMapsPreserved": 3,
+      "announcementReviewDue": false,
+      "scheduleReviewAtPreserved": "2026-10-23T02:20:47.389Z",
+      "note": "当前官方3.3更新对应拟境部分为勋章/头像调整，不能据此创建无依据的规则或窗口。没有重新做已完成的活动/地图全量审计。"
     }
   ],
   "sources": [
@@ -872,27 +883,45 @@
         }
       ],
       "checkedAt": "2026-10-22T09:00:31.554Z"
+    },
+    {
+      "key": "cycles:hollow-annihilation:20261023",
+      "target": "cycles",
+      "status": "pending",
+      "checkedAt": "2026-10-23T02:08:24.805Z",
+      "adoptedValue": null,
+      "reason": "可靠资料仍不足以表达必要排期字段；按最新Agent裁决标准也不能捏造周期锚点、cadence或时长。保留三地图已解决裁决和其他周期稳定定义。",
+      "sources": [
+        "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+        "https://www.taptap.cn/app/234493/topic?type=official"
+      ],
+      "notAWholeCatalogVerifiedUnchanged": true
     }
   ],
   "pending": [
     {
       "key": "cycles:hollow-annihilation",
       "target": "cycles",
-      "reason": "官方完整更新仍只列拟境相关更新，没有可靠重置锚点、周期长度和开放时长；一次独立定向补查无补证，继续pending。",
-      "checkedAt": "2026-10-22T02:03:15.293Z"
+      "reason": "2026-10-23当前完整官方3.3更新只补充拟境勋章/头像等内容，未取得适用国服的重置锚点、开启间隔和开放时长；当前官方列表及一次独立定向补查仍无补证。保留真实必要字段缺口，不从普通版本周期或其他模式推算。",
+      "checkedAt": "2026-10-23T02:08:24.805Z",
+      "retryAt": "2026-10-24T02:08:24.805Z",
+      "missingFields": [
+        "reset anchor with applicable server/time zone",
+        "cadence",
+        "open duration"
+      ]
     }
   ],
   "independentSupplement": {
-    "checkedAt": "2026-10-22T02:03:15.293Z",
-    "performed": true,
     "bounded": true,
+    "rounds": 1,
     "queries": [
-      "维尔乌姆城区 探索进度",
-      "宁息屿 探索进度",
-      "空域总控塔 探索进度",
-      "拟境湮灭战 3.3 重置"
+      "site:taptap.cn/moment \"拟境湮灭战\" \"重置\" \"2026\"",
+      "site:zenless.hoyoverse.com \"拟境湮灭战\" \"3.3\""
     ],
-    "result": "公开结果为官方完整更新及转述、旧Steam公告或无关内容，没有补齐具体字段；本轮收敛为pending，不无限搜索。"
+    "result": "Official versions3.1/3.2/3.3 and unrelated double-reward reset or unofficial guide results did not supply the three specific missing cycle facts; no data adopted from unrelated modes or derivative guides.",
+    "checkedAt": "2026-10-23T02:08:24.805Z",
+    "performed": true
   },
   "validation": {
     "inventory": "fresh exact-main actual consumer passed",
@@ -984,26 +1013,29 @@
       "realConsumer": "fresh exact-main CLI public inventory passed",
       "planner": "latest main plan contract checked",
       "ci": "final exact head Verify and Cloud baseline checks required before merge; results outside repository"
+    },
+    "thisAttempt": {
+      "plannerTests": {
+        "passed": 37,
+        "failed": 0
+      },
+      "catalogBytesChanged": false,
+      "requiredCI": "Verify and Cloud baseline checks must pass final exact head; no source code or workflow changes"
     }
   },
   "delivery": {
-    "stage": "partial_published",
-    "branch": "codex/cloud-map-coverage-fix",
-    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/34",
-    "catalogChanged": true,
-    "referenceCatalogRevision": "2026-10-21.genshin-7.1-event-discovery",
-    "referenceCatalogSha256": "48e679e8b75e1c7b3bbca685d4fa46d540403a770fe830c4aa901405420c5bd7",
-    "lastPublishedCatalogRevision": "2026-10-21.zenless-3.3-sign-in",
-    "lastPublishedCatalogSha256": "6b0a5b24f5230b437c955413ece6238f9df817a807a24ccdae1d8ee498c56aae",
+    "stage": "research_only",
+    "branch": "codex/cloud-baseline/zenless-3-2-version-end",
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/36",
+    "catalogChanged": false,
+    "referenceCatalogRevision": "2026-10-22.zenless-map-admission",
+    "referenceCatalogSha256": "d2a930d0519c76780900084190b15b057f1395a33afada17c79bd8e573beb75c",
+    "lastPublishedCatalogRevision": "2026-10-22.zenless-map-admission",
+    "lastPublishedCatalogSha256": "d2a930d0519c76780900084190b15b057f1395a33afada17c79bd8e573beb75c",
     "nodeComplete": false,
     "remainingPendingCount": 1,
-    "resumeAt": "2026-10-23T01:59:25.209Z",
-    "catalogRevision": "2026-10-22.zenless-map-admission",
-    "catalogSha256": "d2a930d0519c76780900084190b15b057f1395a33afada17c79bd8e573beb75c",
-    "evidencePath": "catalog-research/cloud/admission-authority-repair-20261022.json",
-    "resumeBranch": "codex/cloud-baseline/zenless-3-2-version-end",
-    "mainReadSha": "455f8504f487a59b5e88b24200494cfa5b53d0c1",
-    "mainVerifiedAt": "2026-10-22T09:19:44.078Z"
+    "resumeAt": "2026-10-24T02:08:24.805Z",
+    "priorAdministratorPublication": "catalog-research/cloud/admission-authority-repair-20261022.json"
   },
   "verifiedCatalogDelta": {
     "schemaVersion": 2,
@@ -1125,6 +1157,52 @@
       ],
       "status": "running",
       "leaseUntil": "2026-10-22T02:59:26.000Z"
+    },
+    {
+      "attempt": 5,
+      "startedAt": "2026-10-23T02:05:03Z",
+      "baseMainSha": "397e892bf30fa515a1f54a2467611404bbe5def7",
+      "pendingAtStart": [
+        "cycles:hollow-annihilation"
+      ],
+      "priorCurrentAttempt": {
+        "attempt": 4,
+        "checkedAt": "2026-10-22T02:03:15.293Z",
+        "scope": "resume exact pending; current official updates and bounded supplement",
+        "catalogAdded": 3,
+        "resolvedPending": [
+          "map-candidate:verum-city",
+          "map-candidate:ningxi-isle",
+          "map-candidate:airspace-control-tower"
+        ],
+        "auditComplete": false,
+        "administratorRepairAt": "2026-10-22T09:00:31.554Z",
+        "remainingPending": 1
+      },
+      "priorDelivery": {
+        "stage": "partial_published",
+        "branch": "codex/cloud-map-coverage-fix",
+        "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/34",
+        "catalogChanged": true,
+        "referenceCatalogRevision": "2026-10-21.genshin-7.1-event-discovery",
+        "referenceCatalogSha256": "48e679e8b75e1c7b3bbca685d4fa46d540403a770fe830c4aa901405420c5bd7",
+        "lastPublishedCatalogRevision": "2026-10-21.zenless-3.3-sign-in",
+        "lastPublishedCatalogSha256": "6b0a5b24f5230b437c955413ece6238f9df817a807a24ccdae1d8ee498c56aae",
+        "nodeComplete": false,
+        "remainingPendingCount": 1,
+        "resumeAt": "2026-10-23T01:59:25.209Z",
+        "catalogRevision": "2026-10-22.zenless-map-admission",
+        "catalogSha256": "d2a930d0519c76780900084190b15b057f1395a33afada17c79bd8e573beb75c",
+        "evidencePath": "catalog-research/cloud/admission-authority-repair-20261022.json",
+        "resumeBranch": "codex/cloud-baseline/zenless-3-2-version-end",
+        "mainReadSha": "455f8504f487a59b5e88b24200494cfa5b53d0c1",
+        "mainVerifiedAt": "2026-10-22T09:19:44.078Z"
+      },
+      "priorProgress": {
+        "catalogAdditions": 0,
+        "resolvedPending": [],
+        "remainingPending": 4
+      }
     }
   ],
   "scheduleResolution": {
@@ -1166,23 +1244,20 @@
     }
   },
   "scheduleReviewThisAttempt": {
-    "checkedAt": "2026-10-21T04:31:38.008Z",
-    "evidencePath": "catalog-research/cloud/schedule-review-20261021-midday.json",
-    "nextScheduleReviewAt": "2026-10-22T01:59:00.000Z"
+    "performed": false,
+    "reason": "scheduleReviewDue=false",
+    "nextScheduleReviewAtPreserved": "2026-10-23T02:20:47.389Z"
   },
   "currentAttempt": {
-    "attempt": 4,
-    "checkedAt": "2026-10-22T02:03:15.293Z",
-    "scope": "resume exact pending; current official updates and bounded supplement",
-    "catalogAdded": 3,
-    "resolvedPending": [
-      "map-candidate:verum-city",
-      "map-candidate:ningxi-isle",
-      "map-candidate:airspace-control-tower"
-    ],
+    "attempt": 5,
+    "startedAt": "2026-10-23T02:05:03Z",
+    "checkedAt": "2026-10-23T02:08:24.805Z",
+    "scope": "resume only due cycle pending",
+    "catalogAdded": 0,
+    "resolvedPending": [],
+    "remainingPending": 1,
     "auditComplete": false,
-    "administratorRepairAt": "2026-10-22T09:00:31.554Z",
-    "remainingPending": 1
+    "administratorMapsAlreadyPublished": 3
   },
   "partialPublications": [
     {
@@ -1237,9 +1312,9 @@
   "progressThisAttempt": {
     "catalogAdditions": 0,
     "resolvedPending": [],
-    "remainingPending": 4
+    "remainingPending": 1
   },
-  "consecutiveRunsWithoutProgress": 1,
+  "consecutiveRunsWithoutProgress": 2,
   "resolvedPendingHistory": [
     {
       "at": "2026-10-22T09:00:31.554Z",
@@ -1302,5 +1377,45 @@
       "map-candidate:airspace-control-tower"
     ],
     "verifiedAt": "2026-10-22T09:19:44.078Z"
-  }
+  },
+  "sourceCheckHistory": [
+    {
+      "attempt": 5,
+      "checkedAt": "2026-10-23T02:08:24.805Z",
+      "checks": [
+        {
+          "url": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+          "identity": "绝区零官方发布账号",
+          "sourcePublicationDisplay": "前天23:00（页面相对显示，仅保留原显示，不据抓取日期伪造绝对发布时间）",
+          "result": "actual public update section read; relevant changes do not state required reset fields",
+          "evidence": "source sections around lines265 and273",
+          "precision": "no cycle time supplied"
+        },
+        {
+          "url": "https://www.taptap.cn/app/234493/topic?type=official",
+          "identity": "official publisher list",
+          "result": "current list checked for new cycle-specific announcements; no usable reset anchor obtained"
+        },
+        {
+          "url": "https://zenless.hoyoverse.com/m/zh-cn/news/166963",
+          "identity": "official publisher site",
+          "result": "direct extraction empty; search index confirms medal-group reference only; not treated as a complete page read"
+        },
+        {
+          "url": "https://www.taptap.cn/moment/846454619398734794",
+          "identity": "official publisher 3.2 update",
+          "result": "prior version source reread as context, not mistaken for new 3.3 schedule"
+        }
+      ],
+      "supplement": {
+        "bounded": true,
+        "rounds": 1,
+        "queries": [
+          "site:taptap.cn/moment \"拟境湮灭战\" \"重置\" \"2026\"",
+          "site:zenless.hoyoverse.com \"拟境湮灭战\" \"3.3\""
+        ],
+        "result": "Official versions3.1/3.2/3.3 and unrelated double-reward reset or unofficial guide results did not supply the three specific missing cycle facts; no data adopted from unrelated modes or derivative guides."
+      }
+    }
+  ]
 }
