@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "revision": "2026-10-22.zenless-map-admission",
-  "publishedAt": "2026-10-22T09:00:31.554Z",
+  "revision": "2026-10-23.genshin-activities-wuwa-map",
+  "publishedAt": "2026-10-23T03:22:59Z",
   "games": [
     {
       "gameId": "genshin",
@@ -277,6 +277,45 @@
           "activityTags": [
             "exploration",
             "quest"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:7.1:standard-character-invitation",
+          "title": "巡历雪境，凝铸锋锐",
+          "startsAt": "2026-09-23T11:00:00+08:00",
+          "endsAt": "2026-11-03T14:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/850788740455467399",
+          "category": "limited_event",
+          "activityTags": [
+            "unknown"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:7.1:limited-character-invitation",
+          "title": "桌上剧团·冒险的前夜会",
+          "startsAt": "2026-09-23T11:00:00+08:00",
+          "endsAt": "2026-11-03T14:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/850789386164372042",
+          "category": "limited_event",
+          "activityTags": [
+            "unknown"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:7.1:youshang-yaoxing-changhuai",
+          "title": "游赏耀星·畅怀",
+          "startsAt": "2026-10-19T10:00:00+08:00",
+          "endsAt": "2026-11-02T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/860111862446949870?group_id=201765",
+          "category": "limited_event",
+          "activityTags": [
+            "unknown"
           ],
           "scheduleKind": "fixed_window",
           "timeZone": "Asia/Shanghai"
@@ -1312,6 +1351,14 @@
           "mapNodeKind": "subregion",
           "parentRemoteKey": "map-catalog:wuthering-waves:region:46d939ba62197e5a32ca",
           "parentTitle": "瑝珑"
+        },
+        {
+          "remoteKey": "map-catalog:wuthering-waves:subregion:timeslip-ruins",
+          "title": "时隙废都",
+          "sourceUrl": "https://www.kurobbs.com/mc/map/",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:wuthering-waves:region:2c98904a996835946465"
         }
       ],
       "archives": [

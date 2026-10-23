@@ -1,0 +1,380 @@
+{
+  "schemaVersion": 1,
+  "kind": "schedule_and_activity_announcement_review",
+  "checkedAt": "2026-10-23T03:23:58.715Z",
+  "status": "ready",
+  "auditComplete": true,
+  "serverScope": {
+    "server": "CN production; each announcement independently scoped",
+    "timeZone": "Asia/Shanghai"
+  },
+  "baseMainSha": "5ec0e3b344e4a9f022a8cb34042f814aceba5706",
+  "priorEvidence": [
+    "catalog-research/cloud/announcement-review-20261022.json",
+    "catalog-research/cloud/admission-authority-repair-20261022.json",
+    "docs/catalog-research/genshin-7.1-2026-09-24.json"
+  ],
+  "announcementReview": {
+    "checkedAt": "2026-10-23T03:23:58.715Z",
+    "games": [
+      {
+        "gameId": "genshin",
+        "coverage": "complete",
+        "checkedSources": [
+          "https://www.taptap.cn/app/168332/topic?type=official",
+          "https://www.taptap.cn/moment/850788740455467399",
+          "https://www.taptap.cn/moment/850789386164372042",
+          "https://www.taptap.cn/moment/860111862446949870?group_id=201765",
+          "https://www.taptap.cn/moment/850790336472025502",
+          "https://www.taptap.cn/moment/862035358592795454?group_id=201765"
+        ],
+        "evidencePath": "catalog-research/cloud/announcement-review-20261023.json",
+        "pending": []
+      },
+      {
+        "gameId": "star-rail",
+        "coverage": "complete",
+        "checkedSources": [
+          "https://www.taptap.cn/app/224267/topic?type=official"
+        ],
+        "evidencePath": "catalog-research/cloud/announcement-review-20261023.json",
+        "pending": []
+      },
+      {
+        "gameId": "zenless",
+        "coverage": "complete",
+        "checkedSources": [
+          "https://www.taptap.cn/app/234493/topic?type=official"
+        ],
+        "evidencePath": "catalog-research/cloud/announcement-review-20261023.json",
+        "pending": []
+      },
+      {
+        "gameId": "wuthering-waves",
+        "coverage": "complete",
+        "checkedSources": [
+          "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
+          "https://www.taptap.cn/moment/854139064348051537",
+          "https://www.taptap.cn/moment/850400466570315803"
+        ],
+        "evidencePath": "catalog-research/cloud/announcement-review-20261023.json",
+        "pending": []
+      }
+    ]
+  },
+  "coverage": [
+    {
+      "gameId": "genshin",
+      "scope": "最新官方列表、跨版本仍有效活动及历史四项未决；不提前全量地图/周期审计",
+      "findings": "绮星盛会最新报告为同一网页活动扩充，未访问个人报告；无忧大雪仗已收录。按新main标准发布两项独立邀约和游赏耀星；旧判测胜券已于本轮前结束，关闭未发布候选，不新建过期活动。",
+      "newRemoteKeys": [
+        "event:7.1:standard-character-invitation",
+        "event:7.1:limited-character-invitation",
+        "event:7.1:youshang-yaoxing-changhuai"
+      ],
+      "unresolvedCount": 0
+    },
+    {
+      "gameId": "star-rail",
+      "scope": "复用已完成4.6节点并读当前新增公告",
+      "findings": "一镜到底、位面分裂均已收录；4.7漫画登录赠礼尚未给独立活动窗口，不把角色/穿搭奖励各拆活动。没有新的可发布差异；不重做成功节点。",
+      "terminalNodeRepeated": false
+    },
+    {
+      "gameId": "zenless",
+      "scope": "复用当日上午已核验活动范围，读取当前官方列表及3.3窗口",
+      "findings": "怪奇诡屋及八项3.3活动、跨版应援均已入清单；当前新帖为规则、生日与前瞻，未见新增独立活动。拟境周期缺口在独立节点保留，重试尚未到，不重复增计。",
+      "catalogChanged": false
+    },
+    {
+      "gameId": "wuthering-waves",
+      "scope": "最新官方列表、3.7完整更新及既有活动目录；凝月辉途独立原图补查",
+      "findings": "凭栏听雨、无音消除、踏潮探历、声弦涤荡均已收录。凝月辉途原图明确月影溯环来自月卡、通行证、付费礼包/充值，整体为消费累积奖励，按实际作用不收录为参与活动。社区关注抽奖、商城、卡池不收录。",
+      "catalogChanged": false
+    }
+  ],
+  "decisions": [
+    {
+      "key": "event:7.1:standard-character-invitation",
+      "decision": "publish",
+      "sourceUrl": "https://www.taptap.cn/moment/850788740455467399",
+      "sourceIdentity": "原神官方账号/西风快报员",
+      "sourcePublishedAt": "2026-09-21",
+      "adopted": {
+        "category": "limited_event",
+        "activityTags": [
+          "unknown"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai",
+        "remoteKey": "event:7.1:standard-character-invitation",
+        "title": "巡历雪境，凝铸锋锐",
+        "startsAt": "2026-09-23T11:00:00+08:00",
+        "endsAt": "2026-11-03T14:59:00+08:00",
+        "sourceUrl": "https://www.taptap.cn/moment/850788740455467399"
+      },
+      "correctionReason": "最新main明确unknown为合法活动标签，旧custom.*分发或玩法分类不足不能阻塞已确认独立限时事项。保留原有研究，不修改程序。",
+      "rationale": "独立命名、独立参与界面和明确期限的一次邀约；不是卡池/商城。起点使用维护06:00加预计5小时的公告基准11:00，非实测开服时刻。",
+      "timePrecision": {
+        "startsAt": "official_nominal_maintenance_completion",
+        "endsAt": "official_minute"
+      },
+      "supportingSources": [
+        "https://www.taptap.cn/moment/850781129639202732?group_id=201765",
+        "https://www.taptap.cn/moment/851520146462737868?group_id=201765"
+      ]
+    },
+    {
+      "key": "event:7.1:limited-character-invitation",
+      "decision": "publish",
+      "sourceUrl": "https://www.taptap.cn/moment/850789386164372042",
+      "sourceIdentity": "原神官方账号/西风快报员",
+      "sourcePublishedAt": "2026-09-21",
+      "adopted": {
+        "category": "limited_event",
+        "activityTags": [
+          "unknown"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai",
+        "remoteKey": "event:7.1:limited-character-invitation",
+        "title": "桌上剧团·冒险的前夜会",
+        "startsAt": "2026-09-23T11:00:00+08:00",
+        "endsAt": "2026-11-03T14:59:00+08:00",
+        "sourceUrl": "https://www.taptap.cn/moment/850789386164372042"
+      },
+      "correctionReason": "最新main明确unknown为合法活动标签，旧custom.*分发或玩法分类不足不能阻塞已确认独立限时事项。保留原有研究，不修改程序。",
+      "rationale": "独立命名、独立参与界面和明确期限的一次邀约；不是卡池/商城。起点使用维护06:00加预计5小时的公告基准11:00，非实测开服时刻。",
+      "timePrecision": {
+        "startsAt": "official_nominal_maintenance_completion",
+        "endsAt": "official_minute"
+      },
+      "supportingSources": [
+        "https://www.taptap.cn/moment/850781129639202732?group_id=201765",
+        "https://www.taptap.cn/moment/851520146462737868?group_id=201765"
+      ]
+    },
+    {
+      "key": "event:7.1:youshang-yaoxing-changhuai",
+      "decision": "publish",
+      "sourceUrl": "https://www.taptap.cn/moment/860111862446949870?group_id=201765",
+      "sourceIdentity": "原神官方账号/西风快报员",
+      "sourcePublishedAt": "2026-10-18",
+      "adopted": {
+        "category": "limited_event",
+        "activityTags": [
+          "unknown"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai",
+        "remoteKey": "event:7.1:youshang-yaoxing-changhuai",
+        "title": "游赏耀星·畅怀",
+        "startsAt": "2026-10-19T10:00:00+08:00",
+        "endsAt": "2026-11-02T03:59:00+08:00",
+        "sourceUrl": "https://www.taptap.cn/moment/860111862446949870?group_id=201765"
+      },
+      "correctionReason": "最新main明确unknown为合法活动标签，旧custom.*分发或玩法分类不足不能阻塞已确认独立限时事项。保留原有研究，不修改程序。",
+      "rationale": "整体活动截止11月2日03:59；任务完成仅到10月29日04:00，保留子时限而不替代整体。已确认活动无需凭奖励推断玩法标签。",
+      "timePrecision": "official_minute",
+      "supportingSources": [],
+      "taskWindow": {
+        "startsAt": "2026-10-19T10:00:00+08:00",
+        "endsAt": "2026-10-29T04:00:00+08:00"
+      }
+    },
+    {
+      "key": "event:7.1:outcome-prediction",
+      "decision": "expired_unpublished",
+      "sourceUrl": "https://www.taptap.cn/moment/850790336472025502",
+      "endsAt": "2026-10-23T09:59:00+08:00",
+      "reason": "沿用旧已核验结束时刻；本轮11点后才复核，已过期不新建。旧标签门槛已取消，不再记作协议阻塞。",
+      "correctionReason": "区分旧规则过严与当前是否仍需发布；不伪造过期清单变化。"
+    },
+    {
+      "key": "event:3.7:ningyue-huitu",
+      "decision": "exclude",
+      "sourceUrl": "https://www.taptap.cn/moment/850400466570315803",
+      "reason": "原图显示付费累计获得月影溯环解锁奖励；按实际用途属消费/商城奖励，不是独立游玩参与活动。"
+    }
+  ],
+  "pending": [],
+  "sources": [
+    {
+      "url": "https://www.taptap.cn/app/168332/topic?type=official",
+      "identity": "原神官方列表",
+      "read": "最新独立公告及已发布活动对照"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/862035358592795454?group_id=201765",
+      "identity": "西风快报员",
+      "sourcePublishedAt": "2026-10-22 04:00（页面本轮昨天04:00）",
+      "read": "绮星盛会更多内容；仅公开公告，不访问个人回顾"
+    },
+    {
+      "url": "https://www.taptap.cn/app/224267/topic?type=official",
+      "identity": "崩坏：星穹铁道官方列表",
+      "read": "当前一镜到底/位面分裂/4.7预热"
+    },
+    {
+      "url": "https://www.taptap.cn/app/234493/topic?type=official",
+      "identity": "绝区零官方列表",
+      "read": "当前3.3活动、怪奇诡屋及已有八活动目录"
+    },
+    {
+      "url": "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
+      "identity": "鸣潮官方列表",
+      "read": "当前凭栏听雨10/22 10:00–11/11 03:59服务器时间、无音消除宣传"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/850400466570315803",
+      "identity": "鸣潮官方版主",
+      "sourcePublishedAt": "2026-09-19",
+      "read": "凝月辉途原始规则图实际读取；消费累积奖励而非独立游玩活动"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/850781129639202732?group_id=201765",
+      "identity": "提瓦特测试员转载的维护公告",
+      "read": "9/23 06:00预计5小时，仅名义排期，不冒称实测"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/851520146462737868?group_id=201765",
+      "identity": "提瓦特测试员转载的版本说明",
+      "read": "同一维护基准；官方当前活动列表与西风快报员独立活动源支持当前7.1已开放"
+    }
+  ],
+  "sourceImages": [
+    {
+      "url": "https://img2-tc.tapimg.com/moment/etag/lkkhUljUiRzjS4byf2X7eiq9LBov_20260919153525.png/_tap_ugc.jpg",
+      "sha256": "1b554133312a5b0df79f39cbfb62176ef299f4163f3a0645a28d7355e3f3003b",
+      "read": "original_image_visually_read",
+      "finding": "凝月辉途9/30更新后至11/11 11:59服务器时间，月影溯环取自付费内容，奖励档位不拆"
+    }
+  ],
+  "scheduleReview": {
+    "checkedAt": "2026-10-23T03:23:58.715Z",
+    "primaryAndOneIndependentSupplementCompleted": true,
+    "changes": [],
+    "preserveUnknownFields": true,
+    "gaps": [
+      {
+        "gameId": "genshin",
+        "periodKey": "7.1",
+        "missing": "具体完整版本窗口缺口沿用state；本轮主公告列表和一次独立维护定向补查未补齐"
+      },
+      {
+        "gameId": "genshin",
+        "periodKey": null,
+        "missing": "具体完整版本窗口缺口沿用state；本轮主公告列表和一次独立维护定向补查未补齐"
+      },
+      {
+        "gameId": "star-rail",
+        "periodKey": "4.7",
+        "missing": "具体完整版本窗口缺口沿用state；本轮主公告列表和一次独立维护定向补查未补齐"
+      },
+      {
+        "gameId": "wuthering-waves",
+        "periodKey": "3.7",
+        "missing": "具体完整版本窗口缺口沿用state；本轮主公告列表和一次独立维护定向补查未补齐"
+      },
+      {
+        "gameId": "wuthering-waves",
+        "periodKey": null,
+        "missing": "具体完整版本窗口缺口沿用state；本轮主公告列表和一次独立维护定向补查未补齐"
+      }
+    ],
+    "supplementQueries": [
+      "site:taptap.cn 原神 \"7.2\" \"更新维护\"",
+      "site:taptap.cn \"星穹铁道\" \"4.7\" \"维护\"",
+      "site:taptap.cn \"鸣潮\" \"3.8\" \"维护\""
+    ],
+    "notes": "7.2前瞻10/23 20:00是节目；4.7赠礼预热不证明版本窗口。3.7日历11/12仅日期，唤取11/11结束不替代维护边界。沿用HSR4.6和ZZZ3.3已有可靠窗口，其他null不推断。",
+    "nextReviewAfterVerification": {
+      "at": "2026-10-24T03:23:58.715Z",
+      "reason": "missing_schedule"
+    }
+  },
+  "validation": {
+    "plannerTests": {
+      "passed": 37,
+      "failed": 0
+    },
+    "originalCompilerAndConsumer": {
+      "ok": true,
+      "output": "/workspace/scratch/9fa58b576113/cloud-run-20261023-1112/compiled-catalog.json",
+      "changed": true,
+      "revision": "2026-10-23.genshin-activities-wuwa-map",
+      "schemaVersion": 2,
+      "games": [
+        {
+          "gameId": "genshin",
+          "upserts": 25,
+          "archives": 5,
+          "versionException": false,
+          "scheduleUpdates": 0,
+          "deadlineReviews": []
+        },
+        {
+          "gameId": "star-rail",
+          "upserts": 19,
+          "archives": 3,
+          "versionException": true,
+          "scheduleUpdates": 7,
+          "deadlineReviews": []
+        },
+        {
+          "gameId": "zenless",
+          "upserts": 30,
+          "archives": 3,
+          "versionException": false,
+          "scheduleUpdates": 0,
+          "deadlineReviews": []
+        },
+        {
+          "gameId": "wuthering-waves",
+          "upserts": 21,
+          "archives": 3,
+          "versionException": true,
+          "scheduleUpdates": 0,
+          "deadlineReviews": []
+        }
+      ],
+      "applied": {
+        "added": 80,
+        "updated": 10,
+        "preserved": 5,
+        "archived": 0,
+        "expiredRemoved": 34
+      },
+      "receipt": {
+        "revision": "2026-10-23.genshin-activities-wuwa-map",
+        "publishedAt": "2026-10-23T03:22:59.000Z",
+        "contentHash": "5cab9f1b38befe660b24ee3acc7abbf627c50a7aed9f7424406190955b55ab06"
+      },
+      "consumer": "unchanged latest main CLI; AppDatabase(:memory:)",
+      "rawUtf8Sha256": "8f61275ae7258e2ccaf7cd59929f63cf4fa0389faba940c6f7bc371a6b056d42",
+      "semanticReview": "仅新增3项原神活动和1项鸣潮地图，加revision/publishedAt；所有既有条目、退役、规则和其他游戏对象保持相同"
+    },
+    "requiredCI": "pending final exact-head Verify and Cloud baseline checks",
+    "announcementReview": {
+      "ok": true,
+      "coveredGames": [
+        "genshin",
+        "star-rail",
+        "zenless",
+        "wuthering-waves"
+      ],
+      "auditComplete": true,
+      "unresolvedCount": 0
+    }
+  },
+  "delivery": {
+    "stage": "ready",
+    "branch": "codex/cloud-baseline/wuthering-waves-3-7-first-half-end",
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/37",
+    "catalogChanged": true,
+    "catalogRevision": "2026-10-23.genshin-activities-wuwa-map",
+    "catalogSha256": "8f61275ae7258e2ccaf7cd59929f63cf4fa0389faba940c6f7bc371a6b056d42",
+    "mainVerified": false,
+    "activityPublicationComplete": false
+  }
+}

@@ -5,17 +5,18 @@
   "gameId": "wuthering-waves",
   "periodKey": "3.7",
   "node": "first_half_end",
-  "checkedAt": "2026-10-22T02:20:47.389Z",
-  "status": "running",
+  "checkedAt": "2026-10-23T03:23:58.715Z",
+  "status": "pending",
   "auditComplete": false,
   "serverScope": {
     "server": "CN production",
     "timeZone": "Asia/Shanghai"
   },
-  "baseMainSha": "429a18f3354ae9090e3211e62cf6d45d5b1b4ab0",
+  "baseMainSha": "5ec0e3b344e4a9f022a8cb34042f814aceba5706",
   "priorEvidence": [
     "docs/catalog-research/wuthering-waves-3.7-2026-09-30.json",
-    "catalog-research/cloud/activity-discovery-repair-20261021.json"
+    "catalog-research/cloud/activity-discovery-repair-20261021.json",
+    "catalog-research/cloud/admission-authority-repair-20261022.json"
   ],
   "coverage": [
     {
@@ -517,13 +518,14 @@
     },
     {
       "section": "exploration",
-      "result": "complete_no_catalog_delta",
+      "result": "verified_delta",
       "retainedRegions": 4,
       "retainedSubregions": 51,
       "liveCountryRegions": 4,
       "liveCountryLevel2": 52,
       "unmatchedPublishedChildren": [],
-      "findings": "从实时官方地图脚本只读定位匿名公共资源配置，取得当前country.json；全部51既有子区名称/父级匹配，唯一额外level2时隙废都沿用已核验排除。梦枢天罗已开放、已收录，公共912点位支持；内部7场景不加第三级。玄元境按既有用户排除继续排除。未访问账号、令牌或个人地图。"
+      "findings": "当前实时country资源SHA与昨日相同，4父52个level2；全部51既有子区继续匹配。本轮按管理员现行标准纠正时隙废都过严排除，公开导航明确黑海岸父级及3个内部地名，官方公开点位支持已开放区域，补入subregion。内部场景不建第三级；玄元境用户特定排除保持。",
+      "newSubregions": 1
     },
     {
       "section": "cycles",
@@ -615,6 +617,27 @@
       "identity": "old public configuration URL",
       "httpStatus": 404,
       "read": "replaced by live configuration above, not treated as no map changes"
+    },
+    {
+      "url": "https://web-static.kurobbs.com/mcmap/country/C0B10EA53A0E4A84B600C2360CF76966/country.json",
+      "identity": "实时匿名官方公共地图导航",
+      "httpStatus": 200,
+      "checkedAt": "2026-10-23T03:23:58.715Z",
+      "sha256": "3e2744d36834c53de8cad66ab9acfbb623c8d5f301f7739387cd8c72391366db",
+      "read": "4父52个level2；黑海岸→时隙废都(stateId910)，内部列车长咖啡厅、细波大道、幸缘喷泉广场。导航有明确公开空间分区，不因无探索百分比而否定。"
+    },
+    {
+      "url": "https://mc.kurogames.com/main/news/detail/5569",
+      "identity": "鸣潮官方3.7内容说明",
+      "publishedOrUpdated": "2026-09-30",
+      "checkedAt": "2026-10-23T03:23:58.715Z",
+      "read": "当前索引完整内容与官方论坛全文不提供矩阵精确时分；不采用第三方wiki"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/850400466570315803",
+      "identity": "鸣潮官方版主",
+      "checkedAt": "2026-10-23T03:23:58.715Z",
+      "read": "凝月辉途原图实际读取；消费累计奖励排除，见全游戏公告复核记录"
     }
   ],
   "decisions": [
@@ -644,7 +667,15 @@
         "\"终焉矩阵\" \"2026/10/08\" \"04:00\"",
         "\"鸣潮\" \"3.7\" \"终焉矩阵\" \"11月12日\""
       ],
-      "supplementResult": "一次定向补查仅有wiki提供精确时分及不相关旧版官方资料，不足以采用；本轮停止搜索并安排日更补查。"
+      "supplementResult": "一次定向补查仅有wiki提供精确时分及不相关旧版官方资料，不足以采用；本轮停止搜索并安排日更补查。",
+      "latestSupplement": {
+        "checkedAt": "2026-10-23T03:23:58.715Z",
+        "queries": [
+          "site:taptap.cn \"终焉矩阵\" \"险境强袭\" \"11月12日\"",
+          "site:mc.kurogames.com \"终焉矩阵\" \"3.7\""
+        ],
+        "result": "主3.7更新及一次独立定向补查均未给适用国服精确时分；沿用10/07至11/12日期，不推算04:00，停止本轮搜索。"
+      }
     },
     {
       "key": "map:all-published",
@@ -652,14 +683,25 @@
       "reason": "复用已验证开放与独立探索资格，最新完整更新未新增下半地图；当前官方导航完整覆盖全部已收录子区。"
     },
     {
-      "key": "map:timeslip-ruins",
-      "decision": "excluded",
-      "reason": "沿用前次排除：当前910点位只有作战准备、素材和信标等，未补足独立探索进度资格；不将目录存在当资格。"
-    },
-    {
       "key": "events:lower-half",
       "decision": "verified_no_delta",
       "reason": "四项下半独立事项窗口与已有清单一致；不因今日开始重复发布，不因自然到期清理累计upserts。"
+    },
+    {
+      "key": "map:timeslip-ruins",
+      "decision": "publish",
+      "adopted": {
+        "remoteKey": "map-catalog:wuthering-waves:subregion:timeslip-ruins",
+        "title": "时隙废都",
+        "category": "exploration",
+        "mapNodeKind": "subregion",
+        "parentRemoteKey": "map-catalog:wuthering-waves:region:2c98904a996835946465",
+        "sourceUrl": "https://www.kurobbs.com/mc/map/"
+      },
+      "correctionReason": "旧记录仅因未取得独立探索进度而排除；最新管理员main明确探索百分比为可选证据。按实际空间区域及官方父级导航裁决，不增加该门槛。",
+      "rationale": "当前匿名官方导航明确黑海岸下level2时隙废都及内部地名；已开放公共点位与既有资料相符。作为二级区域补漏，非第三层场景，不涉及个人数据。",
+      "sourceUrl": "https://www.kurobbs.com/mc/map/",
+      "structuredSource": "https://web-static.kurobbs.com/mcmap/country/C0B10EA53A0E4A84B600C2360CF76966/country.json"
     }
   ],
   "pending": [
@@ -667,25 +709,26 @@
       "key": "cycles:terminus-matrix:3.7:precise-window",
       "target": "cycles",
       "reason": "官方当前日历仅10/07至11/12日期；缺适用国服的精确开始/结束时分，尤其结束日与已生成11/11窗口不同。保留既有规则并按日补查，不采纳wiki推断。",
-      "checkedAt": "2026-10-22T02:20:47.389Z",
-      "retryAt": "2026-10-23T02:20:47.389Z"
+      "checkedAt": "2026-10-23T03:23:58.715Z",
+      "retryAt": "2026-10-24T03:23:58.715Z"
     }
   ],
   "delivery": {
-    "stage": "researching",
+    "stage": "ready_partial",
     "branch": "codex/cloud-baseline/wuthering-waves-3-7-first-half-end",
-    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/32",
-    "catalogChanged": false,
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/37",
+    "catalogChanged": true,
     "batchCatalogChanged": true,
-    "batchEvidencePath": "catalog-research/cloud/announcement-review-20261022.json",
-    "referenceCatalogRevision": "2026-10-22.genshin-7.1-activity-review",
-    "referenceCatalogSha256": "7c79052acf4a4037dff722ed5284e30f5c2cc8ebd8f89592071bf81119c2ebe3",
+    "batchEvidencePath": "catalog-research/cloud/announcement-review-20261023.json",
+    "referenceCatalogRevision": "2026-10-23.genshin-activities-wuwa-map",
+    "referenceCatalogSha256": "8f61275ae7258e2ccaf7cd59929f63cf4fa0389faba940c6f7bc371a6b056d42",
     "nodeComplete": false,
     "remainingPendingCount": 1,
-    "resumeAt": "2026-10-23T04:13:13.000Z",
-    "batchPublicationVerified": true,
-    "batchPublicationMainSha": "7977fa8e30586521d19e7ff70fa8896c18ff2454",
-    "batchPublicationCheckedAt": "2026-10-22T02:31:36Z"
+    "resumeAt": "2026-10-24T03:23:58.715Z",
+    "batchPublicationVerified": false,
+    "catalogRevision": "2026-10-23.genshin-activities-wuwa-map",
+    "catalogSha256": "8f61275ae7258e2ccaf7cd59929f63cf4fa0389faba940c6f7bc371a6b056d42",
+    "mainVerified": false
   },
   "unresolvedDecisionCount": 1,
   "sourceImages": [
@@ -706,8 +749,8 @@
   ],
   "progress": {
     "attempts": 2,
-    "consecutiveRunsWithoutProgress": 1,
-    "advanceThisRun": "完整下半、所有既有地图和3周期范围已核查；修复旧研究日期误读，精确时分缺口仍在。",
+    "consecutiveRunsWithoutProgress": 0,
+    "advanceThisRun": "纠正过严地图排除并交付时隙废都；终焉矩阵精确时分仍未解决。计为有进展，不能把其他游戏缺口或本轮未到重试计为连续失败。",
     "emergency": false
   },
   "validation": {
@@ -716,24 +759,60 @@
       "failed": 0
     },
     "originalConsumerInventory": true,
-    "requiredCI": [
-      {
-        "name": "Verify",
-        "runId": 39711337008,
-        "headSha": "3bb769cadc888828b48c4cb8f5dbdea29cb32c97",
-        "status": "completed",
-        "conclusion": "success",
-        "url": "https://github.com/BaiQue3rL/Gtask/actions/runs/39711337008"
+    "originalCompilerAndConsumer": {
+      "ok": true,
+      "output": "/workspace/scratch/9fa58b576113/cloud-run-20261023-1112/compiled-catalog.json",
+      "changed": true,
+      "revision": "2026-10-23.genshin-activities-wuwa-map",
+      "schemaVersion": 2,
+      "games": [
+        {
+          "gameId": "genshin",
+          "upserts": 25,
+          "archives": 5,
+          "versionException": false,
+          "scheduleUpdates": 0,
+          "deadlineReviews": []
+        },
+        {
+          "gameId": "star-rail",
+          "upserts": 19,
+          "archives": 3,
+          "versionException": true,
+          "scheduleUpdates": 7,
+          "deadlineReviews": []
+        },
+        {
+          "gameId": "zenless",
+          "upserts": 30,
+          "archives": 3,
+          "versionException": false,
+          "scheduleUpdates": 0,
+          "deadlineReviews": []
+        },
+        {
+          "gameId": "wuthering-waves",
+          "upserts": 21,
+          "archives": 3,
+          "versionException": true,
+          "scheduleUpdates": 0,
+          "deadlineReviews": []
+        }
+      ],
+      "applied": {
+        "added": 80,
+        "updated": 10,
+        "preserved": 5,
+        "archived": 0,
+        "expiredRemoved": 34
       },
-      {
-        "name": "Cloud baseline checks",
-        "runId": 39711336876,
-        "headSha": "3bb769cadc888828b48c4cb8f5dbdea29cb32c97",
-        "status": "completed",
-        "conclusion": "success",
-        "url": "https://github.com/BaiQue3rL/Gtask/actions/runs/39711336876"
+      "receipt": {
+        "revision": "2026-10-23.genshin-activities-wuwa-map",
+        "publishedAt": "2026-10-23T03:22:59.000Z",
+        "contentHash": "5cab9f1b38befe660b24ee3acc7abbf627c50a7aed9f7424406190955b55ab06"
       }
-    ]
+    },
+    "requiredCI": "pending final exact-head Verify and Cloud baseline checks"
   },
   "resumeHistory": [
     {
@@ -757,6 +836,92 @@
         "batchPublicationCheckedAt": "2026-10-22T02:31:36Z"
       },
       "reason": "到期续接；管理员当前main允许unknown标签，探索进度为可选补证"
+    }
+  ],
+  "reviewHistory": [
+    {
+      "checkedAt": "2026-10-22T02:20:47.389Z",
+      "decisions": [
+        {
+          "key": "cycles:terminus-matrix:3.7",
+          "decision": "pending",
+          "oldResearch": {
+            "sourcePath": "docs/catalog-research/wuthering-waves-3.7-2026-09-30.json",
+            "dateOnlyStartsAt": "2026-10-08",
+            "dateOnlyEndsAt": "2026-11-12"
+          },
+          "adoptedDateOnly": {
+            "startsAt": "2026-10-07",
+            "endsAt": "2026-11-12"
+          },
+          "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+          "sourcePublishedOrUpdated": "2026-09-28",
+          "correctionReason": "本轮实际读取原始日历，起点清楚为10.07；旧研究的10.08是读图错误，不能继续照抄。该更正不提供小时。",
+          "timePrecision": "official_calendar_date_only",
+          "currentGeneratedWindow": {
+            "startsAt": "2026-10-07T04:00:00+08:00",
+            "endsAt": "2026-11-11T04:00:00+08:00"
+          },
+          "rationale": "结束日与现有生成窗口不同，必须核实准确时分才能用既有窗口结构更正。不得机械填04:00、改长期规则或常规逐期发布。",
+          "supplementQueries": [
+            "\"终焉矩阵\" \"险境强袭\" \"10月8日\"",
+            "\"终焉矩阵\" \"2026/10/08\" \"04:00\"",
+            "\"鸣潮\" \"3.7\" \"终焉矩阵\" \"11月12日\""
+          ],
+          "supplementResult": "一次定向补查仅有wiki提供精确时分及不相关旧版官方资料，不足以采用；本轮停止搜索并安排日更补查。"
+        },
+        {
+          "key": "map:all-published",
+          "decision": "retain",
+          "reason": "复用已验证开放与独立探索资格，最新完整更新未新增下半地图；当前官方导航完整覆盖全部已收录子区。"
+        },
+        {
+          "key": "map:timeslip-ruins",
+          "decision": "excluded",
+          "reason": "沿用前次排除：当前910点位只有作战准备、素材和信标等，未补足独立探索进度资格；不将目录存在当资格。"
+        },
+        {
+          "key": "events:lower-half",
+          "decision": "verified_no_delta",
+          "reason": "四项下半独立事项窗口与已有清单一致；不因今日开始重复发布，不因自然到期清理累计upserts。"
+        }
+      ],
+      "coverage": [
+        {
+          "section": "limited_events",
+          "result": "complete_no_catalog_delta",
+          "periodEventsChecked": 11,
+          "findings": "整版更新、版本活动日历、最新两页官方公告和下半两张原图逐项对照；凭栏听雨之礼、无音消除、踏潮探历・玄方地界、声弦涤荡均已收录。回音盈域今晨03:59:59到期由消费者处理；其他永久故梦/心影不新建。",
+          "announcementReviewEvidencePath": "catalog-research/cloud/announcement-review-20261022.json"
+        },
+        {
+          "section": "exploration",
+          "result": "complete_no_catalog_delta",
+          "retainedRegions": 4,
+          "retainedSubregions": 51,
+          "liveCountryRegions": 4,
+          "liveCountryLevel2": 52,
+          "unmatchedPublishedChildren": [],
+          "findings": "从实时官方地图脚本只读定位匿名公共资源配置，取得当前country.json；全部51既有子区名称/父级匹配，唯一额外level2时隙废都沿用已核验排除。梦枢天罗已开放、已收录，公共912点位支持；内部7场景不加第三级。玄元境按既有用户排除继续排除。未访问账号、令牌或个人地图。"
+        },
+        {
+          "section": "cycles",
+          "result": "partial",
+          "modes": [
+            "逆境深塔",
+            "冥歌海墟",
+            "终焉矩阵"
+          ],
+          "findings": "逆境深塔日历10/12至11/9与28日规则一致；冥歌海墟9/28至10/26、10/26至11/23与规则一致。矩阵日历10/07至11/12只有日期，精确时分未核实，不把周期推算或wiki时分当官方事实。"
+        },
+        {
+          "section": "official_schedule_boundary",
+          "result": "verified",
+          "firstHalfEndsAt": "2026-10-22T09:59:00+08:00",
+          "endsAt": null,
+          "findings": "旧上半唤取公告原时刻复核；下半唤取和版本日历不充当下一次结束维护的时分依据。"
+        }
+      ]
     }
   ]
 }
