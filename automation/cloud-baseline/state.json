@@ -195,17 +195,17 @@
       "periodKey": "3.7",
       "node": "first_half_end",
       "boundaryAt": "2026-10-22T09:59:00+08:00",
-      "status": "pending",
-      "attempts": 1,
-      "updatedAt": "2026-10-22T02:20:47.389Z",
-      "retryAt": "2026-10-23T02:20:47.389Z",
+      "status": "running",
+      "attempts": 2,
+      "updatedAt": "2026-10-23T03:19:51Z",
+      "retryAt": "2026-10-23T04:13:13.000Z",
       "branch": "codex/cloud-baseline/wuthering-waves-3-7-first-half-end",
       "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/32",
       "catalogRevision": null,
       "catalogSha256": null,
       "evidencePath": "catalog-research/cloud/wuthering-waves-3-7-first-half-end.json",
       "completedAt": null,
-      "notes": "下半新增与完整范围已核查：11项3.7活动均已入累计清单（回音盈域已自动到期）、4父51子地图匹配实时公共目录、3周期模式。无鸣潮清单差异；终焉矩阵官方日历更正旧研究10/08为10/07，但11/12结束仅有日期，无可靠时分，不发布猜测窗口。节点保持pending，按日补查；同PR交付四游戏公告复核及4项原神真实差异。"
+      "notes": "续接既有3.7下半研究及旧规则过严裁决；本轮四游戏公告复核与精确周期缺口补查进行中。"
     }
   ]
 }

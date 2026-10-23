@@ -6,7 +6,7 @@
   "periodKey": "3.7",
   "node": "first_half_end",
   "checkedAt": "2026-10-22T02:20:47.389Z",
-  "status": "pending",
+  "status": "running",
   "auditComplete": false,
   "serverScope": {
     "server": "CN production",
@@ -672,7 +672,7 @@
     }
   ],
   "delivery": {
-    "stage": "research_only",
+    "stage": "researching",
     "branch": "codex/cloud-baseline/wuthering-waves-3-7-first-half-end",
     "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/32",
     "catalogChanged": false,
@@ -682,7 +682,7 @@
     "referenceCatalogSha256": "7c79052acf4a4037dff722ed5284e30f5c2cc8ebd8f89592071bf81119c2ebe3",
     "nodeComplete": false,
     "remainingPendingCount": 1,
-    "resumeAt": "2026-10-23T02:20:47.389Z",
+    "resumeAt": "2026-10-23T04:13:13.000Z",
     "batchPublicationVerified": true,
     "batchPublicationMainSha": "7977fa8e30586521d19e7ff70fa8896c18ff2454",
     "batchPublicationCheckedAt": "2026-10-22T02:31:36Z"
@@ -705,7 +705,7 @@
     }
   ],
   "progress": {
-    "attempts": 1,
+    "attempts": 2,
     "consecutiveRunsWithoutProgress": 1,
     "advanceThisRun": "完整下半、所有既有地图和3周期范围已核查；修复旧研究日期误读，精确时分缺口仍在。",
     "emergency": false
@@ -734,5 +734,29 @@
         "url": "https://github.com/BaiQue3rL/Gtask/actions/runs/39711336876"
       }
     ]
-  }
+  },
+  "resumeHistory": [
+    {
+      "checkedAt": "2026-10-23T03:19:51Z",
+      "priorStatus": "pending",
+      "priorCheckedAt": "2026-10-22T02:20:47.389Z",
+      "priorDelivery": {
+        "stage": "research_only",
+        "branch": "codex/cloud-baseline/wuthering-waves-3-7-first-half-end",
+        "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/32",
+        "catalogChanged": false,
+        "batchCatalogChanged": true,
+        "batchEvidencePath": "catalog-research/cloud/announcement-review-20261022.json",
+        "referenceCatalogRevision": "2026-10-22.genshin-7.1-activity-review",
+        "referenceCatalogSha256": "7c79052acf4a4037dff722ed5284e30f5c2cc8ebd8f89592071bf81119c2ebe3",
+        "nodeComplete": false,
+        "remainingPendingCount": 1,
+        "resumeAt": "2026-10-23T02:20:47.389Z",
+        "batchPublicationVerified": true,
+        "batchPublicationMainSha": "7977fa8e30586521d19e7ff70fa8896c18ff2454",
+        "batchPublicationCheckedAt": "2026-10-22T02:31:36Z"
+      },
+      "reason": "到期续接；管理员当前main允许unknown标签，探索进度为可选补证"
+    }
+  ]
 }
