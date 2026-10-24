@@ -6,7 +6,7 @@
   "periodKey": "3.2",
   "node": "version_end",
   "newVersion": "3.3",
-  "checkedAt": "2026-10-23T02:08:24.805Z",
+  "checkedAt": "2026-10-24T02:09:26.273Z",
   "status": "pending",
   "auditComplete": false,
   "serverScope": {
@@ -337,6 +337,16 @@
       "announcementReviewDue": false,
       "scheduleReviewAtPreserved": "2026-10-23T02:20:47.389Z",
       "note": "当前官方3.3更新对应拟境部分为勋章/头像调整，不能据此创建无依据的规则或窗口。没有重新做已完成的活动/地图全量审计。"
+    },
+    {
+      "section": "resumption_attempt_6",
+      "result": "partial",
+      "checkedAt": "2026-10-24T02:09:26.273Z",
+      "scope": "only remaining cycle gap due; completed catalog and map/event decisions reused",
+      "method": "current official listing and complete 3.3 update re-read; one independent targeted web search; original official gameplay-introduction images attempted",
+      "cycleFieldsVerified": false,
+      "announcementReviewDue": false,
+      "note": "3.3完整官方更新仍只列拟境相关勋章/头像与敌人更新；当前官方列表没有周期说明。独立定向检索只返回官方旧玩法介绍、玩家攻略或无关更新，原始官方介绍图部分抓取超时且可读图未给周期字段。未取得国服重置锚点、cadence或开放时长，不从版本周期、其他模式或非官方攻略推算。"
     }
   ],
   "sources": [
@@ -507,6 +517,38 @@
       "checkedAt": "2026-10-22T02:03:15.293Z",
       "result": "readable",
       "summary": "直接复核新地区名称/父级/剧情解锁条件和玩法部分；有效旧裁决复用。3.3公开内容不足以建立三个独立进度资格或拟境重置规则。"
+    },
+    {
+      "url": "https://www.taptap.cn/app/234493/topic?type=official",
+      "sourceRef": "turn1view2",
+      "checkedAt": "2026-10-24T02:09:26.273Z",
+      "result": "official_listing_reviewed",
+      "identity": "official game account list",
+      "summary": "当前列表已复核；新增内容为头像、角色档案和既有3.3活动，未出现拟境周期排期公告。"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+      "sourceRef": "turn1view1",
+      "checkedAt": "2026-10-24T02:09:26.273Z",
+      "result": "full_update_rechecked",
+      "identity": "official game account",
+      "summary": "3.3完整更新公告仅涉及拟境勋章组、头像和相关敌人/内容更新，不提供重置锚点、开启间隔或开放时长。"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/816701048914709432",
+      "sourceRef": "turn1view0",
+      "checkedAt": "2026-10-24T02:09:26.273Z",
+      "result": "official_gameplay_intro_partially_read",
+      "identity": "official game account",
+      "summary": "旧玩法介绍正文确认玩法性质；多张原始规则图抓取超时，成功读取的可见图为敌人机制，未取得周期必要字段。"
+    },
+    {
+      "url": "https://zenless.hoyoverse.com/m/zh-cn/news/166963",
+      "sourceRef": "turn3search4",
+      "checkedAt": "2026-10-24T02:09:26.273Z",
+      "result": "official_search_index_rechecked",
+      "identity": "official publisher site",
+      "summary": "官方3.3更新索引未返回拟境周期必要字段。"
     }
   ],
   "decisions": [
@@ -896,15 +938,29 @@
         "https://www.taptap.cn/app/234493/topic?type=official"
       ],
       "notAWholeCatalogVerifiedUnchanged": true
+    },
+    {
+      "key": "cycles:hollow-annihilation:20261024",
+      "target": "cycles",
+      "status": "pending",
+      "checkedAt": "2026-10-24T02:09:26.273Z",
+      "adoptedValue": null,
+      "reason": "主要官方公告与一次独立定向补查仍不足以表达国服重置锚点、cadence和开放时长；本轮不制造cycle_rule或逐期window。",
+      "sources": [
+        "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+        "https://www.taptap.cn/app/234493/topic?type=official",
+        "https://www.taptap.cn/moment/816701048914709432"
+      ],
+      "notAWholeCatalogVerifiedUnchanged": true
     }
   ],
   "pending": [
     {
       "key": "cycles:hollow-annihilation",
       "target": "cycles",
-      "reason": "2026-10-23当前完整官方3.3更新只补充拟境勋章/头像等内容，未取得适用国服的重置锚点、开启间隔和开放时长；当前官方列表及一次独立定向补查仍无补证。保留真实必要字段缺口，不从普通版本周期或其他模式推算。",
-      "checkedAt": "2026-10-23T02:08:24.805Z",
-      "retryAt": "2026-10-24T02:08:24.805Z",
+      "reason": "2026-10-24复核：当前完整官方3.3更新、官方列表、旧官方玩法介绍及一次独立定向补查仍未取得适用国服的重置锚点、开启间隔和开放时长；原始规则图部分抓取失败，成功读取内容也未给周期字段。保留真实必要字段缺口，不从版本周期、其他模式或玩家攻略推算。",
+      "checkedAt": "2026-10-24T02:09:26.273Z",
+      "retryAt": "2026-10-25T02:09:26.273Z",
       "missingFields": [
         "reset anchor with applicable server/time zone",
         "cadence",
@@ -1026,7 +1082,7 @@
   "delivery": {
     "stage": "research_only",
     "branch": "codex/cloud-baseline/zenless-3-2-version-end",
-    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/36",
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/41",
     "catalogChanged": false,
     "referenceCatalogRevision": "2026-10-22.zenless-map-admission",
     "referenceCatalogSha256": "d2a930d0519c76780900084190b15b057f1395a33afada17c79bd8e573beb75c",
@@ -1034,7 +1090,7 @@
     "lastPublishedCatalogSha256": "d2a930d0519c76780900084190b15b057f1395a33afada17c79bd8e573beb75c",
     "nodeComplete": false,
     "remainingPendingCount": 1,
-    "resumeAt": "2026-10-24T02:08:24.805Z",
+    "resumeAt": "2026-10-25T02:09:26.273Z",
     "priorAdministratorPublication": "catalog-research/cloud/admission-authority-repair-20261022.json"
   },
   "verifiedCatalogDelta": {
@@ -1417,5 +1473,12 @@
         "result": "Official versions3.1/3.2/3.3 and unrelated double-reward reset or unofficial guide results did not supply the three specific missing cycle facts; no data adopted from unrelated modes or derivative guides."
       }
     }
-  ]
+  ],
+  "progress": {
+    "attempts": 6,
+    "consecutiveRunsWithoutProgress": 3,
+    "advanceThisRun": "无新增可交付事实；完成限定范围官方复核与一次独立补查并保留精确缺口。",
+    "emergency": true,
+    "emergencyReason": "同一到期节点连续三次运行仍无法取得拟境湮灭战周期必要可靠证据。"
+  }
 }

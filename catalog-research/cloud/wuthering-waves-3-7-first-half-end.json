@@ -5,14 +5,14 @@
   "gameId": "wuthering-waves",
   "periodKey": "3.7",
   "node": "first_half_end",
-  "checkedAt": "2026-10-23T03:23:58.715Z",
+  "checkedAt": "2026-10-24T03:25:49.216Z",
   "status": "pending",
   "auditComplete": false,
   "serverScope": {
     "server": "CN production",
     "timeZone": "Asia/Shanghai"
   },
-  "baseMainSha": "5ec0e3b344e4a9f022a8cb34042f814aceba5706",
+  "baseMainSha": "2f1fb788766e4c9604d473b0d451e5230236e34c",
   "priorEvidence": [
     "docs/catalog-research/wuthering-waves-3.7-2026-09-30.json",
     "catalog-research/cloud/activity-discovery-repair-20261021.json",
@@ -543,6 +543,16 @@
       "firstHalfEndsAt": "2026-10-22T09:59:00+08:00",
       "endsAt": null,
       "findings": "旧上半唤取公告原时刻复核；下半唤取和版本日历不充当下一次结束维护的时分依据。"
+    },
+    {
+      "section": "resumption_attempt_3",
+      "result": "partial",
+      "checkedAt": "2026-10-24T03:25:49.216Z",
+      "scope": "remaining precise cycle gap plus due all-game announcement/schedule review",
+      "cycleFieldsVerified": false,
+      "announcementReviewDue": true,
+      "announcementReviewEvidencePath": "catalog-research/cloud/announcement-review-20261024.json",
+      "note": "官方3.7内容说明、当前官方列表、原始日期日历和二期唤取重新核对；日历仍只给10/07至11/12日期，唤取11/11 11:59不等于版本或矩阵结束。一次独立补查给出04:00/03:59但非官方，未采用。"
     }
   ],
   "sources": [
@@ -638,6 +648,38 @@
       "identity": "鸣潮官方版主",
       "checkedAt": "2026-10-23T03:23:58.715Z",
       "read": "凝月辉途原图实际读取；消费累计奖励排除，见全游戏公告复核记录"
+    },
+    {
+      "url": "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
+      "sourceRef": "turn5view3",
+      "identity": "鸣潮官方列表",
+      "checkedAt": "2026-10-24T03:25:49.216Z",
+      "result": "readable",
+      "summary": "最新为角色与社区内容；未出现终焉矩阵精确时分或3.8完整维护公告。"
+    },
+    {
+      "url": "https://mc.kurogames.com/main/news/detail/5569",
+      "sourceRef": "turn7search21",
+      "identity": "鸣潮官方网站",
+      "checkedAt": "2026-10-24T03:25:49.216Z",
+      "result": "indexed_text_rechecked",
+      "summary": "3.7内容说明覆盖活动与版本内容，但不提供终焉矩阵精确时分或版本结束维护边界。"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/861624365911900497?group_id=330015",
+      "sourceRef": "turn7search38",
+      "identity": "鸣潮官方账号",
+      "checkedAt": "2026-10-24T03:25:49.216Z",
+      "result": "readable",
+      "summary": "二期唤取为10/22 10:00至11/11 11:59服务器时间；卡池截止不替代矩阵或版本结束。"
+    },
+    {
+      "url": "https://wuwa.huijiwiki.com/wiki/模板:活动/展开",
+      "sourceRef": "turn7search0",
+      "identity": "independent third-party supplement",
+      "checkedAt": "2026-10-24T03:25:49.216Z",
+      "result": "not_adopted",
+      "summary": "第三方给出10/07 04:00至11/12 03:59；缺官方确认，不据此纠正公共周期。"
     }
   ],
   "decisions": [
@@ -669,12 +711,13 @@
       ],
       "supplementResult": "一次定向补查仅有wiki提供精确时分及不相关旧版官方资料，不足以采用；本轮停止搜索并安排日更补查。",
       "latestSupplement": {
-        "checkedAt": "2026-10-23T03:23:58.715Z",
+        "checkedAt": "2026-10-24T03:25:49.216Z",
         "queries": [
-          "site:taptap.cn \"终焉矩阵\" \"险境强袭\" \"11月12日\"",
-          "site:mc.kurogames.com \"终焉矩阵\" \"3.7\""
+          "官方3.7内容说明与列表",
+          "官方二期唤取",
+          "独立精确时分定向补查"
         ],
-        "result": "主3.7更新及一次独立定向补查均未给适用国服精确时分；沿用10/07至11/12日期，不推算04:00，停止本轮搜索。"
+        "result": "主要官方来源仍只有10/07至11/12日期；二期唤取截止无关。第三方04:00/03:59未获官方确认，不采用并停止本轮搜索。"
       }
     },
     {
@@ -708,39 +751,30 @@
     {
       "key": "cycles:terminus-matrix:3.7:precise-window",
       "target": "cycles",
-      "reason": "官方当前日历仅10/07至11/12日期；缺适用国服的精确开始/结束时分，尤其结束日与已生成11/11窗口不同。保留既有规则并按日补查，不采纳wiki推断。",
-      "checkedAt": "2026-10-23T03:23:58.715Z",
-      "retryAt": "2026-10-24T03:23:58.715Z"
+      "reason": "2026-10-24复核：官方3.7内容说明、当前官方列表、原始日期日历及二期唤取仍未给终焉矩阵适用国服精确开始/结束时分。独立补查仅第三方给出04:00/03:59，缺官方确认且与既有生成窗口冲突，不采用。",
+      "checkedAt": "2026-10-24T03:25:49.216Z",
+      "retryAt": "2026-10-25T03:25:49.216Z"
     }
   ],
   "delivery": {
-    "stage": "published_partial",
+    "stage": "research_only",
     "branch": "codex/cloud-baseline/wuthering-waves-3-7-first-half-end",
-    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/37",
-    "catalogChanged": true,
-    "batchCatalogChanged": true,
-    "batchEvidencePath": "catalog-research/cloud/announcement-review-20261023.json",
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/43",
+    "catalogChanged": false,
+    "batchCatalogChanged": false,
+    "batchEvidencePath": "catalog-research/cloud/announcement-review-20261024.json",
     "referenceCatalogRevision": "2026-10-23.genshin-activities-wuwa-map",
     "referenceCatalogSha256": "8f61275ae7258e2ccaf7cd59929f63cf4fa0389faba940c6f7bc371a6b056d42",
     "nodeComplete": false,
     "remainingPendingCount": 1,
-    "resumeAt": "2026-10-24T03:23:58.715Z",
-    "batchPublicationVerified": true,
-    "catalogRevision": "2026-10-23.genshin-activities-wuwa-map",
-    "catalogSha256": "8f61275ae7258e2ccaf7cd59929f63cf4fa0389faba940c6f7bc371a6b056d42",
-    "mainVerified": true,
-    "publishedAt": "2026-10-23T03:31:20Z",
-    "publicationHeadSha": "59df803d7ceb28a98850197e9dedab433fc0fd8c",
-    "mergedMainSha": "fb9bebb26e2a15bdedcad055875a0ba751d11ada",
-    "savedMainVerification": {
-      "sha": "fb9bebb26e2a15bdedcad055875a0ba751d11ada",
-      "allFourFilesExactMatch": true,
-      "revision": "2026-10-23.genshin-activities-wuwa-map",
-      "rawUtf8Sha256": "8f61275ae7258e2ccaf7cd59929f63cf4fa0389faba940c6f7bc371a6b056d42",
-      "checkedAt": "2026-10-23 03:31:37 UTC"
-    },
-    "batchPublicationMainSha": "fb9bebb26e2a15bdedcad055875a0ba751d11ada",
-    "batchPublicationCheckedAt": "2026-10-23 03:31:37 UTC"
+    "resumeAt": "2026-10-25T03:25:49.216Z",
+    "priorPublication": {
+      "stage": "published_partial",
+      "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/37",
+      "catalogRevision": "2026-10-23.genshin-activities-wuwa-map",
+      "catalogSha256": "8f61275ae7258e2ccaf7cd59929f63cf4fa0389faba940c6f7bc371a6b056d42",
+      "mainVerified": true
+    }
   },
   "unresolvedDecisionCount": 1,
   "sourceImages": [
@@ -760,9 +794,9 @@
     }
   ],
   "progress": {
-    "attempts": 2,
-    "consecutiveRunsWithoutProgress": 0,
-    "advanceThisRun": "纠正过严地图排除并交付时隙废都；终焉矩阵精确时分仍未解决。计为有进展，不能把其他游戏缺口或本轮未到重试计为连续失败。",
+    "attempts": 3,
+    "consecutiveRunsWithoutProgress": 1,
+    "advanceThisRun": "完成到期排期/公告复核并确认原神7.2上线日期；终焉矩阵必要精确字段无可靠新增，未产生清单差异。",
     "emergency": false
   },
   "validation": {
