@@ -1082,7 +1082,7 @@
   "delivery": {
     "stage": "research_only",
     "branch": "codex/cloud-baseline/zenless-3-2-version-end",
-    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/36",
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/41",
     "catalogChanged": false,
     "referenceCatalogRevision": "2026-10-22.zenless-map-admission",
     "referenceCatalogSha256": "d2a930d0519c76780900084190b15b057f1395a33afada17c79bd8e573beb75c",
