@@ -190,7 +190,7 @@
       "updatedAt": "2026-10-24T03:25:49.216Z",
       "retryAt": "2026-10-25T03:25:49.216Z",
       "branch": "codex/cloud-baseline/wuthering-waves-3-7-first-half-end",
-      "pullRequestUrl": null,
+      "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/43",
       "catalogRevision": "2026-10-23.genshin-activities-wuwa-map",
       "catalogSha256": "8f61275ae7258e2ccaf7cd59929f63cf4fa0389faba940c6f7bc371a6b056d42",
       "evidencePath": "catalog-research/cloud/wuthering-waves-3-7-first-half-end.json",
