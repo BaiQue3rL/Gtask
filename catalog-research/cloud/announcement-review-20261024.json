@@ -1,0 +1,291 @@
+{
+  "schemaVersion": 1,
+  "kind": "announcement_and_schedule_review",
+  "checkedAt": "2026-10-24T03:25:49.216Z",
+  "status": "pending",
+  "auditComplete": false,
+  "serverScope": {
+    "region": "中国大陆适用官方公告",
+    "timeZone": "Asia/Shanghai",
+    "utcOffset": "+08:00",
+    "note": "逐游戏采用国服/简中官方来源；日期精度不扩写为时分，不混用其他服务器。"
+  },
+  "baseMainSha": "2f1fb788766e4c9604d473b0d451e5230236e34c",
+  "priorEvidence": [
+    "catalog-research/cloud/announcement-review-20261023.json",
+    "catalog-research/cloud/wuthering-waves-3-7-first-half-end.json"
+  ],
+  "announcementReview": {
+    "checkedAt": "2026-10-24T03:25:49.216Z",
+    "games": [
+      {
+        "gameId": "genshin",
+        "coverage": "partial",
+        "checkedSources": [
+          "https://www.taptap.cn/app/168332/topic?type=official",
+          "https://www.taptap.cn/moment/862794225241031570?group_id=201765",
+          "https://www.taptap.cn/moment/862794779967097506?group_id=201765"
+        ],
+        "evidencePath": "catalog-research/cloud/announcement-review-20261024.json",
+        "pending": [
+          "7.2前瞻确认11月4日上线及三项命名版本活动，但未公布各活动适用国服起止时分；新地图尚未开放，不提前发布。"
+        ]
+      },
+      {
+        "gameId": "star-rail",
+        "coverage": "partial",
+        "checkedSources": [
+          "https://www.taptap.cn/app/224267/topic?type=official",
+          "https://www.taptap.cn/moment/862360304653176292?group_id=311675",
+          "https://hsr.hoyoverse.com/zh-cn/news/166468"
+        ],
+        "evidencePath": "catalog-research/cloud/announcement-review-20261024.json",
+        "pending": [
+          "“幻月游戏”新赛季预告未给上线时间、周期边界或可持久化规则；4.7完整窗口与上半截止仍未公告。"
+        ]
+      },
+      {
+        "gameId": "zenless",
+        "coverage": "complete",
+        "checkedSources": [
+          "https://www.taptap.cn/app/234493/topic?type=official",
+          "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
+        ],
+        "evidencePath": "catalog-research/cloud/announcement-review-20261024.json",
+        "pending": []
+      },
+      {
+        "gameId": "wuthering-waves",
+        "coverage": "partial",
+        "checkedSources": [
+          "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
+          "https://mc.kurogames.com/main/news/detail/5569",
+          "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+          "https://www.taptap.cn/moment/861624365911900497?group_id=330015"
+        ],
+        "evidencePath": "catalog-research/cloud/announcement-review-20261024.json",
+        "pending": [
+          "终焉矩阵官方日历仍仅给10月7日至11月12日日期；精确国服开始/结束时分与既有生成窗口冲突，不能采用第三方04:00/03:59。"
+        ]
+      }
+    ]
+  },
+  "coverage": [
+    {
+      "gameId": "genshin",
+      "result": "partial",
+      "summary": "官方7.2前瞻长图与列表完整读取：确认11月4日上线、新地区和压力方块粉碎计划/厉影定格录/临危受命！全域镇卫・逆捍谬罚；未提供活动精确窗口，未开放地图不发布。"
+    },
+    {
+      "gameId": "star-rail",
+      "result": "partial",
+      "summary": "官方列表新增幻月游戏赛季预告但无排期字段；既有4.6活动清单无差异，4.7完整窗口未公告。"
+    },
+    {
+      "gameId": "zenless",
+      "result": "complete_no_delta",
+      "summary": "当前官方列表仅有3.3头像、角色档案和已收录怪奇诡屋惊魂记；完整3.3活动范围沿用，无新增目录差异。"
+    },
+    {
+      "gameId": "wuthering-waves",
+      "result": "partial",
+      "summary": "当前官方列表为角色/社区内容，3.7下半四项活动均已收录；终焉矩阵精确窗口继续pending，未把第三方时分当事实。"
+    }
+  ],
+  "decisions": [
+    {
+      "key": "genshin:7.2:version-date",
+      "decision": "verified_date_only",
+      "adoptedValue": "2026-11-04",
+      "sourceUrl": "https://www.taptap.cn/moment/862794225241031570?group_id=201765",
+      "reason": "官方仅称11月4日上线；不足以填写带时区的startsAt、7.1 endsAt或上半截止。"
+    },
+    {
+      "key": "genshin:7.2:announced-events",
+      "decision": "pending",
+      "candidates": [
+        "压力方块粉碎计划",
+        "厉影定格录",
+        "临危受命！全域镇卫・逆捍谬罚"
+      ],
+      "reason": "官方前瞻确认名称与限时版本活动性质，但没有各自适用国服起止时分；尚未开放，不使用deadlineReview。"
+    },
+    {
+      "key": "genshin:7.2:new-maps",
+      "decision": "defer_until_open",
+      "candidates": [
+        "冶金工造研究局",
+        "匹兹堡国立研究所"
+      ],
+      "reason": "前瞻只确认未来新区域；7.2尚未上线，不提前发布地图。"
+    },
+    {
+      "key": "star-rail:4.7:phantom-moon-season",
+      "decision": "pending",
+      "reason": "官方称将迎新赛季，但未给上线时刻、周期边界或规则；不建立无依据cycle_rule/window。"
+    },
+    {
+      "key": "zenless:3.3:catalog",
+      "decision": "verified_no_delta",
+      "reason": "当前官方列表未出现清单外且具备必要字段的新活动。"
+    },
+    {
+      "key": "wuthering-waves:3.7:catalog",
+      "decision": "partial_no_delta",
+      "reason": "既有活动与地图保持；终焉矩阵精确时分未解决。"
+    }
+  ],
+  "pending": [
+    {
+      "gameId": "genshin",
+      "reason": "7.2前瞻确认11月4日上线及三项命名版本活动，但未公布各活动适用国服起止时分；新地图尚未开放，不提前发布。",
+      "retryAt": "2026-10-25T03:25:49.216Z"
+    },
+    {
+      "gameId": "star-rail",
+      "reason": "“幻月游戏”新赛季预告未给上线时间、周期边界或可持久化规则；4.7完整窗口与上半截止仍未公告。",
+      "retryAt": "2026-10-25T03:25:49.216Z"
+    },
+    {
+      "gameId": "wuthering-waves",
+      "reason": "终焉矩阵官方日历仍仅给10月7日至11月12日日期；精确国服开始/结束时分与既有生成窗口冲突，不能采用第三方04:00/03:59。",
+      "retryAt": "2026-10-25T03:25:49.216Z"
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://www.taptap.cn/app/168332/topic?type=official",
+      "sourceRef": "turn5view0",
+      "identity": "原神官方列表",
+      "checkedAt": "2026-10-24T03:25:49.216Z",
+      "result": "readable"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/862794225241031570?group_id=201765",
+      "sourceRef": "turn8view0",
+      "identity": "原神官方/西风快报员",
+      "checkedAt": "2026-10-24T03:25:49.216Z",
+      "result": "text_and_three_original_images_read"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/862794779967097506?group_id=201765",
+      "sourceRef": "turn8view1",
+      "identity": "原神官方/西风快报员",
+      "checkedAt": "2026-10-24T03:25:49.216Z",
+      "result": "readable"
+    },
+    {
+      "url": "https://www.taptap.cn/app/224267/topic?type=official",
+      "sourceRef": "turn5view1",
+      "identity": "崩坏：星穹铁道官方列表",
+      "checkedAt": "2026-10-24T03:25:49.216Z",
+      "result": "readable"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/862360304653176292?group_id=311675",
+      "sourceRef": "turn8view2",
+      "identity": "崩坏：星穹铁道官方账号",
+      "checkedAt": "2026-10-24T03:25:49.216Z",
+      "result": "text_readable_images_not_needed_for_schedule_claim"
+    },
+    {
+      "url": "https://www.taptap.cn/app/234493/topic?type=official",
+      "sourceRef": "turn5view2",
+      "identity": "绝区零官方列表",
+      "checkedAt": "2026-10-24T03:25:49.216Z",
+      "result": "readable"
+    },
+    {
+      "url": "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
+      "sourceRef": "turn5view3",
+      "identity": "鸣潮官方列表",
+      "checkedAt": "2026-10-24T03:25:49.216Z",
+      "result": "readable"
+    },
+    {
+      "url": "https://mc.kurogames.com/main/news/detail/5569",
+      "sourceRef": "turn7search21",
+      "identity": "鸣潮官方网站",
+      "checkedAt": "2026-10-24T03:25:49.216Z",
+      "result": "indexed_text_rechecked"
+    },
+    {
+      "url": "https://wuwa.huijiwiki.com/wiki/模板:活动/展开",
+      "sourceRef": "turn7search0",
+      "identity": "independent third-party supplement",
+      "checkedAt": "2026-10-24T03:25:49.216Z",
+      "result": "claims precise 04:00/03:59 but not adopted without official confirmation"
+    }
+  ],
+  "sourceImages": [
+    {
+      "url": "https://img2-tc.tapimg.com/moment/etag/llGXDStk6IrhFOCe_5NnDMXW9u_C_20261023203558.png/_tap_ugc.jpg",
+      "read": "官方7.2前瞻第1图：新地区与版本主题；未来地图不提前发布。"
+    },
+    {
+      "url": "https://img2-tc.tapimg.com/moment/etag/lhMJnoPZ8DrWJg-u9FowXnVOp7TV_20261023203559.png/_tap_ugc.jpg",
+      "read": "官方7.2前瞻第2图：三项命名版本活动，无精确活动窗口。"
+    },
+    {
+      "url": "https://img2-tc.tapimg.com/moment/etag/Fh701Nv_Bv7zn_P8TIDVECeFxtqQ_20261023203600.png/_tap_ugc.jpg",
+      "read": "官方7.2前瞻第3图：系统优化与上海文旅联动预告。"
+    }
+  ],
+  "scheduleReview": {
+    "checkedAt": "2026-10-24T03:25:49.216Z",
+    "primaryAndOneIndependentSupplementCompleted": true,
+    "changes": [],
+    "preserveUnknownFields": true,
+    "gaps": [
+      {
+        "gameId": "genshin",
+        "periodKey": "7.1",
+        "missing": "7.2已确认2026-11-04上线，但7.1结束维护边界仍无官方精确时分；不把日期或现有活动截止当维护结束。"
+      },
+      {
+        "gameId": "genshin",
+        "periodKey": null,
+        "missing": "7.2仅确认2026-11-04上线日期；结束维护边界与官方上半截止未公布，不能建立触发期。"
+      },
+      {
+        "gameId": "star-rail",
+        "periodKey": "4.7",
+        "missing": "4.6官方结束为2026-11-11 06:00 UTC+8；4.7开始、结束及官方上半截止仍缺完整公告。"
+      },
+      {
+        "gameId": "wuthering-waves",
+        "periodKey": "3.7",
+        "missing": "3.7内容及二期唤取仅覆盖活动/卡池，仍未给版本结束维护精确边界；日历11月12日仅日期。"
+      },
+      {
+        "gameId": "wuthering-waves",
+        "periodKey": null,
+        "missing": "3.8开始、结束及官方上半截止仍无可靠完整公告。"
+      }
+    ],
+    "supplementQueries": [
+      "原神7.2维护与上半精确时刻",
+      "崩坏：星穹铁道4.7完整窗口",
+      "鸣潮3.8维护与终焉矩阵精确时分"
+    ],
+    "notes": "7.2官方仅确认11月4日上线日期；4.7仍为赠礼/赛季预热；3.7活动与二期唤取不能替代版本结束，终焉矩阵第三方精确时分不采纳。",
+    "nextReviewAfterVerification": {
+      "at": "2026-10-25T03:25:49.216Z",
+      "reason": "missing_schedule"
+    }
+  },
+  "validation": {
+    "reviewContract": "pending_local_verification",
+    "catalogBytesChanged": false
+  },
+  "delivery": {
+    "stage": "research_only",
+    "branch": "codex/cloud-baseline/wuthering-waves-3-7-first-half-end",
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/43",
+    "catalogChanged": false,
+    "referenceCatalogRevision": "2026-10-23.genshin-activities-wuwa-map",
+    "referenceCatalogSha256": "8f61275ae7258e2ccaf7cd59929f63cf4fa0389faba940c6f7bc371a6b056d42",
+    "nodeComplete": false,
+    "resumeAt": "2026-10-25T03:25:49.216Z"
+  }
+}

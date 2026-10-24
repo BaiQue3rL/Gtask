@@ -9,7 +9,7 @@
     "zenless",
     "wuthering-waves"
   ],
-  "nextScheduleReviewAt": "2026-10-24T03:23:58.715Z",
+  "nextScheduleReviewAt": "2026-10-25T03:25:49.216Z",
   "periods": [
     {
       "gameId": "star-rail",
@@ -91,51 +91,55 @@
     {
       "gameId": "genshin",
       "periodKey": "7.1",
-      "reason": "2026-10-23实际复核：7.1明确结束维护边界仍缺可靠完整资料。已读当前官方列表并作一次独立维护定向补查；仅节目/赠礼预热、既有活动或当前更新说明，无所缺字段。保留null，不采用统一21/42天；旧来源与裁决保存于本轮研究scheduleReview.previousGaps。",
+      "reason": "2026-10-24实际复核：官方7.2前瞻确认2026-11-04上线，但未提供7.1结束维护精确时分。已读官方列表、回顾长图及原图并作一次独立维护定向补查；不把日期或现有活动截止当维护边界。",
       "checkedSources": [
-        "https://www.taptap.cn/app/168332/topic?type=official"
+        "https://www.taptap.cn/app/168332/topic?type=official",
+        "https://www.taptap.cn/moment/862794225241031570?group_id=201765"
       ],
-      "checkedAt": "2026-10-23T03:23:58.715Z"
+      "checkedAt": "2026-10-24T03:25:49.216Z"
     },
     {
       "gameId": "genshin",
       "periodKey": null,
-      "reason": "2026-10-23实际复核：下一版本开始、结束及官方上半截止仍缺可靠完整资料。已读当前官方列表并作一次独立维护定向补查；仅节目/赠礼预热、既有活动或当前更新说明，无所缺字段。保留null，不采用统一21/42天；旧来源与裁决保存于本轮研究scheduleReview.previousGaps。",
+      "reason": "2026-10-24实际复核：7.2仅确认2026-11-04上线日期；结束边界与官方上半截止仍无可靠完整资料。前瞻活动亦无精确窗口，保留null，不按21/42天推算。",
       "checkedSources": [
-        "https://www.taptap.cn/app/168332/topic?type=official"
+        "https://www.taptap.cn/app/168332/topic?type=official",
+        "https://www.taptap.cn/moment/862794225241031570?group_id=201765"
       ],
-      "checkedAt": "2026-10-23T03:23:58.715Z"
+      "checkedAt": "2026-10-24T03:25:49.216Z"
     },
     {
       "gameId": "star-rail",
       "periodKey": "4.7",
-      "reason": "2026-10-23实际复核：4.7开始、结束及官方上半截止仍缺可靠完整资料。已读当前官方列表并作一次独立维护定向补查；仅节目/赠礼预热、既有活动或当前更新说明，无所缺字段。保留null，不采用统一21/42天；旧来源与裁决保存于本轮研究scheduleReview.previousGaps。",
+      "reason": "2026-10-24实际复核：4.6官方结束仍为2026-11-11 06:00 UTC+8；当前官方列表仅4.7赠礼/幻月游戏赛季预热，未给4.7开始、结束及上半截止。一次独立补查无官方完整窗口，保留缺口。",
       "checkedSources": [
-        "https://www.taptap.cn/app/224267/topic?type=official"
+        "https://www.taptap.cn/app/224267/topic?type=official",
+        "https://www.taptap.cn/moment/862360304653176292?group_id=311675",
+        "https://hsr.hoyoverse.com/zh-cn/news/166468"
       ],
-      "checkedAt": "2026-10-23T03:23:58.715Z"
+      "checkedAt": "2026-10-24T03:25:49.216Z"
     },
     {
       "gameId": "wuthering-waves",
       "periodKey": "3.7",
-      "reason": "2026-10-23实际复核：3.7明确结束维护边界（11/12只有日期，卡池11/11截止不代替）仍缺可靠完整资料。已读当前官方列表并作一次独立维护定向补查；仅节目/赠礼预热、既有活动或当前更新说明，无所缺字段。保留null，不采用统一21/42天；旧来源与裁决保存于本轮研究scheduleReview.previousGaps。",
+      "reason": "2026-10-24实际复核：官方3.7内容说明、列表、日期日历及二期唤取仍未给版本结束维护精确边界；11/12仅日期、11/11 11:59仅卡池截止。独立补查的第三方时分不采用。",
       "checkedSources": [
         "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
-        "https://www.taptap.cn/moment/854139064348051537",
-        "https://mc.kurogames.com/main/news/detail/5569"
+        "https://mc.kurogames.com/main/news/detail/5569",
+        "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+        "https://www.taptap.cn/moment/861624365911900497?group_id=330015"
       ],
-      "checkedAt": "2026-10-23T03:23:58.715Z"
+      "checkedAt": "2026-10-24T03:25:49.216Z"
     },
     {
       "gameId": "wuthering-waves",
       "periodKey": null,
-      "reason": "2026-10-23实际复核：下一版本开始、结束及官方上半截止仍缺可靠完整资料。已读当前官方列表并作一次独立维护定向补查；仅节目/赠礼预热、既有活动或当前更新说明，无所缺字段。保留null，不采用统一21/42天；旧来源与裁决保存于本轮研究scheduleReview.previousGaps。",
+      "reason": "2026-10-24实际复核：当前官方列表、3.7内容说明及一次3.8维护定向补查仍未取得下一版本开始、结束及上半截止的可靠完整公告；不采用第三方推测或活动/卡池截止。",
       "checkedSources": [
         "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
-        "https://www.taptap.cn/moment/854139064348051537",
         "https://mc.kurogames.com/main/news/detail/5569"
       ],
-      "checkedAt": "2026-10-23T03:23:58.715Z"
+      "checkedAt": "2026-10-24T03:25:49.216Z"
     }
   ],
   "runs": [
@@ -182,16 +186,16 @@
       "node": "first_half_end",
       "boundaryAt": "2026-10-22T09:59:00+08:00",
       "status": "pending",
-      "attempts": 2,
-      "updatedAt": "2026-10-23T03:23:58.715Z",
-      "retryAt": "2026-10-24T03:23:58.715Z",
+      "attempts": 3,
+      "updatedAt": "2026-10-24T03:25:49.216Z",
+      "retryAt": "2026-10-25T03:25:49.216Z",
       "branch": "codex/cloud-baseline/wuthering-waves-3-7-first-half-end",
-      "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/37",
+      "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/43",
       "catalogRevision": "2026-10-23.genshin-activities-wuwa-map",
       "catalogSha256": "8f61275ae7258e2ccaf7cd59929f63cf4fa0389faba940c6f7bc371a6b056d42",
       "evidencePath": "catalog-research/cloud/wuthering-waves-3-7-first-half-end.json",
       "completedAt": null,
-      "notes": "已通过PR37发布黑海岸→时隙废都，官方导航名称/父级有据，纠正旧可选探索百分比门槛；合并main清单revision与原始UTF-8 SHA256已核对。终焉矩阵精确时分仍缺，保持pending每日续接。三项原神活动同批已发布；绝区零及成功星铁节点未重复。"
+      "notes": "终焉矩阵精确时分仍缺：官方3.7内容说明、列表、原始日期日历及二期唤取未给适用国服精确窗口；独立补查只有第三方04:00/03:59，未获官方确认且不据此更正。到期四游戏公告与排期已完整复核：原神7.2确认11月4日上线但活动/维护仅日期级，星铁4.7仍预热，绝区零无差异，鸣潮下半已收录。保持pending并安排次日补查；清单revision/publishedAt不变。"
     }
   ]
 }
