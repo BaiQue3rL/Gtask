@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "repository": "BaiQue3rL/Gtask",
   "timeZone": "Asia/Shanghai",
   "activatedAt": "2026-10-18T17:55:26+08:00",
@@ -9,7 +9,28 @@
     "zenless",
     "wuthering-waves"
   ],
-  "nextScheduleReviewAt": "2026-10-26T04:23:22.072Z",
+  "dateTriggers": [
+    {
+      "gameId": "genshin",
+      "periodKey": "7.1",
+      "node": "version_end",
+      "date": "2026-11-04",
+      "sources": [
+        "https://www.taptap.cn/moment/862794225241031570?group_id=201765"
+      ],
+      "checkedAt": "2026-10-25T07:48:08.799Z"
+    },
+    {
+      "gameId": "wuthering-waves",
+      "periodKey": "3.7",
+      "node": "version_end",
+      "date": "2026-11-12",
+      "sources": [
+        "https://www.taptap.cn/moment/853647253976386369?group_id=330015"
+      ],
+      "checkedAt": "2026-10-25T07:55:00Z"
+    }
+  ],
   "periods": [
     {
       "gameId": "star-rail",
@@ -152,7 +173,7 @@
       "status": "pending",
       "attempts": 7,
       "updatedAt": "2026-10-25T03:12:10.253Z",
-      "retryAt": "2026-10-26T03:12:10.253Z",
+      "retryAt": null,
       "branch": "codex/cloud-baseline/zenless-3-2-version-end",
       "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/44",
       "catalogRevision": "2026-10-22.zenless-map-admission",
@@ -188,7 +209,7 @@
       "status": "pending",
       "attempts": 4,
       "updatedAt": "2026-10-25T04:23:22.072Z",
-      "retryAt": "2026-10-26T04:23:22.072Z",
+      "retryAt": null,
       "branch": "codex/cloud-baseline/wuthering-waves-3-7-first-half-end",
       "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/45",
       "catalogRevision": "2026-10-23.genshin-activities-wuwa-map",

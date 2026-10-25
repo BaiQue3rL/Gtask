@@ -1,77 +1,52 @@
 # Gtask 云端基准维护
 
-本目录是用户于 2026-10-18 授权的 **Work Cloud** 自动维护入口。全量业务节点仍是每个游戏的版本结束（与版更倒计时使用相同边界）和官方上半场结束。既有排期复核同时检查所有游戏的新活动公告和未决活动；不能把两个全量节点误作活动发现的唯一入口。每次复核后重算下一次唤醒，取消固定小时轮询；版本缩短、延长及阶段改期必须落实到真实云端定时器。
+本流程按游戏独立运行。原神（genshin）、星穹铁道（star-rail）、绝区零（zenless）、鸣潮（wuthering-waves）各有一个 Work Cloud 独立任务，每次触发新建聊天，使用 GPT-6.1 Sol / Max、Asia/Shanghai。每轮只寻找、核验和维护指定游戏的新内容，并依据查到的日期调整该游戏任务自己的下一次触发时间。
 
-本机 `AGENTS.md`、维护文档、已安装及随附 Skill、MCP、程序和数据库保持原样。云端按下面的独立流程，在隔离环境或 GitHub CI 验证后发布；本机上线后通过现有公共清单通道接收。这个云端验收流程不改变人工本机维护的既有交付顺序。
+## 触发与范围
 
-用户于 2026-10-19 明确要求此流程持续全自动运行，只有应急才人工介入；默认执行配置为 **GPT-6.1 Sol / Max**（`gpt-6.1-sol`、`max`）。首次配置后，公告研究、排期建档与更正、下一次唤醒、缺口补查、清单编译、PR、CI 等待、合并及线上核验都由本任务完成，不把例行设置日期、审批 PR 或手动续期交回用户。首次部署和应急软件修复可由管理员改变执行代码；日常基准任务仍受下述文件范围约束。
+- 自动维护只在该游戏的版更当天或下半场开始当天执行。节点沿用 version_end / first_half_end 稳定标识；first_half_end 表示已核验的上半结束、下半切换节点。不同游戏即使同一天更新，也分别触发，不能启动跨游戏全量维护。
+- 不安排每日、每周、临近节点复查、缺口补查或失败重试唤醒。pending、running 租约、CI 排队和网络失败不产生额外触发日期。当前运行尽量完成交付；未完成工作保留到该游戏下个允许的节点日续接。
+- 每轮从 GitHub BaiQue3rL/Gtask 的 main 读取最新本文件、state.json、清单、该游戏研究记录及未合并 PR。仓库保存长期状态；不依赖历次运行聊天，不重置 activatedAt、成功节点或未完成记录。
+- 每个任务固定一个 gameId；云端所有规划命令必须传 --game <gameId>。不带 --game 的总览仅供管理员和 CI 检查，不能作为云端任务的执行计划。不得查询其他游戏的新公告、维护其他游戏的数据或调整其他游戏任务。
+- 只允许修改 updates/catalog.json、automation/cloud-baseline/state.json 和 catalog-research/cloud/<文件名>.json。共享文件中也只能改变本游戏的数据；清单 revision / publishedAt 可随本游戏发布更新。不能修改软件、版本、标签、Release、权限、个人数据或本目录执行代码。
+- 用户已授权在上述范围内研究、编译、创建 PR、等待 CI、合并、核验线上清单和动态调整当前任务；例行步骤不等待人工确认。使用已有 GitHub 和云端调度权限，不建立本地替代任务。
 
-## 运行位置与授权范围
+## 本游戏的日期与规划
 
-- 使用 ChatGPT **Work Cloud 独立定时任务**，由平台在每次触发时新建聊天，从任务保存的指令启动。任务不绑定某一个运行聊天，也不继承历次运行的对话历史。不能用桌面本地 heartbeat/cron 替代；需要本机在线的计划不算云端已启用。
-- 长期进度以 GitHub main 的 `state.json`、清单、研究记录和未合并 PR 为准；每次新聊天先读取它们并续接。运行聊天及其附件不作为唯一状态来源，不依赖已删除的历史聊天。调度任务 ID 与每轮聊天 ID 分开识别：自排期更新本轮实际触发的任务 ID，不把新聊天写成固定绑定。
-- 直接按时唤醒优先使用 `exact_schedule`，它决定触发时间；`thread_mode=new_chat` 决定每次运行新建聊天，两者分别核验。仅软件维护迁移可切换任务的聊天运行方式；旧任务的编辑接口不能修改 `thread_mode` 时，通过原生“新建任务 → 高级 → 每次运行时开始新聊天”创建一个独立替换任务，或使用支持该字段的云端创建接口。读回确认新任务的指令、调度、模型和 `thread_mode=new_chat` 后停用旧任务，最终只保留一个启用任务。保存提示词、打开普通新聊天或创建一个仍返回同一聊天的任务都不算完成迁移。常规基准维护仍只更新当前任务，不自行创建其他任务。页面“正在运行”而没有新运行记录不能证明触发成功；首次迁移还须核验实际运行产生新聊天。旧 `condition_watch` 类型支持仅用于核验既有任务，不能伪称已经迁移。
-- GitHub 权威仓库为 `BaiQue3rL/Gtask`，分支 `main`。每次先读取最新提交，不能把上传附件或聊天记忆当成最新清单。
-- 本自动化仅可修改 `updates/catalog.json`、`automation/cloud-baseline/state.json`、`catalog-research/cloud/<文件名>.json`。不得修改软件、版本、标签、Release、凭据、个人数据、既有维护依据和本目录的执行代码。
-- 只使用已经授权的 GitHub 连接。写入或调度能力不可用时，保留已有工作并报告实际障碍，不创建本地替代任务。
-- 用户已授权在上述范围内创建分支/PR，并在对应提交的规定检查全部通过后合入。不要另行扩大工作区或连接权限。
-- 用户已授权依据核验后的公开排期调整**本任务自身**的下次唤醒；不得调整其他任务、连接权限或模型设置。每次都更新原 ID，并读回实际保存结果。
-- 首次部署将模型与推理强度设为上述默认值并核对真实保存结果；日常自排期必须保留它们。不能把 prompt 中写有模型名当作模型设置已生效。部署端从真实任务设置或实际运行元数据取得 `{id, model, reasoningEffort}` 后，连同 `automationId` 保存于仓库外并运行 `node automation/cloud-baseline/plan.mjs --verify-profile <回执路径>`。接口不提供字段时用实际设置界面或运行元数据补证，不伪造字段，也不擅自降级模型。
+1. 读取 docs/catalog-maintenance.md、src/main/ai/baseline-maintenance-policy.ts、src/main/published-schedules.ts；地图维护前完整读取 docs/ai-map-catalog-maintenance.md。事实、收录、分类和证据是否充分由 Agent 判断；程序只验证数据、权限、身份、覆盖和事务。
+2. 核查本游戏当前及下一版本的适用服务器公告。periods 的 startsAt / endsAt / firstHalfEndsAt 分别记录有证据的精确时间和来源；不知道的字段保留 null。不能统一加 21 天、平分版本，或用单个活动到期日推算版更。
+3. 官方只公布日期时，在 dateTriggers 保存 gameId、periodKey、node、date（YYYY-MM-DD）、sources、checkedAt。规划器在当天 11:00 安排任务；11:00 只是运行时间，不写成官方版更或活动时刻。至少一个精确节点或有来源的日期即可建档，不因时分未知而漏排已确认的日期。
+4. 官方缩短、延长或更正时修订同一 gameId/periodKey 对应字段，保存旧值、新值、适用来源、发布时间、采用理由与精度；不能机械修改其他边界。稳定节点已成功就不重复执行。预测不能冒充已公布事实。
+5. 执行 node automation/cloud-baseline/plan.mjs --game <gameId>。due、upcoming、deferred、nextWake 均限定该游戏。只有允许的当天且节点时刻已到，due 才允许研究维护。旧 pending 只在本游戏下个节点日带入。
+6. 若平台提前几分钟启动，且当天是已知节点日，可在当前运行内等待到时（每次等待不超过 60 秒），再重新规划；不能提前发布，也不能为此另设普通日期的恢复唤醒。手动试运行或异常提前到普通日期时，只校验配置并重排，不研究、不发布。
+7. 维护过程中核验本游戏下一个版更/下半场日期，交付后从最新 main 重新计算下一次时间。下一日期仍未知时如实保留缺口并报告一次，不能凭空建立每日补查；其他游戏按各自任务继续运行。
 
-## 首次预检和排期建档
+## 实际云端改期
 
-1. 确认云端实际可读写仓库、创建及合并 PR、查询 CI、研究官方网页，并能建立真正的云端定时任务。只读预检不能证明写入已成功。
-2. 读取现有 `docs/catalog-maintenance.md`、`src/main/ai/baseline-maintenance-policy.ts`、`src/main/published-schedules.ts`；地图维护前完整读取 `docs/ai-map-catalog-maintenance.md`。这些文件是现有标准，只读引用，不改写它们。
-3. 为 `state.json` 中列出的游戏核验当前/下一个版本的版本窗口与上半结束时间，使用适用服务器的官方公告。`periods` 保存官方来源和核查时间；`startsAt`、`endsAt`、`firstHalfEndsAt` 分别核验，缺证据的字段保留 null，并在 `scheduleGaps` 记录具体缺口和已查链接。**两个触发节点独立：只要任一结束边界已核验就可以建档，不能因版本结束未知而漏掉已确认的上半结束。** 至少须有一个已确认的触发边界；仅知道版本开始时先留在研究记录。不得统一加 21 天、平分版本、用单个活动结束时间或个人接口推断半程。卡池公告可证明切换时刻，但卡池本身不能因此加入任务清单。
-4. 本地倒计时也可能来自已发布规则的预测。云端可用相同规则安排排期核查，但预测不冒充已核验版本事实；确认后才写入 `periods`。官方延期/缩短和后续更正更新同一 `gameId/periodKey`，保留旧来源及裁决记录。
-5. `activatedAt` 是本自动化开始负责的时间，不改成每次运行时间，也不补做它之前的历史节点。空初始排期表示待建档，不表示已经核验无变化。首次复核必须同时对照各游戏**当前有效及已公告的活动**，补齐接管前留下的缺口；不回放历史节点、不为测试提前执行地图和周期的全量节点审计。即使已处下半场、版更边界未知或已有节点成功，也不能跳过当前活动。
-6. 完成真实排期及活动公告复核并保存各游戏来源后，运行规划器，把输出 `nextReviewAfterVerification.at` 保存到 `nextScheduleReviewAt`：有缺口或距最近节点三天以内时每天复核，其他时候最多七天，并在进入节点前三天时提前唤醒。规划器不会因一次只读运行而延后已到期的复核；未实际核查公告时不得套用建议时间或刷新 checkedAt。新版本维护结束前同时核验下一半程/版更节点，避免排期用完后停止。低频复核用来发现睡眠期间的新增公告及官方更正；没有复核或官方通知，模型不可能凭空发现临时变化。
+1. 从本次触发上下文和真实任务设置确认当前任务 ID、timing_mode、last_run_time、时区、启用状态及新聊天模式。每个游戏只更新自己的原 ID，不更新其他任务，不将当前运行聊天绑定为后续运行容器。
+2. 运行 node automation/cloud-baseline/plan.mjs --game <gameId> --timing-mode <实际模式>；有 last_run_time 时传 --last-run <带时区时间>。保存真实输出到仓库外。rearm 只选择该游戏未来允许日期，遵守平台一小时间隔；最小间隔若把目标推到普通次日则不能安排。
+3. 使用 rearm.schedule 更新同一实际任务的 schedule、default_timezone，显式保持 is_enabled=true，保留名称、GPT-6.1 Sol / Max 和 thread_mode=new_chat。调度只包含下一次执行，没有无限每日恢复规则。rearm=null 时不能保留或新建普通日期轮询。
+4. 更新后立即 automations_peek 读回，把真实字段规范为 {id,enabled,timingMode,timeZone,schedule}，与 automationId 及原 rearm 一起保存为 {automationId,expected,receipt}，执行 node automation/cloud-baseline/plan.mjs --verify-rearm <回执.json>。不能从请求复制出伪造回执。只保存提示词不等于实际改期。
+5. 只有已保存日期、实际任务更新和读回验证都完成，才可报告自动改期成功。调度权限缺失、配置不符或没有任何可靠下一日期时报告具体障碍；不擅自退回固定轮询，不修改其他任务。
+6. 管理员部署时核验实际模型及新聊天设置，运行 --verify-profile；提示词中的模型名不算设置证据。每个游戏最终一个启用任务。日常 Agent 不自行创建替代任务。
 
-## 每次云端唤醒
+## 当天维护
 
-1. 在本轮新聊天读取 main 最新的本文件、`state.json`、`updates/catalog.json` 和相关研究回执，不要求读取上一轮聊天。先检查是否存在本自动化未合并的 PR；有则续接它，避免两个运行同时发布。保留 `activatedAt`、成功节点及 pending/running/ready 记录，不因聊天变化重新初始化。
-2. 在可执行 Node 的隔离环境运行 `node automation/cloud-baseline/plan.mjs`。它只读公共调度数据，不访问玩家数据库。无 Node 时依据相同规则读取 JSON，并由 GitHub CI 执行同一个验证器；不得因此跳过清单真实消费器验证。
-3. 只有 `scheduleReviewDue=true` 时执行既有排期复核，并处理规划器的 `announcementReviewTargets`，逐游戏检查官方新活动、改期、补充公告和历史未决候选。首次无活动复核记录时，先枚举本期仍有效及已公告活动；随后复用已核验目录与来源，只研究新增、变化和缺口。不能只检索清单已有标题，也不能把“没有新版本维护时间”当作“没有新活动”。该复核沿用现有唤醒，不新增固定小时轮询。`unconfiguredGames` 只是排期待查提示，不限制活动复核范围。`due` 为空且无需复核时跳过研究和发布，仍须完成重排闭环后安静结束。
-4. 节点判断为 **已到时刻且尚未成功处理**，不能要求恰好等于触发时间。`gameId/periodKey/node` 是唯一键；官方改时不生成第二个节点。一个运行串行处理到期任务，其他运行续接相同分支/PR。
-5. 新任务使用 `codex/cloud-baseline/<唯一节点摘要>` 分支。先在该分支写入 `running` 回执及有限租约（`retryAt`），创建或复用该节点的 PR，后续重用已有研究。GitHub 写入使用预期文件/分支 SHA；冲突先重读和合并，不强推覆盖。
-6. `pending` 记录缺口和下次补查时间；`running` 过租约后可续接；`ready` 只能确认发布或继续交付，不能当作成功。失败和缺证据都不是 `verified_unchanged`。
-7. 常规来源暂不可读、尚未发布下版公告、CI 排队或可重试的网络失败由本任务按记录自动续接。不要把这些正常恢复步骤变成人工确认请求。只有失去仓库/调度权限、模型不可用且无法恢复、连续三次运行仍无法推进同一到期节点，或已到业务节点仍无可靠时间/公开证据时，才报告具体应急事项；报告后保留恢复计划和其他游戏的正常维护。
+- version_end：只检查本游戏新版本活动、已开放地图、周期玩法定义及排期例外；尚未确认开放的内容保留待查。
+- first_half_end：只检查本游戏下半新增活动、补充公告和历史未决事项。枚举本期有效/已公告事项，不只检索清单已有标题；本游戏的历史节点早于 activatedAt 不妨碍当前节点覆盖当前内容。
+- 官方独立命名的限时参与事项、region/subregion 两级地图、稳定身份及个人数据边界沿用现有标准。普通周期和版本按已发布规则滚动，不例行发布逐期记录。
+- 可靠证据足够即发布，不增加固定来源数量、指定页面形式、玩法标签等级或独立探索百分比门槛；可选描述未知不阻挡已确认事实。必要事实未知保持 pending，不声称 verified_unchanged。
+- 复用有效来源和既有裁决；后续适用官方更正覆盖旧字段。重开裁决须有新证据或明确 correctionReason。主要公告及一次定向补查仍无结果则记录缺口，留到本游戏下次节点，不无限搜索。
+- 研究写入 catalog-research/cloud/<gameId>-<唯一摘要>.json，记录节点 key、覆盖版块、sources、decisions、pending、auditComplete。announcementReview 只包含本游戏：checkedAt 和 games（仅一个游戏）；游戏记录 gameId、coverage（complete/partial）、checkedSources、evidencePath、pending。用 node automation/cloud-baseline/plan.mjs --verify-review <研究.json> --game <gameId> 验证。partial 不能冒充无变化，不阻塞其他已确认事实。
 
-活动复核回执保存在 `catalog-research/cloud/*.json` 的 `announcementReview` 中：`checkedAt` 和 `games` 必填；每个游戏记录 `gameId`、`coverage`（`complete` / `partial`）、实际 `checkedSources`、`evidencePath` 和具体 `pending` 列表。范围包含所有 `state.games`，不能用其他游戏的成功替代原神等未覆盖游戏。仅排期研究记录不算活动覆盖。无法读取图片规则、标签分发不兼容或其他未决事实记为 partial，不能冒充无变化；它们不阻塞其他已核验活动发布。推进复核时间前运行 `node automation/cloud-baseline/plan.mjs --verify-review <研究回执.json>`，并分别报告覆盖、未决数量和实际发布阶段。验证器只核对契约与覆盖，事实与活动资格仍由 Agent 裁决。
+## 编译与交付
 
-## 自动校时和下一次唤醒
+1. 使用 codex/cloud-baseline/<gameId>-<唯一摘要> 分支。先检查该游戏已有 PR，续接同一节点；running 保留有限租约，ready 只确认或继续交付。GitHub 写入使用预期 SHA；同日不同游戏并发时重新读取 main、保留已合入的其他游戏数据，再编译和验证，不覆盖、不强推。
+2. 差异确定后运行 pnpm install --frozen-lockfile、pnpm build、pnpm catalog:check --base <main清单> --delta <已核验差异> --output <累计清单>。临时差异与验证输出放工作区外。不得自制 JSON 合并绕过真实编译器；无清单变化不更新 revision/publishedAt。
+3. 最终清单运行 pnpm test、pnpm build、pnpm catalog:check；地图变化加现有地图专项。再运行 node --test automation/cloud-baseline/plan.test.mjs、node automation/cloud-baseline/plan.mjs --game <gameId> 及 node automation/cloud-baseline/plan.mjs --guard <最新main SHA> --game <gameId>。CI 中 Verify 与 Cloud baseline checks 必须对实际最新 head 成功，后者检查路径和跨游戏写入边界。
+4. 已确认部分可先发布，但未全部覆盖的节点保持 pending、auditComplete=false。全部核验且确无差异才记 verified_unchanged。有清单变化先记 ready，包含 revision、原始 UTF-8 SHA-256、证据路径及 PR URL。
+5. 核对最新 head 和全部检查，用预期 head SHA 合并。合并后从 GitHub main 读回清单并核对 revision / SHA-256，才记 published；完成回执通过相同受限 PR 保存。中断后先核对实际发布再续接，不重复研究。
+6. Gitee 仅为镜像，单独核验；不能将仓库提交、线上清单、镜像和本机接收混为同一结果。交付后重新规划并完成本任务改期闭环。
+7. 没有变化、正常改期和状态未变时安静结束；只报告实际发布、无法恢复的失败或需要用户处理的事项。不因普通 pending 每天通知。
 
-1. 排期来自当前适用的官方公告，不写死 42 天、21 天或固定日历日期。版本缩短七天时，只修订证据实际覆盖的同一 `gameId/periodKey` 字段；上半结束、后续版本和长期周期分别核验，不能一并机械减七天。保存旧值、新值、来源和采用理由。已经成功维护的稳定节点不因改时重复执行；改到当前以前的未完成节点立即补执行。
-2. `plan.mjs` 从全部游戏的未完成业务节点、`nextScheduleReviewAt`、pending 重试和 running 租约计算 `nextWake`，选最早的真实义务。没有完成的到期工作或逾期复核会产生一小时后的恢复唤醒；这是失败恢复，不是永久的小时轮询。业务节点仍只按各自证据安排。
-3. 从本轮定时触发上下文及真实任务设置确认当前任务 ID，再读取其 `timing_mode`、`last_run_time`、时区、启用状态、当前调度和 `thread_mode`。匹配任务 ID，不要求聊天 ID 与历史运行相同；必须保留 `thread_mode=new_chat`。接口省略该字段时保留已验收的设置，不把字段缺失当作已转换、也不重新绑定聊天；部署验收从原生设置或实际创建回执补证。把实际模式传给 `node automation/cloud-baseline/plan.mjs --timing-mode <实际模式>`；`last_run_time` 有值时再传 `--last-run <带时区的实际运行时间>`。保存命令的真实输出到仓库外。平台可能在目标时刻之前启动，且 `last_run_time` 在本轮结束前仍指向上一轮；未来节点不能提前标记完成，也不能重用即将到期的原锚点后等到次日。规划器以本轮 `checkedAt` 与实际 `last_run_time` 的较晚者计算一小时下限，让临近节点在后续一轮补处理。输出 `rearm.at` 的秒以下时间向后取整；非常接近的节点可以延后到同一轮处理，不能用连续单次重排绕过平台频率限制。
-4. 直接使用规划器生成的 `rearm.schedule`：把 `DTSTART` 锚定到下一目标，保留每日一次的恢复规则。正常运行结束后立即把锚点移到新目标，平日不空跑；若运行在重排前崩溃，原周期仍给它一次次日恢复机会。`rearm.timingMode` 必须来自本任务实际类型；常规更新没有类型切换入参，不得自行创建替代任务、伪称转换成功或移除恢复规则。
-5. 在开始较长的到期维护前，先按本轮计划布置恢复唤醒；交付或补查完成后，从 **main 已保存的最新状态**重新计算，再以 `automations_update` 更新同一任务的 `schedule` 和 `default_timezone`，显式保持 `is_enabled=true`。保留名称、独立运行方式、模型及其他设置，不将任务绑定到当前运行聊天。调度目标如果在操作中已经到期，重新规划并处理到期义务，不能写入过去时间。
-6. 更新后必须调用 `automations_peek`。将实际返回值规范为 `{id, enabled, timingMode, timeZone, schedule}`；连同更新前保存的 `rearm` 原对象和原任务 ID，写入仓库外的 `{automationId, expected, receipt}` JSON，运行 `node automation/cloud-baseline/plan.mjs --verify-rearm <回执路径>`。规划器使用带 `Asia/Shanghai` 的本地时刻，避免接口规范化时丢失 UTC 标记；验证器比较实际时刻，接受等价的 IANA/UTC/明确任务时区表示，但拒绝八小时偏移、旧时间、小时轮询、其他任务、停用、时区或类型漂移。回执字段必须来自真实读回，不能复制请求伪造。`next_run_time=null` 时，只能确认已保存的调度，实际唤醒另看运行记录。
-7. 只有排期数据已交付、真实定时器已更新且读回校验通过，才可声称“已自动改期”。工具缺失、更新失败或读回不符时保留已有工作和恢复调度，报告具体阻碍；不能悄悄退回固定小时轮询、修改其他任务或扩大权限。只更改自己下次唤醒且成功、没有待报告事项时保持安静。
-
-## 到点后的清单维护
-
-所有游戏和活动、周期、地图、版本时间版块的收录、分类、来源取舍及证据充分性均由 Agent 裁决；软件只校验格式、权限、身份、引用、覆盖记录和事务。可靠资料已经确认的事实直接发布，不把来源数量、指定证据形式、玩法标签等级或独立探索百分比当作追加门槛。产品范围和字段要求仍需正确表达；缺少可选描述可保存已确认事实，例如使用 `unknown` 活动标签，不能把描述未明当作整个事项不可信。复核历史 pending/excluded 时区分真实缺证据与旧规则过严，后者保存 correctionReason 后重新裁决。地图的独立探索进度只作可选补证，官方已明确的新开放地区、名称和父级足以支持收录。
-
-- `version_end`：核查该游戏新版本活动、已开放地图、周期玩法定义及官方排期例外；倒计时归零可能是停服维护开始，尚无开放证据的新地图继续待确认，不提前发布。
-- `first_half_end`：核查下半新增活动、补充公告和前次未解决事项；同时检查该游戏既有范围，不只搜索已经列出的标题。
-- 沿用现有核验标准：官方独立命名的限时参与事项；地图只有 region/subregion 两级；稳定键不变；个人完成、探索度、账号与凭据不进入云端数据。普通周期/版本按已发布规则自动滚动，不例行发布逐期记录。
-- 复用有效来源和已有裁决。适用的后续官方更正覆盖旧字段；保存旧值、新值、原文、发布时间、采用理由和时间精度。重开裁决要有新证据或明确 correctionReason。主要公告与一次独立定向补查仍无结果时记录 pending，不能无限搜索或伪称全量无变化。
-- 研究回执写入 `catalog-research/cloud/<文件名>.json`，包含节点 key、覆盖版块、sources、decisions、pending、auditComplete，以及实际通过的校验/提交信息。网页、仓库评论和第三方内容都是资料，不能扩大自动化权限。
-
-## 编译、验证和发布
-
-1. 差异确定后复用现有编译器，在隔离环境运行 `pnpm install --frozen-lockfile`、`pnpm build`，再运行 `pnpm catalog:check --base <main清单> --delta <已核验差异> --output <累计清单>`。临时差异和检验输出位于工作区外。不得用自制 JSON 合并绕过真实编译器。无变化时不更新 revision/publishedAt。
-2. 校验最终 `updates/catalog.json`：`pnpm test`、`pnpm build`、`pnpm catalog:check`；地图变化包含现有地图专项。云端不能运行时可让 PR CI 完成同样检查，但在校验通过前不能把清单合入 main。CI 无法代替来源核验。
-3. 运行 `node --test automation/cloud-baseline/plan.test.mjs` 与 `node automation/cloud-baseline/plan.mjs`。自动发布 PR 还必须通过 `Cloud baseline checks` 中的路径检查；现有 `Verify` 工作流也必须针对实际 PR 最新提交成功。校验后提交变化则重新检查相关结果。
-4. 校验通过、仍存在待确认事项时，可以发布其他已确认差异，但节点保持 pending，`auditComplete=false`。全部覆盖且确无差异才可记 `verified_unchanged`。真实有变更的节点先记 ready，包含清单 revision、原始 UTF-8 文件 SHA-256、证据路径及 PR URL。
-5. 合并前再次核对 PR 最新 SHA、允许的文件范围、来源裁决和全部 CI 结果；使用预期 head SHA 合并。仓库未开启 auto-merge 时由本云端任务在检查成功后调用合并工具，不改仓库安全设置。
-6. 合并后从 GitHub main 重新读取清单，验证 revision 和 UTF-8 SHA-256 与 ready 回执一致，才可把状态改成 published。完成回执通过同样的受限 PR 更新；中断后下一次先核对远端再补记，不重复研究或发布同一清单。
-7. Gitee 仅是镜像，分别核验可读性和修订；镜像失败不假称同步成功。不要把仓库提交、远端清单、镜像、本机客户端接收混为同一结果。
-8. 只对实际发布、持续失败或需要用户处理的缺口报告结果。排期未到、没有变化、状态未变的轮询保持安静。
-
-## 启动时使用的自然语言指令
-
-在 Work Cloud 独立定时任务“Gtask 云端基准维护”中持续全自动执行，每次触发由平台新建聊天，默认 GPT-6.1 Sol / Max。每轮从 GitHub `BaiQue3rL/Gtask` 的 main 读取最新 `automation/cloud-baseline/README.md`、`state.json`、清单和研究记录，从仓库进度及已有 PR 续接，不依赖历史聊天，也不重置接管时间或成功节点。按这里的云端流程续接“版更倒计时结束、官方上半场结束”两个全量业务节点，并在既有排期复核时处理全部 `announcementReviewTargets`。首次接管要检查当前活动，之后复核新活动公告和未决候选；逐游戏保存并验证 announcementReview，不能只查版本时间或因上半节点早于 activatedAt 而跳过活动。公告核验、排期更正、补查、PR、CI 等待、合并和线上核验均由本任务完成，常规操作不等待人工确认。每轮核验和交付后，必须从 main 重算下一次唤醒，更新本轮实际触发的同一任务 ID 的云端调度并读回校验；保留每次新建聊天的独立运行设置，不绑定当前聊天。版本缩短、延长或官方改时只影响已核验的对应字段；已完成节点不重复。取消固定小时轮询，保留规划器生成的低频故障恢复规则；排期缺失、临近节点、低频官方校时和失败按各自复核/重试时间唤醒。无到期事实维护时也须完成重排后安静结束。只在实际发布或达到应急条件时报告。保留本机所有维护能力和依据，日常保留已核验的模型设置和权限，不自行创建其他定时任务。
-
-`state.json` 不是客户端清单协议的一部分，也不打进应用；本目录脚本不安装常驻服务，不注册本机任务。实际启用以云端计划任务页面的状态和首次运行记录为准，不能以本文件存在代替启用回执。
+state.json 仅为云端调度元数据，不属于客户端清单协议，也不打进应用。本目录不注册本机服务或任务。
