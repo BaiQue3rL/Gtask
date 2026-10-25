@@ -8,7 +8,26 @@
 
 规划器增加 `--game <gameId>`，计划、覆盖验证和自动发布边界均按游戏隔离；删除 nextScheduleReviewAt 及重试触发源，仅输出下一节点的单次调度。旧 pending 保留到本游戏下个节点日续接。新增 schemaVersion=2 的 dateTriggers，官方只有日期时在当天 11:00 执行任务，精确业务时间仍留 null。原神 11 月 4 日依据官方 7.2 前瞻，鸣潮 11 月 12 日依据官方 3.7 整版活动日历的终点；没有把任务时刻当作官方精确维护时间。星铁现有下一节点为 11 月 11 日 06:00，绝区零为同日 11:59。来源保存在 state.json，清单未改变。
 
-执行规范见 `automation/cloud-baseline/README.md` 和根 AGENTS。实际四个任务的 ID、保存设置和调度读回以仓库外 `C:\Users\Administrator\AppData\Local\Codex\task-receipts\gtask-cloud-node-days-20261025` 的验收结果为准；不能以本段或提示词代替实际后台验收。本次仅改云端脚本及调度配置，无须替换本机客户端，不增版、不发布 Release、不创建备份。
+实际云端配置已于 2026-10-25 16:10（北京时间）验收。四个任务均启用，类型为按指定日期执行的云端任务，时区 Asia/Shanghai，保存后的设置均为每次运行新建聊天、GPT-6.1 Sol / Max；“重复执行任务”关闭，由各自 Agent 在维护后动态安排下一次单次执行。
+
+| 游戏 / gameId | 实际任务名 | 云端任务 ID | 当时保存的下次触发（北京时间） |
+| --- | --- | --- | --- |
+| 原神 / `genshin` | Gtask 原神基准维护 | `6adccecc2b288190af3a456080dc8a6c` | 2026-11-04 11:00 |
+| 星铁 / `star-rail` | Gtask 星铁基准维护 | `6addb76ca81c8190936ad76e691ac1f6` | 2026-11-11 06:00 |
+| 绝区零 / `zenless` | Gtask 绝区零基准维护 | `6addb7eef3188190ae9dbe947d25f48d` | 2026-11-11 11:59 |
+| 鸣潮 / `wuthering-waves` | Gtask 鸣潮基准维护 | `6addb85580988190b4123614133e3d64` | 2026-11-12 11:00 |
+
+原独立任务 `6adccecc2b288190af3a456080dc8a6c` 已直接改为原神专属任务，保留原 ID；其余三个任务本次新建。更早的全游戏任务 `6ad63200f43481918a0cc1cc78014515` 继续暂停，不得重新启用或据其旧指令恢复全量/每日维护。上述日期是验收时的配置快照，后续以各任务实际设置及 main 的本游戏计划为准，不将本表当作永久日历。
+
+执行规范见 `automation/cloud-baseline/README.md` 和根 AGENTS。每个任务的保存指令均固定 gameId，要求只研究和写入本游戏、运行 `plan.mjs --game <gameId>`，交付后根据查到的日期更新本次触发任务自身的原 ID，并真实读回验证。共享清单和 state 文件必须保留最新 main 中其他游戏的数据；同日并发发布时先重读、合并再编译验证，不能覆盖另一游戏的交付。不带 --game 的规划仅供管理员/CI 总览。
+
+仓库长期状态继续作为新聊天的入口，不依赖旧聊天，也不重新初始化接管时间或已成功节点。未完成事项仍保留：绝区零 `zenless/3.2/version_end` 的拟境湮灭战周期锚点等必要排期字段未知，鸣潮 `wuthering-waves/3.7/first_half_end` 的终焉矩阵精确窗口未知。两者 retryAt 已清空，分别留到本游戏下个允许节点日续接；旧研究/notes 中的“次日补查”等文字属于历史，不再产生唤醒。没有可靠下一日期时报告具体缺口，不另设轮询。
+
+[PR #46](https://github.com/BaiQue3rL/Gtask/pull/46) 已合并，功能合并提交为 `e9cc9b85f1af524af5f1700292c8b990cb9a8cbc`；PR 与该提交的 Verify、Cloud baseline checks 均成功。27 项规划、单次调度、按游戏覆盖及跨游戏写入边界回归通过。实际配置验收来自保存后的原生任务编辑器和云端网页列表，并据此规范化后通过调度/模型验证；没有取得 automations_peek 原始响应，不能把 UI 回执称为该接口回执。
+
+四任务新排期的自然定时触发及其后自改期尚未发生；本次没有为试运行提前执行清单内容维护或发布，不能把配置读回或规划器测试称为已完成自然运行。到允许节点后的实际运行，再核验它只覆盖对应游戏、从仓库续接、新建聊天、完成交付和更新原任务日期；不为这项待验证内容增加提前检查或额外定时器。
+
+验收材料位于仓库外 `C:\Users\Administrator\AppData\Local\Codex\task-receipts\gtask-cloud-node-days-20261025`：`result.json`、`saved-ui-configurations.json`、`verification-results.json`、`expected-plans.json`、各游戏保存的指令及设置截图、`four-games-enabled.png`。本次仅改云端脚本、说明及调度配置，公开清单和客户端程序未变，无须替换本机客户端；未增版、未发布 Release、未创建备份。此前关机授权已完成，不适用于本次或后续接手。
 
 ## 2026-10-24 云端维护每次新建聊天
 
