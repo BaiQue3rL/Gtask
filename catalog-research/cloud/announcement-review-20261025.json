@@ -1,0 +1,224 @@
+{
+  "schemaVersion": 1,
+  "kind": "announcement_and_schedule_review",
+  "checkedAt": "2026-10-25T04:23:22.072Z",
+  "status": "pending",
+  "auditComplete": false,
+  "baseMainSha": "d7d00dac90f2304d38ff6b6c857e2c9336b46c74",
+  "priorEvidence": [
+    "catalog-research/cloud/announcement-review-20261024.json",
+    "catalog-research/cloud/wuthering-waves-3-7-first-half-end.json"
+  ],
+  "serverScope": {
+    "region": "CN production",
+    "timeZone": "Asia/Shanghai"
+  },
+  "announcementReview": {
+    "checkedAt": "2026-10-25T04:23:22.072Z",
+    "games": [
+      {
+        "gameId": "genshin",
+        "coverage": "partial",
+        "checkedSources": [
+          "https://www.taptap.cn/app/168332/topic?type=official",
+          "https://www.taptap.cn/moment/862831267807232113?group_id=201765",
+          "https://www.taptap.cn/moment/862794225241031570?group_id=201765"
+        ],
+        "evidencePath": "catalog-research/cloud/announcement-review-20261025.json",
+        "pending": [
+          "7.2三项已公告活动的国服精确窗口仍缺；新地图未开放。"
+        ]
+      },
+      {
+        "gameId": "star-rail",
+        "coverage": "partial",
+        "checkedSources": [
+          "https://www.taptap.cn/app/224267/topic?type=official",
+          "https://www.taptap.cn/moment/862703042242283177?group_id=311675",
+          "https://hsr.hoyoverse.com/zh-cn/news/166468"
+        ],
+        "evidencePath": "catalog-research/cloud/announcement-review-20261025.json",
+        "pending": [
+          "4.7版本/上半与幻月游戏新赛季完整必要字段未公布。"
+        ]
+      },
+      {
+        "gameId": "zenless",
+        "coverage": "complete",
+        "checkedSources": [
+          "https://www.taptap.cn/app/234493/topic?type=official",
+          "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
+        ],
+        "evidencePath": "catalog-research/cloud/announcement-review-20261025.json",
+        "pending": []
+      },
+      {
+        "gameId": "wuthering-waves",
+        "coverage": "partial",
+        "checkedSources": [
+          "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
+          "https://www.taptap.cn/moment/854139064348051537",
+          "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+          "https://www.taptap.cn/moment/861624365911900497?group_id=330015"
+        ],
+        "evidencePath": "catalog-research/cloud/announcement-review-20261025.json",
+        "pending": [
+          "终焉矩阵3.7精确起止时分仍缺；日期级日历不能替代时间戳。"
+        ]
+      }
+    ]
+  },
+  "coverage": [
+    {
+      "gameId": "genshin",
+      "summary": "新祝圣移涌独立公告明确10/26 04:00至11/02 03:59，与既有稳定键窗口一致；最新列表仅生日、音乐、创作赛预告等。复用昨日已读7.2长图裁决，未重读图片；7.2仍仅11/04上线日期，不推算维护边界。"
+    },
+    {
+      "gameId": "star-rail",
+      "summary": "最新官方列表增加货币战争趣味数据回顾，正文为赛季即将收官及颁奖典礼宣传，不作为独立限时参与事项或精确周期边界；九张统计图片未作为排期证据。4.7仍是赠礼/幻月游戏预热，定向补查无完整窗口。"
+    },
+    {
+      "gameId": "zenless",
+      "summary": "最新列表为强敌与代理人档案；复核官方3.3全文的活动窗口和12/02 06:00版本结束，与已存基准一致；拟境湮灭战未到retryAt，保持今日早先pending记录。"
+    },
+    {
+      "gameId": "wuthering-waves",
+      "summary": "最新列表为朝月良辰、桌宠预告和角色内容；3.7全文及二期公告复核，下半既有活动不重复发布。全文无终焉矩阵精确时分；复用此前已读日期日历，一次独立定向补查未取得可靠国服精确窗口。网站正文为空，使用官方论坛全文交叉核验。"
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://www.taptap.cn/app/168332/topic?type=official",
+      "checkedAt": "2026-10-25T04:23:22.072Z",
+      "identity": "official publisher account or official website",
+      "result": "text_readable"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/862831267807232113?group_id=201765",
+      "checkedAt": "2026-10-25T04:23:22.072Z",
+      "identity": "official publisher account or official website",
+      "result": "text_readable"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/862794225241031570?group_id=201765",
+      "checkedAt": "2026-10-25T04:23:22.072Z",
+      "identity": "official publisher account or official website",
+      "result": "text_readable"
+    },
+    {
+      "url": "https://www.taptap.cn/app/224267/topic?type=official",
+      "checkedAt": "2026-10-25T04:23:22.072Z",
+      "identity": "official publisher account or official website",
+      "result": "text_readable"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/862703042242283177?group_id=311675",
+      "checkedAt": "2026-10-25T04:23:22.072Z",
+      "identity": "official publisher account or official website",
+      "result": "text_readable"
+    },
+    {
+      "url": "https://hsr.hoyoverse.com/zh-cn/news/166468",
+      "checkedAt": "2026-10-25T04:23:22.072Z",
+      "identity": "official publisher account or official website",
+      "result": "page_loading_only; official indexed excerpt confirms existing 4.6 end"
+    },
+    {
+      "url": "https://www.taptap.cn/app/234493/topic?type=official",
+      "checkedAt": "2026-10-25T04:23:22.072Z",
+      "identity": "official publisher account or official website",
+      "result": "text_readable"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+      "checkedAt": "2026-10-25T04:23:22.072Z",
+      "identity": "official publisher account or official website",
+      "result": "text_readable"
+    },
+    {
+      "url": "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
+      "checkedAt": "2026-10-25T04:23:22.072Z",
+      "identity": "official publisher account or official website",
+      "result": "text_readable"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/854139064348051537",
+      "checkedAt": "2026-10-25T04:23:22.072Z",
+      "identity": "official publisher account or official website",
+      "result": "text_readable"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+      "checkedAt": "2026-10-25T04:23:22.072Z",
+      "identity": "official publisher account or official website",
+      "result": "text_readable"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/861624365911900497?group_id=330015",
+      "checkedAt": "2026-10-25T04:23:22.072Z",
+      "identity": "official publisher account or official website",
+      "result": "text_readable"
+    }
+  ],
+  "independentSupplement": {
+    "queries": [
+      "鸣潮 3.7 终焉矩阵 险境强袭 10月7日 11月12日 官方",
+      "原神 7.2 2026 维护 11月4日 官方",
+      "星穹铁道 4.7 2026 更新公告 官方",
+      "鸣潮 3.8 2026 维护 更新公告 官方"
+    ],
+    "result": "No reliable new exact boundaries; stop this run; third-party predictions not adopted."
+  },
+  "scheduleReview": {
+    "checkedAt": "2026-10-25T04:23:22.072Z",
+    "changes": [],
+    "preserveUnknownFields": true,
+    "nextReviewAfterVerification": {
+      "at": "2026-10-26T04:23:22.072Z",
+      "reason": "missing_schedule"
+    },
+    "notes": "最新官方列表及一次独立补查完成；保留既有已核验时间和具体缺口。"
+  },
+  "pending": [
+    {
+      "gameId": "genshin",
+      "reason": "7.2三项已公告活动的国服精确窗口仍缺；新地图未开放。",
+      "retryAt": "2026-10-26T04:23:22.072Z"
+    },
+    {
+      "gameId": "star-rail",
+      "reason": "4.7版本/上半与幻月游戏新赛季完整必要字段未公布。",
+      "retryAt": "2026-10-26T04:23:22.072Z"
+    },
+    {
+      "gameId": "wuthering-waves",
+      "reason": "终焉矩阵3.7精确起止时分仍缺；日期级日历不能替代时间戳。",
+      "retryAt": "2026-10-26T04:23:22.072Z"
+    }
+  ],
+  "decisions": [
+    {
+      "key": "genshin:event:7.1:overflowing-abundance-artifacts",
+      "decision": "verified_existing_window",
+      "sourceUrl": "https://www.taptap.cn/moment/862831267807232113?group_id=201765",
+      "startsAt": "2026-10-26T04:00:00+08:00",
+      "endsAt": "2026-11-02T03:59:00+08:00"
+    },
+    {
+      "key": "star-rail:currency-war-annual-data",
+      "decision": "exclude_promotional_statistics",
+      "sourceUrl": "https://www.taptap.cn/moment/862703042242283177?group_id=311675",
+      "reason": "官方正文定位趣味数据回顾，非独立限时参与公告。"
+    }
+  ],
+  "validation": {
+    "catalogBytesChanged": false
+  },
+  "delivery": {
+    "stage": "research_only",
+    "branch": "codex/cloud-baseline/wuthering-waves-3-7-first-half-end",
+    "catalogChanged": false,
+    "nodeComplete": false,
+    "resumeAt": "2026-10-26T04:23:22.072Z"
+  }
+}
