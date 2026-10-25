@@ -6,7 +6,7 @@
   "periodKey": "3.2",
   "node": "version_end",
   "newVersion": "3.3",
-  "checkedAt": "2026-10-24T02:09:26.273Z",
+  "checkedAt": "2026-10-25T03:12:10.253Z",
   "status": "pending",
   "auditComplete": false,
   "serverScope": {
@@ -15,7 +15,7 @@
     "utcOffset": "+08:00",
     "note": "按既有已核验国服范围归一化；不混用其他服务器时间。公告仅到分钟时保留:00秒。"
   },
-  "baseMainSha": "397e892bf30fa515a1f54a2467611404bbe5def7",
+  "baseMainSha": "572a2b1819565b376021710c2e154c2f646b0d7e",
   "priorEvidence": [
     "docs/catalog-research/zenless-3.2-2026-10-11.json",
     "catalog-research/cloud/schedule-review-20261019.json",
@@ -347,6 +347,16 @@
       "cycleFieldsVerified": false,
       "announcementReviewDue": false,
       "note": "3.3完整官方更新仍只列拟境相关勋章/头像与敌人更新；当前官方列表没有周期说明。独立定向检索只返回官方旧玩法介绍、玩家攻略或无关更新，原始官方介绍图部分抓取超时且可读图未给周期字段。未取得国服重置锚点、cadence或开放时长，不从版本周期、其他模式或非官方攻略推算。"
+    },
+    {
+      "section": "resumption_attempt_7",
+      "result": "partial",
+      "checkedAt": "2026-10-25T03:12:10.253Z",
+      "scope": "remaining cycle evidence only; prior completed map and event decisions reused",
+      "cycleFieldsVerified": false,
+      "scheduleReviewDue": false,
+      "nextScheduleReviewAtPreserved": "2026-10-25T03:25:49.216Z",
+      "note": "2026-10-25限定补查：完整3.3更新、当前官方列表及旧官方玩法介绍均未提供适用国服重置锚点、开启间隔和开放时长。玩法介绍三张PNG已实际解码阅读：封面、参与条件/奖励、战绩记录；GIF规则图抓取超时。一次独立定向补查及官方检索交叉核验仍无必要字段；不从其他模式、版本长度或玩家攻略推算。"
     }
   ],
   "sources": [
@@ -549,6 +559,52 @@
       "result": "official_search_index_rechecked",
       "identity": "official publisher site",
       "summary": "官方3.3更新索引未返回拟境周期必要字段。"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+      "sourceRef": "turn0view0",
+      "identity": "official game publisher account",
+      "result": "update_read_no_required_cycle_fields",
+      "checkedAt": "2026-10-25T03:12:10.253Z"
+    },
+    {
+      "url": "https://www.taptap.cn/app/234493/topic?type=official",
+      "sourceRef": "turn0view1",
+      "identity": "official publisher list",
+      "result": "listing_read_no_cycle_specific_announcement_seen",
+      "checkedAt": "2026-10-25T03:12:10.253Z"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/816701048914709432",
+      "sourceRef": "turn0view2",
+      "identity": "official game publisher account",
+      "result": "text_and_three_png_images_read_gif_timeout",
+      "imageEvidence": [
+        {
+          "url": "https://img2-tc.tapimg.com/moment/etag/95db3f58a2500e48a1f87c42cdf12b2e.png/_tap_ugc.jpg",
+          "result": "cover_read"
+        },
+        {
+          "url": "https://img2-tc.tapimg.com/moment/etag/88eeeb86b515c9eac1d8eef52db7856b.png/_tap_ugc.jpg",
+          "result": "participation_requirements_and_rewards_read_no_cycle_times"
+        },
+        {
+          "url": "https://img2-tc.tapimg.com/moment/etag/0a7e11c9a50471322efc16ab4b7f51d4.png/_tap_ugc.jpg",
+          "result": "history_and_rank_rules_read_no_cycle_times"
+        },
+        {
+          "url": "https://img2-tc.tapimg.com/moment/etag/d48408a86ad4305e038982af7a3f8378.gif/_tap_ugc.gif",
+          "result": "web_fetch_and_direct_read_timeout_not_covered"
+        }
+      ],
+      "checkedAt": "2026-10-25T03:12:10.253Z"
+    },
+    {
+      "url": "https://zenless.hoyoverse.com/m/zh-cn/news/166963",
+      "sourceRef": "turn2search0",
+      "identity": "official publisher site",
+      "result": "search_index_only_no_required_cycle_fields",
+      "checkedAt": "2026-10-25T03:12:10.253Z"
     }
   ],
   "decisions": [
@@ -952,15 +1008,30 @@
         "https://www.taptap.cn/moment/816701048914709432"
       ],
       "notAWholeCatalogVerifiedUnchanged": true
+    },
+    {
+      "key": "cycles:hollow-annihilation:20261025",
+      "target": "cycles",
+      "status": "pending",
+      "checkedAt": "2026-10-25T03:12:10.253Z",
+      "adoptedValue": null,
+      "reason": "2026-10-25限定补查：完整3.3更新、当前官方列表及旧官方玩法介绍均未提供适用国服重置锚点、开启间隔和开放时长。玩法介绍三张PNG已实际解码阅读：封面、参与条件/奖励、战绩记录；GIF规则图抓取超时。一次独立定向补查及官方检索交叉核验仍无必要字段；不从其他模式、版本长度或玩家攻略推算。",
+      "sources": [
+        "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+        "https://www.taptap.cn/app/234493/topic?type=official",
+        "https://www.taptap.cn/moment/816701048914709432",
+        "https://zenless.hoyoverse.com/m/zh-cn/news/166963"
+      ],
+      "notAWholeCatalogVerifiedUnchanged": true
     }
   ],
   "pending": [
     {
       "key": "cycles:hollow-annihilation",
       "target": "cycles",
-      "reason": "2026-10-24复核：当前完整官方3.3更新、官方列表、旧官方玩法介绍及一次独立定向补查仍未取得适用国服的重置锚点、开启间隔和开放时长；原始规则图部分抓取失败，成功读取内容也未给周期字段。保留真实必要字段缺口，不从版本周期、其他模式或玩家攻略推算。",
-      "checkedAt": "2026-10-24T02:09:26.273Z",
-      "retryAt": "2026-10-25T02:09:26.273Z",
+      "reason": "2026-10-25限定补查：完整3.3更新、当前官方列表及旧官方玩法介绍均未提供适用国服重置锚点、开启间隔和开放时长。玩法介绍三张PNG已实际解码阅读：封面、参与条件/奖励、战绩记录；GIF规则图抓取超时。一次独立定向补查及官方检索交叉核验仍无必要字段；不从其他模式、版本长度或玩家攻略推算。",
+      "checkedAt": "2026-10-25T03:12:10.253Z",
+      "retryAt": "2026-10-26T03:12:10.253Z",
       "missingFields": [
         "reset anchor with applicable server/time zone",
         "cadence",
@@ -1082,15 +1153,15 @@
   "delivery": {
     "stage": "research_only",
     "branch": "codex/cloud-baseline/zenless-3-2-version-end",
-    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/41",
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/44",
     "catalogChanged": false,
-    "referenceCatalogRevision": "2026-10-22.zenless-map-admission",
-    "referenceCatalogSha256": "d2a930d0519c76780900084190b15b057f1395a33afada17c79bd8e573beb75c",
+    "referenceCatalogRevision": "2026-10-23.genshin-activities-wuwa-map",
+    "referenceCatalogSha256": "8f61275ae7258e2ccaf7cd59929f63cf4fa0389faba940c6f7bc371a6b056d42",
     "lastPublishedCatalogRevision": "2026-10-22.zenless-map-admission",
     "lastPublishedCatalogSha256": "d2a930d0519c76780900084190b15b057f1395a33afada17c79bd8e573beb75c",
     "nodeComplete": false,
     "remainingPendingCount": 1,
-    "resumeAt": "2026-10-25T02:09:26.273Z",
+    "resumeAt": "2026-10-26T03:12:10.253Z",
     "priorAdministratorPublication": "catalog-research/cloud/admission-authority-repair-20261022.json"
   },
   "verifiedCatalogDelta": {
@@ -1312,18 +1383,17 @@
   "scheduleReviewThisAttempt": {
     "performed": false,
     "reason": "scheduleReviewDue=false",
-    "nextScheduleReviewAtPreserved": "2026-10-23T02:20:47.389Z"
+    "nextScheduleReviewAtPreserved": "2026-10-25T03:25:49.216Z"
   },
   "currentAttempt": {
-    "attempt": 5,
-    "startedAt": "2026-10-23T02:05:03Z",
-    "checkedAt": "2026-10-23T02:08:24.805Z",
+    "attempt": 7,
+    "startedAt": "2026-10-25T03:11:10.298Z",
+    "checkedAt": "2026-10-25T03:12:10.253Z",
     "scope": "resume only due cycle pending",
     "catalogAdded": 0,
     "resolvedPending": [],
     "remainingPending": 1,
-    "auditComplete": false,
-    "administratorMapsAlreadyPublished": 3
+    "auditComplete": false
   },
   "partialPublications": [
     {
@@ -1380,7 +1450,7 @@
     "resolvedPending": [],
     "remainingPending": 1
   },
-  "consecutiveRunsWithoutProgress": 2,
+  "consecutiveRunsWithoutProgress": 4,
   "resolvedPendingHistory": [
     {
       "at": "2026-10-22T09:00:31.554Z",
@@ -1482,13 +1552,86 @@
         ],
         "result": "Official versions3.1/3.2/3.3 and unrelated double-reward reset or unofficial guide results did not supply the three specific missing cycle facts; no data adopted from unrelated modes or derivative guides."
       }
+    },
+    {
+      "attempt": 7,
+      "checkedAt": "2026-10-25T03:12:10.253Z",
+      "checks": [
+        {
+          "url": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+          "sourceRef": "turn0view0",
+          "identity": "official game publisher account",
+          "result": "update_read_no_required_cycle_fields",
+          "checkedAt": "2026-10-25T03:12:10.253Z"
+        },
+        {
+          "url": "https://www.taptap.cn/app/234493/topic?type=official",
+          "sourceRef": "turn0view1",
+          "identity": "official publisher list",
+          "result": "listing_read_no_cycle_specific_announcement_seen",
+          "checkedAt": "2026-10-25T03:12:10.253Z"
+        },
+        {
+          "url": "https://www.taptap.cn/moment/816701048914709432",
+          "sourceRef": "turn0view2",
+          "identity": "official game publisher account",
+          "result": "text_and_three_png_images_read_gif_timeout",
+          "imageEvidence": [
+            {
+              "url": "https://img2-tc.tapimg.com/moment/etag/95db3f58a2500e48a1f87c42cdf12b2e.png/_tap_ugc.jpg",
+              "result": "cover_read"
+            },
+            {
+              "url": "https://img2-tc.tapimg.com/moment/etag/88eeeb86b515c9eac1d8eef52db7856b.png/_tap_ugc.jpg",
+              "result": "participation_requirements_and_rewards_read_no_cycle_times"
+            },
+            {
+              "url": "https://img2-tc.tapimg.com/moment/etag/0a7e11c9a50471322efc16ab4b7f51d4.png/_tap_ugc.jpg",
+              "result": "history_and_rank_rules_read_no_cycle_times"
+            },
+            {
+              "url": "https://img2-tc.tapimg.com/moment/etag/d48408a86ad4305e038982af7a3f8378.gif/_tap_ugc.gif",
+              "result": "web_fetch_and_direct_read_timeout_not_covered"
+            }
+          ],
+          "checkedAt": "2026-10-25T03:12:10.253Z"
+        },
+        {
+          "url": "https://zenless.hoyoverse.com/m/zh-cn/news/166963",
+          "sourceRef": "turn2search0",
+          "identity": "official publisher site",
+          "result": "search_index_only_no_required_cycle_fields",
+          "checkedAt": "2026-10-25T03:12:10.253Z"
+        }
+      ],
+      "supplement": {
+        "bounded": true,
+        "rounds": 1,
+        "queries": [
+          "site:zenless.hoyoverse.com \"拟境湮灭战\" \"重置\"",
+          "site:taptap.cn/moment \"拟境湮灭战\" \"周期\" \"绝区零\""
+        ],
+        "primaryEngine": "system2",
+        "verificationEngine": "system1",
+        "result": "official update results refer to medals, unrelated reset mechanics, or other versions; unofficial guides rejected; no applicable cycle rule obtained"
+      }
     }
   ],
   "progress": {
-    "attempts": 6,
-    "consecutiveRunsWithoutProgress": 3,
-    "advanceThisRun": "无新增可交付事实；完成限定范围官方复核与一次独立补查并保留精确缺口。",
+    "attempts": 7,
+    "consecutiveRunsWithoutProgress": 4,
+    "advanceThisRun": "限定官方补查完成；三张原图本轮可读但未补齐周期字段。",
     "emergency": true,
-    "emergencyReason": "同一到期节点连续三次运行仍无法取得拟境湮灭战周期必要可靠证据。"
+    "emergencyReason": "既有同一到期节点周期必要证据持续缺失；保留已登记应急，不伪造成功。"
+  },
+  "cloudRuntimeObservation": {
+    "automationId": "6adccecc2b288190af3a456080dc8a6c",
+    "matchedBy": "unique enabled title and current run scheduled_for 2026-10-25T03:08:01Z / started_at 2026-10-25T03:08:39.647592Z",
+    "timingMode": "exact_schedule",
+    "lastRunTime": "2026-10-25T02:08:16.061311+00:00",
+    "threadMode": "not_exposed_by_connector; preserved administrator-accepted new_chat setting documented in docs/next-session.md",
+    "modelProfile": "not_exposed_by_connector; preserved administrator-verified profile, no new profile receipt claimed",
+    "initialRearmVerifiedAt": "2026-10-25T04:09:33.000Z",
+    "rearmNote": "at denotes saved target, not observed actual wake; raw receipts outside repository"
   }
 }

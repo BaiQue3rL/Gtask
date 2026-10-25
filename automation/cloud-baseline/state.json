@@ -149,17 +149,17 @@
       "periodKey": "3.2",
       "node": "version_end",
       "boundaryAt": "2026-10-21T06:00:00+08:00",
-      "status": "running",
+      "status": "pending",
       "attempts": 7,
-      "updatedAt": "2026-10-25T03:11:10.298Z",
-      "retryAt": "2026-10-25T04:11:10.298Z",
+      "updatedAt": "2026-10-25T03:12:10.253Z",
+      "retryAt": "2026-10-26T03:12:10.253Z",
       "branch": "codex/cloud-baseline/zenless-3-2-version-end",
-      "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/41",
+      "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/44",
       "catalogRevision": "2026-10-22.zenless-map-admission",
       "catalogSha256": "d2a930d0519c76780900084190b15b057f1395a33afada17c79bd8e573beb75c",
       "evidencePath": "catalog-research/cloud/zenless-3-2-version-end.json",
       "completedAt": null,
-      "notes": "续接既有周期缺口，限时租约；不重复已发布地图/活动，不提前执行尚未到期复核。"
+      "notes": "2026-10-25限定补查：完整3.3更新、当前官方列表及旧官方玩法介绍均未提供适用国服重置锚点、开启间隔和开放时长。玩法介绍三张PNG已实际解码阅读：封面、参与条件/奖励、战绩记录；GIF规则图抓取超时。一次独立定向补查及官方检索交叉核验仍无必要字段；不从其他模式、版本长度或玩家攻略推算。 保持既有应急缺口和次日补查；其他游戏按原排期处理。"
     },
     {
       "key": "star-rail/4.6/first_half_end",
