@@ -1259,6 +1259,16 @@
         "resolvedPending": [],
         "remainingPending": 4
       }
+    },
+    {
+      "attempt": 7,
+      "startedAt": "2026-10-25T03:11:10.298Z",
+      "baseMainSha": "572a2b1819565b376021710c2e154c2f646b0d7e",
+      "status": "running",
+      "leaseUntil": "2026-10-25T04:11:10.298Z",
+      "pendingAtStart": [
+        "cycles:hollow-annihilation"
+      ]
     }
   ],
   "scheduleResolution": {
