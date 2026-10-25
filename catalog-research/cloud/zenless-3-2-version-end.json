@@ -1631,7 +1631,12 @@
     "lastRunTime": "2026-10-25T02:08:16.061311+00:00",
     "threadMode": "not_exposed_by_connector; preserved administrator-accepted new_chat setting documented in docs/next-session.md",
     "modelProfile": "not_exposed_by_connector; preserved administrator-verified profile, no new profile receipt claimed",
-    "initialRearmVerifiedAt": "2026-10-25T04:09:33.000Z",
-    "rearmNote": "at denotes saved target, not observed actual wake; raw receipts outside repository"
+    "rearmNote": "at denotes saved target, not observed actual wake; raw receipts outside repository",
+    "initialRearmTargetAt": "2026-10-25T04:09:33.000Z",
+    "initialRearmVerification": {
+      "ok": true,
+      "receiptLocation": "outside repository",
+      "observedOutput": "{\"ok\":true,\"at\":\"2026-10-25T04:09:33.000Z\"}"
+    }
   }
 }
