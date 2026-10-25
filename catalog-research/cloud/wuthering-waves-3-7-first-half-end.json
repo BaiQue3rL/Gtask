@@ -5,7 +5,7 @@
   "gameId": "wuthering-waves",
   "periodKey": "3.7",
   "node": "first_half_end",
-  "checkedAt": "2026-10-24T03:25:49.216Z",
+  "checkedAt": "2026-10-25T04:23:22.072Z",
   "status": "pending",
   "auditComplete": false,
   "serverScope": {
@@ -680,6 +680,30 @@
       "checkedAt": "2026-10-24T03:25:49.216Z",
       "result": "not_adopted",
       "summary": "第三方给出10/07 04:00至11/12 03:59；缺官方确认，不据此纠正公共周期。"
+    },
+    {
+      "url": "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
+      "checkedAt": "2026-10-25T04:23:22.072Z",
+      "identity": "鸣潮官方账号",
+      "result": "text_readable; previous calendar image verdict reused, not freshly reread"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/854139064348051537",
+      "checkedAt": "2026-10-25T04:23:22.072Z",
+      "identity": "鸣潮官方账号",
+      "result": "text_readable; previous calendar image verdict reused, not freshly reread"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+      "checkedAt": "2026-10-25T04:23:22.072Z",
+      "identity": "鸣潮官方账号",
+      "result": "text_readable; previous calendar image verdict reused, not freshly reread"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/861624365911900497?group_id=330015",
+      "checkedAt": "2026-10-25T04:23:22.072Z",
+      "identity": "鸣潮官方账号",
+      "result": "text_readable; previous calendar image verdict reused, not freshly reread"
     }
   ],
   "decisions": [
@@ -751,23 +775,23 @@
     {
       "key": "cycles:terminus-matrix:3.7:precise-window",
       "target": "cycles",
-      "reason": "2026-10-24复核：官方3.7内容说明、当前官方列表、原始日期日历及二期唤取仍未给终焉矩阵适用国服精确开始/结束时分。独立补查仅第三方给出04:00/03:59，缺官方确认且与既有生成窗口冲突，不采用。",
-      "checkedAt": "2026-10-24T03:25:49.216Z",
-      "retryAt": "2026-10-25T03:25:49.216Z"
+      "reason": "终焉矩阵3.7精确起止时分仍缺；日期级日历不能替代时间戳。 最新列表为朝月良辰、桌宠预告和角色内容；3.7全文及二期公告复核，下半既有活动不重复发布。全文无终焉矩阵精确时分；复用此前已读日期日历，一次独立定向补查未取得可靠国服精确窗口。网站正文为空，使用官方论坛全文交叉核验。",
+      "checkedAt": "2026-10-25T04:23:22.072Z",
+      "retryAt": "2026-10-26T04:23:22.072Z"
     }
   ],
   "delivery": {
     "stage": "research_only",
     "branch": "codex/cloud-baseline/wuthering-waves-3-7-first-half-end",
-    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/43",
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/45",
     "catalogChanged": false,
     "batchCatalogChanged": false,
-    "batchEvidencePath": "catalog-research/cloud/announcement-review-20261024.json",
+    "batchEvidencePath": "catalog-research/cloud/announcement-review-20261025.json",
     "referenceCatalogRevision": "2026-10-23.genshin-activities-wuwa-map",
     "referenceCatalogSha256": "8f61275ae7258e2ccaf7cd59929f63cf4fa0389faba940c6f7bc371a6b056d42",
     "nodeComplete": false,
     "remainingPendingCount": 1,
-    "resumeAt": "2026-10-25T03:25:49.216Z",
+    "resumeAt": "2026-10-26T04:23:22.072Z",
     "priorPublication": {
       "stage": "published_partial",
       "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/37",
@@ -794,10 +818,11 @@
     }
   ],
   "progress": {
-    "attempts": 3,
-    "consecutiveRunsWithoutProgress": 1,
-    "advanceThisRun": "完成到期排期/公告复核并确认原神7.2上线日期；终焉矩阵必要精确字段无可靠新增，未产生清单差异。",
-    "emergency": false
+    "attempts": 4,
+    "consecutiveRunsWithoutProgress": 2,
+    "advanceThisRun": "完成四游戏到期公告/排期复核；矩阵必要精确字段仍缺，无目录变化。",
+    "emergency": true,
+    "emergencyReason": "已到节点仍缺必要可靠精确窗口；保留每日补查，既有已发布活动/地图不回退。"
   },
   "validation": {
     "plannerTests": {
@@ -899,6 +924,12 @@
         "batchPublicationCheckedAt": "2026-10-22T02:31:36Z"
       },
       "reason": "到期续接；管理员当前main允许unknown标签，探索进度为可选补证"
+    },
+    {
+      "checkedAt": "2026-10-25T04:23:22.072Z",
+      "priorCheckedAt": "2026-10-24T03:25:49.216Z",
+      "priorStatus": "pending",
+      "reason": "到期补查，保留已发布部分和未决精确时分。"
     }
   ],
   "reviewHistory": [

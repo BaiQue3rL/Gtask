@@ -9,7 +9,7 @@
     "zenless",
     "wuthering-waves"
   ],
-  "nextScheduleReviewAt": "2026-10-25T03:25:49.216Z",
+  "nextScheduleReviewAt": "2026-10-26T04:23:22.072Z",
   "periods": [
     {
       "gameId": "star-rail",
@@ -91,55 +91,55 @@
     {
       "gameId": "genshin",
       "periodKey": "7.1",
-      "reason": "2026-10-24实际复核：官方7.2前瞻确认2026-11-04上线，但未提供7.1结束维护精确时分。已读官方列表、回顾长图及原图并作一次独立维护定向补查；不把日期或现有活动截止当维护边界。",
+      "reason": "2026-10-25实际复核：官方7.2前瞻确认2026-11-04上线，但未提供7.1结束维护精确时分。已读官方列表、回顾长图及原图并作一次独立维护定向补查；不把日期或现有活动截止当维护边界。 本轮官方列表及独立补查仍无新增可靠必要字段。",
       "checkedSources": [
         "https://www.taptap.cn/app/168332/topic?type=official",
         "https://www.taptap.cn/moment/862794225241031570?group_id=201765"
       ],
-      "checkedAt": "2026-10-24T03:25:49.216Z"
+      "checkedAt": "2026-10-25T04:23:22.072Z"
     },
     {
       "gameId": "genshin",
       "periodKey": null,
-      "reason": "2026-10-24实际复核：7.2仅确认2026-11-04上线日期；结束边界与官方上半截止仍无可靠完整资料。前瞻活动亦无精确窗口，保留null，不按21/42天推算。",
+      "reason": "2026-10-25实际复核：7.2仅确认2026-11-04上线日期；结束边界与官方上半截止仍无可靠完整资料。前瞻活动亦无精确窗口，保留null，不按21/42天推算。 本轮官方列表及独立补查仍无新增可靠必要字段。",
       "checkedSources": [
         "https://www.taptap.cn/app/168332/topic?type=official",
         "https://www.taptap.cn/moment/862794225241031570?group_id=201765"
       ],
-      "checkedAt": "2026-10-24T03:25:49.216Z"
+      "checkedAt": "2026-10-25T04:23:22.072Z"
     },
     {
       "gameId": "star-rail",
       "periodKey": "4.7",
-      "reason": "2026-10-24实际复核：4.6官方结束仍为2026-11-11 06:00 UTC+8；当前官方列表仅4.7赠礼/幻月游戏赛季预热，未给4.7开始、结束及上半截止。一次独立补查无官方完整窗口，保留缺口。",
+      "reason": "2026-10-25实际复核：4.6官方结束仍为2026-11-11 06:00 UTC+8；当前官方列表仅4.7赠礼/幻月游戏赛季预热，未给4.7开始、结束及上半截止。一次独立补查无官方完整窗口，保留缺口。 本轮官方列表及独立补查仍无新增可靠必要字段。",
       "checkedSources": [
         "https://www.taptap.cn/app/224267/topic?type=official",
         "https://www.taptap.cn/moment/862360304653176292?group_id=311675",
         "https://hsr.hoyoverse.com/zh-cn/news/166468"
       ],
-      "checkedAt": "2026-10-24T03:25:49.216Z"
+      "checkedAt": "2026-10-25T04:23:22.072Z"
     },
     {
       "gameId": "wuthering-waves",
       "periodKey": "3.7",
-      "reason": "2026-10-24实际复核：官方3.7内容说明、列表、日期日历及二期唤取仍未给版本结束维护精确边界；11/12仅日期、11/11 11:59仅卡池截止。独立补查的第三方时分不采用。",
+      "reason": "2026-10-25实际复核：官方3.7内容说明、列表、日期日历及二期唤取仍未给版本结束维护精确边界；11/12仅日期、11/11 11:59仅卡池截止。独立补查的第三方时分不采用。 本轮官方列表及独立补查仍无新增可靠必要字段。",
       "checkedSources": [
         "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
         "https://mc.kurogames.com/main/news/detail/5569",
         "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
         "https://www.taptap.cn/moment/861624365911900497?group_id=330015"
       ],
-      "checkedAt": "2026-10-24T03:25:49.216Z"
+      "checkedAt": "2026-10-25T04:23:22.072Z"
     },
     {
       "gameId": "wuthering-waves",
       "periodKey": null,
-      "reason": "2026-10-24实际复核：当前官方列表、3.7内容说明及一次3.8维护定向补查仍未取得下一版本开始、结束及上半截止的可靠完整公告；不采用第三方推测或活动/卡池截止。",
+      "reason": "2026-10-25实际复核：当前官方列表、3.7内容说明及一次3.8维护定向补查仍未取得下一版本开始、结束及上半截止的可靠完整公告；不采用第三方推测或活动/卡池截止。 本轮官方列表及独立补查仍无新增可靠必要字段。",
       "checkedSources": [
         "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
         "https://mc.kurogames.com/main/news/detail/5569"
       ],
-      "checkedAt": "2026-10-24T03:25:49.216Z"
+      "checkedAt": "2026-10-25T04:23:22.072Z"
     }
   ],
   "runs": [
@@ -186,16 +186,16 @@
       "node": "first_half_end",
       "boundaryAt": "2026-10-22T09:59:00+08:00",
       "status": "pending",
-      "attempts": 3,
-      "updatedAt": "2026-10-24T03:25:49.216Z",
-      "retryAt": "2026-10-25T03:25:49.216Z",
+      "attempts": 4,
+      "updatedAt": "2026-10-25T04:23:22.072Z",
+      "retryAt": "2026-10-26T04:23:22.072Z",
       "branch": "codex/cloud-baseline/wuthering-waves-3-7-first-half-end",
-      "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/43",
+      "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/45",
       "catalogRevision": "2026-10-23.genshin-activities-wuwa-map",
       "catalogSha256": "8f61275ae7258e2ccaf7cd59929f63cf4fa0389faba940c6f7bc371a6b056d42",
       "evidencePath": "catalog-research/cloud/wuthering-waves-3-7-first-half-end.json",
       "completedAt": null,
-      "notes": "终焉矩阵精确时分仍缺：官方3.7内容说明、列表、原始日期日历及二期唤取未给适用国服精确窗口；独立补查只有第三方04:00/03:59，未获官方确认且不据此更正。到期四游戏公告与排期已完整复核：原神7.2确认11月4日上线但活动/维护仅日期级，星铁4.7仍预热，绝区零无差异，鸣潮下半已收录。保持pending并安排次日补查；清单revision/publishedAt不变。"
+      "notes": "最新列表为朝月良辰、桌宠预告和角色内容；3.7全文及二期公告复核，下半既有活动不重复发布。全文无终焉矩阵精确时分；复用此前已读日期日历，一次独立定向补查未取得可靠国服精确窗口。网站正文为空，使用官方论坛全文交叉核验。 保留pending和已发布成果；本轮无清单差异。"
     }
   ]
 }
