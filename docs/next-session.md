@@ -23,9 +23,9 @@
 
 仓库长期状态继续作为新聊天的入口，不依赖旧聊天，也不重新初始化接管时间或已成功节点。未完成事项仍保留：绝区零 `zenless/3.2/version_end` 的拟境湮灭战周期锚点等必要排期字段未知，鸣潮 `wuthering-waves/3.7/first_half_end` 的终焉矩阵精确窗口未知。两者 retryAt 已清空，分别留到本游戏下个允许节点日续接；旧研究/notes 中的“次日补查”等文字属于历史，不再产生唤醒。没有可靠下一日期时报告具体缺口，不另设轮询。
 
-[PR #46](https://github.com/BaiQue3rL/Gtask/pull/46) 已合并，main 为 `e9cc9b85f1af524af5f1700292c8b990cb9a8cbc`；PR 与该 main 提交的 Verify、Cloud baseline checks 均成功。27 项规划、单次调度、按游戏覆盖及跨游戏写入边界回归通过。实际配置验收来自保存后的原生任务编辑器和云端网页列表，并据此规范化后通过调度/模型验证；没有取得 automations_peek 原始响应，不能把 UI 回执称为该接口回执。
+[PR #46](https://github.com/BaiQue3rL/Gtask/pull/46) 已合并，功能合并提交为 `e9cc9b85f1af524af5f1700292c8b990cb9a8cbc`；PR 与该提交的 Verify、Cloud baseline checks 均成功。27 项规划、单次调度、按游戏覆盖及跨游戏写入边界回归通过。实际配置验收来自保存后的原生任务编辑器和云端网页列表，并据此规范化后通过调度/模型验证；没有取得 automations_peek 原始响应，不能把 UI 回执称为该接口回执。
 
-四任务新排期的自然定时触发及其后自改期尚未发生；本次没有为验收在普通日期执行基准研究或发布，不能把配置读回或规划器测试称为已完成自然运行。到允许节点后的实际运行，再核验它只覆盖对应游戏、从仓库续接、新建聊天、完成交付和更新原任务日期；不为这项待验证内容增加提前检查或额外定时器。
+四任务新排期的自然定时触发及其后自改期尚未发生；本次没有为试运行提前执行清单内容维护或发布，不能把配置读回或规划器测试称为已完成自然运行。到允许节点后的实际运行，再核验它只覆盖对应游戏、从仓库续接、新建聊天、完成交付和更新原任务日期；不为这项待验证内容增加提前检查或额外定时器。
 
 验收材料位于仓库外 `C:\Users\Administrator\AppData\Local\Codex\task-receipts\gtask-cloud-node-days-20261025`：`result.json`、`saved-ui-configurations.json`、`verification-results.json`、`expected-plans.json`、各游戏保存的指令及设置截图、`four-games-enabled.png`。本次仅改云端脚本、说明及调度配置，公开清单和客户端程序未变，无须替换本机客户端；未增版、未发布 Release、未创建备份。此前关机授权已完成，不适用于本次或后续接手。
 
