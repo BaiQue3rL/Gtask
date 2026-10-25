@@ -212,13 +212,29 @@
     }
   ],
   "validation": {
-    "catalogBytesChanged": false
+    "catalogBytesChanged": false,
+    "plannerTests": {
+      "passed": 37,
+      "failed": 0
+    },
+    "reviewContract": {
+      "ok": true,
+      "coveredGames": [
+        "genshin",
+        "star-rail",
+        "zenless",
+        "wuthering-waves"
+      ],
+      "auditComplete": false,
+      "unresolvedCount": 3
+    }
   },
   "delivery": {
     "stage": "research_only",
     "branch": "codex/cloud-baseline/wuthering-waves-3-7-first-half-end",
     "catalogChanged": false,
     "nodeComplete": false,
-    "resumeAt": "2026-10-26T04:23:22.072Z"
+    "resumeAt": "2026-10-26T04:23:22.072Z",
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/45"
   }
 }

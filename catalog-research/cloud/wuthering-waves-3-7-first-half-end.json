@@ -783,7 +783,7 @@
   "delivery": {
     "stage": "research_only",
     "branch": "codex/cloud-baseline/wuthering-waves-3-7-first-half-end",
-    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/43",
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/45",
     "catalogChanged": false,
     "batchCatalogChanged": false,
     "batchEvidencePath": "catalog-research/cloud/announcement-review-20261025.json",
