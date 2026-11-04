@@ -250,7 +250,7 @@
       "updatedAt": "2026-11-04T03:05:13.238Z",
       "retryAt": null,
       "branch": "codex/cloud-baseline/genshin-7-1-version-end-20261104",
-      "pullRequestUrl": null,
+      "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/48",
       "catalogRevision": "2026-11-04.genshin-7.2-baseline",
       "catalogSha256": "5dbbdb1d7bcb8ee2e17f1f0829dc1fb4086a6d76711866a3a25c71fc91441d55",
       "evidencePath": "catalog-research/cloud/genshin-7-1-version-end-20261104.json",
