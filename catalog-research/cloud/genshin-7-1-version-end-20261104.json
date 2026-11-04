@@ -27,7 +27,8 @@
     "https://www.miyoushe.com/ys/article/79287284",
     "https://www.miyoushe.com/ys/article/79287281",
     "https://www.miyoushe.com/ys/article/79232315",
-    "https://www.miyoushe.com/ys/article/79287283"
+    "https://www.miyoushe.com/ys/article/79287283",
+    "https://ys.mihoyo.com/main/m/news/detail/167205"
   ],
   "decisions": [
     {
@@ -56,15 +57,16 @@
       "reason": "国服第一期祈愿的官方截止，沿用上半结束边界口径。未填报下半实际开服时分。"
     },
     {
-      "subject": "7.2 结束日期",
+      "subject": "7.2 结束基准",
       "oldValue": null,
-      "adoptedValue": "2026-12-16",
+      "adoptedValue": "2026-12-16T06:00:00+08:00",
       "sources": [
         "https://www.taptap.cn/moment/866276924782019655?group_id=201765",
         "https://www.taptap.cn/moment/866271965436971946?group_id=201765"
       ],
       "publishedOn": "2026-11-02",
-      "reason": "一期官方速递总览标主活动结束为12月16日，独立详细规则确认它贯穿7.2版本，组合确认日期，具体维护时分保留空。"
+      "reason": "官方日期12月16日与原神国服稳定停服时刻06:00组合为版本结束排期基准；不是7.3精确维护公告。后续官方例外覆盖该基准。",
+      "timeBasis": "nominal_maintenance"
     },
     {
       "subject": "周期",
@@ -131,15 +133,17 @@
       "remoteKey": "event:7.2:grand-defense",
       "title": "全域镇卫·逆捍谬罚",
       "startsAt": "2026-11-04T11:00:00+08:00",
-      "endsAt": null,
-      "sourceUrl": "https://www.taptap.cn/moment/866271965436971946?group_id=201765"
+      "endsAt": "2026-12-16T06:00:00+08:00",
+      "sourceUrl": "https://www.taptap.cn/moment/866271965436971946?group_id=201765",
+      "timeBasis": "nominal_maintenance"
     },
     {
       "remoteKey": "event:7.2:forging-realm",
       "title": "铸境研炼·无量疾战",
       "startsAt": "2026-11-04T11:00:00+08:00",
-      "endsAt": null,
-      "sourceUrl": "https://ys.mihoyo.com/main/news/detail/167205"
+      "endsAt": "2026-12-16T06:00:00+08:00",
+      "sourceUrl": "https://ys.mihoyo.com/main/news/detail/167205",
+      "timeBasis": "nominal_maintenance"
     },
     {
       "remoteKey": "map-catalog:genshin:subregion:1d07c6c9703eacd2356c",
@@ -153,7 +157,6 @@
     }
   ],
   "pending": [
-    "7.3 国服维护精确起始时分待官方通知。全域镇卫·逆捍谬罚和铸境研炼·无量疾战的精确截止也待该边界核实，清单使用截止待确认。",
     "压力方块粉碎计划、历影定格录、地脉移涌及「长夜」网页活动仅见预告或整理，缺可发布的官方国服参与窗口。"
   ],
   "announcementReview": {
@@ -174,14 +177,72 @@
           "https://www.miyoushe.com/ys/article/79287284",
           "https://www.miyoushe.com/ys/article/79287281",
           "https://www.miyoushe.com/ys/article/79232315",
-          "https://www.miyoushe.com/ys/article/79287283"
+          "https://www.miyoushe.com/ys/article/79287283",
+          "https://ys.mihoyo.com/main/m/news/detail/167205"
         ],
         "evidencePath": "catalog-research/cloud/genshin-7-1-version-end-20261104.json",
         "pending": [
-          "7.3 国服维护精确起始时分待官方通知。全域镇卫·逆捍谬罚和铸境研炼·无量疾战的精确截止也待该边界核实，清单使用截止待确认。",
           "压力方块粉碎计划、历影定格录、地脉移涌及「长夜」网页活动仅见预告或整理，缺可发布的官方国服参与窗口。"
         ]
       }
     ]
-  }
+  },
+  "corrections": [
+    {
+      "checkedAt": "2026-11-04T14:22:02.668Z",
+      "correctionReason": "用户纠正：此前把下一版精确维护公告当成版本结束基准的必要条件，忽略已有版本日期、稳定停服时刻和版本绑定规则。",
+      "timeBasis": "nominal_maintenance",
+      "previousVersionDecision": {
+        "subject": "7.2 结束日期",
+        "oldValue": null,
+        "adoptedValue": "2026-12-16",
+        "sources": [
+          "https://www.taptap.cn/moment/866276924782019655?group_id=201765",
+          "https://www.taptap.cn/moment/866271965436971946?group_id=201765"
+        ],
+        "publishedOn": "2026-11-02",
+        "reason": "一期官方速递总览标主活动结束为12月16日，独立详细规则确认它贯穿7.2版本，组合确认日期，具体维护时分保留空。"
+      },
+      "previousPending": "7.3 国服维护精确起始时分待官方通知。全域镇卫·逆捍谬罚和铸境研炼·无量疾战的精确截止也待该边界核实，清单使用截止待确认。",
+      "adoptedVersionEnd": "2026-12-16T06:00:00+08:00",
+      "affectedActivities": [
+        {
+          "remoteKey": "event:7.2:grand-defense",
+          "previousEndsAt": null,
+          "endsAt": "2026-12-16T06:00:00+08:00"
+        },
+        {
+          "remoteKey": "event:7.2:forging-realm",
+          "previousEndsAt": null,
+          "endsAt": "2026-12-16T06:00:00+08:00"
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://www.taptap.cn/moment/866271965436971946?group_id=201765",
+          "publishedAt": "2026-11-02",
+          "statement": "全域镇卫活动在7.2版本期间持续开放。"
+        },
+        {
+          "url": "https://www.taptap.cn/moment/866276924782019655?group_id=201765",
+          "publishedAt": "2026-11-02",
+          "statement": "官方活动速递总览的主活动终点为12月16日；沿用本轮已读取六张原图的裁决。"
+        },
+        {
+          "url": "https://ys.mihoyo.com/main/m/news/detail/167205",
+          "publishedAt": "2026-11-04",
+          "statement": "国服版本更新维护06:00开始，预计5小时；铸境研炼在7.2版本期间持续开放。"
+        }
+      ],
+      "sourceObservationDecision": {
+        "status": "excluded",
+        "observedAt": "2026-11-04T14:08:34.073Z",
+        "endpoint": "miyoushe-genshin-event-calendar",
+        "observedStartsAt": "2026-11-03T23:00:00.000Z",
+        "observedEndsAt": "2026-12-15T23:00:00.000Z",
+        "reason": "该日历给出北京时间07:00起止；起点并非版本维护公告的预计开放11:00，终点也不是下一版国服停服公告，不能将该日历精度直接视为国服维护边界。此处采用有公开日期与稳定停服锚点支持的nominal基准，不冒充实测或精确公告。"
+      },
+      "coverage": "仅纠正版本结束基准与两项活动截止；沿用当天其他已验证事实，其他预告活动缺口保持，auditComplete仍为false。"
+    }
+  ]
 }

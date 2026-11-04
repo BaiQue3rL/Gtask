@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "revision": "2026-11-04.genshin-7.2-baseline",
-  "publishedAt": "2026-11-04T03:04:57.851Z",
+  "revision": "2026-11-04.genshin-version-end-baseline",
+  "publishedAt": "2026-11-04T14:22:02.668Z",
   "games": [
     {
       "gameId": "genshin",
@@ -419,23 +419,9 @@
           "remoteKey": "event:7.2:grand-defense",
           "title": "全域镇卫·逆捍谬罚",
           "startsAt": "2026-11-04T11:00:00+08:00",
-          "endsAt": null,
+          "endsAt": "2026-12-16T06:00:00+08:00",
           "sourceUrl": "https://www.taptap.cn/moment/866271965436971946?group_id=201765",
           "category": "limited_event",
-          "deadlineReview": {
-            "eligibility": "confirmed_limited",
-            "openState": "confirmed_open",
-            "limitedSourceUrl": "https://www.taptap.cn/moment/866271965436971946?group_id=201765",
-            "openSourceUrl": "https://ys.mihoyo.com/main/news/detail/167205",
-            "checkedSources": [
-              "https://www.taptap.cn/moment/866271965436971946?group_id=201765",
-              "https://ys.mihoyo.com/main/news/detail/167205",
-              "https://www.taptap.cn/moment/866276924782019655?group_id=201765"
-            ],
-            "checkedAt": "2026-11-04T03:04:57.851Z",
-            "reviewAt": "2026-11-24T17:59:00+08:00",
-            "missingReason": "官方规则为7.2版本期间持续开放，仍缺7.3停服维护精确时分。"
-          },
           "activityTags": [
             "combat",
             "challenge",
@@ -448,23 +434,9 @@
           "remoteKey": "event:7.2:forging-realm",
           "title": "铸境研炼·无量疾战",
           "startsAt": "2026-11-04T11:00:00+08:00",
-          "endsAt": null,
+          "endsAt": "2026-12-16T06:00:00+08:00",
           "sourceUrl": "https://ys.mihoyo.com/main/news/detail/167205",
           "category": "limited_event",
-          "deadlineReview": {
-            "eligibility": "confirmed_limited",
-            "openState": "confirmed_open",
-            "limitedSourceUrl": "https://ys.mihoyo.com/main/news/detail/167205",
-            "openSourceUrl": "https://ys.mihoyo.com/main/news/detail/167205",
-            "checkedSources": [
-              "https://ys.mihoyo.com/main/news/detail/167205",
-              "https://ys.mihoyo.com/main/news/detail/167205",
-              "https://www.taptap.cn/moment/866276924782019655?group_id=201765"
-            ],
-            "checkedAt": "2026-11-04T03:04:57.851Z",
-            "reviewAt": "2026-11-24T17:59:00+08:00",
-            "missingReason": "官方规则为7.2版本期间持续开放，仍缺7.3停服维护精确时分。"
-          },
           "activityTags": [
             "card",
             "challenge"

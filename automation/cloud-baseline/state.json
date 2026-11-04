@@ -123,18 +123,19 @@
       "gameId": "genshin",
       "periodKey": "7.2",
       "startsAt": "2026-11-04T11:00:00+08:00",
-      "endsAt": null,
+      "endsAt": "2026-12-16T06:00:00+08:00",
       "firstHalfEndsAt": "2026-11-24T17:59:00+08:00",
       "versionSources": [
         "https://ys.mihoyo.com/main/news/detail/167205",
         "https://www.taptap.cn/moment/866276924782019655?group_id=201765",
-        "https://www.taptap.cn/moment/866271965436971946?group_id=201765"
+        "https://www.taptap.cn/moment/866271965436971946?group_id=201765",
+        "https://ys.mihoyo.com/main/m/news/detail/167205"
       ],
       "firstHalfSources": [
         "https://www.taptap.cn/moment/866643843888448091?group_id=201765",
         "https://www.taptap.cn/moment/866276924782019655?group_id=201765"
       ],
-      "checkedAt": "2026-11-04T03:04:57.851Z"
+      "checkedAt": "2026-11-04T14:22:02.668Z"
     }
   ],
   "scheduleGaps": [
@@ -170,18 +171,6 @@
         "https://mc.kurogames.com/main/news/detail/5569"
       ],
       "checkedAt": "2026-10-25T04:23:22.072Z"
-    },
-    {
-      "gameId": "genshin",
-      "periodKey": "7.2",
-      "reason": "7.3 国服维护精确起始时分待官方通知。全域镇卫·逆捍谬罚和铸境研炼·无量疾战的精确截止也待该边界核实，清单使用截止待确认。",
-      "checkedSources": [
-        "https://ys.mihoyo.com/main/news/detail/167205",
-        "https://www.taptap.cn/moment/866276924782019655?group_id=201765",
-        "https://www.taptap.cn/moment/866271965436971946?group_id=201765",
-        "https://www.taptap.cn/moment/866643163261961149?group_id=201765"
-      ],
-      "checkedAt": "2026-11-04T03:04:57.851Z"
     }
   ],
   "runs": [
@@ -247,7 +236,7 @@
       "boundaryAt": "2026-11-04T06:00:00+08:00",
       "status": "pending",
       "attempts": 1,
-      "updatedAt": "2026-11-04T03:05:13.238Z",
+      "updatedAt": "2026-11-04T14:22:02.668Z",
       "retryAt": null,
       "branch": "codex/cloud-baseline/genshin-7-1-version-end-20261104",
       "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/48",
@@ -255,7 +244,7 @@
       "catalogSha256": "5dbbdb1d7bcb8ee2e17f1f0829dc1fb4086a6d76711866a3a25c71fc91441d55",
       "evidencePath": "catalog-research/cloud/genshin-7-1-version-end-20261104.json",
       "completedAt": null,
-      "notes": "已核验部分提交发布；官方时分缺口与其余预告活动留待原神下半节点。"
+      "notes": "已核验部分提交发布；官方时分缺口与其余预告活动留待原神下半节点。 2026-11-04用户纠正：版本结束及两项随版本结束活动采用12月16日06:00北京时间的nominal停服基准；其他预告活动仍待核验。"
     }
   ]
 }
