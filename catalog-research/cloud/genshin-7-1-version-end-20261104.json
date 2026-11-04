@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 1,
+  "gameId": "genshin",
+  "nodeKey": "genshin/7.1/version_end",
+  "checkedAt": "2026-11-04T03:04:57.851Z",
+  "auditComplete": false,
+  "baseMainSha": "7e7a38d4a84591a2b39ecf5d3523180954ac3ca6",
+  "priorEvidence": [
+    "docs/catalog-research/genshin-7.1-2026-09-24.json",
+    "catalog-research/cloud/announcement-review-20261025.json"
+  ],
+  "coverage": [
+    "国服7.2版更全文、第一期官方活动速递及六张原图、公告列表及独立活动规则",
+    "真实消费者的原神公共目录、现有活动和稳定模式",
+    "至冬开放地图及父级",
+    "版本切换、上半结束、周期排期与例外"
+  ],
+  "sources": [
+    "https://ys.mihoyo.com/main/news/detail/167205",
+    "https://www.taptap.cn/moment/866276924782019655?group_id=201765",
+    "https://www.taptap.cn/moment/866643843888448091?group_id=201765",
+    "https://www.taptap.cn/moment/866643163261961149?group_id=201765",
+    "https://www.taptap.cn/moment/866641461968375409?group_id=201765",
+    "https://www.taptap.cn/moment/866643451830078348?group_id=201765",
+    "https://www.taptap.cn/moment/866271965436971946?group_id=201765",
+    "https://www.miyoushe.com/ys/article/79287286",
+    "https://www.miyoushe.com/ys/article/79287284",
+    "https://www.miyoushe.com/ys/article/79287281",
+    "https://www.miyoushe.com/ys/article/79232315",
+    "https://www.miyoushe.com/ys/article/79287283"
+  ],
+  "decisions": [
+    {
+      "subject": "7.1 结束",
+      "oldValue": null,
+      "adoptedValue": "2026-11-04T06:00:00+08:00",
+      "source": "https://ys.mihoyo.com/main/news/detail/167205",
+      "publishedOn": "2026-11-04",
+      "reason": "国服停服开始公告，分钟精度。既有11:00日期触发已执行。"
+    },
+    {
+      "subject": "7.2 开始与版更后活动",
+      "oldValue": null,
+      "adoptedValue": "2026-11-04T11:00:00+08:00",
+      "source": "https://ys.mihoyo.com/main/news/detail/167205",
+      "publishedOn": "2026-11-04",
+      "reason": "06:00开始且预计5小时，采用预计完成时刻作为排期基准。",
+      "timeBasis": "nominal_maintenance"
+    },
+    {
+      "subject": "7.2 上半结束",
+      "oldValue": null,
+      "adoptedValue": "2026-11-24T17:59:00+08:00",
+      "source": "https://www.taptap.cn/moment/866643843888448091?group_id=201765",
+      "publishedOn": "2026-11-03",
+      "reason": "国服第一期祈愿的官方截止，沿用上半结束边界口径。未填报下半实际开服时分。"
+    },
+    {
+      "subject": "7.2 结束日期",
+      "oldValue": null,
+      "adoptedValue": "2026-12-16",
+      "sources": [
+        "https://www.taptap.cn/moment/866276924782019655?group_id=201765",
+        "https://www.taptap.cn/moment/866271965436971946?group_id=201765"
+      ],
+      "publishedOn": "2026-11-02",
+      "reason": "一期官方速递总览标主活动结束为12月16日，独立详细规则确认它贯穿7.2版本，组合确认日期，具体维护时分保留空。"
+    },
+    {
+      "subject": "周期",
+      "reason": "幽境危战11/11 10:00—12/15 03:59与现有42日、33.75日规则相符（04:00为紧随末分钟的排他边界）；剧诗12/1、深境螺旋11/16和12/16均沿用现有规则。绝境攻炼新增常驻关卡，未见新的周期模式。"
+    },
+    {
+      "subject": "地图",
+      "reason": "官方国服更新说明直接列新基捷城和如翼之峰为至冬新开放区域，使用至冬现有父键。影域为如翼之峰局部任务状态。"
+    },
+    {
+      "subject": "其他候选",
+      "reason": "祈愿、装扮上架、礼包、常规纪行和常驻系统不作独立活动；新手自选是注册触发的个人42日窗口，缺统一国服日程。主活动四星自选作为活动奖励。覆音赛季以计分游玩段为参与窗口，拾光季以投稿截止为参与边界。砺行修远新一期使用独立键保留上期状态。"
+    },
+    {
+      "remoteKey": "event:7.2:hour-of-ruin-quest-rewards",
+      "title": "「坏灭肇始之时」魔神任务限时奖励",
+      "startsAt": "2026-11-04T11:00:00+08:00",
+      "endsAt": "2026-12-15T14:59:00+08:00",
+      "sourceUrl": "https://www.miyoushe.com/ys/article/79287286"
+    },
+    {
+      "remoteKey": "event:7.2:crystal-forest-exploration-rewards",
+      "title": "「晶石如林生长之地」区域探索限时奖励",
+      "startsAt": "2026-11-04T11:00:00+08:00",
+      "endsAt": "2027-01-26T14:59:00+08:00",
+      "sourceUrl": "https://www.miyoushe.com/ys/article/79287284"
+    },
+    {
+      "remoteKey": "event:7.2:myriad-melodies-rewards",
+      "title": "「相遇·悠久旅途之暇」千音雅集限时奖励",
+      "startsAt": "2026-11-04T11:00:00+08:00",
+      "endsAt": "2026-12-15T14:59:00+08:00",
+      "sourceUrl": "https://www.miyoushe.com/ys/article/79287281"
+    },
+    {
+      "remoteKey": "event:7.2:qiyi-treasure-hechi",
+      "title": "绮衣珍赏·赫炽",
+      "startsAt": "2026-11-04T11:00:00+08:00",
+      "endsAt": "2026-12-16T05:59:00+08:00",
+      "sourceUrl": "https://www.taptap.cn/moment/866643163261961149?group_id=201765"
+    },
+    {
+      "remoteKey": "event:7.2:milliastra-creation-contest",
+      "title": "千星创作赛·拾光季",
+      "startsAt": "2026-11-04T11:00:00+08:00",
+      "endsAt": "2026-12-08T11:59:59+08:00",
+      "sourceUrl": "https://www.taptap.cn/moment/866641461968375409?group_id=201765"
+    },
+    {
+      "remoteKey": "event:7.2:milliastra-fuyin-season",
+      "title": "覆音赛季",
+      "startsAt": "2026-11-05T10:00:00+08:00",
+      "endsAt": "2026-12-15T03:59:00+08:00",
+      "sourceUrl": "https://www.taptap.cn/moment/866643451830078348?group_id=201765"
+    },
+    {
+      "remoteKey": "event:2026-11:seasonal-training",
+      "title": "砺行修远",
+      "startsAt": "2026-11-02T04:00:00+08:00",
+      "endsAt": "2027-01-25T03:59:00+08:00",
+      "sourceUrl": "https://www.miyoushe.com/ys/article/79232315"
+    },
+    {
+      "remoteKey": "event:7.2:grand-defense",
+      "title": "全域镇卫·逆捍谬罚",
+      "startsAt": "2026-11-04T11:00:00+08:00",
+      "endsAt": null,
+      "sourceUrl": "https://www.taptap.cn/moment/866271965436971946?group_id=201765"
+    },
+    {
+      "remoteKey": "event:7.2:forging-realm",
+      "title": "铸境研炼·无量疾战",
+      "startsAt": "2026-11-04T11:00:00+08:00",
+      "endsAt": null,
+      "sourceUrl": "https://ys.mihoyo.com/main/news/detail/167205"
+    },
+    {
+      "remoteKey": "map-catalog:genshin:subregion:1d07c6c9703eacd2356c",
+      "title": "新基捷城",
+      "sourceUrl": "https://ys.mihoyo.com/main/news/detail/167205"
+    },
+    {
+      "remoteKey": "map-catalog:genshin:subregion:e507fc243bf34da4104e",
+      "title": "如翼之峰",
+      "sourceUrl": "https://ys.mihoyo.com/main/news/detail/167205"
+    }
+  ],
+  "pending": [
+    "7.3 国服维护精确起始时分待官方通知。全域镇卫·逆捍谬罚和铸境研炼·无量疾战的精确截止也待该边界核实，清单使用截止待确认。",
+    "压力方块粉碎计划、历影定格录、地脉移涌及「长夜」网页活动仅见预告或整理，缺可发布的官方国服参与窗口。"
+  ],
+  "announcementReview": {
+    "checkedAt": "2026-11-04T03:04:57.851Z",
+    "games": [
+      {
+        "gameId": "genshin",
+        "coverage": "partial",
+        "checkedSources": [
+          "https://ys.mihoyo.com/main/news/detail/167205",
+          "https://www.taptap.cn/moment/866276924782019655?group_id=201765",
+          "https://www.taptap.cn/moment/866643843888448091?group_id=201765",
+          "https://www.taptap.cn/moment/866643163261961149?group_id=201765",
+          "https://www.taptap.cn/moment/866641461968375409?group_id=201765",
+          "https://www.taptap.cn/moment/866643451830078348?group_id=201765",
+          "https://www.taptap.cn/moment/866271965436971946?group_id=201765",
+          "https://www.miyoushe.com/ys/article/79287286",
+          "https://www.miyoushe.com/ys/article/79287284",
+          "https://www.miyoushe.com/ys/article/79287281",
+          "https://www.miyoushe.com/ys/article/79232315",
+          "https://www.miyoushe.com/ys/article/79287283"
+        ],
+        "evidencePath": "catalog-research/cloud/genshin-7-1-version-end-20261104.json",
+        "pending": [
+          "7.3 国服维护精确起始时分待官方通知。全域镇卫·逆捍谬罚和铸境研炼·无量疾战的精确截止也待该边界核实，清单使用截止待确认。",
+          "压力方块粉碎计划、历影定格录、地脉移涌及「长夜」网页活动仅见预告或整理，缺可发布的官方国服参与窗口。"
+        ]
+      }
+    ]
+  }
+}

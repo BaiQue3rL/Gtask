@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "revision": "2026-10-23.genshin-activities-wuwa-map",
-  "publishedAt": "2026-10-23T03:22:59Z",
+  "revision": "2026-11-04.genshin-7.2-baseline",
+  "publishedAt": "2026-11-04T03:04:57.851Z",
   "games": [
     {
       "gameId": "genshin",
@@ -319,6 +319,176 @@
           ],
           "scheduleKind": "fixed_window",
           "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:7.2:hour-of-ruin-quest-rewards",
+          "title": "「坏灭肇始之时」魔神任务限时奖励",
+          "startsAt": "2026-11-04T11:00:00+08:00",
+          "endsAt": "2026-12-15T14:59:00+08:00",
+          "sourceUrl": "https://www.miyoushe.com/ys/article/79287286",
+          "category": "limited_event",
+          "activityTags": [
+            "quest",
+            "story"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:7.2:crystal-forest-exploration-rewards",
+          "title": "「晶石如林生长之地」区域探索限时奖励",
+          "startsAt": "2026-11-04T11:00:00+08:00",
+          "endsAt": "2027-01-26T14:59:00+08:00",
+          "sourceUrl": "https://www.miyoushe.com/ys/article/79287284",
+          "category": "limited_event",
+          "activityTags": [
+            "exploration",
+            "quest"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:7.2:myriad-melodies-rewards",
+          "title": "「相遇·悠久旅途之暇」千音雅集限时奖励",
+          "startsAt": "2026-11-04T11:00:00+08:00",
+          "endsAt": "2026-12-15T14:59:00+08:00",
+          "sourceUrl": "https://www.miyoushe.com/ys/article/79287281",
+          "category": "limited_event",
+          "activityTags": [
+            "rhythm"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:7.2:qiyi-treasure-hechi",
+          "title": "绮衣珍赏·赫炽",
+          "startsAt": "2026-11-04T11:00:00+08:00",
+          "endsAt": "2026-12-16T05:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/866643163261961149?group_id=201765",
+          "category": "limited_event",
+          "activityTags": [
+            "quest",
+            "collection"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:7.2:milliastra-creation-contest",
+          "title": "千星创作赛·拾光季",
+          "startsAt": "2026-11-04T11:00:00+08:00",
+          "endsAt": "2026-12-08T11:59:59+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/866641461968375409?group_id=201765",
+          "category": "limited_event",
+          "activityTags": [
+            "unknown"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:7.2:milliastra-fuyin-season",
+          "title": "覆音赛季",
+          "startsAt": "2026-11-05T10:00:00+08:00",
+          "endsAt": "2026-12-15T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/866643451830078348?group_id=201765",
+          "category": "limited_event",
+          "activityTags": [
+            "challenge"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:2026-11:seasonal-training",
+          "title": "砺行修远",
+          "startsAt": "2026-11-02T04:00:00+08:00",
+          "endsAt": "2027-01-25T03:59:00+08:00",
+          "sourceUrl": "https://www.miyoushe.com/ys/article/79232315",
+          "category": "limited_event",
+          "activityTags": [
+            "quest",
+            "material-reward"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:7.2:grand-defense",
+          "title": "全域镇卫·逆捍谬罚",
+          "startsAt": "2026-11-04T11:00:00+08:00",
+          "endsAt": null,
+          "sourceUrl": "https://www.taptap.cn/moment/866271965436971946?group_id=201765",
+          "category": "limited_event",
+          "deadlineReview": {
+            "eligibility": "confirmed_limited",
+            "openState": "confirmed_open",
+            "limitedSourceUrl": "https://www.taptap.cn/moment/866271965436971946?group_id=201765",
+            "openSourceUrl": "https://ys.mihoyo.com/main/news/detail/167205",
+            "checkedSources": [
+              "https://www.taptap.cn/moment/866271965436971946?group_id=201765",
+              "https://ys.mihoyo.com/main/news/detail/167205",
+              "https://www.taptap.cn/moment/866276924782019655?group_id=201765"
+            ],
+            "checkedAt": "2026-11-04T03:04:57.851Z",
+            "reviewAt": "2026-11-24T17:59:00+08:00",
+            "missingReason": "官方规则为7.2版本期间持续开放，仍缺7.3停服维护精确时分。"
+          },
+          "activityTags": [
+            "combat",
+            "challenge",
+            "shooting"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:7.2:forging-realm",
+          "title": "铸境研炼·无量疾战",
+          "startsAt": "2026-11-04T11:00:00+08:00",
+          "endsAt": null,
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/167205",
+          "category": "limited_event",
+          "deadlineReview": {
+            "eligibility": "confirmed_limited",
+            "openState": "confirmed_open",
+            "limitedSourceUrl": "https://ys.mihoyo.com/main/news/detail/167205",
+            "openSourceUrl": "https://ys.mihoyo.com/main/news/detail/167205",
+            "checkedSources": [
+              "https://ys.mihoyo.com/main/news/detail/167205",
+              "https://ys.mihoyo.com/main/news/detail/167205",
+              "https://www.taptap.cn/moment/866276924782019655?group_id=201765"
+            ],
+            "checkedAt": "2026-11-04T03:04:57.851Z",
+            "reviewAt": "2026-11-24T17:59:00+08:00",
+            "missingReason": "官方规则为7.2版本期间持续开放，仍缺7.3停服维护精确时分。"
+          },
+          "activityTags": [
+            "card",
+            "challenge"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "map-catalog:genshin:subregion:1d07c6c9703eacd2356c",
+          "title": "新基捷城",
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/167205",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:genshin:region:414719b0efe139ee12c9",
+          "parentTitle": "至冬"
+        },
+        {
+          "remoteKey": "map-catalog:genshin:subregion:e507fc243bf34da4104e",
+          "title": "如翼之峰",
+          "sourceUrl": "https://ys.mihoyo.com/main/news/detail/167205",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:genshin:region:414719b0efe139ee12c9",
+          "parentTitle": "至冬"
         }
       ],
       "archives": [

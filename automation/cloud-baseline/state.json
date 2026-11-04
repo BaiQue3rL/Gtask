@@ -29,6 +29,17 @@
         "https://www.taptap.cn/moment/853647253976386369?group_id=330015"
       ],
       "checkedAt": "2026-10-25T07:55:00Z"
+    },
+    {
+      "gameId": "genshin",
+      "periodKey": "7.2",
+      "node": "version_end",
+      "date": "2026-12-16",
+      "sources": [
+        "https://www.taptap.cn/moment/866276924782019655?group_id=201765",
+        "https://www.taptap.cn/moment/866271965436971946?group_id=201765"
+      ],
+      "checkedAt": "2026-11-04T03:04:57.851Z"
     }
   ],
   "periods": [
@@ -80,16 +91,17 @@
       "gameId": "genshin",
       "periodKey": "7.1",
       "startsAt": "2026-09-23T11:00:00+08:00",
-      "endsAt": null,
+      "endsAt": "2026-11-04T06:00:00+08:00",
       "firstHalfEndsAt": "2026-10-13T17:59:00+08:00",
       "versionSources": [
         "https://www.taptap.cn/moment/850781129639202732?group_id=201765",
-        "https://www.taptap.cn/moment/851520146462737868?group_id=201765"
+        "https://www.taptap.cn/moment/851520146462737868?group_id=201765",
+        "https://ys.mihoyo.com/main/news/detail/167205"
       ],
       "firstHalfSources": [
         "https://www.taptap.cn/moment/851175040782174930"
       ],
-      "checkedAt": "2026-10-19T15:14:21.971Z"
+      "checkedAt": "2026-11-04T03:04:57.851Z"
     },
     {
       "gameId": "zenless",
@@ -106,29 +118,26 @@
         "https://www.taptap.cn/moment/861197641654994725?group_id=330333"
       ],
       "checkedAt": "2026-10-22T02:20:47.389Z"
+    },
+    {
+      "gameId": "genshin",
+      "periodKey": "7.2",
+      "startsAt": "2026-11-04T11:00:00+08:00",
+      "endsAt": null,
+      "firstHalfEndsAt": "2026-11-24T17:59:00+08:00",
+      "versionSources": [
+        "https://ys.mihoyo.com/main/news/detail/167205",
+        "https://www.taptap.cn/moment/866276924782019655?group_id=201765",
+        "https://www.taptap.cn/moment/866271965436971946?group_id=201765"
+      ],
+      "firstHalfSources": [
+        "https://www.taptap.cn/moment/866643843888448091?group_id=201765",
+        "https://www.taptap.cn/moment/866276924782019655?group_id=201765"
+      ],
+      "checkedAt": "2026-11-04T03:04:57.851Z"
     }
   ],
   "scheduleGaps": [
-    {
-      "gameId": "genshin",
-      "periodKey": "7.1",
-      "reason": "2026-10-25实际复核：官方7.2前瞻确认2026-11-04上线，但未提供7.1结束维护精确时分。已读官方列表、回顾长图及原图并作一次独立维护定向补查；不把日期或现有活动截止当维护边界。 本轮官方列表及独立补查仍无新增可靠必要字段。",
-      "checkedSources": [
-        "https://www.taptap.cn/app/168332/topic?type=official",
-        "https://www.taptap.cn/moment/862794225241031570?group_id=201765"
-      ],
-      "checkedAt": "2026-10-25T04:23:22.072Z"
-    },
-    {
-      "gameId": "genshin",
-      "periodKey": null,
-      "reason": "2026-10-25实际复核：7.2仅确认2026-11-04上线日期；结束边界与官方上半截止仍无可靠完整资料。前瞻活动亦无精确窗口，保留null，不按21/42天推算。 本轮官方列表及独立补查仍无新增可靠必要字段。",
-      "checkedSources": [
-        "https://www.taptap.cn/app/168332/topic?type=official",
-        "https://www.taptap.cn/moment/862794225241031570?group_id=201765"
-      ],
-      "checkedAt": "2026-10-25T04:23:22.072Z"
-    },
     {
       "gameId": "star-rail",
       "periodKey": "4.7",
@@ -161,6 +170,18 @@
         "https://mc.kurogames.com/main/news/detail/5569"
       ],
       "checkedAt": "2026-10-25T04:23:22.072Z"
+    },
+    {
+      "gameId": "genshin",
+      "periodKey": "7.2",
+      "reason": "7.3 国服维护精确起始时分待官方通知。全域镇卫·逆捍谬罚和铸境研炼·无量疾战的精确截止也待该边界核实，清单使用截止待确认。",
+      "checkedSources": [
+        "https://ys.mihoyo.com/main/news/detail/167205",
+        "https://www.taptap.cn/moment/866276924782019655?group_id=201765",
+        "https://www.taptap.cn/moment/866271965436971946?group_id=201765",
+        "https://www.taptap.cn/moment/866643163261961149?group_id=201765"
+      ],
+      "checkedAt": "2026-11-04T03:04:57.851Z"
     }
   ],
   "runs": [
@@ -217,6 +238,24 @@
       "evidencePath": "catalog-research/cloud/wuthering-waves-3-7-first-half-end.json",
       "completedAt": null,
       "notes": "最新列表为朝月良辰、桌宠预告和角色内容；3.7全文及二期公告复核，下半既有活动不重复发布。全文无终焉矩阵精确时分；复用此前已读日期日历，一次独立定向补查未取得可靠国服精确窗口。网站正文为空，使用官方论坛全文交叉核验。 保留pending和已发布成果；本轮无清单差异。"
+    },
+    {
+      "key": "genshin/7.1/version_end",
+      "gameId": "genshin",
+      "periodKey": "7.1",
+      "node": "version_end",
+      "boundaryAt": "2026-11-04T06:00:00+08:00",
+      "status": "pending",
+      "attempts": 1,
+      "updatedAt": "2026-11-04T03:05:13.238Z",
+      "retryAt": null,
+      "branch": "codex/cloud-baseline/genshin-7-1-version-end-20261104",
+      "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/48",
+      "catalogRevision": "2026-11-04.genshin-7.2-baseline",
+      "catalogSha256": "5dbbdb1d7bcb8ee2e17f1f0829dc1fb4086a6d76711866a3a25c71fc91441d55",
+      "evidencePath": "catalog-research/cloud/genshin-7-1-version-end-20261104.json",
+      "completedAt": null,
+      "notes": "已核验部分提交发布；官方时分缺口与其余预告活动留待原神下半节点。"
     }
   ]
 }
