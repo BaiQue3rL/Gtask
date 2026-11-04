@@ -14,7 +14,7 @@
 ## 本游戏的日期与规划
 
 1. 读取 docs/catalog-maintenance.md、src/main/ai/baseline-maintenance-policy.ts、src/main/published-schedules.ts；地图维护前完整读取 docs/ai-map-catalog-maintenance.md。事实、收录、分类和证据是否充分由 Agent 判断；程序只验证数据、权限、身份、覆盖和事务。
-2. 核查本游戏当前及下一版本的适用服务器公告。periods 的 startsAt / endsAt / firstHalfEndsAt 分别记录有证据的精确时间和来源；不知道的字段保留 null。不能统一加 21 天、平分版本，或用单个活动到期日推算版更。
+2. 核查本游戏当前及下一版本的适用服务器公告。periods 的 startsAt / endsAt / firstHalfEndsAt 分别记录有依据的排期时间和来源。已有版更日期时，Agent 可结合该游戏适用服务器、时区的稳定停服时刻；没有单独日期时可沿用已发布的版本周期与锚点，在研究记录标为 nominal_maintenance 并保留推算依据。官方明确随版本结束的活动采用同一基准，不能仅因下一版精确维护公告未发布而留作截止待确认。后续官方例外优先；确无适用基准的字段才保留 null。不能统一加 21 天、平分版本，或用单个活动到期日、每日重置和另一游戏的时刻推算版更。
 3. 官方只公布日期时，在 dateTriggers 保存 gameId、periodKey、node、date（YYYY-MM-DD）、sources、checkedAt。规划器在当天 11:00 安排任务；11:00 只是运行时间，不写成官方版更或活动时刻。至少一个精确节点或有来源的日期即可建档，不因时分未知而漏排已确认的日期。
 4. 官方缩短、延长或更正时修订同一 gameId/periodKey 对应字段，保存旧值、新值、适用来源、发布时间、采用理由与精度；不能机械修改其他边界。稳定节点已成功就不重复执行。预测不能冒充已公布事实。
 5. 执行 node automation/cloud-baseline/plan.mjs --game <gameId>。due、upcoming、deferred、nextWake 均限定该游戏。只有允许的当天且节点时刻已到，due 才允许研究维护。旧 pending 只在本游戏下个节点日带入。

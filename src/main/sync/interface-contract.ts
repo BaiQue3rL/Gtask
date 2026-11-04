@@ -32,6 +32,7 @@ const tasksContract: SyncSectionContract = {
     '时间覆盖当前正在运行的正式版本，而不是已经结束或尚未开始的其他版本。',
     '正例是官方版本更新公告、版本专题或能够证明整个版本起止时间的排期资料；反例是下半卡池开始时间、单个活动结束时间、维护补偿领取期限和前瞻直播时间。',
     '官方已公布精确版更时刻时必须采用官方值，并在 evidence 中保留直接来源。',
+    '常规版本周期未变时沿用已发布的规则，不例行重写 versionWindow。Agent 可把已确认的版更日期与该游戏适用服务器、时区的稳定停服时刻组合为版本结束基准；缺单独日期时复用已发布周期与锚点。以 timeBasis=nominal_maintenance 和 evidence.note 记录依据，不能仅因下一版精确维护公告未发布而保留空值。',
     '官方尚未公布精确版更时刻时，不得仅因此结束为失败；应交叉核验当前版本官方开始时间、官方已公布的后续内容排期、相邻版本维护记录或可靠排期资料，给出最可信的暂定 endsAt，并用较低 confidence 且在 evidence.note 中明确说明“暂定”及推算依据。',
     '暂定时间不是任意猜测：不能直接拿卡池、单个活动或奖励期限充当版本结束时间；证据互相冲突且无法形成可信结论时才允许失败。',
     '后续官方公告出现延期、提前更新或精确维护时刻时，必须以同一 periodKey 重新提交并覆盖暂定时间；来源时区不明时先核验服务器时区。'
@@ -70,6 +71,7 @@ const eventsContract: SyncSectionContract = {
     '限时活动正例：具有独立官方活动名称、整体开始时间和整体结束时间的限时签到、限时玩法或限时剧情活动。',
     '限时活动反例：活动内部的每日阶段、单个关卡、剧情任务、活动商店、奖励档位、版本前瞻、维护公告、兑换码和角色或武器卡池；这些不能作为新的活动清单项。',
     '同一活动的预告页、规则页、玩法页和奖励页只是同一活动的不同资料，不得分别建项；标题应使用活动容器的官方本地化总名称。',
+    '官方明确活动在版本期间持续开放或随版本结束时，Agent 采用对应游戏、服务器和时区的版本结束基准填写 endsAt；可结合官方日期与稳定停服时刻，或复用已发布的版本周期和锚点，记录 nominal_maintenance 及依据。下一版精确维护公告尚未发布本身不构成 deadlineReview 缺口；后续官方例外覆盖同一活动。不能把每日重置、卡池截止或另一游戏的时刻当作该基准。',
     '先区分限时资格与时间完整性；常驻、长期一次性或限时资格未知的内容不加入清单。正常活动提供 startsAt 和 endsAt；确已证实限时且当前开放、检查主要公告和规则仍未取得可靠时限时，提交 deadlineReview 与空 endsAt，界面显示“截止时间待确认”，不能捏造时间。',
     'deadlineReview 必须含限时和当前开放的 HTTPS 证据、checkedSources、checkedAt、reviewAt 与 missingReason。每次覆盖该游戏时优先复核 job.deadlineReviews；版本切换必须复核。复核节点不是活动结束时间，客户端不会据此自动删除。确认结束或常驻才发布退役；开放依据失效又无法确认继续开放时发布移出主清单决定，并在维护记录保留待核实状态。',
     `玩法标签是活动必填字段。提交 ${MIN_AI_ACTIVITY_TAGS} 至 ${MAX_AI_ACTIVITY_TAGS} 个符合 requestContext.outputLocale 的准确标签；不能同义重复、用泛化词凑数或为了覆盖词表而硬贴。`,
@@ -233,14 +235,14 @@ export function getPublicSyncContract(
       title: `由 ${requestContext.outputLocale} 官方本地化资料确认的游戏内名称，不自行翻译。`,
       activityTags: activityTagSemantics(requestContext.outputLocale),
       startsAt: '活动、周期或当前游戏版本开始的排期基准，ISO-8601 且包含 Z 或明确 UTC 偏移量。官方维护推导的 nominal 开始须按 maintenancePolicy 记录依据，不能冒充实测开放。',
-      endsAt: '活动、周期或当前游戏版本结束的绝对时刻，ISO-8601 且包含 Z 或明确 UTC 偏移量。版本校时在官方精确时刻尚未公布时按 tasks 契约提交可靠暂定值，其他版块不得套用该例外。',
+      endsAt: '活动、周期或当前游戏版本结束的绝对时刻，ISO-8601 且包含 Z 或明确 UTC 偏移量。Agent 可按 tasks 契约给出可靠暂定值作为版本结束基准；官方明确随版本结束的活动可采用同一基准，记录 nominal_maintenance 及依据。无版本关联或其他可靠规则时不得任意推算。',
       periodKey: '版本或周期实例身份；同一期稳定，不同周期不能复用。周期挑战的标题、副标题或期数变化通常属于 periodKey，而不是新的 modeKey。',
       modeKey: '跨周期稳定的玩法模式身份；单层、节点、阶段、难度、增益或奖励档位不能拥有独立 modeKey。',
       mapNodeKind:
         '地图只有 region 与 subregion。region 是一级主地区且 parentRemoteKey 必须为空；subregion 是二级地区且 parentRemoteKey 必须指向唯一 region。不得提交第三种节点或第三层。个人接口层级只是观测证据，不能单独覆盖规范目录。',
       titleSourceUrl: `能够核验 ${requestContext.outputLocale} 官方本地化名称的直接页面。`,
       sourceUrl: '能够核验该事项核心事实的直接 HTTP(S) 来源。',
-      confidence: 'Codex 对该条结构化结果的 0 到 1 置信度；任务版更校时的暂定结束时间必须低于官方精确公告的置信度。',
+      confidence: 'Codex 对该条结构化结果的 0 到 1 置信度；采用暂定版本结束基准的版本或活动，其置信度低于官方精确公告。',
       versionWindow: '游戏级版本窗口，不是清单事项。只在 tasks 实际变化时提交；包含当前正式版本的 startsAt、endsAt、periodKey、timeZone、sourceUrl 和 confidence。',
       verifiedUnchangedTargets: '完成目标版块全范围核查且与当前基准没有任何差异时，提交对应 target；它表示“已核查但无需写入”，不能与该版块的新增、更新、归档或 versionWindow 同时提交。',
       evidence: '本次提交的直接证据；可引用 sourceObservations，或提供 HTTP(S) 页面。只在字段缺失或冲突时要求额外公开来源。'
