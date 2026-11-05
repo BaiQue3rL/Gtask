@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "gameId": "genshin",
+  "checkedAt": "2026-11-05T12:12:06.777Z",
+  "revision": "2026-11-05.genshin-core-game-events",
+  "scope": "千星奇域相关活动从原神本体活动清单退役及后续排除规则",
+  "scopeAuditComplete": true,
+  "auditComplete": false,
+  "correctionReason": "用户明确要求：千星奇域是独立玩法，其相关活动不再算作原神本体活动，也不再收录。",
+  "previousResearch": [
+    "docs/catalog-research/genshin-7.1-2026-09-24.json",
+    "catalog-research/cloud/announcement-review-20261023.json",
+    "catalog-research/cloud/genshin-7-1-version-end-20261104.json"
+  ],
+  "policy": "由 Agent 按实际参与内容判断归属。排除千星奇域赛季、玩法活动、奇偶装扮活动、创作赛事及相关网页活动；原神官方公告渠道或原石奖励不改变归属。不增加运行时关键词过滤，不转入其他版块继续收录。",
+  "decisions": [
+    {
+      "remoteKey": "event:7.1:qixing-festival-web",
+      "title": "「绮星盛会」网页特别活动",
+      "status": "excluded",
+      "previousValue": "原神限时活动",
+      "adoptedValue": "按稳定键退役",
+      "sourceUrl": "https://www.taptap.cn/moment/854673845603273392",
+      "publishedAt": "2026-10-02",
+      "statement": "公告将其明确归为千星奇域网页活动，奖励包含千星奇域道具。",
+      "reason": "千星奇域相关网页活动；虽已结束，仍退役累计清单中的旧条目。"
+    },
+    {
+      "remoteKey": "event:7.1:qiyi-treasure-qingnuan",
+      "title": "绮衣珍赏·晴暖",
+      "status": "excluded",
+      "previousValue": "原神限时活动",
+      "adoptedValue": "按稳定键退役",
+      "sourceUrl": "https://www.taptap.cn/moment/851174279427917260",
+      "publishedAt": "2026-09-22",
+      "statement": "需要先唤醒千星奇域奇偶，奖励为奇偶装扮及重现晶簇。",
+      "reason": "千星奇域奇偶装扮活动；虽已结束，仍退役累计清单中的旧条目。"
+    },
+    {
+      "remoteKey": "event:7.1:youshang-yaoxing-changhuai",
+      "title": "游赏耀星·畅怀",
+      "status": "excluded",
+      "previousValue": "原神限时活动",
+      "adoptedValue": "按稳定键退役",
+      "sourceUrl": "https://www.taptap.cn/moment/860111862446949870?group_id=201765",
+      "publishedAt": "2026-10-18",
+      "statement": "需要先唤醒千星奇域奇偶，通过游赏耀星关卡获取见闻并领取奇丽凝晶。",
+      "reason": "千星奇域玩法活动；虽已结束，仍退役累计清单中的旧条目。"
+    },
+    {
+      "remoteKey": "event:7.2:qiyi-treasure-hechi",
+      "title": "绮衣珍赏·赫炽",
+      "status": "excluded",
+      "previousValue": "原神限时活动",
+      "adoptedValue": "按稳定键退役",
+      "sourceUrl": "https://www.taptap.cn/moment/866643163261961149?group_id=201765",
+      "publishedAt": "2026-11-03",
+      "statement": "需要先唤醒千星奇域奇偶，奖励为奇偶装扮及重现晶簇。",
+      "reason": "千星奇域奇偶装扮活动，从当前原神活动清单移出。"
+    },
+    {
+      "remoteKey": "event:7.2:milliastra-creation-contest",
+      "title": "千星创作赛·拾光季",
+      "status": "excluded",
+      "previousValue": "原神限时活动",
+      "adoptedValue": "按稳定键退役",
+      "sourceUrl": "https://www.taptap.cn/moment/866641461968375409?group_id=201765",
+      "publishedAt": "2026-11-03",
+      "statement": "参赛需使用千星沙箱创作并发布奇域。",
+      "reason": "千星奇域创作赛事，从当前原神活动清单移出；原石奖励不改变归属。"
+    },
+    {
+      "remoteKey": "event:7.2:milliastra-fuyin-season",
+      "title": "覆音赛季",
+      "status": "excluded",
+      "previousValue": "原神限时活动",
+      "adoptedValue": "按稳定键退役",
+      "sourceUrl": "https://www.taptap.cn/moment/866643451830078348?group_id=201765",
+      "publishedAt": "2026-11-03",
+      "statement": "需要先唤醒千星奇域奇偶，游玩带段位或排行榜的奇域以获取分数。",
+      "reason": "千星奇域赛季，从当前原神活动清单移出。"
+    }
+  ],
+  "coverage": "枚举现有原神公共活动及累计清单，按新范围排除6项，其中3项当前仍在清单、3项已经结束。原神本体活动及其他游戏数据保持。",
+  "pending": [
+    "仅完成本次收录范围校正。沿用2026-11-04原研究中压力方块粉碎计划、历影定格录、地脉移涌及长夜网页活动的官方参与窗口缺口，未声称整版全量审计完成。"
+  ]
+}

@@ -35,6 +35,7 @@
 - version_end：只检查本游戏新版本活动、已开放地图、周期玩法定义及排期例外；尚未确认开放的内容保留待查。
 - first_half_end：只检查本游戏下半新增活动、补充公告和历史未决事项。枚举本期有效/已公告事项，不只检索清单已有标题；本游戏的历史节点早于 activatedAt 不妨碍当前节点覆盖当前内容。
 - 官方独立命名的限时参与事项、region/subregion 两级地图、稳定身份及个人数据边界沿用现有标准。普通周期和版本按已发布规则滚动，不例行发布逐期记录。
+- 原神任务只收录原神本体活动。千星奇域的赛季、玩法活动、奇偶装扮活动、创作赛事及相关网页活动均排除，不因原神官方公告或原石奖励而收录，也不转入其他版块。Agent 按实际参与内容判断归属，沿用已发布的稳定键退役记录。
 - 可靠证据足够即发布，不增加固定来源数量、指定页面形式、玩法标签等级或独立探索百分比门槛；可选描述未知不阻挡已确认事实。必要事实未知保持 pending，不声称 verified_unchanged。
 - 复用有效来源和既有裁决；后续适用官方更正覆盖旧字段。重开裁决须有新证据或明确 correctionReason。主要公告及一次定向补查仍无结果则记录缺口，留到本游戏下次节点，不无限搜索。
 - 研究写入 catalog-research/cloud/<gameId>-<唯一摘要>.json，记录节点 key、覆盖版块、sources、decisions、pending、auditComplete。announcementReview 只包含本游戏：checkedAt 和 games（仅一个游戏）；游戏记录 gameId、coverage（complete/partial）、checkedSources、evidencePath、pending。用 node automation/cloud-baseline/plan.mjs --verify-review <研究.json> --game <gameId> 验证。partial 不能冒充无变化，不阻塞其他已确认事实。
