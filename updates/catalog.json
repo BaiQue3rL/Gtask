@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "revision": "2026-11-04.genshin-version-end-baseline",
-  "publishedAt": "2026-11-04T14:22:02.668Z",
+  "revision": "2026-11-05.genshin-core-game-events",
+  "publishedAt": "2026-11-05T12:12:06.7771509Z",
   "games": [
     {
       "gameId": "genshin",
@@ -227,33 +227,6 @@
           "timeZone": "Asia/Shanghai"
         },
         {
-          "remoteKey": "event:7.1:qixing-festival-web",
-          "title": "「绮星盛会」网页特别活动",
-          "startsAt": "2026-10-01T12:00:00+08:00",
-          "endsAt": "2026-11-03T04:00:00+08:00",
-          "sourceUrl": "https://www.taptap.cn/moment/854673845603273392",
-          "category": "limited_event",
-          "activityTags": [
-            "web-event",
-            "quest"
-          ],
-          "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai"
-        },
-        {
-          "remoteKey": "event:7.1:qiyi-treasure-qingnuan",
-          "title": "绮衣珍赏·晴暖",
-          "startsAt": "2026-09-23T11:00:00+08:00",
-          "endsAt": "2026-11-04T05:59:00+08:00",
-          "sourceUrl": "https://www.taptap.cn/moment/851174279427917260",
-          "category": "limited_event",
-          "activityTags": [
-            "quest"
-          ],
-          "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai"
-        },
-        {
           "remoteKey": "event:7.1:overflowing-abundance-artifacts",
           "title": "祝圣移涌",
           "startsAt": "2026-10-26T04:00:00+08:00",
@@ -308,19 +281,6 @@
           "timeZone": "Asia/Shanghai"
         },
         {
-          "remoteKey": "event:7.1:youshang-yaoxing-changhuai",
-          "title": "游赏耀星·畅怀",
-          "startsAt": "2026-10-19T10:00:00+08:00",
-          "endsAt": "2026-11-02T03:59:00+08:00",
-          "sourceUrl": "https://www.taptap.cn/moment/860111862446949870?group_id=201765",
-          "category": "limited_event",
-          "activityTags": [
-            "unknown"
-          ],
-          "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai"
-        },
-        {
           "remoteKey": "event:7.2:hour-of-ruin-quest-rewards",
           "title": "「坏灭肇始之时」魔神任务限时奖励",
           "startsAt": "2026-11-04T11:00:00+08:00",
@@ -357,46 +317,6 @@
           "category": "limited_event",
           "activityTags": [
             "rhythm"
-          ],
-          "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai"
-        },
-        {
-          "remoteKey": "event:7.2:qiyi-treasure-hechi",
-          "title": "绮衣珍赏·赫炽",
-          "startsAt": "2026-11-04T11:00:00+08:00",
-          "endsAt": "2026-12-16T05:59:00+08:00",
-          "sourceUrl": "https://www.taptap.cn/moment/866643163261961149?group_id=201765",
-          "category": "limited_event",
-          "activityTags": [
-            "quest",
-            "collection"
-          ],
-          "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai"
-        },
-        {
-          "remoteKey": "event:7.2:milliastra-creation-contest",
-          "title": "千星创作赛·拾光季",
-          "startsAt": "2026-11-04T11:00:00+08:00",
-          "endsAt": "2026-12-08T11:59:59+08:00",
-          "sourceUrl": "https://www.taptap.cn/moment/866641461968375409?group_id=201765",
-          "category": "limited_event",
-          "activityTags": [
-            "unknown"
-          ],
-          "scheduleKind": "fixed_window",
-          "timeZone": "Asia/Shanghai"
-        },
-        {
-          "remoteKey": "event:7.2:milliastra-fuyin-season",
-          "title": "覆音赛季",
-          "startsAt": "2026-11-05T10:00:00+08:00",
-          "endsAt": "2026-12-15T03:59:00+08:00",
-          "sourceUrl": "https://www.taptap.cn/moment/866643451830078348?group_id=201765",
-          "category": "limited_event",
-          "activityTags": [
-            "challenge"
           ],
           "scheduleKind": "fixed_window",
           "timeZone": "Asia/Shanghai"
@@ -468,7 +388,13 @@
         "hot-update-test:genshin:cycles:v1",
         "hot-update-test:genshin:exploration:v1",
         "endgame:spiral-abyss:2026-08-16",
-        "endgame:imaginarium-theater:2026-09-01"
+        "endgame:imaginarium-theater:2026-09-01",
+        "event:7.1:qixing-festival-web",
+        "event:7.1:qiyi-treasure-qingnuan",
+        "event:7.1:youshang-yaoxing-changhuai",
+        "event:7.2:qiyi-treasure-hechi",
+        "event:7.2:milliastra-creation-contest",
+        "event:7.2:milliastra-fuyin-season"
       ]
     },
     {
