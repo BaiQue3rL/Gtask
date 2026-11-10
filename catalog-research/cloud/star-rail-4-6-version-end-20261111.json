@@ -201,7 +201,8 @@
     "catalogRevision": "2026-11-05.genshin-core-game-events",
     "catalogChanged": false,
     "catalogSha256": "9edf1958bc5accfed6763bab595f022370c0558173cc682b265cd140144eca04",
-    "proposedRevision": "2026-11-11.star-rail-4.7-confirmed-events"
+    "proposedRevision": "2026-11-11.star-rail-4.7-confirmed-events",
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/51"
   },
   "proposedDelta": {
     "schemaVersion": 2,
@@ -251,6 +252,7 @@
       "error": "版更校时不能提交已经结束的游戏版本"
     },
     "unchangedCatalog": "pnpm catalog:check passed with original revision/publishedAt; not evidence of proposed delta success",
-    "plannerTests": "33 tests passed"
+    "plannerTests": "27 passed",
+    "fullTests": "Linux: 504 passed, 4 Windows-path-related failures, 13 skipped; actual PR head Windows CI required before merge"
   }
 }
