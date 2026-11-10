@@ -1,0 +1,258 @@
+{
+  "schemaVersion": 1,
+  "gameId": "star-rail",
+  "nodeKey": "star-rail/4.6/version_end",
+  "checkedAt": "2026-11-10T22:03:26.891Z",
+  "auditComplete": false,
+  "unresolvedDecisionCount": 4,
+  "catalogChanged": false,
+  "scope": "4.7 version-change additions and full-scope review; confirmed subset only",
+  "announcementReview": {
+    "checkedAt": "2026-11-10T22:03:26.891Z",
+    "games": [
+      {
+        "gameId": "star-rail",
+        "coverage": "partial",
+        "checkedSources": [
+          "https://www.taptap.cn/moment/868821967740865688?group_id=311675",
+          "https://www.taptap.cn/moment/868905398936014841?group_id=311675",
+          "https://www.taptap.cn/app/224267/topic?type=official",
+          "https://www.hoyolab.com/article/47375703",
+          "https://www.taptap.cn/moment/869233443618162970?group_id=311675"
+        ],
+        "evidencePath": "catalog-research/cloud/star-rail-4-6-version-end-20261111.json",
+        "pending": [
+          "完整4.7更新说明当前官方列表及一次定向补查未取得；周期规则与例外保留既有定义，不能声称本轮完整核验。",
+          "点星船为4.7新场景预告；当前仍在公告预计维护窗口内，正式开放及父级必要事实尚未完整核验，不发布地图。",
+          "剧场版绒绒号：欢闹厨房、阿哈觉得你需要、万象和鸣、位面分裂、异器盈界及可能的网页限时事项，完整枚举与必要时限尚未全部核实；下半节点续接。",
+          "真实编译器拒绝累计清单：保留的4.6 versionWindow已于2026-11-11T06:00:00+08:00结束，新增publishedAt触发消费者错误“版更校时不能提交已经结束的游戏版本”。未绕过编译器、未删除历史例外、未伪造发布时间；需要单独软件维护修复历史例外消费后再发布已核验差异。"
+        ]
+      }
+    ]
+  },
+  "pending": [
+    "完整4.7更新说明当前官方列表及一次定向补查未取得；周期规则与例外保留既有定义，不能声称本轮完整核验。",
+    "点星船为4.7新场景预告；当前仍在公告预计维护窗口内，正式开放及父级必要事实尚未完整核验，不发布地图。",
+    "剧场版绒绒号：欢闹厨房、阿哈觉得你需要、万象和鸣、位面分裂、异器盈界及可能的网页限时事项，完整枚举与必要时限尚未全部核实；下半节点续接。",
+    "真实编译器拒绝累计清单：保留的4.6 versionWindow已于2026-11-11T06:00:00+08:00结束，新增publishedAt触发消费者错误“版更校时不能提交已经结束的游戏版本”。未绕过编译器、未删除历史例外、未伪造发布时间；需要单独软件维护修复历史例外消费后再发布已核验差异。"
+  ],
+  "sources": [
+    {
+      "url": "https://www.taptap.cn/moment/868821967740865688?group_id=311675",
+      "official": true,
+      "publicationDate": "2026-11-09",
+      "readScope": "full update/pre-install notice",
+      "facts": "11月11日06:00开始，预计5小时"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/868905398936014841?group_id=311675",
+      "official": true,
+      "publicationDate": "2026-11-10",
+      "readScope": "full official phase I post",
+      "facts": "返场上半截至12月2日11:59；阿哈单独延长至12月22日15:00，不用于版更推断"
+    },
+    {
+      "url": "https://www.hoyolab.com/article/47375703",
+      "official": true,
+      "readScope": "full text",
+      "facts": "奇库寻遗4.7更新后至12月23日03:59 UTC+8；任务获取权限卡"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/869233443618162970?group_id=311675",
+      "official": true,
+      "readScope": "full post and actual decoded official image 2",
+      "imageUrl": "https://img2-tc.tapimg.com/moment/etag/FotbDTp7HH6VyhplraMwSjPu0bKg_20261110150309.jpg/_tap_ugc.jpg",
+      "facts": "成名之路11月27日12:00至12月21日03:59，战斗玩法"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/869167479199368130?group_id=311675",
+      "official": true,
+      "readScope": "full post and images 1 through 7 excluding animated instructions",
+      "facts": "欢闹厨房独立活动名称/经营玩法；图像未给本次可核验完整时限，保留待查"
+    },
+    {
+      "url": "https://www.miyoushe.com/sr/article/79216272",
+      "official": true,
+      "result": "direct loading only; indexed partial text",
+      "facts": "阿哈觉得你需要为签到活动；不声称完整读取"
+    },
+    {
+      "url": "https://hsr.hoyoverse.com/zh-cn/news",
+      "official": true,
+      "result": "Loading only"
+    },
+    {
+      "url": "https://bbs-api.miyoushe.com/post/wapi/getPostFull?gids=6&post_id=79450189&read=1",
+      "official": true,
+      "result": "HTTP503"
+    },
+    {
+      "url": "https://prtimes.jp/main/html/rd/p/000000462.000096124.html/",
+      "official": true,
+      "publicationDate": "2026-10-30",
+      "readScope": "full publisher release",
+      "facts": "4.7版本预告、两项主要玩法、常驻货币战争新赛季；不从日本限定活动推导国服时限"
+    }
+  ],
+  "decisions": [
+    {
+      "key": "event:4.7:relic-recon",
+      "status": "resolved",
+      "adoptedValue": {
+        "remoteKey": "event:4.7:relic-recon",
+        "title": "奇库寻遗",
+        "startsAt": "2026-11-11T11:00:00+08:00",
+        "endsAt": "2026-12-23T03:59:00+08:00",
+        "sourceUrl": "https://www.hoyolab.com/article/47375703",
+        "category": "limited_event",
+        "activityTags": [
+          "unknown"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai"
+      },
+      "timeBasis": "nominal_maintenance",
+      "reason": "起点11月11日06:00+预计5小时=11:00，是公告排期基准而非实测开服；截止为官方分钟精度03:59，不臆造59秒。unknown为已注册标签，不阻挡必要事实。"
+    },
+    {
+      "key": "event:4.7:interastral-peace-gala-path-to-fame",
+      "status": "resolved",
+      "adoptedValue": {
+        "remoteKey": "event:4.7:interastral-peace-gala-path-to-fame",
+        "title": "星际和平盛典：成名之路",
+        "startsAt": "2026-11-27T12:00:00+08:00",
+        "endsAt": "2026-12-21T03:59:00+08:00",
+        "sourceUrl": "https://www.taptap.cn/moment/869233443618162970?group_id=311675",
+        "category": "limited_event",
+        "activityTags": [
+          "combat"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai"
+      },
+      "timeBasis": "official_exact_minute",
+      "reason": "完整读取官方活动介绍图片2窗口；与4.6一镜到底为不同命名事项，新稳定键，保留旧键。"
+    },
+    {
+      "key": "star-rail/4.7",
+      "status": "resolved",
+      "previousValue": null,
+      "adoptedValue": {
+        "gameId": "star-rail",
+        "periodKey": "4.7",
+        "startsAt": "2026-11-11T11:00:00+08:00",
+        "endsAt": "2026-12-23T06:00:00+08:00",
+        "firstHalfEndsAt": "2026-12-02T11:59:00+08:00",
+        "versionSources": [
+          "https://www.taptap.cn/moment/868821967740865688?group_id=311675",
+          "https://hsr.hoyoverse.com/zh-cn/news/166468"
+        ],
+        "firstHalfSources": [
+          "https://www.taptap.cn/moment/868905398936014841?group_id=311675"
+        ],
+        "checkedAt": "2026-11-10T22:03:26.891Z"
+      },
+      "timeBasis": "nominal_maintenance",
+      "reason": "开始及下半分别有官方公告；结束使用已发布42天常规周期与11月11日06:00锚点，未平分版本、未用活动截止倒推。官方4.8维护公告仍待下个允许节点核验。"
+    },
+    {
+      "key": "excluded-containers",
+      "status": "excluded",
+      "reason": "角色/光锥跃迁、时装抽取池、商店、无名勋礼、常驻货币战争赛季、永久剧情与关卡不作为独立限时事项；阿哈觉得你需要为独立签到候选，保留pending，不沿用旧赠礼容器排除。"
+    }
+  ],
+  "coverage": [
+    {
+      "section": "events",
+      "result": "partial",
+      "confirmed": [
+        "event:4.7:relic-recon",
+        "event:4.7:interastral-peace-gala-path-to-fame"
+      ]
+    },
+    {
+      "section": "maps",
+      "result": "partial",
+      "note": "复用8父82子稳定身份及生研院裁决；新场景尚待开放核验。"
+    },
+    {
+      "section": "cycles",
+      "result": "partial",
+      "note": "4稳定周期及7既有规则/例外保留，无例行逐期窗口发布。"
+    },
+    {
+      "section": "version_and_exceptions",
+      "result": "partial",
+      "note": "新建4.7调度元数据；常规42天，不更新客户端versionWindow。"
+    }
+  ],
+  "reusedEvidence": [
+    "catalog-research/cloud/star-rail-4-6-first-half-end.json",
+    "docs/catalog-research/star-rail-4.6-2026-10-01.json"
+  ],
+  "independentSupplement": {
+    "performed": true,
+    "bounded": true,
+    "result": "官方最新列表、官方单项公告/图片与一次完整更新定向补查已完成；必要缺口保留至下半节点，不设置重试唤醒。"
+  },
+  "delivery": {
+    "stage": "blocked_by_real_consumer_pending",
+    "branch": "codex/cloud-baseline/star-rail-4-6-version-end-20261111",
+    "catalogRevision": "2026-11-05.genshin-core-game-events",
+    "catalogChanged": false,
+    "catalogSha256": "9edf1958bc5accfed6763bab595f022370c0558173cc682b265cd140144eca04",
+    "proposedRevision": "2026-11-11.star-rail-4.7-confirmed-events",
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/51"
+  },
+  "proposedDelta": {
+    "schemaVersion": 2,
+    "revision": "2026-11-11.star-rail-4.7-confirmed-events",
+    "publishedAt": "2026-11-10T22:03:26.891Z",
+    "games": [
+      {
+        "gameId": "star-rail",
+        "upserts": [
+          {
+            "remoteKey": "event:4.7:relic-recon",
+            "title": "奇库寻遗",
+            "startsAt": "2026-11-11T11:00:00+08:00",
+            "endsAt": "2026-12-23T03:59:00+08:00",
+            "sourceUrl": "https://www.hoyolab.com/article/47375703",
+            "category": "limited_event",
+            "activityTags": [
+              "unknown"
+            ],
+            "scheduleKind": "fixed_window",
+            "timeZone": "Asia/Shanghai"
+          },
+          {
+            "remoteKey": "event:4.7:interastral-peace-gala-path-to-fame",
+            "title": "星际和平盛典：成名之路",
+            "startsAt": "2026-11-27T12:00:00+08:00",
+            "endsAt": "2026-12-21T03:59:00+08:00",
+            "sourceUrl": "https://www.taptap.cn/moment/869233443618162970?group_id=311675",
+            "category": "limited_event",
+            "activityTags": [
+              "combat"
+            ],
+            "scheduleKind": "fixed_window",
+            "timeZone": "Asia/Shanghai"
+          }
+        ]
+      }
+    ]
+  },
+  "validation": {
+    "pnpmInstall": "frozen-lockfile passed",
+    "build": "passed including typecheck; unchanged software",
+    "inventory": "actual AppDatabase(:memory:) passed before boundary, star-rail 4 modes and 8 parent/82 child inventory reused",
+    "compiler": {
+      "command": "pnpm catalog:check --base /tmp/star-rail-main-catalog.json --delta /tmp/star-rail-delta.json --output /tmp/star-rail-compiled.json",
+      "exitCode": 1,
+      "error": "版更校时不能提交已经结束的游戏版本"
+    },
+    "unchangedCatalog": "pnpm catalog:check passed with original revision/publishedAt; not evidence of proposed delta success",
+    "plannerTests": "27 passed",
+    "fullTests": "Linux: 504 passed, 4 Windows-path-related failures, 13 skipped; actual PR head Windows CI required before merge"
+  }
+}
