@@ -40,6 +40,16 @@
         "https://www.taptap.cn/moment/866271965436971946?group_id=201765"
       ],
       "checkedAt": "2026-11-04T03:04:57.851Z"
+    },
+    {
+      "gameId": "star-rail",
+      "periodKey": "4.7",
+      "node": "first_half_end",
+      "date": "2026-12-02",
+      "sources": [
+        "https://www.taptap.cn/moment/868905398936014841?group_id=311675"
+      ],
+      "checkedAt": "2026-11-10T22:03:26.891Z"
     }
   ],
   "periods": [
@@ -136,20 +146,24 @@
         "https://www.taptap.cn/moment/866276924782019655?group_id=201765"
       ],
       "checkedAt": "2026-11-04T14:22:02.668Z"
-    }
-  ],
-  "scheduleGaps": [
+    },
     {
       "gameId": "star-rail",
       "periodKey": "4.7",
-      "reason": "2026-10-25实际复核：4.6官方结束仍为2026-11-11 06:00 UTC+8；当前官方列表仅4.7赠礼/幻月游戏赛季预热，未给4.7开始、结束及上半截止。一次独立补查无官方完整窗口，保留缺口。 本轮官方列表及独立补查仍无新增可靠必要字段。",
-      "checkedSources": [
-        "https://www.taptap.cn/app/224267/topic?type=official",
-        "https://www.taptap.cn/moment/862360304653176292?group_id=311675",
+      "startsAt": "2026-11-11T11:00:00+08:00",
+      "endsAt": "2026-12-23T06:00:00+08:00",
+      "firstHalfEndsAt": "2026-12-02T11:59:00+08:00",
+      "versionSources": [
+        "https://www.taptap.cn/moment/868821967740865688?group_id=311675",
         "https://hsr.hoyoverse.com/zh-cn/news/166468"
       ],
-      "checkedAt": "2026-10-25T04:23:22.072Z"
-    },
+      "firstHalfSources": [
+        "https://www.taptap.cn/moment/868905398936014841?group_id=311675"
+      ],
+      "checkedAt": "2026-11-10T22:03:26.891Z"
+    }
+  ],
+  "scheduleGaps": [
     {
       "gameId": "wuthering-waves",
       "periodKey": "3.7",
@@ -171,6 +185,17 @@
         "https://mc.kurogames.com/main/news/detail/5569"
       ],
       "checkedAt": "2026-10-25T04:23:22.072Z"
+    },
+    {
+      "gameId": "star-rail",
+      "periodKey": "4.7",
+      "reason": "4.7开始采用11月11日06:00+预计5小时名义维护基准；下半以官方一期返场截止12月2日11:59为稳定first_half_end边界。12月23日06:00为已发布42天周期和11月11日停服锚点推算的nominal_maintenance，未取得4.8独立精确维护公告；不得称为官方精确公告。",
+      "checkedSources": [
+        "https://www.taptap.cn/moment/868821967740865688?group_id=311675",
+        "https://www.taptap.cn/moment/868905398936014841?group_id=311675",
+        "https://hsr.hoyoverse.com/zh-cn/news/166468"
+      ],
+      "checkedAt": "2026-11-10T22:03:26.891Z"
     }
   ],
   "runs": [
@@ -245,6 +270,24 @@
       "evidencePath": "catalog-research/cloud/genshin-7-1-version-end-20261104.json",
       "completedAt": null,
       "notes": "已核验部分提交发布；官方时分缺口与其余预告活动留待原神下半节点。 2026-11-04用户纠正：版本结束及两项随版本结束活动采用12月16日06:00北京时间的nominal停服基准；其他预告活动仍待核验。"
+    },
+    {
+      "key": "star-rail/4.6/version_end",
+      "gameId": "star-rail",
+      "periodKey": "4.6",
+      "node": "version_end",
+      "boundaryAt": "2026-11-11T06:00:00+08:00",
+      "status": "pending",
+      "attempts": 1,
+      "updatedAt": "2026-11-10T22:03:26.891Z",
+      "retryAt": null,
+      "branch": "codex/cloud-baseline/star-rail-4-6-version-end-20261111",
+      "pullRequestUrl": null,
+      "catalogRevision": "2026-11-05.genshin-core-game-events",
+      "catalogSha256": "9edf1958bc5accfed6763bab595f022370c0558173cc682b265cd140144eca04",
+      "evidencePath": "catalog-research/cloud/star-rail-4-6-version-end-20261111.json",
+      "completedAt": null,
+      "notes": "已核验奇库寻遗、成名之路两项差异存入研究记录proposedDelta；真实消费者拒绝已结束历史versionWindow，未发布。完整范围仍pending，不称无变化。下半节点12月2日续接；软件缺陷需范围外单独修复。"
     }
   ]
 }
