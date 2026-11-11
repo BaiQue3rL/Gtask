@@ -123,7 +123,8 @@
   "delivery": {
     "branch": "codex/cloud-baseline/zenless-3-3-half-20261111",
     "stage": "research_and_schedule_metadata_only",
-    "catalogChanged": false
+    "catalogChanged": false,
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/52"
   },
   "runtime": {
     "automationId": "6addb7eef3188190ae9dbe947d25f48d",
