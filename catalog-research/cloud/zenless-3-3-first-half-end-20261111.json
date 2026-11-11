@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "gameId": "zenless",
+  "nodeKey": "zenless/3.3/first_half_end",
+  "carriedNodes": [
+    "zenless/3.2/version_end"
+  ],
+  "checkedAt": "2026-11-11T04:06:32.604Z",
+  "baseMainSha": "d0c12ff4eeaeb9712d28329a4077c1ccd01bc7ab",
+  "auditComplete": false,
+  "catalogChanged": false,
+  "catalogRevision": "2026-11-05.genshin-core-game-events",
+  "catalogSha256": "9edf1958bc5accfed6763bab595f022370c0558173cc682b265cd140144eca04",
+  "pending": [
+    "拟境湮灭战：主要更新公告与一次独立定向补查仍无适用国服重置锚点、开启间隔及开放时长；沿用历史pending，不从版本长度或其他模式推算。"
+  ],
+  "announcementReview": {
+    "checkedAt": "2026-11-11T04:06:32.604Z",
+    "games": [
+      {
+        "gameId": "zenless",
+        "coverage": "partial",
+        "checkedSources": [
+          "https://www.taptap.cn/app/234493/topic?type=official",
+          "https://www.taptap.cn/app/234493/topic?page=2&type=official",
+          "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+          "https://zenless.hoyoverse.com/m/zh-cn/news/167269",
+          "https://zenless.hoyoverse.com/m/zh-cn/news/167271",
+          "https://zenless.hoyoverse.com/zh-cn/news/167270"
+        ],
+        "evidencePath": "catalog-research/cloud/zenless-3-3-first-half-end-20261111.json",
+        "pending": [
+          "拟境湮灭战：主要更新公告与一次独立定向补查仍无适用国服重置锚点、开启间隔及开放时长；沿用历史pending，不从版本长度或其他模式推算。"
+        ]
+      }
+    ]
+  },
+  "sources": [
+    {
+      "url": "https://www.taptap.cn/app/234493/topic?type=official",
+      "result": "official text/list read"
+    },
+    {
+      "url": "https://www.taptap.cn/app/234493/topic?page=2&type=official",
+      "result": "official text/list read"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+      "result": "official text/list read"
+    },
+    {
+      "url": "https://zenless.hoyoverse.com/m/zh-cn/news/167269",
+      "result": "official text/list read"
+    },
+    {
+      "url": "https://zenless.hoyoverse.com/m/zh-cn/news/167271",
+      "result": "official text/list read"
+    },
+    {
+      "url": "https://zenless.hoyoverse.com/zh-cn/news/167270",
+      "result": "official text/list read"
+    }
+  ],
+  "reusedEvidence": [
+    "catalog-research/cloud/zenless-3-2-version-end.json"
+  ],
+  "coverage": [
+    {
+      "section": "events",
+      "result": "reviewed_no_delta",
+      "enumerated": [
+        "全新放送",
+        "怪奇诡屋惊魂记",
+        "赛博圣手，出诊!",
+        "先遣赏金-区域巡防",
+        "「嗯呢」从天降",
+        "跛脚乌鸦奇踪记",
+        "修复吧！漂流画集",
+        "数据悬赏-实战模拟",
+        "天使应援大作战"
+      ],
+      "note": "主公告枚举、当前列表及下半单项说明与现有稳定键时限相符；跨版本天使应援复用既有裁决。"
+    },
+    {
+      "section": "maps",
+      "result": "no_new_delta",
+      "note": "复用已发布两级身份及开放证据；3.3新增两管制区均已收录；当前下半公告无新增地图事实。"
+    },
+    {
+      "section": "cycles",
+      "result": "partial",
+      "note": "拟境湮灭战：主要更新公告与一次独立定向补查仍无适用国服重置锚点、开启间隔及开放时长；沿用历史pending，不从版本长度或其他模式推算。"
+    },
+    {
+      "section": "version_and_exceptions",
+      "result": "next_boundary_verified",
+      "note": "下一节点12月2日06:00为官方3.3明确结束；当前下半12:00开放公告补充11:59上半结束证据，不改变稳定节点。"
+    }
+  ],
+  "decisions": [
+    {
+      "key": "limited-event-containers",
+      "status": "excluded",
+      "reason": "频段及其代理人试玩关卡属于卡池体验内容；商城时装、EP、线下FES及未正式开放联动预告不作为本轮游戏内独立限时活动。"
+    },
+    {
+      "key": "next-version",
+      "status": "resolved",
+      "adoptedValue": "2026-12-02T06:00:00+08:00",
+      "timeBasis": "official_explicit_version_end",
+      "reason": "复核3.3完整公告；不采用单项商城或卡池截止倒推。"
+    }
+  ],
+  "independentSupplement": {
+    "bounded": true,
+    "queries": [
+      "site:taptap.cn/moment 拟境湮灭战 周期",
+      "site:zenless.hoyoverse.com 拟境湮灭战 重置",
+      "site:zenless.hoyoverse.com 3.4 2026/12/02"
+    ],
+    "result": "未获得适用周期三字段或3.4下半日期；不把未检得写成官方未公告。"
+  },
+  "delivery": {
+    "branch": "codex/cloud-baseline/zenless-3-3-half-20261111",
+    "stage": "research_and_schedule_metadata_only",
+    "catalogChanged": false,
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/52"
+  },
+  "runtime": {
+    "automationId": "6addb7eef3188190ae9dbe947d25f48d",
+    "timingMode": "exact_schedule",
+    "timeZone": "Asia/Shanghai",
+    "profile": "model/thread fields not exposed by connector; existing settings preserved; no new profile verification claimed"
+  },
+  "inventorySummary": {
+    "items": 45,
+    "categories": {
+      "limited_event": 8,
+      "endgame": 2,
+      "exploration": 35
+    },
+    "modes": [
+      "式舆防卫战",
+      "危局强袭战"
+    ]
+  },
+  "validation": {
+    "install": "frozen-lockfile passed",
+    "build": "passed including typecheck",
+    "catalogCheck": "unchanged cumulative catalog consumed successfully",
+    "compiler": "no factual catalog delta; no revision or publishedAt change",
+    "plannerTests": "27 passed",
+    "fullTests": "Linux:504 passed,4 existing Windows path failures,13 skipped; require actual Windows Verify and Cloud baseline checks CI before merge"
+  }
+}

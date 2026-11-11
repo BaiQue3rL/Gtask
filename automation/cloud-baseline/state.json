@@ -50,6 +50,16 @@
         "https://www.taptap.cn/moment/868905398936014841?group_id=311675"
       ],
       "checkedAt": "2026-11-10T22:03:26.891Z"
+    },
+    {
+      "gameId": "zenless",
+      "periodKey": "3.3",
+      "node": "version_end",
+      "date": "2026-12-02",
+      "sources": [
+        "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
+      ],
+      "checkedAt": "2026-11-11T04:06:32.604Z"
     }
   ],
   "periods": [
@@ -122,12 +132,14 @@
       "versionSources": [
         "https://www.taptap.cn/moment/861195006294099434?group_id=330333",
         "https://zenless.hoyoverse.com/m/zh-cn/news/166925",
-        "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
+        "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+        "https://zenless.hoyoverse.com/zh-cn/news/166963"
       ],
       "firstHalfSources": [
-        "https://www.taptap.cn/moment/861197641654994725?group_id=330333"
+        "https://www.taptap.cn/moment/861197641654994725?group_id=330333",
+        "https://zenless.hoyoverse.com/m/zh-cn/news/167269"
       ],
-      "checkedAt": "2026-10-22T02:20:47.389Z"
+      "checkedAt": "2026-11-11T04:06:32.604Z"
     },
     {
       "gameId": "genshin",
@@ -196,6 +208,17 @@
         "https://hsr.hoyoverse.com/zh-cn/news/166468"
       ],
       "checkedAt": "2026-11-10T22:03:26.891Z"
+    },
+    {
+      "gameId": "zenless",
+      "periodKey": "3.4",
+      "reason": "已再次核验3.3版本结束为12月2日06:00 UTC+8；当前官方列表及一次3.4定向补查未取得3.4下半开始日期、版本结束或独立维护公告。保留既有下一版更边界，不平分版本，不安排缺口轮询。",
+      "checkedSources": [
+        "https://www.taptap.cn/app/234493/topic?type=official",
+        "https://www.taptap.cn/app/234493/topic?page=2&type=official",
+        "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
+      ],
+      "checkedAt": "2026-11-11T04:06:32.604Z"
     }
   ],
   "runs": [
@@ -206,16 +229,16 @@
       "node": "version_end",
       "boundaryAt": "2026-10-21T06:00:00+08:00",
       "status": "pending",
-      "attempts": 7,
-      "updatedAt": "2026-10-25T03:12:10.253Z",
+      "attempts": 8,
+      "updatedAt": "2026-11-11T04:06:32.604Z",
       "retryAt": null,
       "branch": "codex/cloud-baseline/zenless-3-2-version-end",
       "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/44",
       "catalogRevision": "2026-10-22.zenless-map-admission",
       "catalogSha256": "d2a930d0519c76780900084190b15b057f1395a33afada17c79bd8e573beb75c",
-      "evidencePath": "catalog-research/cloud/zenless-3-2-version-end.json",
+      "evidencePath": "catalog-research/cloud/zenless-3-3-first-half-end-20261111.json",
       "completedAt": null,
-      "notes": "2026-10-25限定补查：完整3.3更新、当前官方列表及旧官方玩法介绍均未提供适用国服重置锚点、开启间隔和开放时长。玩法介绍三张PNG已实际解码阅读：封面、参与条件/奖励、战绩记录；GIF规则图抓取超时。一次独立定向补查及官方检索交叉核验仍无必要字段；不从其他模式、版本长度或玩家攻略推算。 保持既有应急缺口和次日补查；其他游戏按原排期处理。"
+      "notes": "2026-10-25限定补查：完整3.3更新、当前官方列表及旧官方玩法介绍均未提供适用国服重置锚点、开启间隔和开放时长。玩法介绍三张PNG已实际解码阅读：封面、参与条件/奖励、战绩记录；GIF规则图抓取超时。一次独立定向补查及官方检索交叉核验仍无必要字段；不从其他模式、版本长度或玩家攻略推算。 保持既有应急缺口和次日补查；其他游戏按原排期处理。 2026-11-11下半节点续接：周期三项必要字段仍未取得，保持pending；本轮记录见新evidencePath。"
     },
     {
       "key": "star-rail/4.6/first_half_end",
@@ -288,6 +311,24 @@
       "evidencePath": "catalog-research/cloud/star-rail-4-6-version-end-20261111.json",
       "completedAt": null,
       "notes": "已核验奇库寻遗、成名之路两项差异存入研究记录proposedDelta；真实消费者拒绝已结束历史versionWindow，未发布。完整范围仍pending，不称无变化。下半节点12月2日续接；软件缺陷需范围外单独修复。"
+    },
+    {
+      "key": "zenless/3.3/first_half_end",
+      "gameId": "zenless",
+      "periodKey": "3.3",
+      "node": "first_half_end",
+      "boundaryAt": "2026-11-11T11:59:00+08:00",
+      "status": "pending",
+      "attempts": 1,
+      "updatedAt": "2026-11-11T04:06:32.604Z",
+      "retryAt": null,
+      "branch": "codex/cloud-baseline/zenless-3-3-half-20261111",
+      "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/52",
+      "catalogRevision": "2026-11-05.genshin-core-game-events",
+      "catalogSha256": "9edf1958bc5accfed6763bab595f022370c0558173cc682b265cd140144eca04",
+      "evidencePath": "catalog-research/cloud/zenless-3-3-first-half-end-20261111.json",
+      "completedAt": null,
+      "notes": "下半已核验活动时限与累计清单一致；历史周期必要事实缺失，整体partial，不声称verified_unchanged。12月2日版更节点再续接。"
     }
   ]
 }
