@@ -333,7 +333,7 @@
     "referenceCatalogSha256": "9edf1958bc5accfed6763bab595f022370c0558173cc682b265cd140144eca04",
     "compilerError": "版更校时不能提交已经结束的游戏版本",
     "branch": "codex/cloud-baseline/wuthering-waves-3-8-20261112-93bc9ca9",
-    "pullRequestUrl": null,
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/53",
     "nextAllowedNode": "wuthering-waves/3.8/first_half_end",
     "localPlayerReceipt": null,
     "mirrorReceipt": null
