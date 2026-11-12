@@ -9,7 +9,7 @@
   "coverage": [
     {
       "section": "limited_events",
-      "result": "verified_delta_ready",
+      "result": "verified_delta_published",
       "items": 8,
       "summary": "完整读取11月9日活动笔记五张原图；六项独立玩法/签到加两项材料双倍。忆旅赠礼为抽卡累计奖励排除，卡池/服饰商店/常驻全息挑战及系统功能排除。未收社区抽奖。"
     },
@@ -145,8 +145,10 @@
     },
     {
       "key": "events:3.8",
-      "decision": "verified_pending_publication",
-      "reason": "真实编译器阻塞，保留稳定键差异，不手工合并清单。"
+      "decision": "published",
+      "reason": "PR #54已修复编译器；用户要求立即恢复，8项已核验活动通过PR #55发布，并按原始UTF-8 SHA-256读回核对。",
+      "previousDecision": "verified_pending_publication",
+      "previousReason": "真实编译器阻塞，保留稳定键差异，不手工合并清单。"
     },
     {
       "key": "cycles:terminus-matrix",
@@ -325,7 +327,7 @@
     ]
   },
   "delivery": {
-    "stage": "ready",
+    "stage": "published_partial",
     "catalogChanged": false,
     "referenceCatalogRevision": "2026-11-05.genshin-core-game-events",
     "referenceCatalogSha256": "9edf1958bc5accfed6763bab595f022370c0558173cc682b265cd140144eca04",
@@ -338,7 +340,11 @@
     "previousStage": "compiler_blocked",
     "catalogRevision": "2026-11-12.blocked-baseline-recovery",
     "catalogSha256": "6f72cdf13e179d3e4ae72938506141cfa9bec332bddd39ffffcd20c813df36f7",
-    "compilerBlockerResolvedBy": "https://github.com/BaiQue3rL/Gtask/pull/54"
+    "compilerBlockerResolvedBy": "https://github.com/BaiQue3rL/Gtask/pull/54",
+    "publicationPullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/55",
+    "publicationCommit": "86c1756ea3b34adbb58418d0b9154f2e635b9e65",
+    "onlineRawSha256": "6f72cdf13e179d3e4ae72938506141cfa9bec332bddd39ffffcd20c813df36f7",
+    "verifiedPublishedAt": "2026-11-12T13:35:51.799Z"
   },
   "validation": {
     "install": "pnpm install --frozen-lockfile passed",
@@ -371,7 +377,7 @@
   "immediateRecovery": {
     "requestedBy": "user",
     "preparedAt": "2026-11-12T13:28:07.230Z",
-    "stage": "ready",
+    "stage": "published",
     "catalogRevision": "2026-11-12.blocked-baseline-recovery",
     "catalogSha256": "6f72cdf13e179d3e4ae72938506141cfa9bec332bddd39ffffcd20c813df36f7",
     "originalDecisionsReused": true,
@@ -380,6 +386,10 @@
     "localReadbackVerified": true,
     "actualCompilerPassed": true,
     "auditComplete": false,
-    "localVersionJobId": "fc831609-2959-4542-adc3-a0ccf8ae63b2"
+    "localVersionJobId": "fc831609-2959-4542-adc3-a0ccf8ae63b2",
+    "publicationPullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/55",
+    "publicationCommit": "86c1756ea3b34adbb58418d0b9154f2e635b9e65",
+    "onlineRawSha256": "6f72cdf13e179d3e4ae72938506141cfa9bec332bddd39ffffcd20c813df36f7",
+    "verifiedPublishedAt": "2026-11-12T13:35:51.799Z"
   }
 }
