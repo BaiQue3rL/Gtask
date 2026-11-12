@@ -4,8 +4,8 @@
   "nodeKey": "star-rail/4.6/version_end",
   "checkedAt": "2026-11-10T22:03:26.891Z",
   "auditComplete": false,
-  "unresolvedDecisionCount": 4,
-  "catalogChanged": false,
+  "unresolvedDecisionCount": 3,
+  "catalogChanged": true,
   "scope": "4.7 version-change additions and full-scope review; confirmed subset only",
   "announcementReview": {
     "checkedAt": "2026-11-10T22:03:26.891Z",
@@ -24,8 +24,7 @@
         "pending": [
           "完整4.7更新说明当前官方列表及一次定向补查未取得；周期规则与例外保留既有定义，不能声称本轮完整核验。",
           "点星船为4.7新场景预告；当前仍在公告预计维护窗口内，正式开放及父级必要事实尚未完整核验，不发布地图。",
-          "剧场版绒绒号：欢闹厨房、阿哈觉得你需要、万象和鸣、位面分裂、异器盈界及可能的网页限时事项，完整枚举与必要时限尚未全部核实；下半节点续接。",
-          "真实编译器拒绝累计清单：保留的4.6 versionWindow已于2026-11-11T06:00:00+08:00结束，新增publishedAt触发消费者错误“版更校时不能提交已经结束的游戏版本”。未绕过编译器、未删除历史例外、未伪造发布时间；需要单独软件维护修复历史例外消费后再发布已核验差异。"
+          "剧场版绒绒号：欢闹厨房、阿哈觉得你需要、万象和鸣、位面分裂、异器盈界及可能的网页限时事项，完整枚举与必要时限尚未全部核实；下半节点续接。"
         ]
       }
     ]
@@ -33,8 +32,7 @@
   "pending": [
     "完整4.7更新说明当前官方列表及一次定向补查未取得；周期规则与例外保留既有定义，不能声称本轮完整核验。",
     "点星船为4.7新场景预告；当前仍在公告预计维护窗口内，正式开放及父级必要事实尚未完整核验，不发布地图。",
-    "剧场版绒绒号：欢闹厨房、阿哈觉得你需要、万象和鸣、位面分裂、异器盈界及可能的网页限时事项，完整枚举与必要时限尚未全部核实；下半节点续接。",
-    "真实编译器拒绝累计清单：保留的4.6 versionWindow已于2026-11-11T06:00:00+08:00结束，新增publishedAt触发消费者错误“版更校时不能提交已经结束的游戏版本”。未绕过编译器、未删除历史例外、未伪造发布时间；需要单独软件维护修复历史例外消费后再发布已核验差异。"
+    "剧场版绒绒号：欢闹厨房、阿哈觉得你需要、万象和鸣、位面分裂、异器盈界及可能的网页限时事项，完整枚举与必要时限尚未全部核实；下半节点续接。"
   ],
   "sources": [
     {
@@ -196,13 +194,15 @@
     "result": "官方最新列表、官方单项公告/图片与一次完整更新定向补查已完成；必要缺口保留至下半节点，不设置重试唤醒。"
   },
   "delivery": {
-    "stage": "blocked_by_real_consumer_pending",
+    "stage": "ready",
     "branch": "codex/cloud-baseline/star-rail-4-6-version-end-20261111",
-    "catalogRevision": "2026-11-05.genshin-core-game-events",
+    "catalogRevision": "2026-11-12.blocked-baseline-recovery",
     "catalogChanged": false,
-    "catalogSha256": "9edf1958bc5accfed6763bab595f022370c0558173cc682b265cd140144eca04",
+    "catalogSha256": "6f72cdf13e179d3e4ae72938506141cfa9bec332bddd39ffffcd20c813df36f7",
     "proposedRevision": "2026-11-11.star-rail-4.7-confirmed-events",
-    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/51"
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/51",
+    "previousStage": "blocked_by_real_consumer_pending",
+    "compilerBlockerResolvedBy": "https://github.com/BaiQue3rL/Gtask/pull/54"
   },
   "proposedDelta": {
     "schemaVersion": 2,
@@ -254,5 +254,18 @@
     "unchangedCatalog": "pnpm catalog:check passed with original revision/publishedAt; not evidence of proposed delta success",
     "plannerTests": "27 passed",
     "fullTests": "Linux: 504 passed, 4 Windows-path-related failures, 13 skipped; actual PR head Windows CI required before merge"
+  },
+  "immediateRecovery": {
+    "requestedBy": "user",
+    "preparedAt": "2026-11-12T13:28:07.230Z",
+    "stage": "ready",
+    "catalogRevision": "2026-11-12.blocked-baseline-recovery",
+    "catalogSha256": "6f72cdf13e179d3e4ae72938506141cfa9bec332bddd39ffffcd20c813df36f7",
+    "originalDecisionsReused": true,
+    "confirmedItems": 2,
+    "localApplicationJobId": "ed4de402-b492-453d-9c4d-136a8d540383",
+    "localReadbackVerified": true,
+    "actualCompilerPassed": true,
+    "auditComplete": false
   }
 }

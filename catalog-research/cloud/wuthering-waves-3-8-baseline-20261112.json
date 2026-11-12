@@ -9,7 +9,7 @@
   "coverage": [
     {
       "section": "limited_events",
-      "result": "verified_delta_blocked",
+      "result": "verified_delta_ready",
       "items": 8,
       "summary": "完整读取11月9日活动笔记五张原图；六项独立玩法/签到加两项材料双倍。忆旅赠礼为抽卡累计奖励排除，卡池/服饰商店/常驻全息挑战及系统功能排除。未收社区抽奖。"
     },
@@ -166,7 +166,6 @@
     }
   ],
   "pending": [
-    "真实编译器/消费者在2026-11-12的新版publishedAt拒绝累计清单中已结束的历史versionWindow；不能修改其他游戏数据或绕过真实编译器。",
     "终焉矩阵3.7既有精确窗口缺口沿用；3.8官方日历仅给11月19日至12月22日，未取得必要精确时分，不套用每日重置或活动时分。",
     "灵魂列车已由维护公告确认为3.8新场景；当前匿名官方地图导航无该节点，父级/地图层级未确定，暂不猜测父级。"
   ],
@@ -319,7 +318,6 @@
         ],
         "evidencePath": "catalog-research/cloud/wuthering-waves-3-8-baseline-20261112.json",
         "pending": [
-          "真实编译器/消费者在2026-11-12的新版publishedAt拒绝累计清单中已结束的历史versionWindow；不能修改其他游戏数据或绕过真实编译器。",
           "终焉矩阵3.7既有精确窗口缺口沿用；3.8官方日历仅给11月19日至12月22日，未取得必要精确时分，不套用每日重置或活动时分。",
           "灵魂列车已由维护公告确认为3.8新场景；当前匿名官方地图导航无该节点，父级/地图层级未确定，暂不猜测父级。"
         ]
@@ -327,7 +325,7 @@
     ]
   },
   "delivery": {
-    "stage": "compiler_blocked",
+    "stage": "ready",
     "catalogChanged": false,
     "referenceCatalogRevision": "2026-11-05.genshin-core-game-events",
     "referenceCatalogSha256": "9edf1958bc5accfed6763bab595f022370c0558173cc682b265cd140144eca04",
@@ -336,7 +334,11 @@
     "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/53",
     "nextAllowedNode": "wuthering-waves/3.8/first_half_end",
     "localPlayerReceipt": null,
-    "mirrorReceipt": null
+    "mirrorReceipt": null,
+    "previousStage": "compiler_blocked",
+    "catalogRevision": "2026-11-12.blocked-baseline-recovery",
+    "catalogSha256": "6f72cdf13e179d3e4ae72938506141cfa9bec332bddd39ffffcd20c813df36f7",
+    "compilerBlockerResolvedBy": "https://github.com/BaiQue3rL/Gtask/pull/54"
   },
   "validation": {
     "install": "pnpm install --frozen-lockfile passed",
@@ -363,5 +365,21 @@
       "filesFailed": 3,
       "failureDetail": "Linux运行下Windows路径相关既有测试失败：backup.test.ts 1；codex-schedule-worker.test.ts 2；data-paths.test.ts 1。等待Windows Verify CI。"
     }
+  },
+  "unresolvedDecisionCount": 2,
+  "catalogChanged": true,
+  "immediateRecovery": {
+    "requestedBy": "user",
+    "preparedAt": "2026-11-12T13:28:07.230Z",
+    "stage": "ready",
+    "catalogRevision": "2026-11-12.blocked-baseline-recovery",
+    "catalogSha256": "6f72cdf13e179d3e4ae72938506141cfa9bec332bddd39ffffcd20c813df36f7",
+    "originalDecisionsReused": true,
+    "confirmedItems": 8,
+    "localApplicationJobId": "3bad0dec-9cf7-461f-b132-ad313540a6c8",
+    "localReadbackVerified": true,
+    "actualCompilerPassed": true,
+    "auditComplete": false,
+    "localVersionJobId": "fc831609-2959-4542-adc3-a0ccf8ae63b2"
   }
 }
