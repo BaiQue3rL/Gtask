@@ -186,21 +186,25 @@ describe('functional audit regressions', () => {
     }
   })
 
-  it('a delayed cumulative feed can include a formerly valid version exception', () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2026-10-15T12:00:00Z'))
-    const db = new AppDatabase(':memory:')
-    try {
-      expect(() => db.applyRemoteCatalogFeed(parseRemoteCatalogFeed({
-        schemaVersion: 1, revision: 'audit.delayed-feed', publishedAt: '2026-09-14T11:00:00Z',
-        games: [{ gameId: 'genshin', upserts: [], archives: [], versionWindow: {
-          periodKey: 'audit.version', startsAt: '2026-09-01T04:00:00+08:00',
-          endsAt: '2026-10-01T04:00:00+08:00', timeZone: 'Asia/Shanghai',
-          sourceUrl: 'https://example.com/exception', confidence: 1
-        } }]
-      }))).not.toThrow()
-    } finally { db.close() }
-  })
+  it.each(['2026-09-14T11:00:00Z', '2026-10-15T11:00:00Z'])(
+    'a delayed cumulative feed published at %s can retain a historical version exception', (publishedAt) => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2026-10-15T12:00:00Z'))
+      const db = new AppDatabase(':memory:')
+      try {
+        expect(() => db.applyRemoteCatalogFeed(parseRemoteCatalogFeed({
+          schemaVersion: 1, revision: 'audit.delayed-feed', publishedAt,
+          games: [{ gameId: 'genshin', upserts: [], archives: [], versionWindow: {
+            periodKey: 'audit.version', startsAt: '2026-09-01T04:00:00+08:00',
+            endsAt: '2026-10-01T04:00:00+08:00', timeZone: 'Asia/Shanghai',
+            sourceUrl: 'https://example.com/exception', confidence: 1
+          } }]
+        }))).not.toThrow()
+        expect(db.getRelevantGameVersionWindow('genshin')).toMatchObject({
+          startsAt: '2026-09-30T20:00:00.000Z', endsAt: '2026-11-11T20:00:00.000Z'
+        })
+      } finally { db.close() }
+    })
 
   it('missing completion evidence is unknown across all personal parsers', () => {
     const start = '2026-09-01T04:00:00+08:00'
