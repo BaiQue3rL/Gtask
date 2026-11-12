@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "revision": "2026-11-05.genshin-core-game-events",
-  "publishedAt": "2026-11-05T12:12:06.7771509Z",
+  "revision": "2026-11-12.blocked-baseline-recovery",
+  "publishedAt": "2026-11-12T13:25:42.683Z",
   "games": [
     {
       "gameId": "genshin",
@@ -633,6 +633,32 @@
           ],
           "scheduleKind": "fixed_window",
           "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:4.7:relic-recon",
+          "title": "奇库寻遗",
+          "startsAt": "2026-11-11T11:00:00+08:00",
+          "endsAt": "2026-12-23T03:59:00+08:00",
+          "sourceUrl": "https://www.hoyolab.com/article/47375703",
+          "category": "limited_event",
+          "activityTags": [
+            "unknown"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:4.7:interastral-peace-gala-path-to-fame",
+          "title": "星际和平盛典：成名之路",
+          "startsAt": "2026-11-27T12:00:00+08:00",
+          "endsAt": "2026-12-21T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/869233443618162970?group_id=311675",
+          "category": "limited_event",
+          "activityTags": [
+            "combat"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
         }
       ],
       "archives": [
@@ -1132,11 +1158,11 @@
     {
       "gameId": "wuthering-waves",
       "versionWindow": {
-        "periodKey": "predicted:wuthering-waves:version:2026-09-29T20:00:00.000Z",
-        "startsAt": "2026-09-30T11:00:00+08:00",
-        "endsAt": "2026-11-12T04:00:00+08:00",
+        "periodKey": "predicted:wuthering-waves:version:2026-11-11T20:00:00.000Z",
+        "startsAt": "2026-11-12T11:00:00+08:00",
+        "endsAt": "2026-12-22T04:00:00+08:00",
         "timeZone": "Asia/Shanghai",
-        "sourceUrl": "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
+        "sourceUrl": "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
         "confidence": 0.85
       },
       "upserts": [
@@ -1427,6 +1453,114 @@
           "category": "exploration",
           "mapNodeKind": "subregion",
           "parentRemoteKey": "map-catalog:wuthering-waves:region:2c98904a996835946465"
+        },
+        {
+          "remoteKey": "ww:event:3.8:second-solaris-unnamed-dream",
+          "title": "第二索拉：未名之梦",
+          "startsAt": "2026-11-12T11:00:00+08:00",
+          "endsAt": "2026-12-21T11:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+          "category": "limited_event",
+          "activityTags": [
+            "story",
+            "quest"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "ww:event:3.8:past-dream-gift",
+          "title": "昔梦赠礼",
+          "startsAt": "2026-11-12T11:00:00+08:00",
+          "endsAt": "2026-12-21T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+          "category": "limited_event",
+          "activityTags": [
+            "sign-in"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "ww:event:3.8:where-the-wind-leads",
+          "title": "风之所向",
+          "startsAt": "2026-12-07T04:00:00+08:00",
+          "endsAt": "2026-12-21T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+          "category": "limited_event",
+          "activityTags": [
+            "sign-in"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "ww:event:3.8:lahai-roi-blocks-reversal",
+          "title": "拉海洛方块・逆转",
+          "startsAt": "2026-11-19T04:00:00+08:00",
+          "endsAt": "2026-12-03T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+          "category": "limited_event",
+          "activityTags": [
+            "puzzle"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "ww:event:3.8:wuwu-project-preparation",
+          "title": "呜呜企划・整备",
+          "startsAt": "2026-12-03T10:00:00+08:00",
+          "endsAt": "2026-12-17T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+          "category": "limited_event",
+          "activityTags": [
+            "quest"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "ww:event:3.8:dreamland-wonders",
+          "title": "梦野寻奇",
+          "startsAt": "2026-12-03T10:00:00+08:00",
+          "endsAt": "2026-12-21T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+          "category": "limited_event",
+          "activityTags": [
+            "combat",
+            "challenge"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "ww:event:3.8:echoing-realm",
+          "title": "回音盈域",
+          "startsAt": "2026-11-26T04:00:00+08:00",
+          "endsAt": "2026-12-03T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+          "category": "limited_event",
+          "activityTags": [
+            "double-drop",
+            "material-reward"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "ww:event:3.8:tacet-field-double-drop",
+          "title": "声弦涤荡",
+          "startsAt": "2026-12-14T04:00:00+08:00",
+          "endsAt": "2026-12-21T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+          "category": "limited_event",
+          "activityTags": [
+            "double-drop",
+            "material-reward"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
         }
       ],
       "archives": [
