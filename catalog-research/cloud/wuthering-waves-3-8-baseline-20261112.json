@@ -1,0 +1,367 @@
+{
+  "gameId": "wuthering-waves",
+  "checkedAt": "2026-11-12T03:08:48.310219Z",
+  "nodes": [
+    "wuthering-waves/3.7/first_half_end",
+    "wuthering-waves/3.7/version_end"
+  ],
+  "auditComplete": false,
+  "coverage": [
+    {
+      "section": "limited_events",
+      "result": "verified_delta_blocked",
+      "items": 8,
+      "summary": "完整读取11月9日活动笔记五张原图；六项独立玩法/签到加两项材料双倍。忆旅赠礼为抽卡累计奖励排除，卡池/服饰商店/常驻全息挑战及系统功能排除。未收社区抽奖。"
+    },
+    {
+      "section": "exploration",
+      "result": "partial",
+      "regions": 4,
+      "subregions": 52,
+      "navigationRegions": 4,
+      "navigationSubregions": 52,
+      "missingPublished": [],
+      "additionalNavigation": [],
+      "summary": "已收录地图与当前官方匿名导航逐项核对，未重置身份；灵魂列车缺父级保留pending；玄元境沿用用户排除。"
+    },
+    {
+      "section": "cycles",
+      "result": "partial",
+      "summary": "深塔11/9至12/7、海墟10/26至11/23及11/23至12/21与28日规则一致；常规期不发布。矩阵日历为11/19至12/22，时分未核实。主要公告和一次定向补查后停止检索。"
+    },
+    {
+      "section": "periods",
+      "result": "verified",
+      "summary": "3.7结束补齐11/12 04:00；3.8开始为维护预计完成11/12 11:00；3.8结束日期12/22维护前+本游戏04:00停服锚点为名义基准。下半12/3 10:00来自第二期原图。"
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://www.taptap.cn/moment/867871551700077817?group_id=330015",
+      "checkedAt": "2026-11-12T03:08:48.310219Z"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+      "checkedAt": "2026-11-12T03:08:48.310219Z"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/869528003246293506?group_id=330015",
+      "checkedAt": "2026-11-12T03:08:48.310219Z"
+    },
+    {
+      "url": "https://www.taptap.cn/moment/869548444329444300?group_id=330015",
+      "checkedAt": "2026-11-12T03:08:48.310219Z"
+    },
+    {
+      "url": "https://www.taptap.cn/app/234280/topic?type=official",
+      "checkedAt": "2026-11-12T03:08:48.310219Z"
+    },
+    {
+      "url": "https://www.taptap.cn/app/234280/topic?page=2&type=official",
+      "checkedAt": "2026-11-12T03:08:48.310219Z"
+    },
+    {
+      "url": "https://www.taptap.cn/app/234280/topic?page=3&type=official",
+      "checkedAt": "2026-11-12T03:08:48.310219Z"
+    },
+    {
+      "url": "https://mc.kurogames.com/main",
+      "checkedAt": "2026-11-12T03:08:48.310219Z"
+    },
+    {
+      "url": "https://www.kurobbs.com/mc/map/",
+      "checkedAt": "2026-11-12T03:08:48.310219Z"
+    },
+    {
+      "url": "https://web-static.kurobbs.com/mcmap/country/56B91DBC9C854C7CA932D638F722ADC5/country.json",
+      "checkedAt": "2026-11-12T03:08:48.310219Z"
+    }
+  ],
+  "sourceImages": [
+    {
+      "path": "official-version-info-image-0",
+      "url": "https://img2-tc.tapimg.com/moment/etag/lqev5EhvUm_3L_nFgbq5dlzalTx9_20261109113518.png/_tap_ugc.jpg",
+      "sha256": "0dc3d97eb18a0e41585914b6e6c9449cbf05f906b8284db269506d39d15a0bdc",
+      "visuallyRead": true
+    },
+    {
+      "path": "official-version-info-image-1",
+      "url": "https://img2-tc.tapimg.com/moment/etag/lmtmU0loM6rDNCfw3tx3GPBkjMIP_20261109113518.png/_tap_ugc.jpg",
+      "sha256": "aa451e6f093d17de16b15e892ab8c5f4734899e283e947b6af0f3589dbb2e220",
+      "visuallyRead": true
+    },
+    {
+      "path": "official-version-info-image-2",
+      "url": "https://img2-tc.tapimg.com/moment/etag/lp1lwpsJiJpni-AB3dQJhFfPIxTR_20261109114059.png/_tap_ugc.jpg",
+      "sha256": "3c98ffd5508fe6a483606a11abf7120e204431670f540c51d9c919676860a626",
+      "visuallyRead": true
+    },
+    {
+      "path": "official-version-info-image-3",
+      "url": "https://img2-tc.tapimg.com/moment/etag/lqDvAo63godKytT0VCazNwY1_MeJ_20261109114127.png/_tap_ugc.jpg",
+      "sha256": "220073d648bf960b9c2eb67d5f99e9339505d4e100885074d0d4bcc1feb8ca7e",
+      "visuallyRead": true
+    },
+    {
+      "path": "official-version-info-image-4",
+      "url": "https://img2-tc.tapimg.com/moment/etag/Fu1W86Qttt0jy9vheMyaifiZhVfk_20261109114156.jpg/_tap_ugc.jpg",
+      "sha256": "9fc8c78460a5b79a49955ac548836f0e729997f5bbf2bc02497e1a485673fdeb",
+      "visuallyRead": true
+    }
+  ],
+  "decisions": [
+    {
+      "key": "period:3.7:endsAt",
+      "oldValue": null,
+      "adoptedValue": "2026-11-12T04:00:00+08:00",
+      "sourceUrl": "https://www.taptap.cn/moment/867871551700077817?group_id=330015",
+      "publishedAt": "2026-11-07",
+      "timeBasis": "official_exact",
+      "reason": "新官方维护公告明确11/12 04:00~11:00 UTC+8。"
+    },
+    {
+      "key": "period:3.8",
+      "adoptedValue": {
+        "gameId": "wuthering-waves",
+        "periodKey": "3.8",
+        "startsAt": "2026-11-12T11:00:00+08:00",
+        "endsAt": "2026-12-22T04:00:00+08:00",
+        "firstHalfEndsAt": "2026-12-03T10:00:00+08:00",
+        "versionSources": [
+          "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+          "https://www.taptap.cn/moment/867871551700077817?group_id=330015"
+        ],
+        "firstHalfSources": [
+          "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+          "https://www.taptap.cn/moment/869528003246293506?group_id=330015"
+        ],
+        "checkedAt": "2026-11-12T03:08:48.310219Z"
+      },
+      "sourceUrl": "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+      "publishedAt": "2026-11-09",
+      "timeBasis": "nominal_maintenance",
+      "statement": "2026年11月12日更新后 ~ 2026年12月22日维护前",
+      "reason": "12/22日期与本游戏已核验04:00停服锚点组合；非官方下一版精确维护公告。3.8为40天例外，不改长期42天规则。"
+    },
+    {
+      "key": "events:3.8",
+      "decision": "verified_pending_publication",
+      "reason": "真实编译器阻塞，保留稳定键差异，不手工合并清单。"
+    },
+    {
+      "key": "cycles:terminus-matrix",
+      "decision": "pending",
+      "priorEvidence": "catalog-research/cloud/wuthering-waves-3-7-first-half-end.json",
+      "reason": "终焉矩阵3.7既有精确窗口缺口沿用；3.8官方日历仅给11月19日至12月22日，未取得必要精确时分，不套用每日重置或活动时分。"
+    },
+    {
+      "key": "map:soul-train",
+      "decision": "pending",
+      "reason": "灵魂列车已由维护公告确认为3.8新场景；当前匿名官方地图导航无该节点，父级/地图层级未确定，暂不猜测父级。"
+    },
+    {
+      "key": "exclusions:3.8",
+      "decision": "excluded",
+      "reason": "先约电台为常规通行证；忆旅赠礼为抽卡累计奖励；商店服饰礼包、卡池、常驻剧情和全息挑战不作限时参与事项收录。"
+    }
+  ],
+  "pending": [
+    "真实编译器/消费者在2026-11-12的新版publishedAt拒绝累计清单中已结束的历史versionWindow；不能修改其他游戏数据或绕过真实编译器。",
+    "终焉矩阵3.7既有精确窗口缺口沿用；3.8官方日历仅给11月19日至12月22日，未取得必要精确时分，不套用每日重置或活动时分。",
+    "灵魂列车已由维护公告确认为3.8新场景；当前匿名官方地图导航无该节点，父级/地图层级未确定，暂不猜测父级。"
+  ],
+  "proposedDelta": {
+    "schemaVersion": 2,
+    "revision": "2026-11-12.wuthering-waves-3.8-baseline",
+    "publishedAt": "2026-11-12T03:06:19.448248Z",
+    "games": [
+      {
+        "gameId": "wuthering-waves",
+        "versionWindow": {
+          "periodKey": "predicted:wuthering-waves:version:2026-11-11T20:00:00.000Z",
+          "startsAt": "2026-11-12T11:00:00+08:00",
+          "endsAt": "2026-12-22T04:00:00+08:00",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+          "confidence": 0.85
+        },
+        "upserts": [
+          {
+            "remoteKey": "ww:event:3.8:second-solaris-unnamed-dream",
+            "title": "第二索拉：未名之梦",
+            "startsAt": "2026-11-12T11:00:00+08:00",
+            "endsAt": "2026-12-21T11:59:00+08:00",
+            "sourceUrl": "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+            "category": "limited_event",
+            "activityTags": [
+              "story",
+              "quest"
+            ],
+            "scheduleKind": "fixed_window",
+            "timeZone": "Asia/Shanghai"
+          },
+          {
+            "remoteKey": "ww:event:3.8:past-dream-gift",
+            "title": "昔梦赠礼",
+            "startsAt": "2026-11-12T11:00:00+08:00",
+            "endsAt": "2026-12-21T03:59:00+08:00",
+            "sourceUrl": "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+            "category": "limited_event",
+            "activityTags": [
+              "sign-in"
+            ],
+            "scheduleKind": "fixed_window",
+            "timeZone": "Asia/Shanghai"
+          },
+          {
+            "remoteKey": "ww:event:3.8:where-the-wind-leads",
+            "title": "风之所向",
+            "startsAt": "2026-12-07T04:00:00+08:00",
+            "endsAt": "2026-12-21T03:59:00+08:00",
+            "sourceUrl": "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+            "category": "limited_event",
+            "activityTags": [
+              "sign-in"
+            ],
+            "scheduleKind": "fixed_window",
+            "timeZone": "Asia/Shanghai"
+          },
+          {
+            "remoteKey": "ww:event:3.8:lahai-roi-blocks-reversal",
+            "title": "拉海洛方块・逆转",
+            "startsAt": "2026-11-19T04:00:00+08:00",
+            "endsAt": "2026-12-03T03:59:00+08:00",
+            "sourceUrl": "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+            "category": "limited_event",
+            "activityTags": [
+              "puzzle"
+            ],
+            "scheduleKind": "fixed_window",
+            "timeZone": "Asia/Shanghai"
+          },
+          {
+            "remoteKey": "ww:event:3.8:wuwu-project-preparation",
+            "title": "呜呜企划・整备",
+            "startsAt": "2026-12-03T10:00:00+08:00",
+            "endsAt": "2026-12-17T03:59:00+08:00",
+            "sourceUrl": "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+            "category": "limited_event",
+            "activityTags": [
+              "quest"
+            ],
+            "scheduleKind": "fixed_window",
+            "timeZone": "Asia/Shanghai"
+          },
+          {
+            "remoteKey": "ww:event:3.8:dreamland-wonders",
+            "title": "梦野寻奇",
+            "startsAt": "2026-12-03T10:00:00+08:00",
+            "endsAt": "2026-12-21T03:59:00+08:00",
+            "sourceUrl": "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+            "category": "limited_event",
+            "activityTags": [
+              "combat",
+              "challenge"
+            ],
+            "scheduleKind": "fixed_window",
+            "timeZone": "Asia/Shanghai"
+          },
+          {
+            "remoteKey": "ww:event:3.8:echoing-realm",
+            "title": "回音盈域",
+            "startsAt": "2026-11-26T04:00:00+08:00",
+            "endsAt": "2026-12-03T03:59:00+08:00",
+            "sourceUrl": "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+            "category": "limited_event",
+            "activityTags": [
+              "double-drop",
+              "material-reward"
+            ],
+            "scheduleKind": "fixed_window",
+            "timeZone": "Asia/Shanghai"
+          },
+          {
+            "remoteKey": "ww:event:3.8:tacet-field-double-drop",
+            "title": "声弦涤荡",
+            "startsAt": "2026-12-14T04:00:00+08:00",
+            "endsAt": "2026-12-21T03:59:00+08:00",
+            "sourceUrl": "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+            "category": "limited_event",
+            "activityTags": [
+              "double-drop",
+              "material-reward"
+            ],
+            "scheduleKind": "fixed_window",
+            "timeZone": "Asia/Shanghai"
+          }
+        ],
+        "archives": []
+      }
+    ]
+  },
+  "announcementReview": {
+    "checkedAt": "2026-11-12T03:08:48.310219Z",
+    "games": [
+      {
+        "gameId": "wuthering-waves",
+        "coverage": "partial",
+        "checkedSources": [
+          "https://www.taptap.cn/moment/867871551700077817?group_id=330015",
+          "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+          "https://www.taptap.cn/moment/869528003246293506?group_id=330015",
+          "https://www.taptap.cn/moment/869548444329444300?group_id=330015",
+          "https://www.taptap.cn/app/234280/topic?type=official",
+          "https://www.taptap.cn/app/234280/topic?page=2&type=official",
+          "https://www.taptap.cn/app/234280/topic?page=3&type=official",
+          "https://mc.kurogames.com/main",
+          "https://www.kurobbs.com/mc/map/",
+          "https://web-static.kurobbs.com/mcmap/country/56B91DBC9C854C7CA932D638F722ADC5/country.json"
+        ],
+        "evidencePath": "catalog-research/cloud/wuthering-waves-3-8-baseline-20261112.json",
+        "pending": [
+          "真实编译器/消费者在2026-11-12的新版publishedAt拒绝累计清单中已结束的历史versionWindow；不能修改其他游戏数据或绕过真实编译器。",
+          "终焉矩阵3.7既有精确窗口缺口沿用；3.8官方日历仅给11月19日至12月22日，未取得必要精确时分，不套用每日重置或活动时分。",
+          "灵魂列车已由维护公告确认为3.8新场景；当前匿名官方地图导航无该节点，父级/地图层级未确定，暂不猜测父级。"
+        ]
+      }
+    ]
+  },
+  "delivery": {
+    "stage": "compiler_blocked",
+    "catalogChanged": false,
+    "referenceCatalogRevision": "2026-11-05.genshin-core-game-events",
+    "referenceCatalogSha256": "9edf1958bc5accfed6763bab595f022370c0558173cc682b265cd140144eca04",
+    "compilerError": "版更校时不能提交已经结束的游戏版本",
+    "branch": "codex/cloud-baseline/wuthering-waves-3-8-20261112-93bc9ca9",
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/53",
+    "nextAllowedNode": "wuthering-waves/3.8/first_half_end",
+    "localPlayerReceipt": null,
+    "mirrorReceipt": null
+  },
+  "validation": {
+    "install": "pnpm install --frozen-lockfile passed",
+    "build": "pnpm build passed (typecheck + electron-vite)",
+    "plannerTests": {
+      "passed": 27,
+      "failed": 0
+    },
+    "announcementReview": {
+      "auditComplete": false,
+      "unresolvedCount": 3
+    },
+    "currentCatalogCheck": "passed on unchanged catalog",
+    "compiler": {
+      "passed": false,
+      "error": "版更校时不能提交已经结束的游戏版本",
+      "reason": "累计清单包含截至11月11日已结束的历史versionWindow；当前消费器以新版publishedAt重新应用这些窗口。不能改变其他游戏条目或绕过消费者。"
+    },
+    "fullTests": {
+      "passed": 504,
+      "failed": 4,
+      "skipped": 13,
+      "filesPassed": 76,
+      "filesFailed": 3,
+      "failureDetail": "Linux运行下Windows路径相关既有测试失败：backup.test.ts 1；codex-schedule-worker.test.ts 2；data-paths.test.ts 1。等待Windows Verify CI。"
+    }
+  }
+}

@@ -60,6 +60,26 @@
         "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
       ],
       "checkedAt": "2026-11-11T04:06:32.604Z"
+    },
+    {
+      "gameId": "wuthering-waves",
+      "periodKey": "3.8",
+      "node": "version_end",
+      "date": "2026-12-22",
+      "sources": [
+        "https://www.taptap.cn/moment/868821283758934283?group_id=330015"
+      ],
+      "checkedAt": "2026-11-12T03:08:48.310219Z"
+    },
+    {
+      "gameId": "wuthering-waves",
+      "periodKey": "3.8",
+      "node": "first_half_end",
+      "date": "2026-12-03",
+      "sources": [
+        "https://www.taptap.cn/moment/868821283758934283?group_id=330015"
+      ],
+      "checkedAt": "2026-11-12T03:08:48.310219Z"
     }
   ],
   "periods": [
@@ -97,15 +117,16 @@
       "gameId": "wuthering-waves",
       "periodKey": "3.7",
       "startsAt": "2026-09-30T11:00:00+08:00",
-      "endsAt": null,
+      "endsAt": "2026-11-12T04:00:00+08:00",
       "firstHalfEndsAt": "2026-10-22T09:59:00+08:00",
       "versionSources": [
-        "https://www.taptap.cn/moment/854139064348051537"
+        "https://www.taptap.cn/moment/854139064348051537",
+        "https://www.taptap.cn/moment/867871551700077817?group_id=330015"
       ],
       "firstHalfSources": [
         "https://www.taptap.cn/moment/853756601964691535"
       ],
-      "checkedAt": "2026-10-22T02:20:47.389Z"
+      "checkedAt": "2026-11-12T03:08:48.310219Z"
     },
     {
       "gameId": "genshin",
@@ -173,31 +194,25 @@
         "https://www.taptap.cn/moment/868905398936014841?group_id=311675"
       ],
       "checkedAt": "2026-11-10T22:03:26.891Z"
+    },
+    {
+      "gameId": "wuthering-waves",
+      "periodKey": "3.8",
+      "startsAt": "2026-11-12T11:00:00+08:00",
+      "endsAt": "2026-12-22T04:00:00+08:00",
+      "firstHalfEndsAt": "2026-12-03T10:00:00+08:00",
+      "versionSources": [
+        "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+        "https://www.taptap.cn/moment/867871551700077817?group_id=330015"
+      ],
+      "firstHalfSources": [
+        "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+        "https://www.taptap.cn/moment/869528003246293506?group_id=330015"
+      ],
+      "checkedAt": "2026-11-12T03:08:48.310219Z"
     }
   ],
   "scheduleGaps": [
-    {
-      "gameId": "wuthering-waves",
-      "periodKey": "3.7",
-      "reason": "2026-10-25实际复核：官方3.7内容说明、列表、日期日历及二期唤取仍未给版本结束维护精确边界；11/12仅日期、11/11 11:59仅卡池截止。独立补查的第三方时分不采用。 本轮官方列表及独立补查仍无新增可靠必要字段。",
-      "checkedSources": [
-        "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
-        "https://mc.kurogames.com/main/news/detail/5569",
-        "https://www.taptap.cn/moment/853647253976386369?group_id=330015",
-        "https://www.taptap.cn/moment/861624365911900497?group_id=330015"
-      ],
-      "checkedAt": "2026-10-25T04:23:22.072Z"
-    },
-    {
-      "gameId": "wuthering-waves",
-      "periodKey": null,
-      "reason": "2026-10-25实际复核：当前官方列表、3.7内容说明及一次3.8维护定向补查仍未取得下一版本开始、结束及上半截止的可靠完整公告；不采用第三方推测或活动/卡池截止。 本轮官方列表及独立补查仍无新增可靠必要字段。",
-      "checkedSources": [
-        "https://www.taptap.cn/app/234280/topic?os=pc&type=official",
-        "https://mc.kurogames.com/main/news/detail/5569"
-      ],
-      "checkedAt": "2026-10-25T04:23:22.072Z"
-    },
     {
       "gameId": "star-rail",
       "periodKey": "4.7",
@@ -219,6 +234,17 @@
         "https://www.taptap.cn/moment/861685253129898403?group_id=330333"
       ],
       "checkedAt": "2026-11-11T04:06:32.604Z"
+    },
+    {
+      "gameId": "wuthering-waves",
+      "periodKey": "3.8",
+      "reason": "12月22日维护日期由11月9日官方活动笔记原图确认；04:00采用本游戏11月12日维护锚点的nominal_maintenance，不冒充下一版本独立精确维护公告。12月3日10:00下半由官方活动笔记唤取二期原图确认。",
+      "checkedSources": [
+        "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+        "https://www.taptap.cn/moment/867871551700077817?group_id=330015",
+        "https://www.taptap.cn/moment/869528003246293506?group_id=330015"
+      ],
+      "checkedAt": "2026-11-12T03:08:48.310219Z"
     }
   ],
   "runs": [
@@ -265,16 +291,16 @@
       "node": "first_half_end",
       "boundaryAt": "2026-10-22T09:59:00+08:00",
       "status": "pending",
-      "attempts": 4,
-      "updatedAt": "2026-10-25T04:23:22.072Z",
+      "attempts": 5,
+      "updatedAt": "2026-11-12T03:08:48.310219Z",
       "retryAt": null,
-      "branch": "codex/cloud-baseline/wuthering-waves-3-7-first-half-end",
-      "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/45",
-      "catalogRevision": "2026-10-23.genshin-activities-wuwa-map",
-      "catalogSha256": "8f61275ae7258e2ccaf7cd59929f63cf4fa0389faba940c6f7bc371a6b056d42",
-      "evidencePath": "catalog-research/cloud/wuthering-waves-3-7-first-half-end.json",
+      "branch": "codex/cloud-baseline/wuthering-waves-3-8-20261112-93bc9ca9",
+      "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/53",
+      "catalogRevision": "2026-11-05.genshin-core-game-events",
+      "catalogSha256": "9edf1958bc5accfed6763bab595f022370c0558173cc682b265cd140144eca04",
+      "evidencePath": "catalog-research/cloud/wuthering-waves-3-8-baseline-20261112.json",
       "completedAt": null,
-      "notes": "最新列表为朝月良辰、桌宠预告和角色内容；3.7全文及二期公告复核，下半既有活动不重复发布。全文无终焉矩阵精确时分；复用此前已读日期日历，一次独立定向补查未取得可靠国服精确窗口。网站正文为空，使用官方论坛全文交叉核验。 保留pending和已发布成果；本轮无清单差异。"
+      "notes": "最新列表为朝月良辰、桌宠预告和角色内容；3.7全文及二期公告复核，下半既有活动不重复发布。全文无终焉矩阵精确时分；复用此前已读日期日历，一次独立定向补查未取得可靠国服精确窗口。网站正文为空，使用官方论坛全文交叉核验。 保留pending和已发布成果；本轮无清单差异。 2026-11-12版更节点核查：八项3.8限时活动及40天版本例外已核验，真实编译器拒绝累计清单中已结束历史versionWindow，未发布。差异保存在研究proposedDelta；终焉矩阵精确窗口、灵魂列车父级仍pending。12月3日10:00下半节点续接，不增设补查或恢复定时器。"
     },
     {
       "key": "genshin/7.1/version_end",
@@ -329,6 +355,24 @@
       "evidencePath": "catalog-research/cloud/zenless-3-3-first-half-end-20261111.json",
       "completedAt": null,
       "notes": "下半已核验活动时限与累计清单一致；历史周期必要事实缺失，整体partial，不声称verified_unchanged。12月2日版更节点再续接。"
+    },
+    {
+      "key": "wuthering-waves/3.7/version_end",
+      "gameId": "wuthering-waves",
+      "periodKey": "3.7",
+      "node": "version_end",
+      "boundaryAt": "2026-11-12T04:00:00+08:00",
+      "status": "pending",
+      "attempts": 1,
+      "updatedAt": "2026-11-12T03:08:48.310219Z",
+      "retryAt": null,
+      "branch": "codex/cloud-baseline/wuthering-waves-3-8-20261112-93bc9ca9",
+      "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/53",
+      "catalogRevision": "2026-11-05.genshin-core-game-events",
+      "catalogSha256": "9edf1958bc5accfed6763bab595f022370c0558173cc682b265cd140144eca04",
+      "evidencePath": "catalog-research/cloud/wuthering-waves-3-8-baseline-20261112.json",
+      "completedAt": null,
+      "notes": "2026-11-12版更节点核查：八项3.8限时活动及40天版本例外已核验，真实编译器拒绝累计清单中已结束历史versionWindow，未发布。差异保存在研究proposedDelta；终焉矩阵精确窗口、灵魂列车父级仍pending。12月3日10:00下半节点续接，不增设补查或恢复定时器。"
     }
   ]
 }
