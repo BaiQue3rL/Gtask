@@ -886,6 +886,18 @@ describe('本地 MCP server', () => {
     const startsAt = new Date(now - 24 * 60 * 60 * 1_000).toISOString()
     const endsAt = new Date(now + 40 * 24 * 60 * 60 * 1_000).toISOString()
     const sourceUrl = 'https://example.com/genshin-version-cn'
+    const expired = await connected.callTool({
+      name: 'apply_gtask_public_schedule',
+      arguments: {
+        agentId: 'version-agent', jobId: queued.id, contentLocale: 'zh-CN',
+        retrievedAt: new Date(now).toISOString(), items: [],
+        versionWindow: { periodKey: 'genshin:version:expired', startsAt,
+          endsAt: new Date(now - 1_000).toISOString(), timeZone: 'Asia/Shanghai', sourceUrl, confidence: 1 },
+        evidence: [{ url: sourceUrl, platform: '官方平台', publisher: '原神官方', official: true, language: 'zh-CN' }]
+      }
+    })
+    expect(expired.isError).toBe(true)
+    expect(JSON.stringify(expired.content)).toContain('已经结束')
     const result = await connected.callTool({
       name: 'apply_gtask_public_schedule',
       arguments: {

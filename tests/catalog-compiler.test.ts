@@ -38,4 +38,25 @@ describe('public catalog compiler', () => {
       expect(serialized).not.toContain(privateField)
     }
   })
+
+  it('compiles another game after a retained version exception has ended', () => {
+    const versionWindow = { periodKey: '4.6', startsAt: '2026-09-28T06:00:00+08:00',
+      endsAt: '2026-11-11T06:00:00+08:00', timeZone: 'Asia/Shanghai', confidence: 1,
+      sourceUrl: 'https://example.com/official-version' }
+    const historical = { ...base, publishedAt: '2026-09-29T00:00:00Z',
+      games: [...base.games, { gameId: 'star-rail', versionWindow, upserts: [], archives: [] }] }
+    const next = { ...delta, publishedAt: '2026-11-12T03:00:00Z' }
+    const result = compileCatalogDelta(historical, { ...next,
+      games: [{ gameId: 'wuthering-waves', upserts: [{ ...event, startsAt: '2026-11-12T03:00:00Z',
+        endsAt: '2026-12-01T00:00:00Z' }] }] })
+    expect(result.changed).toBe(true)
+    expect(result.feed.games.find((game) => game.gameId === 'star-rail')?.versionWindow).toEqual(versionWindow)
+    expect(result.feed.games.find((game) => game.gameId === 'genshin')?.archives).toEqual(base.games[0].archives)
+    expect(result.validation.receipt?.revision).toBe(delta.revision)
+    expect(() => compileCatalogDelta(historical, { ...next, games: [{ gameId: 'star-rail',
+      versionWindow: { ...versionWindow, startsAt: '2026-12-01T00:00:00Z', endsAt: '2027-01-01T00:00:00Z' } }] }))
+      .toThrow('当前已经开始')
+    expect(() => compileCatalogDelta(historical, { ...next, games: [{ gameId: 'star-rail',
+      versionWindow: { ...versionWindow, endsAt: versionWindow.startsAt } }] })).toThrow('开始时间')
+  })
 })

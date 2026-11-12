@@ -3151,8 +3151,9 @@ export class AppDatabase {
         if (records.length) parseRemoteCatalogFeed({ schemaVersion: 2, revision: feed.revision, publishedAt: feed.publishedAt,
           games: [{ gameId: game.gameId, scheduleUpdates: records }] })
         if (game.versionWindow) {
-          // A cumulative feed remains usable after the published exception ends.
-          this.validateVersionWindow(game.versionWindow, new Date(syncedAt))
+          // Republishing another game advances publishedAt without changing this
+          // historical anchor. Only direct current-version calibration must be active.
+          this.validateVersionWindow(game.versionWindow, new Date(syncedAt), { allowExpired: true })
           this.upsertVersionWindow(game.gameId, game.versionWindow, syncedAt)
         }
         if (game.upserts.length > 0) {
@@ -3929,7 +3930,11 @@ export class AppDatabase {
     }
   }
 
-  private validateVersionWindow(window: CodexVersionWindow, reference: Date): void {
+  private validateVersionWindow(
+    window: CodexVersionWindow,
+    reference: Date,
+    options: { allowExpired?: boolean } = {}
+  ): void {
     if (!window.periodKey.trim()) throw new Error('版更校时缺少当前版本标识')
     if (!window.timeZone.trim()) throw new Error('版更校时缺少官方服务器时区')
     const startsAt = Date.parse(window.startsAt)
@@ -3938,7 +3943,7 @@ export class AppDatabase {
       throw new Error('版更校时缺少有效的版本起止时间')
     }
     if (startsAt > reference.getTime()) throw new Error('版更校时只能提交当前已经开始的游戏版本')
-    if (endsAt <= reference.getTime()) throw new Error('版更校时不能提交已经结束的游戏版本')
+    if (!options.allowExpired && endsAt <= reference.getTime()) throw new Error('版更校时不能提交已经结束的游戏版本')
     if (!Number.isFinite(window.confidence) || window.confidence < 0 || window.confidence > 1) {
       throw new Error('版更校时置信度格式不正确')
     }
