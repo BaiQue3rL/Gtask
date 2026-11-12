@@ -300,7 +300,7 @@
       "catalogSha256": "6f72cdf13e179d3e4ae72938506141cfa9bec332bddd39ffffcd20c813df36f7",
       "evidencePath": "catalog-research/cloud/wuthering-waves-3-8-baseline-20261112.json",
       "completedAt": null,
-      "notes": "2026-11-12用户要求立即恢复：已核验8项3.8活动及40天版本例外已通过本机任务应用，本次累计清单包含同一批差异；软件阻塞由PR #54解除，不再延迟已确认差异。终焉矩阵精确窗口及灵魂列车父级仍保留pending，auditComplete=false；原任务日期保持。"
+      "notes": "2026-11-12用户要求立即恢复：已核验8项3.8活动及40天版本例外已通过本机任务应用，本次累计清单包含同一批差异；软件阻塞由PR #54解除，不再延迟已确认差异。终焉矩阵精确窗口及灵魂列车父级仍保留pending，auditComplete=false；原任务日期保持。 已通过PR #55发布并核对线上原始UTF-8 SHA-256；这批已确认差异不再待发布。"
     },
     {
       "key": "genshin/7.1/version_end",
@@ -336,7 +336,7 @@
       "catalogSha256": "6f72cdf13e179d3e4ae72938506141cfa9bec332bddd39ffffcd20c813df36f7",
       "evidencePath": "catalog-research/cloud/star-rail-4-6-version-end-20261111.json",
       "completedAt": null,
-      "notes": "2026-11-12用户要求立即恢复：已核验2项活动已通过原子领取的本机任务应用，本次累计清单包含同一批差异；软件阻塞由PR #54解除，不再把已确认差异延迟至下半节点。其余预告活动、完整更新说明及新场景必要事实仍保留原pending，auditComplete=false；原任务日期保持。"
+      "notes": "2026-11-12用户要求立即恢复：已核验2项活动已通过原子领取的本机任务应用，本次累计清单包含同一批差异；软件阻塞由PR #54解除，不再把已确认差异延迟至下半节点。其余预告活动、完整更新说明及新场景必要事实仍保留原pending，auditComplete=false；原任务日期保持。 已通过PR #55发布并核对线上原始UTF-8 SHA-256；这批已确认差异不再待发布。"
     },
     {
       "key": "zenless/3.3/first_half_end",
@@ -372,7 +372,7 @@
       "catalogSha256": "6f72cdf13e179d3e4ae72938506141cfa9bec332bddd39ffffcd20c813df36f7",
       "evidencePath": "catalog-research/cloud/wuthering-waves-3-8-baseline-20261112.json",
       "completedAt": null,
-      "notes": "2026-11-12用户要求立即恢复：已核验8项3.8活动及40天版本例外已通过本机任务应用，本次累计清单包含同一批差异；软件阻塞由PR #54解除，不再延迟已确认差异。终焉矩阵精确窗口及灵魂列车父级仍保留pending，auditComplete=false；原任务日期保持。"
+      "notes": "2026-11-12用户要求立即恢复：已核验8项3.8活动及40天版本例外已通过本机任务应用，本次累计清单包含同一批差异；软件阻塞由PR #54解除，不再延迟已确认差异。终焉矩阵精确窗口及灵魂列车父级仍保留pending，auditComplete=false；原任务日期保持。 已通过PR #55发布并核对线上原始UTF-8 SHA-256；这批已确认差异不再待发布。"
     }
   ]
 }

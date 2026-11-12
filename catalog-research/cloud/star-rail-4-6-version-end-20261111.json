@@ -194,7 +194,7 @@
     "result": "官方最新列表、官方单项公告/图片与一次完整更新定向补查已完成；必要缺口保留至下半节点，不设置重试唤醒。"
   },
   "delivery": {
-    "stage": "ready",
+    "stage": "published_partial",
     "branch": "codex/cloud-baseline/star-rail-4-6-version-end-20261111",
     "catalogRevision": "2026-11-12.blocked-baseline-recovery",
     "catalogChanged": false,
@@ -202,7 +202,11 @@
     "proposedRevision": "2026-11-11.star-rail-4.7-confirmed-events",
     "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/51",
     "previousStage": "blocked_by_real_consumer_pending",
-    "compilerBlockerResolvedBy": "https://github.com/BaiQue3rL/Gtask/pull/54"
+    "compilerBlockerResolvedBy": "https://github.com/BaiQue3rL/Gtask/pull/54",
+    "publicationPullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/55",
+    "publicationCommit": "86c1756ea3b34adbb58418d0b9154f2e635b9e65",
+    "onlineRawSha256": "6f72cdf13e179d3e4ae72938506141cfa9bec332bddd39ffffcd20c813df36f7",
+    "verifiedPublishedAt": "2026-11-12T13:35:51.799Z"
   },
   "proposedDelta": {
     "schemaVersion": 2,
@@ -258,7 +262,7 @@
   "immediateRecovery": {
     "requestedBy": "user",
     "preparedAt": "2026-11-12T13:28:07.230Z",
-    "stage": "ready",
+    "stage": "published",
     "catalogRevision": "2026-11-12.blocked-baseline-recovery",
     "catalogSha256": "6f72cdf13e179d3e4ae72938506141cfa9bec332bddd39ffffcd20c813df36f7",
     "originalDecisionsReused": true,
@@ -266,6 +270,10 @@
     "localApplicationJobId": "ed4de402-b492-453d-9c4d-136a8d540383",
     "localReadbackVerified": true,
     "actualCompilerPassed": true,
-    "auditComplete": false
+    "auditComplete": false,
+    "publicationPullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/55",
+    "publicationCommit": "86c1756ea3b34adbb58418d0b9154f2e635b9e65",
+    "onlineRawSha256": "6f72cdf13e179d3e4ae72938506141cfa9bec332bddd39ffffcd20c813df36f7",
+    "verifiedPublishedAt": "2026-11-12T13:35:51.799Z"
   }
 }
