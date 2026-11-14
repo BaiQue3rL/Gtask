@@ -36,9 +36,28 @@ function sources(value, allowEmpty = false) {
 }
 export function runKey(gameId, periodKey, node) { return `${gameId}/${periodKey}/${node}` }
 
+/** Keep published timing obligations and the cloud timer's inventory in agreement. */
+export function verifyActivityTimeReviews(state, catalog) {
+  validateState(state)
+  const scheduled = new Map((state.activityTimeReviews ?? []).map(review => [`${review.gameId}/${review.remoteKey}`, review]))
+  for (const game of catalog.games) {
+    for (const item of game.upserts ?? []) {
+      if (!item.deadlineReview) continue
+      const id = `${game.gameId}/${item.remoteKey}`, review = scheduled.get(id)
+      assert(review, `Missing cloud time review: ${id}`)
+      assert.equal(timestamp(review.reviewAt), timestamp(item.deadlineReview.reviewAt), `Time review dates differ: ${id}`)
+      assert.equal(timestamp(review.checkedAt), timestamp(item.deadlineReview.checkedAt), `Time review checks differ: ${id}`)
+      scheduled.delete(id)
+    }
+  }
+  assert.equal(scheduled.size, 0, 'Cloud time review has no matching catalog obligation')
+  return { ok: true, reviews: (state.activityTimeReviews ?? []).length }
+}
+
 /** Cloud-only scheduling metadata. This never reads a player's database or changes a catalog. */
 export function validateState(state) {
-  fields(state, ['schemaVersion', 'repository', 'timeZone', 'activatedAt', 'games', 'dateTriggers', 'periods', 'scheduleGaps', 'runs'])
+  fields(state, ['schemaVersion', 'repository', 'timeZone', 'activatedAt', 'games', 'dateTriggers', 'periods', 'scheduleGaps', 'runs',
+    ...(state.activityTimeReviews === undefined ? [] : ['activityTimeReviews'])])
   assert.equal(state.schemaVersion, 2)
   assert.equal(state.repository, 'BaiQue3rL/Gtask')
   assert.equal(state.timeZone, 'Asia/Shanghai')
@@ -86,6 +105,16 @@ export function validateState(state) {
     assert(state.games.includes(gap.gameId))
     assert(gap.periodKey === null || (typeof gap.periodKey === 'string' && slug.test(gap.periodKey)))
     text(gap.reason); sources(gap.checkedSources); timestamp(gap.checkedAt)
+  }
+  const reviewKeys = new Set()
+  assert(state.activityTimeReviews === undefined || Array.isArray(state.activityTimeReviews), 'Expected activity time reviews')
+  for (const review of state.activityTimeReviews ?? []) {
+    fields(review, ['gameId', 'remoteKey', 'title', 'reviewAt', 'checkedAt', 'reason', 'sources'])
+    assert(state.games.includes(review.gameId), 'Unknown review game')
+    text(review.remoteKey); text(review.title); text(review.reason); sources(review.sources)
+    assert(timestamp(review.reviewAt) > timestamp(review.checkedAt), 'Review must follow its last check')
+    const id = `${review.gameId}/${review.remoteKey}`
+    assert(!reviewKeys.has(id), 'Duplicate activity time review'); reviewKeys.add(id)
   }
   const seen = new Set()
   for (const run of state.runs) {
@@ -136,7 +165,7 @@ export function planMaintenance(input, reference = new Date(), gameId = null) {
         maintenanceDate: localDate(timestamp(boundaryAt)), timePrecision: exact === null ? 'date' : 'exact' })
     }
   }
-  const eligibleGames = [...new Set(tasks.filter(task => task.maintenanceDate === today && timestamp(task.boundaryAt) <= now)
+  const nodeGames = [...new Set(tasks.filter(task => task.maintenanceDate === today && timestamp(task.boundaryAt) <= now)
     .map(task => task.gameId))].sort()
   for (const task of tasks) {
       const run = runs.get(task.key), boundary = timestamp(task.boundaryAt)
@@ -146,12 +175,22 @@ export function planMaintenance(input, reference = new Date(), gameId = null) {
         continue
       }
       const item = { ...task, action: run?.status === 'ready' ? 'confirm_publication' : run ? 'resume' : 'maintain' }
-      if (!eligibleGames.includes(task.gameId) || (run?.status === 'running' && timestamp(run.retryAt) > now)) {
+      if (!nodeGames.includes(task.gameId) || (run?.status === 'running' && timestamp(run.retryAt) > now)) {
         deferred.push(item)
         continue
       }
       due.push({ ...item, carriedOver: task.maintenanceDate !== today })
   }
+  for (const review of state.activityTimeReviews ?? []) {
+    if (!games.includes(review.gameId)) continue
+    const task = { key: `${review.gameId}/activity-time/${review.remoteKey}`, gameId: review.gameId,
+      remoteKey: review.remoteKey, title: review.title, node: 'activity_time_review', action: 'review_activity_time',
+      boundaryAt: review.reviewAt, maintenanceDate: localDate(timestamp(review.reviewAt)),
+      timePrecision: 'estimate', reason: review.reason }
+    if (timestamp(review.reviewAt) > now) upcoming.push(task)
+    else due.push({ ...task, carriedOver: task.maintenanceDate !== today })
+  }
+  const eligibleGames = [...new Set([...nodeGames, ...due.map(task => task.gameId)])].sort()
   const byTime = (a, b) => timestamp(a.boundaryAt) - timestamp(b.boundaryAt) || a.key.localeCompare(b.key)
   upcoming.sort(byTime)
   const next = upcoming[0], nextAt = next ? Math.ceil(timestamp(next.boundaryAt) / 1000) * 1000 : null
@@ -200,12 +239,12 @@ export function verifyCloudExecutionProfile(automationId, receipt) {
   return { ok: true, ...CLOUD_EXECUTION_PROFILE }
 }
 
-/** Schedule one actual maintenance date. Missing facts and old retries never add another run. */
+/** Rearm a single node or an Agent-estimated activity-time review, never a polling loop. */
 export function planCloudRearm(plan, lastRunAt = null, timingMode = 'exact_schedule') {
   assert(timingModes.includes(timingMode), 'Unsupported cloud task timing mode')
   const latestRun = Math.max(timestamp(plan.checkedAt), lastRunAt === null ? 0 : timestamp(lastRunAt))
-  const target = plan.upcoming.find(task => localDate(Math.ceil(Math.max(timestamp(task.boundaryAt), latestRun + hourMs) / 1000) * 1000)
-    === task.maintenanceDate)
+  const target = plan.upcoming.find(task => task.node === 'activity_time_review' ||
+    localDate(Math.ceil(Math.max(timestamp(task.boundaryAt), latestRun + hourMs) / 1000) * 1000) === task.maintenanceDate)
   if (!target) return null
   const requested = timestamp(target.boundaryAt)
   const at = Math.ceil(Math.max(requested, latestRun + hourMs) / 1000) * 1000
@@ -214,7 +253,8 @@ export function planCloudRearm(plan, lastRunAt = null, timingMode = 'exact_sched
     year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
     hourCycle: 'h23' }).formatToParts(new Date(at)).map(x => [x.type, x.value]))
   const start = `${parts.year}${parts.month}${parts.day}T${parts.hour}${parts.minute}${parts.second}`
-  return { requestedAt: new Date(requested).toISOString(), at: iso, maintenanceDate: target.maintenanceDate,
+  return { requestedAt: new Date(requested).toISOString(), at: iso,
+    maintenanceDate: target.node === 'activity_time_review' ? localDate(at) : target.maintenanceDate,
     timeZone: 'Asia/Shanghai', timingMode,
     schedule: `BEGIN:VEVENT\nDTSTART;TZID=Asia/Shanghai:${start}\nRRULE:FREQ=DAILY;COUNT=1\nEND:VEVENT` }
 }
@@ -277,7 +317,7 @@ export function assertCloudGamePublication(gameId, beforeState, afterState, befo
   validateState(beforeState); validateState(afterState)
   assert(beforeState.games.includes(gameId), 'Unknown maintenance game')
   const withoutGame = state => Object.fromEntries(Object.entries(state).map(([key, value]) =>
-    [key, ['periods', 'dateTriggers', 'scheduleGaps', 'runs'].includes(key) ? value.filter(row => row.gameId !== gameId) : value]))
+    [key, ['periods', 'dateTriggers', 'scheduleGaps', 'runs', 'activityTimeReviews'].includes(key) ? value.filter(row => row.gameId !== gameId) : value]))
   assert.deepEqual(withoutGame(afterState), withoutGame(beforeState), 'Another game or shared scheduling configuration changed')
   const catalogScope = catalog => {
     const { revision, publishedAt, games, ...shared } = catalog
@@ -291,6 +331,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     const args = process.argv.slice(2)
     const state = JSON.parse(readFileSync(new URL('./state.json', import.meta.url), 'utf8'))
+    verifyActivityTimeReviews(state, JSON.parse(readFileSync(new URL('../../updates/catalog.json', import.meta.url), 'utf8')))
     const action = ['--guard', '--verify-review', '--verify-rearm', '--verify-profile'].includes(args[0]) ? args.splice(0, 2) : null
     assert(args.length % 2 === 0 && args.every((arg, i) => i % 2 !== 0 || ['--game', '--at', '--last-run', '--timing-mode'].includes(arg)), 'Invalid CLI options')
     assert.equal(new Set(args.filter((_, i) => i % 2 === 0)).size, args.length / 2, 'Duplicate CLI option')

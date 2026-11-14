@@ -63,6 +63,37 @@ describe('published timing and missing deadline exceptions', () => {
     } finally { db.close() }
   })
 
+  it('admits announced activities before their times are known, preserves known boundaries and manual completion when time is resolved', () => {
+    vi.useFakeTimers(); vi.setSystemTime(instant(2))
+    const db = new AppDatabase(':memory:', { seedBundledBaselines: false })
+    const review = { eligibility: 'confirmed_limited', openState: 'confirmed_announced', limitedSourceUrl: sourceUrl,
+      openSourceUrl: sourceUrl, checkedSources: [sourceUrl], checkedAt: instant(2), reviewAt: instant(7),
+      missingReason: '活动已经官宣，起止时间尚未公布', reviewReason: '预计单项公告在开放前发布，届时复查' }
+    const event = { remoteKey: 'event:announced', title: '已预告限时活动', category: 'limited_event',
+      activityTags: ['puzzle'], sourceUrl, deadlineReview: review }
+    const feed = (day: number, upserts: unknown[]) => parseRemoteCatalogFeed({ schemaVersion: 3,
+      revision: `announced.${day}`, publishedAt: instant(day), games: [{ gameId: 'genshin', upserts }] })
+    try {
+      db.applyRemoteCatalogFeed(feed(2, [event, { ...event, remoteKey: 'event:known-end', endsAt: instant(20) },
+        { ...event, remoteKey: 'event:known-start', startsAt: instant(10) }]))
+      const item = db.listChecklistItems('genshin').find(row => row.remoteKey === event.remoteKey)!
+      expect(item).toMatchObject({ startsAt: null, endsAt: null })
+      expect(db.listChecklistItems('genshin').find(row => row.remoteKey === 'event:known-end')?.endsAt).toBe(instant(20))
+      expect(db.listDeadlineReviews('genshin')).toHaveLength(3)
+      db.setChecklistCompletion(item.id, true)
+      db.pruneExpiredSystemItems(new Date(instant(9)))
+      expect(db.getChecklistItem(item.id).completed).toBe(true)
+      db.applyRemoteCatalogFeed(feed(3, [{ ...event, deadlineReview: undefined, startsAt: instant(10), endsAt: instant(20) }]))
+      expect(db.getChecklistItem(item.id)).toMatchObject({ completed: true, manualCompletionLocked: true,
+        startsAt: instant(10), endsAt: instant(20) })
+      expect(db.listDeadlineReviews('genshin').map(row => row.remoteKey)).not.toContain(event.remoteKey)
+      expect(() => publication(2, { upserts: [event] })).toThrow()
+      expect(() => feed(2, [{ ...event, deadlineReview: { ...review, reviewReason: undefined } }])).toThrow()
+      expect(() => feed(2, [{ ...event, deadlineReview: { ...review, reviewAt: instant(1) } }])).toThrow()
+      expect(() => feed(2, [{ ...event, startsAt: instant(10), deadlineReview: { ...review, openState: 'confirmed_open' } }])).toThrow()
+    } finally { db.close() }
+  })
+
   it('persists future version exceptions and activates a cadence change at its published boundary', () => {
     vi.useFakeTimers(); vi.setSystemTime(instant(2))
     const db = new AppDatabase(':memory:', { seedBundledBaselines: false })

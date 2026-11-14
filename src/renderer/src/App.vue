@@ -1751,7 +1751,7 @@ function showError(error: unknown): void {
                       class="item-timing deadline"
                       :class="isExpired(row.item.endsAt) ? 'expired' : deadlineTone(row.item.endsAt)"
                     >{{ countdown(row.item.endsAt) }}</span>
-                    <span v-else-if="row.item.category === 'limited_event'" class="item-timing">截止时间待确认</span>
+                    <span v-else-if="row.item.category === 'limited_event'" class="item-timing">{{ row.item.startsAt ? '截止时间待确认' : '时间待确认' }}</span>
                   </button>
                     <button v-if="panel.section === 'custom'" class="more-button" type="button" aria-label="编辑" @click="openEdit(row.item)">⋮</button>
                   </div>

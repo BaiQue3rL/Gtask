@@ -23,7 +23,7 @@ describe('同步接口契约', () => {
       'events',
       'cycles'
     ])
-    expect(contract.schemaVersion).toBe(17)
+    expect(contract.schemaVersion).toBe(18)
     expect(contract.fieldSemantics.sourcePriority).toContain('字段缺失')
   })
 

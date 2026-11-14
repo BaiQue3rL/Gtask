@@ -1,0 +1,216 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-11-14T12:38:33.047Z",
+  "scope": "用户要求四游戏当前有效及已公告活动核查，以及清单优先、时间后核的软件修正。",
+  "userCorrection": "2026-11-14：确认活动存在且属于范围就先入清单。未知时间留空，估计何时能取得官方时间，并安排一次定向复查。",
+  "games": [
+    {
+      "gameId": "star-rail",
+      "before": 2,
+      "after": 12,
+      "added": 10,
+      "updated": 2,
+      "inventoryComplete": true,
+      "timingUnresolved": 0,
+      "sources": [
+        "https://www.taptap.cn/moment/867813797929160485?group_id=311675",
+        "https://www.taptap.cn/moment/869248465039788964?group_id=311675",
+        "https://www.taptap.cn/moment/869233443618162970?group_id=311675",
+        "https://www.taptap.cn/moment/869911295674025985?group_id=311675",
+        "https://www.taptap.cn/app/224267/topic?type=official"
+      ],
+      "decisions": [
+        {
+          "key": "event:4.7:interastral-peace-gala-path-to-fame",
+          "status": "resolved",
+          "oldValue": {
+            "startsAt": "2026-11-27T12:00:00+08:00",
+            "endsAt": "2026-12-21T03:59:00+08:00"
+          },
+          "adoptedValue": {
+            "startsAt": "2026-11-11T11:00:00+08:00",
+            "endsAt": "2026-12-23T03:59:00+08:00"
+          },
+          "correctionReason": "原研究误读了同一官方图2。当前实际解码为11月11日4.7版本更新后至12月23日03:59，与完整更新说明、11月7日速览和官方脱敏观察一致。这是旧结构化错误，不是官方后来改期。",
+          "timeBasis": "nominal_maintenance",
+          "sources": [
+            {
+              "url": "https://www.taptap.cn/moment/869233443618162970?group_id=311675",
+              "publishedAt": "2026-11-10",
+              "statement": "图2：2026/11/11 4.7版本更新后—2026/12/23 03:59"
+            }
+          ]
+        },
+        {
+          "key": "gift-admission",
+          "status": "resolved",
+          "correctionReason": "旧研究笼统排除赠礼，未区分独立命名的签到、角色/星魂选择及限时领取事项。",
+          "reason": "官方速览分别命名六项领取事项且给出领取期。本次各事项一条，不另建宣传合集开场好礼先抱走，也不把散场也别空着手的三件奖励拆成三条。"
+        },
+        {
+          "key": "nominal-start",
+          "status": "resolved",
+          "reason": "11月11日06:00维护加预计5小时，归一化11:00。不是实测开服；粗略日历07:00或11月9日04:00不覆盖正式活动说明。",
+          "timeBasis": "nominal_maintenance"
+        },
+        {
+          "key": "double-drops",
+          "status": "resolved",
+          "reason": "实际解码官方速览图14：位面分裂11月23日04:00至12月7日03:59；异器盈界12月11日04:00至12月23日03:59。不臆造末分钟的秒。"
+        },
+        {
+          "key": "exclusions",
+          "status": "excluded",
+          "reason": "万象和鸣是累计抽取奖励，幻乐秀场是时装抽取池，货币战争入画奇航为常驻玩法赛季更新。社区转发随机抽奖、攻略征集及线下实体宣传不扩入游戏活动清单。"
+        }
+      ]
+    },
+    {
+      "gameId": "genshin",
+      "before": 6,
+      "after": 9,
+      "added": 3,
+      "updated": 0,
+      "inventoryComplete": true,
+      "timingUnresolved": 3,
+      "sources": [
+        "https://apps.apple.com/cn/app/id1467190251",
+        "https://www.taptap.cn/moment/866735532548295551?group_id=201765",
+        "https://www.taptap.cn/moment/866276924782019655?group_id=201765",
+        "https://www.taptap.cn/app/168332/topic?type=official",
+        "https://www.miyoushe.com/bh3/article/79087188"
+      ],
+      "decisions": [
+        {
+          "key": "announced-events",
+          "status": "resolved",
+          "reason": "开发者App Store 7.2更新记录明确列出压力方块粉碎计划、厉影定格录；前瞻整理对地脉移涌限时双倍身份相互印证，Agent裁定先收录。不采用整理中的具体日期作为已核验国服时间。"
+        },
+        {
+          "key": "unresolved-times",
+          "status": "pending",
+          "reason": "三项已收录，起止留空并分别保存有理由的复查日期。",
+          "items": [
+            {
+              "gameId": "genshin",
+              "remoteKey": "event:7.2:pressure-block-crush",
+              "title": "压力方块粉碎计划",
+              "checkedAt": "2026-11-14T12:38:33.047Z",
+              "reviewAt": "2026-11-18T11:00:00+08:00",
+              "reason": "预计单项玩法公告会在11月下旬开放前发布，先在11月18日核查；这是公告可获得时间的估计，不是活动开放时间。",
+              "sources": [
+                "https://apps.apple.com/cn/app/id1467190251",
+                "https://www.taptap.cn/app/168332/topic?type=official",
+                "https://www.taptap.cn/moment/866276924782019655?group_id=201765"
+              ]
+            },
+            {
+              "gameId": "genshin",
+              "remoteKey": "event:7.2:frames-of-resilience",
+              "title": "厉影定格录",
+              "checkedAt": "2026-11-14T12:38:33.047Z",
+              "reviewAt": "2026-11-25T11:00:00+08:00",
+              "reason": "预计后半版本单项活动公告在11月下旬公布，11月25日复查；若版更下半节点先取得规则则提前补齐。",
+              "sources": [
+                "https://apps.apple.com/cn/app/id1467190251",
+                "https://www.taptap.cn/app/168332/topic?type=official",
+                "https://www.taptap.cn/moment/866276924782019655?group_id=201765"
+              ]
+            },
+            {
+              "gameId": "genshin",
+              "remoteKey": "event:7.2:ley-line-overflow",
+              "title": "地脉移涌",
+              "checkedAt": "2026-11-14T12:38:33.047Z",
+              "reviewAt": "2026-12-05T11:00:00+08:00",
+              "reason": "前瞻整理指向版本后段，预计12月上旬取得单项规则；12月5日定向核查，不把整理中的日期写成活动档期。",
+              "sources": [
+                "https://www.miyoushe.com/bh3/article/79087188",
+                "https://www.taptap.cn/app/168332/topic?type=official",
+                "https://www.taptap.cn/moment/866276924782019655?group_id=201765"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "existing-six",
+          "status": "resolved",
+          "reason": "现有六项与第一期官方速递及单项规则一致。幽境危战、剧诗、深境是既有周期，不重复建活动。"
+        },
+        {
+          "key": "exclusions",
+          "status": "excluded",
+          "reason": "千星奇域沿用用户排除。长夜仅见预测，真实性/官方独立名称尚未确认，不把事实未知当成仅时间未知。新手自选为个人注册触发的42日窗口，不虚构全服时间。"
+        }
+      ]
+    },
+    {
+      "gameId": "zenless",
+      "before": 8,
+      "after": 8,
+      "added": 0,
+      "updated": 0,
+      "inventoryComplete": true,
+      "timingUnresolved": 0,
+      "sources": [
+        "https://www.taptap.cn/moment/861685253129898403?group_id=330333",
+        "https://www.taptap.cn/app/234493/topic?type=official",
+        "https://www.taptap.cn/app/234493/topic?page=2&type=official",
+        "https://www.sina.cn/news/detail/5356162859401483.html"
+      ],
+      "decisions": [
+        {
+          "key": "inventory",
+          "status": "resolved",
+          "reason": "完整版本活动、下半更新及11月13日漂流画集规则与现有八项逐项一致；11月9日已结束先遣赏金不复活，日历末秒不覆盖公告分钟精度。"
+        },
+        {
+          "key": "labyrinth-season",
+          "status": "excluded",
+          "reason": "实际解码官方更新介绍两张原图，迷宫诡域：古怪试炼明确为常驻玩法赛季更新，古怪限购为赛季商店；不将常驻赛季与商店重建为限时活动。"
+        }
+      ]
+    },
+    {
+      "gameId": "wuthering-waves",
+      "before": 8,
+      "after": 8,
+      "added": 0,
+      "updated": 0,
+      "inventoryComplete": true,
+      "timingUnresolved": 0,
+      "sources": [
+        "https://www.taptap.cn/moment/869645690047825113?group_id=330015",
+        "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+        "https://www.taptap.cn/app/234280/topic?type=official",
+        "https://www.taptap.cn/app/234280/topic?page=2&type=official"
+      ],
+      "decisions": [
+        {
+          "key": "inventory",
+          "status": "resolved",
+          "reason": "六项玩法/签到与3.8完整公告一致；两项材料双倍复用11月9日五张官方活动笔记原图。最新列表无新增独立游戏活动。终焉矩阵属周期、灵魂列车属地图，不改变本轮活动审计范围。"
+        }
+      ]
+    }
+  ],
+  "software": {
+    "publicCatalogProtocol": 3,
+    "maintenanceContract": 18,
+    "productVersion": "1.2.2",
+    "newRelease": false
+  },
+  "delivery": {
+    "stage": "local_and_cloud_verified",
+    "revision": "2026-11-14.activity-intake-before-timing",
+    "localReadbackVerified": true,
+    "localEventCounts": { "genshin": 9, "star-rail": 12, "zenless": 8, "wuthering-waves": 8 },
+    "existingPersonalRowsPreserved": 299,
+    "cloudPromptReadbackVerified": true,
+    "cloudScheduleReadbackVerified": true,
+    "nextActivityTimeReview": "2026-11-18T11:00:00+08:00",
+    "cloudEvidence": "保存后刷新服务器页面逐个读回四个原任务新指令；原生编辑器保存原神单次日期并在网页读回11月18日11:00。未创建替代任务，其他游戏原日期保持。UI回执不是automations_peek原始响应。",
+    "localEvidence": "实际安装程序应用内嵌清单后经read_gtask_checklists读回；实际安装asar在隔离路径验证三项预告活动显示时间待确认及成名之路当前可见。",
+    "receiptDirectory": "C:/Users/Administrator/AppData/Local/Codex/task-receipts/gtask-activity-audit-20261114"
+  }
+}

@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { planMaintenance, validateState, runKey, assertCloudPublicationPaths, planCloudRearm, verifyCloudRearm,
-  CLOUD_EXECUTION_PROFILE, verifyCloudExecutionProfile, verifyAnnouncementReview, assertCloudGamePublication } from './plan.mjs'
+  CLOUD_EXECUTION_PROFILE, verifyCloudExecutionProfile, verifyAnnouncementReview, assertCloudGamePublication, verifyActivityTimeReviews } from './plan.mjs'
 
 const at = day => `2026-11-${String(day).padStart(2, '0')}T11:00:00+08:00`
 const source = 'https://example.com/official-fixture'
@@ -68,6 +68,46 @@ test('only version-change and second-half days permit maintenance', () => {
   const next = planMaintenance(fixture(), at(29))
   assert.deepEqual(next.due.map(task => task.node), ['first_half_end', 'version_end'])
   assert.equal(next.due[0].carriedOver, true)
+})
+
+test('an estimated activity review wakes its game before the next node and never resumes a whole missed-node audit', () => {
+  const state = fixture()
+  state.games.push('star-rail')
+  state.periods.push({ ...state.periods[0], gameId: 'star-rail' })
+  const review = { gameId: 'genshin', remoteKey: 'event:fixture', title: '预告活动', checkedAt: at(12),
+    reviewAt: at(18), reason: '预计单项活动规则在开放前公布', sources: [source] }
+  state.activityTimeReviews = [review]
+  const before = planMaintenance(state, at(15), 'genshin')
+  assert.equal(before.nextWake.at, new Date(at(18)).toISOString())
+  assert.equal(planCloudRearm(before).at, new Date(at(18)).toISOString())
+  const due = planMaintenance(state, at(18), 'genshin')
+  assert.deepEqual(due.due.map(task => task.node), ['activity_time_review'])
+  assert.equal(due.due[0].remoteKey, review.remoteKey)
+  assert.equal(due.deferred[0].node, 'first_half_end')
+  assert.deepEqual(verifyAnnouncementReview(state, { ...reviewReceipt(), checkedAt: at(18) }, 'genshin').coveredGames, ['genshin'])
+  assert.equal(planMaintenance(state, at(15), 'star-rail').nextWake.at, new Date(at(29)).toISOString())
+  assert.deepEqual(planMaintenance(state, at(19), 'genshin').due.map(task => task.remoteKey), [review.remoteKey])
+  state.activityTimeReviews = []
+  assert.equal(planMaintenance(state, at(19), 'genshin').nextWake.at, new Date(at(29)).toISOString())
+})
+
+test('activity reviews require a specific estimate and preserve other games under publication guards', () => {
+  const state = fixture()
+  state.activityTimeReviews = [{ gameId: 'genshin', remoteKey: 'event:fixture', title: '预告活动', checkedAt: at(12),
+    reviewAt: at(18), reason: '预计可取得单项公告', sources: [source] }]
+  for (const change of [r => { r.reason = '' }, r => { r.reviewAt = at(11) }, r => { r.gameId = 'unknown' }]) {
+    const invalid = structuredClone(state); change(invalid.activityTimeReviews[0])
+    assert.throws(() => validateState(invalid))
+  }
+  const duplicate = structuredClone(state); duplicate.activityTimeReviews.push({ ...duplicate.activityTimeReviews[0] })
+  assert.throws(() => validateState(duplicate), /Duplicate activity/)
+  const catalog = { games: [{ gameId: 'genshin', upserts: [{ remoteKey: 'event:fixture', deadlineReview: {
+    checkedAt: at(12), reviewAt: at(18) } }] }] }
+  assert.equal(verifyActivityTimeReviews(state, catalog).reviews, 1)
+  assert.throws(() => verifyActivityTimeReviews({ ...state, activityTimeReviews: [] }, catalog), /Missing cloud/)
+  const mismatched = structuredClone(state); mismatched.activityTimeReviews[0].reviewAt = at(19)
+  assert.throws(() => verifyActivityTimeReviews(mismatched, catalog), /dates differ/)
+  assert.throws(() => verifyActivityTimeReviews(state, { games: [] }), /no matching/)
 })
 test('maintenance days use Asia Shanghai and never execute before the boundary', () => {
   assert.equal(planMaintenance(fixture(), '2026-11-12T15:59:59.999Z').due.length, 1)
