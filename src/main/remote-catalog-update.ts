@@ -170,7 +170,7 @@ const gameUpdateSchema = z.object({
 })
 
 const remoteCatalogFeedSchema = z.object({
-  schemaVersion: z.union([z.literal(1), z.literal(2)]),
+  schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3)]),
   revision: z.string().trim().regex(/^[A-Za-z0-9._:-]{1,100}$/),
   publishedAt: timestampSchema,
   games: z.array(gameUpdateSchema).min(1).max(4)
@@ -183,12 +183,18 @@ const remoteCatalogFeedSchema = z.object({
     for (const item of game.upserts) {
       if (item.category !== 'limited_event') continue
       if (item.deadlineReview) {
-        if (feed.schemaVersion !== 2 || item.endsAt || (item.startsAt && Date.parse(item.startsAt) > Date.parse(item.deadlineReview.checkedAt)) ||
-          Date.parse(item.deadlineReview.checkedAt) > Date.parse(feed.publishedAt)) {
-          context.addIssue({ code: 'custom', message: '缺截止时间例外必须使用 v2，并提供限时、当前开放和已完成核查证据' })
+        const review = item.deadlineReview
+        const legacy = feed.schemaVersion === 2
+        if (feed.schemaVersion === 1 || (item.startsAt && item.endsAt) ||
+          Date.parse(review.checkedAt) > Date.parse(feed.publishedAt) ||
+          (legacy && (review.openState !== 'confirmed_open' || review.reviewReason || item.endsAt ||
+            (item.startsAt && Date.parse(item.startsAt) > Date.parse(review.checkedAt)))) ||
+          (!legacy && (!review.reviewReason || (review.openState === 'confirmed_open' && item.startsAt &&
+            Date.parse(item.startsAt) > Date.parse(review.checkedAt))))) {
+          context.addIssue({ code: 'custom', message: '时间待确认活动须提供限时活动依据、缺失字段及有理由的复查时间；预告活动需要协议 v3' })
         }
       } else if (!item.startsAt || !item.endsAt) {
-        context.addIssue({ code: 'custom', message: '限时活动必须提供完整时间或经核验的缺截止时间例外' })
+        context.addIssue({ code: 'custom', message: '限时活动必须提供完整时间或时间待确认记录' })
       }
     }
     if (gameIds.has(game.gameId)) {

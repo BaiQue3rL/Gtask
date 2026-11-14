@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 2,
-  "revision": "2026-11-12.blocked-baseline-recovery",
-  "publishedAt": "2026-11-12T13:25:42.683Z",
+  "schemaVersion": 3,
+  "revision": "2026-11-14.activity-intake-before-timing",
+  "publishedAt": "2026-11-14T12:38:33.047Z",
   "games": [
     {
       "gameId": "genshin",
@@ -381,6 +381,91 @@
           "mapNodeKind": "subregion",
           "parentRemoteKey": "map-catalog:genshin:region:414719b0efe139ee12c9",
           "parentTitle": "至冬"
+        },
+        {
+          "remoteKey": "event:7.2:pressure-block-crush",
+          "title": "压力方块粉碎计划",
+          "startsAt": null,
+          "endsAt": null,
+          "sourceUrl": "https://apps.apple.com/cn/app/id1467190251",
+          "category": "limited_event",
+          "deadlineReview": {
+            "eligibility": "confirmed_limited",
+            "openState": "confirmed_announced",
+            "limitedSourceUrl": "https://apps.apple.com/cn/app/id1467190251",
+            "openSourceUrl": "https://apps.apple.com/cn/app/id1467190251",
+            "checkedSources": [
+              "https://apps.apple.com/cn/app/id1467190251",
+              "https://www.taptap.cn/app/168332/topic?type=official",
+              "https://www.taptap.cn/moment/866276924782019655?group_id=201765"
+            ],
+            "checkedAt": "2026-11-14T12:38:33.047Z",
+            "reviewAt": "2026-11-18T11:00:00+08:00",
+            "missingReason": "已确认7.2限时活动名称和参与性质；已读官方版本与活动公告，尚未取得适用国服的完整起止时间。",
+            "reviewReason": "预计单项玩法公告会在11月下旬开放前发布，先在11月18日核查；这是公告可获得时间的估计，不是活动开放时间。"
+          },
+          "activityTags": [
+            "puzzle"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:7.2:frames-of-resilience",
+          "title": "厉影定格录",
+          "startsAt": null,
+          "endsAt": null,
+          "sourceUrl": "https://apps.apple.com/cn/app/id1467190251",
+          "category": "limited_event",
+          "deadlineReview": {
+            "eligibility": "confirmed_limited",
+            "openState": "confirmed_announced",
+            "limitedSourceUrl": "https://apps.apple.com/cn/app/id1467190251",
+            "openSourceUrl": "https://apps.apple.com/cn/app/id1467190251",
+            "checkedSources": [
+              "https://apps.apple.com/cn/app/id1467190251",
+              "https://www.taptap.cn/app/168332/topic?type=official",
+              "https://www.taptap.cn/moment/866276924782019655?group_id=201765"
+            ],
+            "checkedAt": "2026-11-14T12:38:33.047Z",
+            "reviewAt": "2026-11-25T11:00:00+08:00",
+            "missingReason": "已确认7.2限时活动名称和参与性质；已读官方版本与活动公告，尚未取得适用国服的完整起止时间。",
+            "reviewReason": "预计后半版本单项活动公告在11月下旬公布，11月25日复查；若版更下半节点先取得规则则提前补齐。"
+          },
+          "activityTags": [
+            "photography"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:7.2:ley-line-overflow",
+          "title": "地脉移涌",
+          "startsAt": null,
+          "endsAt": null,
+          "sourceUrl": "https://www.miyoushe.com/bh3/article/79087188",
+          "category": "limited_event",
+          "deadlineReview": {
+            "eligibility": "confirmed_limited",
+            "openState": "confirmed_announced",
+            "limitedSourceUrl": "https://www.miyoushe.com/bh3/article/79087188",
+            "openSourceUrl": "https://www.miyoushe.com/bh3/article/79087188",
+            "checkedSources": [
+              "https://www.miyoushe.com/bh3/article/79087188",
+              "https://www.taptap.cn/app/168332/topic?type=official",
+              "https://www.taptap.cn/moment/866276924782019655?group_id=201765"
+            ],
+            "checkedAt": "2026-11-14T12:38:33.047Z",
+            "reviewAt": "2026-12-05T11:00:00+08:00",
+            "missingReason": "已确认7.2限时活动名称和参与性质；已读官方版本与活动公告，尚未取得适用国服的完整起止时间。",
+            "reviewReason": "前瞻整理指向版本后段，预计12月上旬取得单项规则；12月5日定向核查，不把整理中的日期写成活动档期。"
+          },
+          "activityTags": [
+            "double-drop",
+            "ley-line"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
         }
       ],
       "archives": [
@@ -639,10 +724,11 @@
           "title": "奇库寻遗",
           "startsAt": "2026-11-11T11:00:00+08:00",
           "endsAt": "2026-12-23T03:59:00+08:00",
-          "sourceUrl": "https://www.hoyolab.com/article/47375703",
+          "sourceUrl": "https://www.taptap.cn/moment/869248465039788964?group_id=311675",
           "category": "limited_event",
           "activityTags": [
-            "unknown"
+            "quest",
+            "collection"
           ],
           "scheduleKind": "fixed_window",
           "timeZone": "Asia/Shanghai"
@@ -650,12 +736,142 @@
         {
           "remoteKey": "event:4.7:interastral-peace-gala-path-to-fame",
           "title": "星际和平盛典：成名之路",
-          "startsAt": "2026-11-27T12:00:00+08:00",
-          "endsAt": "2026-12-21T03:59:00+08:00",
+          "startsAt": "2026-11-11T11:00:00+08:00",
+          "endsAt": "2026-12-23T03:59:00+08:00",
           "sourceUrl": "https://www.taptap.cn/moment/869233443618162970?group_id=311675",
           "category": "limited_event",
           "activityTags": [
             "combat"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:4.7:fluffy-wanderer-kitchen-chaos",
+          "title": "剧场版绒绒号：欢闹厨房",
+          "startsAt": "2026-11-11T11:00:00+08:00",
+          "endsAt": "2026-12-23T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/867813797929160485?group_id=311675",
+          "category": "limited_event",
+          "activityTags": [
+            "management"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:4.7:aha-thinks-you-need-this",
+          "title": "阿哈觉得你需要",
+          "startsAt": "2026-11-11T11:00:00+08:00",
+          "endsAt": "2026-12-23T05:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/867813797929160485?group_id=311675",
+          "category": "limited_event",
+          "activityTags": [
+            "sign-in"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:4.7:magic-invitation",
+          "title": "魔术请柬",
+          "startsAt": "2026-11-11T11:00:00+08:00",
+          "endsAt": "2026-12-23T05:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/867813797929160485?group_id=311675",
+          "category": "limited_event",
+          "activityTags": [
+            "sign-in"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:4.7:fated-starveil",
+          "title": "奇缘星幕",
+          "startsAt": "2026-11-11T11:00:00+08:00",
+          "endsAt": "2026-12-23T05:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/867813797929160485?group_id=311675",
+          "category": "limited_event",
+          "activityTags": [
+            "sign-in"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:4.7:stellar-companions",
+          "title": "千星旅伴",
+          "startsAt": "2026-11-11T11:00:00+08:00",
+          "endsAt": "2026-12-23T05:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/867813797929160485?group_id=311675",
+          "category": "limited_event",
+          "activityTags": [
+            "sign-in"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:4.7:delivery-for-you",
+          "title": "快递请查收",
+          "startsAt": "2026-11-11T11:00:00+08:00",
+          "endsAt": "2026-12-23T05:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/867813797929160485?group_id=311675",
+          "category": "limited_event",
+          "activityTags": [
+            "sign-in"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:4.7:dont-leave-empty-handed",
+          "title": "散场也别空着手",
+          "startsAt": "2026-11-11T11:00:00+08:00",
+          "endsAt": "2026-12-23T05:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/867813797929160485?group_id=311675",
+          "category": "limited_event",
+          "activityTags": [
+            "sign-in"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:4.7:planar-fissure",
+          "title": "位面分裂",
+          "startsAt": "2026-11-23T04:00:00+08:00",
+          "endsAt": "2026-12-07T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/867813797929160485?group_id=311675",
+          "category": "limited_event",
+          "activityTags": [
+            "double-drop"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:4.7:realm-of-the-strange",
+          "title": "异器盈界",
+          "startsAt": "2026-12-11T04:00:00+08:00",
+          "endsAt": "2026-12-23T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/867813797929160485?group_id=311675",
+          "category": "limited_event",
+          "activityTags": [
+            "double-drop"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:4.7:ex-nihilo-music",
+          "title": "「无中生有」音乐活动",
+          "startsAt": "2026-11-12T12:00:00+08:00",
+          "endsAt": "2026-11-29T23:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/869911295674025985?group_id=311675",
+          "category": "limited_event",
+          "activityTags": [
+            "web-event"
           ],
           "scheduleKind": "fixed_window",
           "timeZone": "Asia/Shanghai"

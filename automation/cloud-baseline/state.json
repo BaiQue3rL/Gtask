@@ -318,7 +318,7 @@
       "catalogSha256": "5dbbdb1d7bcb8ee2e17f1f0829dc1fb4086a6d76711866a3a25c71fc91441d55",
       "evidencePath": "catalog-research/cloud/genshin-7-1-version-end-20261104.json",
       "completedAt": null,
-      "notes": "已核验部分提交发布；官方时分缺口与其余预告活动留待原神下半节点。 2026-11-04用户纠正：版本结束及两项随版本结束活动采用12月16日06:00北京时间的nominal停服基准；其他预告活动仍待核验。"
+      "notes": "已核验部分提交发布；官方时分缺口与其余预告活动留待原神下半节点。 2026-11-04用户纠正：版本结束及两项随版本结束活动采用12月16日06:00北京时间的nominal停服基准；其他预告活动仍待核验。 2026-11-14用户纠正后完成当前活动枚举：压力方块粉碎计划、厉影定格录、地脉移涌已先入清单，三项时间缺口改由activityTimeReviews定向复查，不再因缺时间留到下半；旧活动延期判断已被取代。研究见catalog-research/activity-audit-20261114.json。本记录不据活动审计冒充全版块完成。"
     },
     {
       "key": "star-rail/4.6/version_end",
@@ -336,7 +336,7 @@
       "catalogSha256": "6f72cdf13e179d3e4ae72938506141cfa9bec332bddd39ffffcd20c813df36f7",
       "evidencePath": "catalog-research/cloud/star-rail-4-6-version-end-20261111.json",
       "completedAt": null,
-      "notes": "2026-11-12用户要求立即恢复：已核验2项活动已通过原子领取的本机任务应用，本次累计清单包含同一批差异；软件阻塞由PR #54解除，不再把已确认差异延迟至下半节点。其余预告活动、完整更新说明及新场景必要事实仍保留原pending，auditComplete=false；原任务日期保持。 已通过PR #55发布并核对线上原始UTF-8 SHA-256；这批已确认差异不再待发布。"
+      "notes": "2026-11-12用户要求立即恢复：已核验2项活动已通过原子领取的本机任务应用，本次累计清单包含同一批差异；软件阻塞由PR #54解除，不再把已确认差异延迟至下半节点。其余预告活动、完整更新说明及新场景必要事实仍保留原pending，auditComplete=false；原任务日期保持。 已通过PR #55发布并核对线上原始UTF-8 SHA-256；这批已确认差异不再待发布。 2026-11-14已按完整更新、前瞻原图和最新官方列表完成当前活动枚举，补10项并修正成名之路日期及奇库标签，共12项；原活动缺口及误读已解决。研究见catalog-research/activity-audit-20261114.json；地图与周期不在本次审计范围，整体记录不改为完成。"
     },
     {
       "key": "zenless/3.3/first_half_end",
@@ -373,6 +373,47 @@
       "evidencePath": "catalog-research/cloud/wuthering-waves-3-8-baseline-20261112.json",
       "completedAt": null,
       "notes": "2026-11-12用户要求立即恢复：已核验8项3.8活动及40天版本例外已通过本机任务应用，本次累计清单包含同一批差异；软件阻塞由PR #54解除，不再延迟已确认差异。终焉矩阵精确窗口及灵魂列车父级仍保留pending，auditComplete=false；原任务日期保持。 已通过PR #55发布并核对线上原始UTF-8 SHA-256；这批已确认差异不再待发布。"
+    }
+  ],
+  "activityTimeReviews": [
+    {
+      "gameId": "genshin",
+      "remoteKey": "event:7.2:pressure-block-crush",
+      "title": "压力方块粉碎计划",
+      "reviewAt": "2026-11-18T11:00:00+08:00",
+      "checkedAt": "2026-11-14T12:38:33.047Z",
+      "reason": "预计单项玩法公告会在11月下旬开放前发布，先在11月18日核查；这是公告可获得时间的估计，不是活动开放时间。",
+      "sources": [
+        "https://apps.apple.com/cn/app/id1467190251",
+        "https://www.taptap.cn/app/168332/topic?type=official",
+        "https://www.taptap.cn/moment/866276924782019655?group_id=201765"
+      ]
+    },
+    {
+      "gameId": "genshin",
+      "remoteKey": "event:7.2:frames-of-resilience",
+      "title": "厉影定格录",
+      "reviewAt": "2026-11-25T11:00:00+08:00",
+      "checkedAt": "2026-11-14T12:38:33.047Z",
+      "reason": "预计后半版本单项活动公告在11月下旬公布，11月25日复查；若版更下半节点先取得规则则提前补齐。",
+      "sources": [
+        "https://apps.apple.com/cn/app/id1467190251",
+        "https://www.taptap.cn/app/168332/topic?type=official",
+        "https://www.taptap.cn/moment/866276924782019655?group_id=201765"
+      ]
+    },
+    {
+      "gameId": "genshin",
+      "remoteKey": "event:7.2:ley-line-overflow",
+      "title": "地脉移涌",
+      "reviewAt": "2026-12-05T11:00:00+08:00",
+      "checkedAt": "2026-11-14T12:38:33.047Z",
+      "reason": "前瞻整理指向版本后段，预计12月上旬取得单项规则；12月5日定向核查，不把整理中的日期写成活动档期。",
+      "sources": [
+        "https://www.miyoushe.com/bh3/article/79087188",
+        "https://www.taptap.cn/app/168332/topic?type=official",
+        "https://www.taptap.cn/moment/866276924782019655?group_id=201765"
+      ]
     }
   ]
 }

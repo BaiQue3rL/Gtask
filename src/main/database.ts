@@ -3218,7 +3218,7 @@ export class AppDatabase {
   listDeadlineReviews(gameId: GameId): Array<DeadlineReview & { remoteKey: string }> {
     return (this.database.prepare(`SELECT r.record_key AS remoteKey, r.payload_json AS payload
       FROM public_time_records r JOIN checklist_items i ON i.game_id = r.game_id AND i.remote_key = r.record_key
-        AND i.source = 'public_schedule' AND i.archived = 0 AND i.ends_at IS NULL
+        AND i.source = 'public_schedule' AND i.archived = 0 AND (i.starts_at IS NULL OR i.ends_at IS NULL)
       WHERE r.game_id = ? AND r.kind = 'deadline_review' AND r.retired = 0`).all(gameId) as Array<{ remoteKey: string; payload: string }>)
       .map((row) => ({ ...JSON.parse(row.payload) as DeadlineReview, remoteKey: row.remoteKey }))
   }
@@ -3296,7 +3296,6 @@ export class AppDatabase {
     const result: SyncMergeResult = { added: 0, updated: 0, preserved: 0 }
     for (const item of items) {
       if (item.category === 'limited_event') {
-        if (item.deadlineReview) item.endsAt = null
         item.activityTags = normalizeActivityTags(item.activityTags ?? [])
       }
     }
@@ -3369,12 +3368,13 @@ export class AppDatabase {
           fillsMissingCycle && catalogState ? catalogState.verifiedAt : syncedAt)
         if (item.category === 'limited_event' && item.deadlineReview) {
           const review = deadlineReviewSchema.parse(item.deadlineReview)
-          if (item.endsAt || Date.parse(review.checkedAt) > Date.parse(syncedAt) ||
-            (item.startsAt && Date.parse(item.startsAt) > Date.parse(review.checkedAt))) {
-            throw new Error('缺截止时间例外必须已有可靠的当前开放证据')
+          if ((item.startsAt && item.endsAt) || Date.parse(review.checkedAt) > Date.parse(syncedAt) ||
+            (review.openState === 'confirmed_open' && item.startsAt && Date.parse(item.startsAt) > Date.parse(review.checkedAt)) ||
+            (review.openState === 'confirmed_announced' && !review.reviewReason)) {
+            throw new Error('时间待确认活动须保留未知字段及有依据的复查记录')
           }
           this.recordPublicTime(gameId, 'deadline_review', remoteKey, review, syncedAt)
-        } else if (item.category === 'limited_event' && item.endsAt) {
+        } else if (item.category === 'limited_event' && item.startsAt && item.endsAt) {
           this.recordPublicTime(gameId, 'deadline_review', remoteKey, {}, syncedAt, true)
         }
 

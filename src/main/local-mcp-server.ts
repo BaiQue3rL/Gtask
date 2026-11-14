@@ -107,7 +107,7 @@ const publicScheduleItemSchema = z.object({
   mapNodeKind: mapNodeKindSchema.nullable().optional(),
   parentRemoteKey: z.string().max(200).nullable().optional(),
   startsAt: isoDateSchema.nullable().optional()
-    .describe('绝对开始时间；缺时间例外按 deadlineReview 证明当前开放'),
+    .describe('绝对开始时间；尚未查明时留空，并提供 deadlineReview'),
   endsAt: isoDateSchema.nullable().optional()
     .describe('绝对结束时间；可靠时限未找到时必须提供 deadlineReview'),
   deadlineReview: deadlineReviewSchema.optional(),
