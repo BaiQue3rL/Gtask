@@ -296,7 +296,7 @@ export interface ActivityTagContractEntry {
 
 export interface PublicSyncContract {
   maintenancePolicy?: { version: string; rules: string[] }
-  schemaVersion: 18
+  schemaVersion: 19
   jobKind: 'public_catalog'
   authority: 'interface_contract'
   decisionAuthority: 'codex'

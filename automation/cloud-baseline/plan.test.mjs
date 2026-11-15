@@ -1,9 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { planMaintenance, validateState, runKey, assertCloudPublicationPaths, planCloudRearm, verifyCloudRearm,
-  CLOUD_EXECUTION_PROFILE, verifyCloudExecutionProfile, verifyAnnouncementReview, assertCloudGamePublication, verifyActivityTimeReviews } from './plan.mjs'
+  CLOUD_EXECUTION_PROFILE, verifyCloudExecutionProfile, verifyAnnouncementReview, assertCloudGamePublication } from './plan.mjs'
 
-const at = day => `2026-11-${String(day).padStart(2, '0')}T11:00:00+08:00`
+const at = day => `2026-11-${String(day).padStart(2, '0')}T12:00:00+08:00`
 const source = 'https://example.com/official-fixture'
 function fixture() {
   return { schemaVersion: 2, repository: 'BaiQue3rL/Gtask', timeZone: 'Asia/Shanghai', activatedAt: at(1), games: ['genshin'],
@@ -70,50 +70,57 @@ test('only version-change and second-half days permit maintenance', () => {
   assert.equal(next.due[0].carriedOver, true)
 })
 
-test('an estimated activity review wakes its game before the next node and never resumes a whole missed-node audit', () => {
-  const state = fixture()
-  state.games.push('star-rail')
+test('a scoped current-half gap can wake later that day or next day without reviving other targets', () => {
+  const state = fixture(); state.games.push('star-rail')
   state.periods.push({ ...state.periods[0], gameId: 'star-rail' })
-  const review = { gameId: 'genshin', remoteKey: 'event:fixture', title: '预告活动', checkedAt: at(12),
-    reviewAt: at(18), reason: '预计单项活动规则在开放前公布', sources: [source] }
-  state.activityTimeReviews = [review]
-  const before = planMaintenance(state, at(15), 'genshin')
-  assert.equal(before.nextWake.at, new Date(at(18)).toISOString())
-  assert.equal(planCloudRearm(before).at, new Date(at(18)).toISOString())
-  const due = planMaintenance(state, at(18), 'genshin')
-  assert.deepEqual(due.due.map(task => task.node), ['activity_time_review'])
-  assert.equal(due.due[0].remoteKey, review.remoteKey)
+  state.followUps = [{ gameId: 'genshin', key: 'current-times', targets: ['events'], remoteKeys: ['event:pending'],
+    checkedAt: at(12), reviewAt: '2026-11-12T15:00:00+08:00', reason: '预计下午补齐当前上半活动时间', sources: [source] }]
+  assert.equal(planMaintenance(state, '2026-11-12T13:00:00+08:00', 'genshin').nextWake.at, '2026-11-12T07:00:00.000Z')
+  state.followUps[0].reviewAt = at(13)
+  const due = planMaintenance(state, at(13), 'genshin')
+  assert.deepEqual(due.due.map(task => task.node), ['follow_up'])
+  assert.deepEqual(due.due[0].targets, ['events'])
+  assert.deepEqual(due.due[0].remoteKeys, ['event:pending'])
   assert.equal(due.deferred[0].node, 'first_half_end')
-  assert.deepEqual(verifyAnnouncementReview(state, { ...reviewReceipt(), checkedAt: at(18) }, 'genshin').coveredGames, ['genshin'])
-  assert.equal(planMaintenance(state, at(15), 'star-rail').nextWake.at, new Date(at(29)).toISOString())
-  assert.deepEqual(planMaintenance(state, at(19), 'genshin').due.map(task => task.remoteKey), [review.remoteKey])
-  state.activityTimeReviews = []
-  assert.equal(planMaintenance(state, at(19), 'genshin').nextWake.at, new Date(at(29)).toISOString())
+  assert.deepEqual(planMaintenance(state, at(13), 'star-rail').due, [])
+  assert.deepEqual(verifyAnnouncementReview(state, { ...reviewReceipt(), checkedAt: at(13) }, 'genshin').coveredGames, ['genshin'])
+  state.followUps = []
+  assert.deepEqual(planMaintenance(state, at(13), 'genshin').due, [])
 })
 
-test('activity reviews require a specific estimate and preserve other games under publication guards', () => {
-  const state = fixture()
-  state.activityTimeReviews = [{ gameId: 'genshin', remoteKey: 'event:fixture', title: '预告活动', checkedAt: at(12),
-    reviewAt: at(18), reason: '预计可取得单项公告', sources: [source] }]
-  for (const change of [r => { r.reason = '' }, r => { r.reviewAt = at(11) }, r => { r.gameId = 'unknown' }]) {
-    const invalid = structuredClone(state); change(invalid.activityTimeReviews[0])
-    assert.throws(() => validateState(invalid))
+test('follow-ups require a reason and scope and preserve the other game', () => {
+  const before = fixture(); before.games.push('star-rail'); before.followUps = []
+  const after = structuredClone(before)
+  const review = { gameId: 'genshin', key: 'times', targets: ['events'], remoteKeys: [], checkedAt: at(12),
+    reviewAt: at(13), reason: '次日补齐当前半场时间', sources: [source] }
+  after.followUps.push(review)
+  const catalog = { games: [] }
+  assert.doesNotThrow(() => assertCloudGamePublication('genshin', before, after, catalog, catalog))
+  for (const change of [r => { r.reason = '' }, r => { r.reviewAt = at(11) }, r => { r.targets = [] }]) {
+    const invalid = structuredClone(after); change(invalid.followUps[0]); assert.throws(() => validateState(invalid))
   }
-  const duplicate = structuredClone(state); duplicate.activityTimeReviews.push({ ...duplicate.activityTimeReviews[0] })
-  assert.throws(() => validateState(duplicate), /Duplicate activity/)
-  const catalog = { games: [{ gameId: 'genshin', upserts: [{ remoteKey: 'event:fixture', deadlineReview: {
-    checkedAt: at(12), reviewAt: at(18) } }] }] }
-  assert.equal(verifyActivityTimeReviews(state, catalog).reviews, 1)
-  assert.throws(() => verifyActivityTimeReviews({ ...state, activityTimeReviews: [] }, catalog), /Missing cloud/)
-  const mismatched = structuredClone(state); mismatched.activityTimeReviews[0].reviewAt = at(19)
-  assert.throws(() => verifyActivityTimeReviews(mismatched, catalog), /dates differ/)
-  assert.throws(() => verifyActivityTimeReviews(state, { games: [] }), /no matching/)
+  after.followUps.push({ ...review, gameId: 'star-rail' })
+  assert.throws(() => assertCloudGamePublication('genshin', before, after, catalog, catalog), /Another game/)
+  after.followUps[1].gameId = 'genshin'
+  assert.throws(() => validateState(after), /Duplicate follow-up/)
 })
+
+test('version-day collection starts at noon without changing its business boundary', () => {
+  const state = fixture(); state.periods[0].endsAt = '2026-11-29T06:00:00+08:00'
+  assert.deepEqual(planMaintenance(state, '2026-11-29T11:59:59+08:00').due, [])
+  assert.equal(planMaintenance(state, at(29)).due.at(-1).node, 'version_end')
+  assert.equal(state.periods[0].endsAt, '2026-11-29T06:00:00+08:00')
+  state.dateTriggers = [dateTrigger({ date: '2026-11-29', reviewAt: '2026-11-29T15:00:00+08:00', reviewReason: '官方推迟开服，下午复核' })]
+  assert.equal(planMaintenance(state, at(15)).nextWake.at, '2026-11-29T07:00:00.000Z')
+  state.dateTriggers[0].reviewAt = '2026-11-29T05:00:00+08:00'
+  assert.throws(() => validateState(state), /precede/)
+})
+
 test('maintenance days use Asia Shanghai and never execute before the boundary', () => {
   assert.equal(planMaintenance(fixture(), '2026-11-12T15:59:59.999Z').due.length, 1)
   assert.equal(planMaintenance(fixture(), '2026-11-12T16:00:00Z').due.length, 0)
   assert.equal(planMaintenance(fixture(), '2026-11-12T02:56:00Z').due.length, 0)
-  assert.deepEqual(planMaintenance(fixture(), '2026-11-12T03:04:00Z').maintenanceTargets, ['genshin'])
+  assert.deepEqual(planMaintenance(fixture(), '2026-11-12T04:04:00Z').maintenanceTargets, ['genshin'])
 })
 test('a missing phase is not invented and a verified half day works without a version end', () => {
   const state = fixture(); state.periods[0].firstHalfEndsAt = null; state.periods[0].firstHalfSources = []
@@ -230,19 +237,21 @@ test('cloud scheduling has exactly one occurrence and no daily fallback', () => 
 })
 test('precision rounds forward and an early run remains on the approved day', () => {
   const state = fixture(); state.periods[0].firstHalfEndsAt = '2026-11-12T11:00:00.285+08:00'
+  state.dateTriggers = [dateTrigger({ node: 'first_half_end', date: '2026-11-12',
+    reviewAt: state.periods[0].firstHalfEndsAt, reviewReason: '下半公告已齐，按此精度复核' })]
   assert.equal(planMaintenance(state, at(5)).nextWake.at, '2026-11-12T03:00:01.000Z')
-  const expected = planCloudRearm(planMaintenance(fixture(), at(5)), '2026-11-12T02:45:00.001Z')
+  const expected = planCloudRearm(planMaintenance(state, at(5)), '2026-11-12T02:45:00.001Z')
   assert.equal(expected.at, '2026-11-12T03:45:01.000Z')
-  const early = planCloudRearm(planMaintenance(fixture(), '2026-11-12T02:56:00.285Z'))
+  const early = planCloudRearm(planMaintenance(state, '2026-11-12T02:56:00.285Z'))
   assert.equal(early.at, '2026-11-12T03:56:01.000Z')
-  assert.equal(planMaintenance(fixture(), early.at).due[0].key, 'genshin/fixture/first_half_end')
+  assert.equal(planMaintenance(state, early.at).due[0].key, 'genshin/fixture/first_half_end')
 })
-test('rate limits never push a late-night node into an ordinary day', () => {
+test('late-night research and rate limits retain the same obligation on the next day', () => {
   const state = fixture(); state.periods[0].firstHalfEndsAt = '2026-11-12T23:59:00+08:00'
   const plan = planMaintenance(state, '2026-11-12T23:30:00+08:00')
-  assert.equal(planCloudRearm(plan).maintenanceDate, '2026-11-29')
+  assert.equal(planCloudRearm(plan).maintenanceDate, '2026-11-13')
   state.periods[0].endsAt = null
-  assert.equal(planCloudRearm(planMaintenance(state, plan.checkedAt)), null)
+  assert.equal(planCloudRearm(planMaintenance(state, plan.checkedAt)).maintenanceDate, '2026-11-13')
 })
 test('readback rejects stale dates, wrong tasks, disabled state, timezone drift and repetition', () => {
   const expected = planCloudRearm(planMaintenance(fixture(), at(5)))
@@ -255,7 +264,7 @@ test('readback rejects stale dates, wrong tasks, disabled state, timezone drift 
 })
 test('readback accepts equivalent single dates in UTC, Shanghai or the task timezone', () => {
   const expected = planCloudRearm(planMaintenance(fixture(), at(5)))
-  for (const start of ['DTSTART;TZID=Asia/Shanghai:20261112T110000', 'DTSTART:20261112T030000Z', 'DTSTART:20261112T110000']) {
+  for (const start of ['DTSTART;TZID=Asia/Shanghai:20261112T120000', 'DTSTART:20261112T040000Z', 'DTSTART:20261112T120000']) {
     const schedule = expected.schedule.replace(/^DTSTART[^\n]+/m, start).replace(/\n/g, '\r\n')
     assert.equal(verifyCloudRearm('fixture-automation', expected, cloudReceipt(expected, { schedule })).ok, true)
   }

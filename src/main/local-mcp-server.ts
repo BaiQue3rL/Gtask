@@ -107,9 +107,9 @@ const publicScheduleItemSchema = z.object({
   mapNodeKind: mapNodeKindSchema.nullable().optional(),
   parentRemoteKey: z.string().max(200).nullable().optional(),
   startsAt: isoDateSchema.nullable().optional()
-    .describe('绝对开始时间；尚未查明时留空，并提供 deadlineReview'),
+    .describe('新增活动必须提供完整开始时间；缺失时留研究并安排补查'),
   endsAt: isoDateSchema.nullable().optional()
-    .describe('绝对结束时间；可靠时限未找到时必须提供 deadlineReview'),
+    .describe('新增活动必须提供完整结束时间；旧版 deadlineReview 仅保留读取兼容'),
   deadlineReview: deadlineReviewSchema.optional(),
   resetRule: z.string().max(200).nullable().optional(),
   periodKey: z.string().max(200).nullable().optional(),
