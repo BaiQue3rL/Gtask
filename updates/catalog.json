@@ -1,7 +1,7 @@
 {
   "schemaVersion": 3,
-  "revision": "2026-11-14.current-half-verified-times",
-  "publishedAt": "2026-11-14T13:53:40.663Z",
+  "revision": "2026-11-15.star-rail-4.7-maps",
+  "publishedAt": "2026-11-15T13:54:47.784Z",
   "games": [
     {
       "gameId": "genshin",
@@ -780,6 +780,24 @@
           ],
           "scheduleKind": "fixed_window",
           "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:dianxingchuan",
+          "title": "点星船",
+          "sourceUrl": "https://www.taptap.cn/moment/869248465039788964?group_id=311675",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:406b67ad56fd72dd630b",
+          "parentTitle": "二相乐园"
+        },
+        {
+          "remoteKey": "map-catalog:star-rail:subregion:shunxihuanyu",
+          "title": "瞬息欢愉",
+          "sourceUrl": "https://www.taptap.cn/moment/869248465039788964?group_id=311675",
+          "category": "exploration",
+          "mapNodeKind": "subregion",
+          "parentRemoteKey": "map-catalog:star-rail:region:406b67ad56fd72dd630b",
+          "parentTitle": "二相乐园"
         }
       ],
       "archives": [
