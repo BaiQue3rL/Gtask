@@ -35,29 +35,12 @@ function sources(value, allowEmpty = false) {
   for (const url of value) assert(typeof url === 'string' && new URL(url).protocol === 'https:', 'Source must be HTTPS')
 }
 export function runKey(gameId, periodKey, node) { return `${gameId}/${periodKey}/${node}` }
-
-/** Keep published timing obligations and the cloud timer's inventory in agreement. */
-export function verifyActivityTimeReviews(state, catalog) {
-  validateState(state)
-  const scheduled = new Map((state.activityTimeReviews ?? []).map(review => [`${review.gameId}/${review.remoteKey}`, review]))
-  for (const game of catalog.games) {
-    for (const item of game.upserts ?? []) {
-      if (!item.deadlineReview) continue
-      const id = `${game.gameId}/${item.remoteKey}`, review = scheduled.get(id)
-      assert(review, `Missing cloud time review: ${id}`)
-      assert.equal(timestamp(review.reviewAt), timestamp(item.deadlineReview.reviewAt), `Time review dates differ: ${id}`)
-      assert.equal(timestamp(review.checkedAt), timestamp(item.deadlineReview.checkedAt), `Time review checks differ: ${id}`)
-      scheduled.delete(id)
-    }
-  }
-  assert.equal(scheduled.size, 0, 'Cloud time review has no matching catalog obligation')
-  return { ok: true, reviews: (state.activityTimeReviews ?? []).length }
-}
+const executionTime = task => timestamp(task.reviewAt ?? task.boundaryAt)
 
 /** Cloud-only scheduling metadata. This never reads a player's database or changes a catalog. */
 export function validateState(state) {
   fields(state, ['schemaVersion', 'repository', 'timeZone', 'activatedAt', 'games', 'dateTriggers', 'periods', 'scheduleGaps', 'runs',
-    ...(state.activityTimeReviews === undefined ? [] : ['activityTimeReviews'])])
+    ...(state.followUps === undefined ? [] : ['followUps'])])
   assert.equal(state.schemaVersion, 2)
   assert.equal(state.repository, 'BaiQue3rL/Gtask')
   assert.equal(state.timeZone, 'Asia/Shanghai')
@@ -91,7 +74,8 @@ export function validateState(state) {
   }
   const dateKeys = new Set()
   for (const trigger of state.dateTriggers) {
-    fields(trigger, ['gameId', 'periodKey', 'node', 'date', 'sources', 'checkedAt'])
+    fields(trigger, ['gameId', 'periodKey', 'node', 'date', 'sources', 'checkedAt',
+      ...(trigger.reviewAt === undefined ? [] : ['reviewAt', 'reviewReason'])])
     const period = periods.get(`${trigger.gameId}/${trigger.periodKey}`)
     assert(period && nodes.includes(trigger.node), 'Date trigger needs a recorded game/version and supported node')
     dateOnly(trigger.date); sources(trigger.sources); timestamp(trigger.checkedAt)
@@ -99,6 +83,10 @@ export function validateState(state) {
     assert(!dateKeys.has(key), 'Duplicate date trigger'); dateKeys.add(key)
     const exact = trigger.node === 'version_end' ? period.endsAt : period.firstHalfEndsAt
     if (exact !== null) assert.equal(localDate(timestamp(exact)), trigger.date, 'Conflicting trigger date and exact boundary')
+    if (trigger.reviewAt !== undefined) {
+      text(trigger.reviewReason)
+      assert(timestamp(trigger.reviewAt) >= (exact === null ? dateOnly(trigger.date) : timestamp(exact)), 'Review cannot precede its node')
+    }
   }
   for (const gap of state.scheduleGaps) {
     fields(gap, ['gameId', 'periodKey', 'reason', 'checkedSources', 'checkedAt'])
@@ -107,14 +95,19 @@ export function validateState(state) {
     text(gap.reason); sources(gap.checkedSources); timestamp(gap.checkedAt)
   }
   const reviewKeys = new Set()
-  assert(state.activityTimeReviews === undefined || Array.isArray(state.activityTimeReviews), 'Expected activity time reviews')
-  for (const review of state.activityTimeReviews ?? []) {
-    fields(review, ['gameId', 'remoteKey', 'title', 'reviewAt', 'checkedAt', 'reason', 'sources'])
+  assert(state.followUps === undefined || Array.isArray(state.followUps), 'Expected follow-ups')
+  for (const review of state.followUps ?? []) {
+    fields(review, ['gameId', 'key', 'targets', 'remoteKeys', 'reviewAt', 'checkedAt', 'reason', 'sources'])
     assert(state.games.includes(review.gameId), 'Unknown review game')
-    text(review.remoteKey); text(review.title); text(review.reason); sources(review.sources)
+    assert(typeof review.key === 'string' && slug.test(review.key), 'Invalid follow-up key')
+    assert(Array.isArray(review.targets) && review.targets.length > 0 && new Set(review.targets).size === review.targets.length)
+    for (const target of review.targets) assert(['version', 'events', 'cycles', 'exploration'].includes(target), 'Unknown follow-up target')
+    assert(Array.isArray(review.remoteKeys) && new Set(review.remoteKeys).size === review.remoteKeys.length)
+    for (const key of review.remoteKeys) text(key)
+    text(review.reason); sources(review.sources)
     assert(timestamp(review.reviewAt) > timestamp(review.checkedAt), 'Review must follow its last check')
-    const id = `${review.gameId}/${review.remoteKey}`
-    assert(!reviewKeys.has(id), 'Duplicate activity time review'); reviewKeys.add(id)
+    const id = `${review.gameId}/${review.key}`
+    assert(!reviewKeys.has(id), 'Duplicate follow-up'); reviewKeys.add(id)
   }
   const seen = new Set()
   for (const run of state.runs) {
@@ -158,17 +151,21 @@ export function planMaintenance(input, reference = new Date(), gameId = null) {
       const key = runKey(period.gameId, period.periodKey, node)
       const exact = node === 'version_end' ? period.endsAt : period.firstHalfEndsAt
       const calendar = dateTriggers.get(key)
-      // 11:00 is a task execution time for an announced date, not an invented official boundary.
+      // Date precision is distinct from the independently scheduled research time.
       const boundaryAt = exact ?? (calendar ? `${calendar.date}T11:00:00+08:00` : null)
       if (boundaryAt === null || timestamp(boundaryAt) < timestamp(state.activatedAt)) continue
+      const nodeDate = localDate(timestamp(boundaryAt))
+      const noon = timestamp(`${nodeDate}T12:00:00+08:00`)
+      const reviewAt = calendar?.reviewAt ?? new Date(Math.max(noon,
+        Math.ceil(timestamp(boundaryAt) / hourMs) * hourMs)).toISOString()
       tasks.push({ key, gameId: period.gameId, periodKey: period.periodKey, node, boundaryAt,
-        maintenanceDate: localDate(timestamp(boundaryAt)), timePrecision: exact === null ? 'date' : 'exact' })
+        reviewAt, maintenanceDate: localDate(timestamp(reviewAt)), timePrecision: exact === null ? 'date' : 'exact' })
     }
   }
-  const nodeGames = [...new Set(tasks.filter(task => task.maintenanceDate === today && timestamp(task.boundaryAt) <= now)
+  const nodeGames = [...new Set(tasks.filter(task => task.maintenanceDate === today && executionTime(task) <= now)
     .map(task => task.gameId))].sort()
   for (const task of tasks) {
-      const run = runs.get(task.key), boundary = timestamp(task.boundaryAt)
+      const run = runs.get(task.key), boundary = executionTime(task)
       if (run && terminal.has(run.status)) continue
       if (boundary > now) {
         upcoming.push(task)
@@ -181,25 +178,25 @@ export function planMaintenance(input, reference = new Date(), gameId = null) {
       }
       due.push({ ...item, carriedOver: task.maintenanceDate !== today })
   }
-  for (const review of state.activityTimeReviews ?? []) {
+  for (const review of state.followUps ?? []) {
     if (!games.includes(review.gameId)) continue
-    const task = { key: `${review.gameId}/activity-time/${review.remoteKey}`, gameId: review.gameId,
-      remoteKey: review.remoteKey, title: review.title, node: 'activity_time_review', action: 'review_activity_time',
-      boundaryAt: review.reviewAt, maintenanceDate: localDate(timestamp(review.reviewAt)),
+    const task = { key: `${review.gameId}/follow-up/${review.key}`, gameId: review.gameId,
+      targets: review.targets, remoteKeys: review.remoteKeys, node: 'follow_up', action: 'follow_up',
+      boundaryAt: review.reviewAt, reviewAt: review.reviewAt, maintenanceDate: localDate(timestamp(review.reviewAt)),
       timePrecision: 'estimate', reason: review.reason }
     if (timestamp(review.reviewAt) > now) upcoming.push(task)
     else due.push({ ...task, carriedOver: task.maintenanceDate !== today })
   }
   const eligibleGames = [...new Set([...nodeGames, ...due.map(task => task.gameId)])].sort()
-  const byTime = (a, b) => timestamp(a.boundaryAt) - timestamp(b.boundaryAt) || a.key.localeCompare(b.key)
+  const byTime = (a, b) => executionTime(a) - executionTime(b) || a.key.localeCompare(b.key)
   upcoming.sort(byTime)
-  const next = upcoming[0], nextAt = next ? Math.ceil(timestamp(next.boundaryAt) / 1000) * 1000 : null
+  const next = upcoming[0], nextAt = next ? Math.ceil(executionTime(next) / 1000) * 1000 : null
   return { checkedAt: new Date(now).toISOString(), gameId, eligibleGames,
     maintenanceTargets: [...new Set(due.map(task => task.gameId))].sort(),
     unconfiguredGames: games.filter(game => !upcoming.some(task => task.gameId === game)),
     due: due.sort(byTime), upcoming, deferred: deferred.sort(byTime),
     nextWake: next ? { at: new Date(nextAt).toISOString(), reasons: upcoming.filter(task =>
-      Math.ceil(timestamp(task.boundaryAt) / 1000) * 1000 === nextAt).map(task => ({ type: 'maintenance', key: task.key })) } : null }
+      Math.ceil(executionTime(task) / 1000) * 1000 === nextAt).map(task => ({ type: 'maintenance', key: task.key })) } : null }
 }
 
 /** Coverage is Agent-reported public research, never inferred from personal data or
@@ -215,7 +212,7 @@ export function verifyAnnouncementReview(input, receipt, gameId = null) {
   let unresolvedCount = 0
   for (const game of receipt.games) {
     fields(game, ['gameId', 'coverage', 'checkedSources', 'evidencePath', 'pending'])
-    assert(eligibleGames.includes(game.gameId), 'Game is outside its maintenance day')
+    assert(eligibleGames.includes(game.gameId), 'Game is outside its scheduled research scope')
     assert(!covered.has(game.gameId), 'Duplicate review game'); covered.add(game.gameId)
     assert(['complete', 'partial'].includes(game.coverage), 'Unknown review coverage')
     sources(game.checkedSources)
@@ -239,14 +236,13 @@ export function verifyCloudExecutionProfile(automationId, receipt) {
   return { ok: true, ...CLOUD_EXECUTION_PROFILE }
 }
 
-/** Rearm a single node or an Agent-estimated activity-time review, never a polling loop. */
+/** Rearm the next research window or justified follow-up, including next-day catch-up. */
 export function planCloudRearm(plan, lastRunAt = null, timingMode = 'exact_schedule') {
   assert(timingModes.includes(timingMode), 'Unsupported cloud task timing mode')
   const latestRun = Math.max(timestamp(plan.checkedAt), lastRunAt === null ? 0 : timestamp(lastRunAt))
-  const target = plan.upcoming.find(task => task.node === 'activity_time_review' ||
-    localDate(Math.ceil(Math.max(timestamp(task.boundaryAt), latestRun + hourMs) / 1000) * 1000) === task.maintenanceDate)
+  const target = plan.upcoming[0]
   if (!target) return null
-  const requested = timestamp(target.boundaryAt)
+  const requested = executionTime(target)
   const at = Math.ceil(Math.max(requested, latestRun + hourMs) / 1000) * 1000
   const iso = new Date(at).toISOString()
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai',
@@ -254,7 +250,7 @@ export function planCloudRearm(plan, lastRunAt = null, timingMode = 'exact_sched
     hourCycle: 'h23' }).formatToParts(new Date(at)).map(x => [x.type, x.value]))
   const start = `${parts.year}${parts.month}${parts.day}T${parts.hour}${parts.minute}${parts.second}`
   return { requestedAt: new Date(requested).toISOString(), at: iso,
-    maintenanceDate: target.node === 'activity_time_review' ? localDate(at) : target.maintenanceDate,
+    maintenanceDate: localDate(at),
     timeZone: 'Asia/Shanghai', timingMode,
     schedule: `BEGIN:VEVENT\nDTSTART;TZID=Asia/Shanghai:${start}\nRRULE:FREQ=DAILY;COUNT=1\nEND:VEVENT` }
 }
@@ -267,7 +263,7 @@ export function verifyCloudRearm(automationId, expected, receipt) {
   assert(timingModes.includes(expected.timingMode), 'Unsupported cloud task timing mode')
   timestamp(expected.requestedAt); timestamp(expected.at)
   dateOnly(expected.maintenanceDate)
-  assert.equal(localDate(timestamp(expected.at)), expected.maintenanceDate, 'Do not schedule outside the maintenance day')
+  assert.equal(localDate(timestamp(expected.at)), expected.maintenanceDate, 'Review date and scheduled time differ')
   fields(receipt, ['id', 'enabled', 'timingMode', 'timeZone', 'schedule'])
   assert.equal(receipt.id, automationId, 'Read back the original cloud task')
   assert.equal(receipt.enabled, true, 'The cloud task must remain enabled')
@@ -317,7 +313,7 @@ export function assertCloudGamePublication(gameId, beforeState, afterState, befo
   validateState(beforeState); validateState(afterState)
   assert(beforeState.games.includes(gameId), 'Unknown maintenance game')
   const withoutGame = state => Object.fromEntries(Object.entries(state).map(([key, value]) =>
-    [key, ['periods', 'dateTriggers', 'scheduleGaps', 'runs', 'activityTimeReviews'].includes(key) ? value.filter(row => row.gameId !== gameId) : value]))
+    [key, ['periods', 'dateTriggers', 'scheduleGaps', 'runs', 'followUps'].includes(key) ? value.filter(row => row.gameId !== gameId) : value]))
   assert.deepEqual(withoutGame(afterState), withoutGame(beforeState), 'Another game or shared scheduling configuration changed')
   const catalogScope = catalog => {
     const { revision, publishedAt, games, ...shared } = catalog
@@ -331,7 +327,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     const args = process.argv.slice(2)
     const state = JSON.parse(readFileSync(new URL('./state.json', import.meta.url), 'utf8'))
-    verifyActivityTimeReviews(state, JSON.parse(readFileSync(new URL('../../updates/catalog.json', import.meta.url), 'utf8')))
+    validateState(state)
     const action = ['--guard', '--verify-review', '--verify-rearm', '--verify-profile'].includes(args[0]) ? args.splice(0, 2) : null
     assert(args.length % 2 === 0 && args.every((arg, i) => i % 2 !== 0 || ['--game', '--at', '--last-run', '--timing-mode'].includes(arg)), 'Invalid CLI options')
     assert.equal(new Set(args.filter((_, i) => i % 2 === 0)).size, args.length / 2, 'Duplicate CLI option')

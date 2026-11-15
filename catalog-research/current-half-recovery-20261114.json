@@ -1,0 +1,294 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-11-14T14:03:32.991Z",
+  "scope": "用户同日后续纠正：当前半场、完整时间、版更中午首轮与灵活补查；取代此前缺时间先入清单方案。",
+  "supersedes": "catalog-research/activity-audit-20261114.json",
+  "decisions": {
+    "admission": "新增活动必须时间完整并属于当前半场；仍有效旧活动与同半场稍后开放的完整时间活动保留。",
+    "firstCollection": "version day 12:00 Asia/Shanghai",
+    "followUp": "当前范围缺口可在当天稍后或次日定向补查，已确认先交付，查齐即停，不固定轮询。",
+    "stableIdentity": "暂缓以同键归档保留个人状态，未来条件满足同键upsert恢复，真实编译器自动撤销该键归档。"
+  },
+  "reuseSources": [
+    "catalog-research/activity-audit-20261114.json",
+    "catalog-research/cloud/star-rail-4-6-version-end-20261111.json",
+    "catalog-research/cloud/wuthering-waves-3-7-version-end-20261112.json"
+  ],
+  "games": [
+    {
+      "gameId": "genshin",
+      "before": 9,
+      "after": 6,
+      "withdrawn": 3,
+      "reason": "三项缺时间候选暂缓，不再以预告占位；只补查当前半场所需信息。"
+    },
+    {
+      "gameId": "star-rail",
+      "before": 12,
+      "after": 11,
+      "withdrawn": 1,
+      "reason": "异器盈界12月11日开始，晚于12月2日下半边界；位面分裂11月23日在本上半，完整时间保留。成名之路正确时间继续保留。"
+    },
+    {
+      "gameId": "zenless",
+      "before": 8,
+      "after": 8,
+      "withdrawn": 0,
+      "reason": "当前已为下半，八项均属于当前有效范围。"
+    },
+    {
+      "gameId": "wuthering-waves",
+      "before": 8,
+      "after": 4,
+      "withdrawn": 4,
+      "reason": "12月3日及以后开始的四项下半活动暂缓；上半后续拉海洛方块与回音盈域有完整时间，保留。"
+    }
+  ],
+  "deferredPublicItems": [
+    {
+      "gameId": "genshin",
+      "reason": "time_unresolved",
+      "item": {
+        "remoteKey": "event:7.2:pressure-block-crush",
+        "title": "压力方块粉碎计划",
+        "startsAt": null,
+        "endsAt": null,
+        "sourceUrl": "https://apps.apple.com/cn/app/id1467190251",
+        "category": "limited_event",
+        "deadlineReview": {
+          "eligibility": "confirmed_limited",
+          "openState": "confirmed_announced",
+          "limitedSourceUrl": "https://apps.apple.com/cn/app/id1467190251",
+          "openSourceUrl": "https://apps.apple.com/cn/app/id1467190251",
+          "checkedSources": [
+            "https://apps.apple.com/cn/app/id1467190251",
+            "https://www.taptap.cn/app/168332/topic?type=official",
+            "https://www.taptap.cn/moment/866276924782019655?group_id=201765"
+          ],
+          "checkedAt": "2026-11-14T12:38:33.047Z",
+          "reviewAt": "2026-11-18T11:00:00+08:00",
+          "missingReason": "已确认7.2限时活动名称和参与性质；已读官方版本与活动公告，尚未取得适用国服的完整起止时间。",
+          "reviewReason": "预计单项玩法公告会在11月下旬开放前发布，先在11月18日核查；这是公告可获得时间的估计，不是活动开放时间。"
+        },
+        "activityTags": [
+          "puzzle"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai"
+      }
+    },
+    {
+      "gameId": "genshin",
+      "reason": "time_unresolved",
+      "item": {
+        "remoteKey": "event:7.2:frames-of-resilience",
+        "title": "厉影定格录",
+        "startsAt": null,
+        "endsAt": null,
+        "sourceUrl": "https://apps.apple.com/cn/app/id1467190251",
+        "category": "limited_event",
+        "deadlineReview": {
+          "eligibility": "confirmed_limited",
+          "openState": "confirmed_announced",
+          "limitedSourceUrl": "https://apps.apple.com/cn/app/id1467190251",
+          "openSourceUrl": "https://apps.apple.com/cn/app/id1467190251",
+          "checkedSources": [
+            "https://apps.apple.com/cn/app/id1467190251",
+            "https://www.taptap.cn/app/168332/topic?type=official",
+            "https://www.taptap.cn/moment/866276924782019655?group_id=201765"
+          ],
+          "checkedAt": "2026-11-14T12:38:33.047Z",
+          "reviewAt": "2026-11-25T11:00:00+08:00",
+          "missingReason": "已确认7.2限时活动名称和参与性质；已读官方版本与活动公告，尚未取得适用国服的完整起止时间。",
+          "reviewReason": "预计后半版本单项活动公告在11月下旬公布，11月25日复查；若版更下半节点先取得规则则提前补齐。"
+        },
+        "activityTags": [
+          "photography"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai"
+      }
+    },
+    {
+      "gameId": "genshin",
+      "reason": "time_unresolved",
+      "item": {
+        "remoteKey": "event:7.2:ley-line-overflow",
+        "title": "地脉移涌",
+        "startsAt": null,
+        "endsAt": null,
+        "sourceUrl": "https://www.miyoushe.com/bh3/article/79087188",
+        "category": "limited_event",
+        "deadlineReview": {
+          "eligibility": "confirmed_limited",
+          "openState": "confirmed_announced",
+          "limitedSourceUrl": "https://www.miyoushe.com/bh3/article/79087188",
+          "openSourceUrl": "https://www.miyoushe.com/bh3/article/79087188",
+          "checkedSources": [
+            "https://www.miyoushe.com/bh3/article/79087188",
+            "https://www.taptap.cn/app/168332/topic?type=official",
+            "https://www.taptap.cn/moment/866276924782019655?group_id=201765"
+          ],
+          "checkedAt": "2026-11-14T12:38:33.047Z",
+          "reviewAt": "2026-12-05T11:00:00+08:00",
+          "missingReason": "已确认7.2限时活动名称和参与性质；已读官方版本与活动公告，尚未取得适用国服的完整起止时间。",
+          "reviewReason": "前瞻整理指向版本后段，预计12月上旬取得单项规则；12月5日定向核查，不把整理中的日期写成活动档期。"
+        },
+        "activityTags": [
+          "double-drop",
+          "ley-line"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai"
+      }
+    },
+    {
+      "gameId": "star-rail",
+      "reason": "second_half_not_yet_current",
+      "item": {
+        "remoteKey": "event:4.7:realm-of-the-strange",
+        "title": "异器盈界",
+        "startsAt": "2026-12-11T04:00:00+08:00",
+        "endsAt": "2026-12-23T03:59:00+08:00",
+        "sourceUrl": "https://www.taptap.cn/moment/867813797929160485?group_id=311675",
+        "category": "limited_event",
+        "activityTags": [
+          "double-drop"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai"
+      }
+    },
+    {
+      "gameId": "wuthering-waves",
+      "reason": "second_half_not_yet_current",
+      "item": {
+        "remoteKey": "ww:event:3.8:wuwu-project-preparation",
+        "title": "呜呜企划・整备",
+        "startsAt": "2026-12-03T10:00:00+08:00",
+        "endsAt": "2026-12-17T03:59:00+08:00",
+        "sourceUrl": "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+        "category": "limited_event",
+        "activityTags": [
+          "quest"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai"
+      }
+    },
+    {
+      "gameId": "wuthering-waves",
+      "reason": "second_half_not_yet_current",
+      "item": {
+        "remoteKey": "ww:event:3.8:dreamland-wonders",
+        "title": "梦野寻奇",
+        "startsAt": "2026-12-03T10:00:00+08:00",
+        "endsAt": "2026-12-21T03:59:00+08:00",
+        "sourceUrl": "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+        "category": "limited_event",
+        "activityTags": [
+          "combat",
+          "challenge"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai"
+      }
+    },
+    {
+      "gameId": "wuthering-waves",
+      "reason": "second_half_not_yet_current",
+      "item": {
+        "remoteKey": "ww:event:3.8:where-the-wind-leads",
+        "title": "风之所向",
+        "startsAt": "2026-12-07T04:00:00+08:00",
+        "endsAt": "2026-12-21T03:59:00+08:00",
+        "sourceUrl": "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+        "category": "limited_event",
+        "activityTags": [
+          "sign-in"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai"
+      }
+    },
+    {
+      "gameId": "wuthering-waves",
+      "reason": "second_half_not_yet_current",
+      "item": {
+        "remoteKey": "ww:event:3.8:tacet-field-double-drop",
+        "title": "声弦涤荡",
+        "startsAt": "2026-12-14T04:00:00+08:00",
+        "endsAt": "2026-12-21T03:59:00+08:00",
+        "sourceUrl": "https://www.taptap.cn/moment/868821283758934283?group_id=330015",
+        "category": "limited_event",
+        "activityTags": [
+          "double-drop",
+          "material-reward"
+        ],
+        "scheduleKind": "fixed_window",
+        "timeZone": "Asia/Shanghai"
+      }
+    }
+  ],
+  "pendingResearch": [
+    {
+      "gameId": "genshin",
+      "remoteKey": "event:7.2:pressure-block-crush",
+      "status": "pending",
+      "reason": "当前检索仍未取得适用官方完整时间，不能把第三方猜测或活动征集时间当作实际活动档期。",
+      "reviewAt": "2026-11-15T12:00:00+08:00"
+    }
+  ],
+  "software": {
+    "productVersion": "1.2.2",
+    "newRelease": false,
+    "contractVersion": 19,
+    "legacyCompatibility": "保留v1/v2与已发布v3版本号识别；撤回预告缺时间扩展，旧版已开放缺截止记录仅供读取兼容。"
+  },
+  "delivery": {
+    "stage": "local_and_cloud_verified",
+    "revision": "2026-11-14.current-half-verified-times",
+    "localVerified": true,
+    "cloudVerified": true,
+    "verifiedAt": "2026-11-15T02:31:28.643Z",
+    "counts": {
+      "genshin": 6,
+      "star-rail": 11,
+      "zenless": 8,
+      "wuthering-waves": 4
+    },
+    "unaffectedActiveItemsPreserved": 304,
+    "deferredItems": 8,
+    "applicationTestsPassed": 512,
+    "plannerTestsPassed": 30,
+    "typecheck": true,
+    "productionBuild": true,
+    "consumerCheck": true,
+    "installedUi": true,
+    "backupCreated": false,
+    "cloudTasks": [
+      {
+        "gameId": "genshin",
+        "ok": true,
+        "at": "2026-11-15T04:00:00.000Z"
+      },
+      {
+        "gameId": "star-rail",
+        "ok": true,
+        "at": "2026-12-02T04:00:00.000Z"
+      },
+      {
+        "gameId": "zenless",
+        "ok": true,
+        "at": "2026-12-02T04:00:00.000Z"
+      },
+      {
+        "gameId": "wuthering-waves",
+        "ok": true,
+        "at": "2026-12-03T04:00:00.000Z"
+      }
+    ],
+    "cloudReceiptKind": "UI normalized original-task readback, not automations_peek",
+    "evidenceRoot": "C:/Users/Administrator/AppData/Local/Codex/task-receipts/gtask-current-half-recovery-20261114"
+  }
+}

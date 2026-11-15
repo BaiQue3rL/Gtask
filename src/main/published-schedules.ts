@@ -19,12 +19,11 @@ export const cyclePolicySchema = z.discriminatedUnion('kind', [intervalPolicy, m
 })
 
 export const deadlineReviewSchema = z.object({
-  eligibility: z.literal('confirmed_limited'), openState: z.enum(['confirmed_open', 'confirmed_announced']),
+  eligibility: z.literal('confirmed_limited'), openState: z.literal('confirmed_open'),
   limitedSourceUrl: https, openSourceUrl: https,
   checkedSources: z.array(https).min(1).max(20),
   checkedAt: publicTimestamp, reviewAt: publicTimestamp,
-  missingReason: z.string().trim().min(1).max(500),
-  reviewReason: z.string().trim().min(1).max(500).optional()
+  missingReason: z.string().trim().min(1).max(500)
 }).strict().superRefine((review, context) => {
   if (Date.parse(review.reviewAt) <= Date.parse(review.checkedAt)) context.addIssue({ code: 'custom', message: '复核节点必须晚于本次核查' })
 })
