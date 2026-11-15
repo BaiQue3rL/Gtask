@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 1,
+  "kind": "map_baseline_recovery",
+  "gameId": "star-rail",
+  "periodKey": "4.7",
+  "checkedAt": "2026-11-15T13:54:47.784Z",
+  "scope": "复核现有星铁90个公开地图节点，并按4.7完整更新说明核对新开放地图、名称及父级；复用之前已核验的旧目录。",
+  "diagnosis": {
+    "ruleAlreadyRequired": true,
+    "originalResearch": "catalog-research/cloud/star-rail-4-6-version-end-20261111.json",
+    "originalCheckedAt": "2026-11-10T22:03:26.891Z",
+    "originalLocalTime": "2026-11-11 06:03 Asia/Shanghai",
+    "originalPending": "点星船仍在预计维护窗口内，开放与父级未核实；未取得完整更新说明。",
+    "failure": "开服前结束研究后没有及时补查；后续活动补录与中午排期纠正没有把已知地图缺口带入补查，公开目录与本机均未新增4.7地图。",
+    "softwareDeliveryFailure": false
+  },
+  "priorEvidence": [
+    "docs/catalog-research/star-rail-4.6-maps-2026-09-28.json",
+    "catalog-research/cloud/star-rail-4-6-first-half-end.json"
+  ],
+  "coverage": {
+    "regionsBefore": 8,
+    "subregionsBefore": 82,
+    "regionsAfter": 8,
+    "subregionsAfter": 84,
+    "parkChildrenBefore": 12,
+    "parkChildrenAfter": 14,
+    "reusedExistingNodes": 90,
+    "newNodes": 2,
+    "renames": 0,
+    "parentCorrections": 0,
+    "currentVersionMapsComplete": true,
+    "fullOriginalVersionAuditComplete": false,
+    "unchangedOtherSections": true
+  },
+  "sources": [
+    {
+      "url": "https://www.taptap.cn/moment/869248465039788964?group_id=311675",
+      "official": true,
+      "publisher": "崩坏：星穹铁道",
+      "publicationDate": "2026-11-10",
+      "readScope": "完整官方更新说明；5、全新场景与剧情开放说明"
+    },
+    {
+      "url": "https://www.miyoushe.com/zzz/accountCenter/postList?id=137101761",
+      "official": false,
+      "publisher": "祈鸢ya",
+      "publicationDate": "2026-11-12",
+      "readScope": "公开作者发帖列表中的地图攻略摘要；两张地图名称、二相乐园归属及已开放探索内容"
+    },
+    {
+      "url": "https://api-static.mihoyo.com/common/srmap/sr_map/v1/map/tree?app_sn=sr_map&lang=zh-cn&map_id=943",
+      "official": true,
+      "result": "HTTP200但retcode=-502；未取得可用导航，不以失败结果冒充核验或阻挡其他充分证据"
+    }
+  ],
+  "decisions": [
+    {
+      "target": "exploration",
+      "key": "map-catalog:star-rail:subregion:dianxingchuan",
+      "status": "resolved",
+      "previousValue": null,
+      "adoptedValue": "{\"title\":\"点星船\",\"mapNodeKind\":\"subregion\",\"parentRemoteKey\":\"map-catalog:star-rail:region:406b67ad56fd72dd630b\"}",
+      "reason": "4.7正式更新说明列出新增场景；已发布攻略明确两张地图属于二相乐园并有常驻探索内容。复用既有父级与两级结构，不要求另有探索百分比或特定导航格式。",
+      "correctionReason": "旧版更研究在维护开始后即收尾并将开服/归属缺口留到下半；当前已正式开放，旧的未开放判断不再成立。",
+      "sources": [
+        {
+          "url": "https://www.taptap.cn/moment/869248465039788964?group_id=311675",
+          "publishedAt": "2026-11-10",
+          "statement": "4.7于2026-11-11更新；全新场景为点星船、瞬息欢愉，开拓任务归二相乐园。"
+        },
+        {
+          "url": "https://www.miyoushe.com/zzz/accountCenter/postList?id=137101761",
+          "publishedAt": "2026-11-12",
+          "statement": "攻略作者公开发帖列表分别写明二相乐园—点星船、二相乐园—瞬息欢愉，两地均有尘灵与解谜探索。已读取列表摘要，不冒充已读取失败的单篇全文。"
+        }
+      ]
+    },
+    {
+      "target": "exploration",
+      "key": "map-catalog:star-rail:subregion:shunxihuanyu",
+      "status": "resolved",
+      "previousValue": null,
+      "adoptedValue": "{\"title\":\"瞬息欢愉\",\"mapNodeKind\":\"subregion\",\"parentRemoteKey\":\"map-catalog:star-rail:region:406b67ad56fd72dd630b\"}",
+      "reason": "4.7正式更新说明列出新增场景；已发布攻略明确两张地图属于二相乐园并有常驻探索内容。复用既有父级与两级结构，不要求另有探索百分比或特定导航格式。",
+      "correctionReason": "旧版更研究在维护开始后即收尾并将开服/归属缺口留到下半；当前已正式开放，旧的未开放判断不再成立。",
+      "sources": [
+        {
+          "url": "https://www.taptap.cn/moment/869248465039788964?group_id=311675",
+          "publishedAt": "2026-11-10",
+          "statement": "4.7于2026-11-11更新；全新场景为点星船、瞬息欢愉，开拓任务归二相乐园。"
+        },
+        {
+          "url": "https://www.miyoushe.com/zzz/accountCenter/postList?id=137101761",
+          "publishedAt": "2026-11-12",
+          "statement": "攻略作者公开发帖列表分别写明二相乐园—点星船、二相乐园—瞬息欢愉，两地均有尘灵与解谜探索。已读取列表摘要，不冒充已读取失败的单篇全文。"
+        }
+      ]
+    }
+  ],
+  "pending": [],
+  "outOfCurrentScope": [
+    "旧真珠的画室候选、周期排期和其他历史版块缺口不由本次4.7地图修复宣告解决。"
+  ],
+  "delta": [
+    {
+      "remoteKey": "map-catalog:star-rail:subregion:dianxingchuan",
+      "category": "exploration",
+      "title": "点星船",
+      "mapNodeKind": "subregion",
+      "parentRemoteKey": "map-catalog:star-rail:region:406b67ad56fd72dd630b",
+      "parentTitle": "二相乐园",
+      "sourceUrl": "https://www.taptap.cn/moment/869248465039788964?group_id=311675"
+    },
+    {
+      "remoteKey": "map-catalog:star-rail:subregion:shunxihuanyu",
+      "category": "exploration",
+      "title": "瞬息欢愉",
+      "mapNodeKind": "subregion",
+      "parentRemoteKey": "map-catalog:star-rail:region:406b67ad56fd72dd630b",
+      "parentTitle": "二相乐园",
+      "sourceUrl": "https://www.taptap.cn/moment/869248465039788964?group_id=311675"
+    }
+  ],
+  "delivery": {
+    "revision": "2026-11-15.star-rail-4.7-maps",
+    "stage": "local_verified",
+    "localApplied": true,
+    "remotePublished": false,
+    "jobId": "b271f6e3-03c3-4fe0-8906-e766c8e134dd",
+    "localVerification": {
+      "existingIdentitiesPreserved": 90,
+      "existingChildProgressPreserved": 82,
+      "reportedRegionProgressPreserved": true,
+      "parentReopenedForNewChildren": true,
+      "regions": 8,
+      "subregions": 84,
+      "parkChildren": 14
+    },
+    "validation": {
+      "mapTestsPassed": 9,
+      "applicationTestsPassed": 512,
+      "typecheck": true,
+      "productionBuild": true,
+      "realConsumer": true,
+      "localMcpReadback": true,
+      "softwareChanged": false
+    }
+  }
+}
