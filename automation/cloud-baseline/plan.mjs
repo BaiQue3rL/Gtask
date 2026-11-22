@@ -10,6 +10,8 @@ const statuses = ['pending', 'running', 'ready', 'published', 'verified_unchange
 const terminal = new Set(['published', 'verified_unchanged'])
 const timingModes = ['exact_schedule', 'condition_watch']
 const hourMs = 60 * 60 * 1000
+// Historical announcement receipts use the default in effect on their node day.
+const eveningDefaultFrom = '2026-11-22'
 export const CLOUD_EXECUTION_PROFILE = Object.freeze({ model: 'gpt-6.2-sol', reasoningEffort: 'max' })
 const slug = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,159}$/
 const digest = /^[a-f0-9]{64}$/
@@ -155,10 +157,12 @@ export function planMaintenance(input, reference = new Date(), gameId = null) {
       // Date precision is distinct from the independently scheduled research time.
       const boundaryAt = exact ?? (calendar ? `${calendar.date}T11:00:00+08:00` : null)
       if (boundaryAt === null || timestamp(boundaryAt) < timestamp(state.activatedAt)) continue
-      const nodeDate = localDate(timestamp(boundaryAt))
-      const noon = timestamp(`${nodeDate}T12:00:00+08:00`)
-      const reviewAt = calendar?.reviewAt ?? new Date(Math.max(noon,
-        Math.ceil(timestamp(boundaryAt) / hourMs) * hourMs)).toISOString()
+      const boundary = timestamp(boundaryAt)
+      const nodeDate = localDate(boundary)
+      const defaultHour = nodeDate < eveningDefaultFrom ? '12' : '18'
+      const defaultReview = timestamp(`${nodeDate}T${defaultHour}:00:00+08:00`)
+      const reviewAt = calendar?.reviewAt ?? new Date(Math.max(defaultReview,
+        Math.ceil(boundary / hourMs) * hourMs)).toISOString()
       tasks.push({ key, gameId: period.gameId, periodKey: period.periodKey, node, boundaryAt,
         reviewAt, maintenanceDate: localDate(timestamp(reviewAt)), timePrecision: exact === null ? 'date' : 'exact' })
     }
