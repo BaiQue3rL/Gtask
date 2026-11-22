@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import { planMaintenance, validateState, runKey, assertCloudPublicationPaths, planCloudRun, planCloudRearm, verifyCloudRearm, verifyCloudResearchDelivery,
   CLOUD_EXECUTION_PROFILE, verifyCloudExecutionProfile, verifyAnnouncementReview, assertCloudGamePublication } from './plan.mjs'
 
-const at = day => `2026-11-${String(day).padStart(2, '0')}T12:00:00+08:00`
+const at = (day, hour = '12') => `2026-11-${String(day).padStart(2, '0')}T${hour}:00:00+08:00`
+const evening = day => at(day, '18')
 const source = 'https://example.com/official-fixture'
 function fixture() {
   return { schemaVersion: 2, repository: 'BaiQue3rL/Gtask', timeZone: 'Asia/Shanghai', activatedAt: at(1), games: ['genshin'],
@@ -37,7 +38,7 @@ test('each game has its own plan and next timer even on simultaneous node days',
     assert.equal(plan.gameId, game)
     assert.deepEqual(plan.maintenanceTargets, [game])
     assert(plan.due.concat(plan.upcoming, plan.deferred).every(task => task.gameId === game))
-    assert.equal(plan.nextWake.at, new Date(at(game === 'genshin' ? 29 : 25)).toISOString())
+    assert.equal(plan.nextWake.at, new Date(evening(game === 'genshin' ? 29 : 25)).toISOString())
     assert.deepEqual(verifyAnnouncementReview(state, reviewReceipt([game]), game).coveredGames, [game])
     assert.throws(() => verifyAnnouncementReview(state, reviewReceipt(state.games), game), /outside/)
   }
@@ -65,7 +66,7 @@ test('a game publication preserves other games and shared scheduling configurati
 test('only version-change and second-half days permit maintenance', () => {
   for (const day of [5, 11, 13, 15, 28, 30]) assert.deepEqual(planMaintenance(fixture(), at(day)).due, [])
   assert.deepEqual(planMaintenance(fixture(), at(12)).due.map(task => task.node), ['first_half_end'])
-  const next = planMaintenance(fixture(), at(29))
+  const next = planMaintenance(fixture(), evening(29))
   assert.deepEqual(next.due.map(task => task.node), ['first_half_end', 'version_end'])
   assert.equal(next.due[0].carriedOver, true)
 })
@@ -127,7 +128,7 @@ test('overdue named and unnamed event reviews remain ahead of future nodes until
   state.followUps[0].targets = ['cycles']
   assert.equal(planMaintenance(state, at(22), 'genshin').due[0].eventNoticesSince, undefined)
   state.followUps = []
-  assert.equal(planCloudRearm(planMaintenance(state, at(22), 'genshin')).at, new Date(at(24)).toISOString())
+  assert.equal(planCloudRearm(planMaintenance(state, at(22), 'genshin')).at, new Date(evening(24)).toISOString())
 })
 
 test('a follow-up closes against its original scope and a source gap retains a same-game wake', () => {
@@ -168,13 +169,31 @@ test('follow-ups require a reason and scope and preserve the other game', () => 
   assert.throws(() => validateState(after), /Duplicate follow-up/)
 })
 
-test('version-day collection starts at noon without changing its business boundary', () => {
-  const state = fixture(); state.periods[0].endsAt = '2026-11-29T06:00:00+08:00'
-  assert.deepEqual(planMaintenance(state, '2026-11-29T11:59:59+08:00').due, [])
-  assert.equal(planMaintenance(state, at(29)).due.at(-1).node, 'version_end')
-  assert.equal(state.periods[0].endsAt, '2026-11-29T06:00:00+08:00')
-  state.dateTriggers = [dateTrigger({ date: '2026-11-29', reviewAt: '2026-11-29T15:00:00+08:00', reviewReason: '官方推迟开服，下午复核' })]
+test('version and half changes use 18:00 or the rounded later boundary', () => {
+  const state = fixture()
+  const period = state.periods[0]
+  period.firstHalfEndsAt = '2026-11-24T11:59:00+08:00'
+  period.endsAt = '2026-11-29T06:00:00+08:00'
+  for (const [day, node, boundaryAt] of [[24, 'first_half_end', period.firstHalfEndsAt], [29, 'version_end', period.endsAt]]) {
+    const before = planMaintenance(state, `2026-11-${day}T17:59:59+08:00`)
+    assert.deepEqual(before.due, [])
+    assert.equal(before.nextWake.at, new Date(evening(day)).toISOString())
+    const due = planMaintenance(state, evening(day)).due.at(-1)
+    assert.equal(due.node, node)
+    assert.equal(due.boundaryAt, boundaryAt)
+  }
+  period.firstHalfEndsAt = '2026-11-24T18:07:00+08:00'
+  assert.deepEqual(planMaintenance(state, evening(24)).due, [])
+  assert.equal(planMaintenance(state, evening(24)).nextWake.at, '2026-11-24T11:00:00.000Z')
+  assert.equal(planMaintenance(state, at(24, '19')).due[0].boundaryAt, period.firstHalfEndsAt)
+})
+
+test('verified review times override the default while staying within the official boundary', () => {
+  const state = fixture()
+  state.periods[0].endsAt = '2026-11-29T06:00:00+08:00'
+  state.dateTriggers = [dateTrigger({ date: '2026-11-29', reviewAt: at(29, '15'), reviewReason: '官方公告已齐，按获准时间复核' })]
   assert.equal(planMaintenance(state, at(15)).nextWake.at, '2026-11-29T07:00:00.000Z')
+  assert.equal(planMaintenance(state, at(29, '15')).due.at(-1).node, 'version_end')
   state.dateTriggers[0].reviewAt = '2026-11-29T05:00:00+08:00'
   assert.throws(() => validateState(state), /precede/)
 })
@@ -187,7 +206,7 @@ test('maintenance days use Asia Shanghai and never execute before the boundary',
 })
 test('a missing phase is not invented and a verified half day works without a version end', () => {
   const state = fixture(); state.periods[0].firstHalfEndsAt = null; state.periods[0].firstHalfSources = []
-  assert.equal(planMaintenance(state, at(24)).nextWake.at, new Date(at(29)).toISOString())
+  assert.equal(planMaintenance(state, at(24)).nextWake.at, new Date(evening(29)).toISOString())
   const half = fixture(); half.periods[0].endsAt = null; half.periods[0].startsAt = null; half.periods[0].versionSources = []
   assert.deepEqual(planMaintenance(half, at(12)).maintenanceTargets, ['genshin'])
   half.periods[0].firstHalfEndsAt = null; half.periods[0].firstHalfSources = []
@@ -196,12 +215,13 @@ test('a missing phase is not invented and a verified half day works without a ve
 test('an announced date schedules that day without inventing an official timestamp', () => {
   const state = fixture(); state.periods[0].endsAt = null; state.dateTriggers = [dateTrigger()]
   const before = structuredClone(state), plan = planMaintenance(state, at(15))
-  assert.equal(plan.nextWake.at, new Date(at(22)).toISOString())
+  assert.equal(plan.nextWake.at, new Date(evening(22)).toISOString())
   assert.equal(plan.upcoming[0].timePrecision, 'date')
-  assert.deepEqual(planMaintenance(state, at(22)).maintenanceTargets, ['genshin'])
+  assert.deepEqual(planMaintenance(state, at(22)).maintenanceTargets, [])
+  assert.deepEqual(planMaintenance(state, evening(22)).maintenanceTargets, ['genshin'])
   assert.deepEqual(state, before)
   state.periods[0].firstHalfEndsAt = null; state.periods[0].firstHalfSources = []
-  assert.equal(planMaintenance(state, at(5)).nextWake.at, new Date(at(22)).toISOString())
+  assert.equal(planMaintenance(state, at(5)).nextWake.at, new Date(evening(22)).toISOString())
 })
 test('date records reject unsupported nodes, missing sources, duplicates and invalid dates', () => {
   for (const change of [{ node: 'weekly_review' }, { gameId: 'unknown' }, { sources: [] },
@@ -234,7 +254,7 @@ test('old pending, running and ready deadlines do not schedule off-day maintenan
     const state = fixture(); state.runs = [receipt(status, { retryAt: at(14) })]
     const plan = planMaintenance(state, at(15))
     assert.deepEqual(plan.due, []); assert.equal(plan.deferred.length, 1)
-    assert.equal(plan.nextWake.at, new Date(at(29)).toISOString())
+    assert.equal(plan.nextWake.at, new Date(evening(29)).toISOString())
   }
 })
 test('carry-over work waits for a maintenance day of its own game', () => {
@@ -243,14 +263,14 @@ test('carry-over work waits for a maintenance day of its own game', () => {
   const plan = planMaintenance(state, at(15))
   assert.deepEqual(plan.maintenanceTargets, ['another-game'])
   assert.equal(plan.deferred[0].gameId, 'genshin')
-  assert.deepEqual(planMaintenance(state, at(29)).due.filter(task => task.gameId === 'genshin').map(task => task.action), ['resume', 'maintain'])
+  assert.deepEqual(planMaintenance(state, evening(29)).due.filter(task => task.gameId === 'genshin').map(task => task.action), ['resume', 'maintain'])
 })
 test('an active owner is not stolen and unfinished work does not add a recovery wake', () => {
   const state = fixture(); state.runs = [receipt('running', { retryAt: '2026-11-12T13:00:00+08:00' })]
   assert.deepEqual(planMaintenance(state, at(12)).due, [])
   assert.equal(planMaintenance(state, '2026-11-12T14:00:00+08:00').due[0].action, 'resume')
-  assert.equal(planMaintenance(fixture(), at(12)).nextWake.at, new Date(at(29)).toISOString())
-  assert.equal(planMaintenance(fixture(), at(29)).nextWake, null)
+  assert.equal(planMaintenance(fixture(), at(12)).nextWake.at, new Date(evening(29)).toISOString())
+  assert.equal(planMaintenance(fixture(), evening(29)).nextWake, null)
 })
 test('successful work is not repeated after correction and activation skips historical nodes', () => {
   for (const status of ['published', 'verified_unchanged']) {
@@ -258,7 +278,7 @@ test('successful work is not repeated after correction and activation skips hist
     assert.deepEqual(planMaintenance(state, at(14)).due, [])
   }
   const state = fixture(); state.activatedAt = at(13)
-  assert.deepEqual(planMaintenance(state, at(29)).due.map(task => task.node), ['version_end'])
+  assert.deepEqual(planMaintenance(state, evening(29)).due.map(task => task.node), ['version_end'])
 })
 test('publication confirmation and evidence validation preserve existing semantics', () => {
   const state = fixture(); state.runs = [receipt('ready')]
@@ -278,11 +298,11 @@ test('state rejects stale polling fields and malformed records', () => {
 })
 test('Agent date corrections dynamically move the next wake without changing other nodes', () => {
   const state = fixture(); state.runs = [receipt('published')]
-  assert.equal(planMaintenance(state, at(15)).nextWake.at, new Date(at(29)).toISOString())
+  assert.equal(planMaintenance(state, at(15)).nextWake.at, new Date(evening(29)).toISOString())
   state.periods[0].endsAt = at(22)
-  assert.equal(planMaintenance(state, at(15)).nextWake.at, new Date(at(22)).toISOString())
+  assert.equal(planMaintenance(state, at(15)).nextWake.at, new Date(evening(22)).toISOString())
   state.periods[0].endsAt = null; state.dateTriggers = [dateTrigger({ date: '2026-11-24' })]
-  assert.equal(planMaintenance(state, at(15)).nextWake.at, new Date(at(24)).toISOString())
+  assert.equal(planMaintenance(state, at(15)).nextWake.at, new Date(evening(24)).toISOString())
   assert.equal(state.periods[0].firstHalfEndsAt, at(12))
 })
 test('second-half corrections move the next wake and simultaneous games share a target', () => {
