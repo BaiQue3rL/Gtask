@@ -1,0 +1,109 @@
+{
+  "gameId": "genshin",
+  "checkedAt": "2026-11-22T03:17:33.246Z",
+  "scope": "中国大陆服7.2上半活动公告。上半截止为11月24日17:59，仍有效的跨半场活动按实际开始时间归属。",
+  "sources": [
+    "https://www.taptap.cn/moment/866276924782019655?group_id=201765",
+    "https://www.taptap.cn/moment/871886252599672947?group_id=201765",
+    "https://www.taptap.cn/moment/872238992341340157?group_id=201765",
+    "https://www.taptap.cn/moment/872242613523056958?group_id=201765",
+    "https://www.taptap.cn/app/168332/topic?sort=created&type=official",
+    "https://www.miyoushe.com/ys/topicDetail/2545"
+  ],
+  "decisions": [
+    {
+      "key": "event:7.2:pressure-block-crush",
+      "previousValue": "预告已确认，档期待核，原键暂缓。",
+      "status": "resolved",
+      "publishedOn": "2026-11-18",
+      "sourceUrl": "https://www.taptap.cn/moment/871886252599672947?group_id=201765",
+      "reason": "官方单项规则给出11月20日10:00至11月30日03:59及挖掘挑战玩法。11月19日第二期速递也列出该档期，起日在上半，恢复原键。",
+      "timeBasis": "exact"
+    },
+    {
+      "key": "event:7.2:heated-battle-qice-jingchi",
+      "previousValue": "上次研究及本机目录均无此项。",
+      "status": "resolved",
+      "publishedOn": "2026-11-19",
+      "sourceUrl": "https://www.taptap.cn/moment/872238992341340157?group_id=201765",
+      "reason": "官方单项规则在新版速递之外给出独立限时卡牌对局，11月21日10:00至12月7日03:59。铸境研炼是另一个活动。",
+      "timeBasis": "exact"
+    },
+    {
+      "key": "7.2:second-half",
+      "sourceUrl": "https://www.taptap.cn/moment/872242613523056958?group_id=201765",
+      "reason": "11月19日速递的活动规则图第6、7项分别给出11月27日10:00至12月7日03:59及12月7日04:00至12月14日03:59。留到下半用原键 event:7.2:frames-of-resilience 和 event:7.2:ley-line-overflow 核对及收录。"
+    }
+  ],
+  "incident": {
+    "scheduledFor": "2026-11-15T12:00:00+08:00",
+    "visibleRunResponseAt": "2026-11-15T11:59:50+08:00",
+    "reportedNextOccurrence": "2026-11-15T12:58:21+08:00",
+    "observedOn": "2026-11-22",
+    "observations": [
+      "原任务在午前报告没有到期事项，读回单次改期。11月22日该任务处于已暂停，运行列表没有12:58的交付，GitHub主分支仍保留15日的待查项。页面未给出暂停的后台原因。",
+      "第一期速递原图未列这两项。只重查14日的一个已知键会遗漏19日单发的卡牌活动。另一条仅靠速递核对的路径也会漏掉卡牌活动。"
+    ]
+  },
+  "auditComplete": true,
+  "pending": [],
+  "announcementReview": {
+    "checkedAt": "2026-11-22T03:17:33.246Z",
+    "games": [{
+      "gameId": "genshin",
+      "coverage": "complete",
+      "checkedSources": [
+        "https://www.taptap.cn/app/168332/topic?sort=created&type=official",
+        "https://www.taptap.cn/moment/872242613523056958?group_id=201765",
+        "https://www.taptap.cn/moment/871886252599672947?group_id=201765",
+        "https://www.taptap.cn/moment/872238992341340157?group_id=201765"
+      ],
+      "evidencePath": "catalog-research/cloud/genshin-7-2-first-half-notices-20261122.json",
+      "pending": [],
+      "eventNotices": {
+        "since": "2026-11-04T11:00:00+08:00",
+        "sources": [
+          "https://www.taptap.cn/app/168332/topic?sort=created&type=official",
+          "https://www.taptap.cn/moment/866276924782019655?group_id=201765",
+          "https://www.taptap.cn/moment/872242613523056958?group_id=201765"
+        ],
+        "status": "covered",
+        "reason": "逐页核对原神官方公告至前次覆盖记录，复用上次上半清单，并查看两期速递的全部活动图。六项原有活动外确认两项。幽境危战已有周期定义。第二期速递已发，另两项已知玩法都在下半开始，接续11月24日18:00的既有节点。",
+        "nextReviewKey": null
+      }
+    }]
+  },
+  "verifiedCatalogDelta": {
+    "schemaVersion": 3,
+    "revision": "2026-11-22.genshin-first-half-events",
+    "publishedAt": "2026-11-22T03:17:33.246Z",
+    "games": [{
+      "gameId": "genshin",
+      "upserts": [
+        {
+          "remoteKey": "event:7.2:pressure-block-crush",
+          "category": "limited_event",
+          "title": "压力方块粉碎计划",
+          "startsAt": "2026-11-20T10:00:00+08:00",
+          "endsAt": "2026-11-30T03:59:00+08:00",
+          "activityTags": ["puzzle"],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/871886252599672947?group_id=201765"
+        },
+        {
+          "remoteKey": "event:7.2:heated-battle-qice-jingchi",
+          "category": "limited_event",
+          "title": "「七圣召唤」热斗模式：奇策竞驰",
+          "startsAt": "2026-11-21T10:00:00+08:00",
+          "endsAt": "2026-12-07T03:59:00+08:00",
+          "activityTags": ["card"],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai",
+          "sourceUrl": "https://www.taptap.cn/moment/872238992341340157?group_id=201765"
+        }
+      ],
+      "archives": []
+    }]
+  }
+}

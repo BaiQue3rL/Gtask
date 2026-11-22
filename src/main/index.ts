@@ -32,6 +32,7 @@ import {
   refreshCodexMcpLauncher
 } from './ai/codex-mcp-runtime'
 import {
+  BASELINE_WORKER_PREFERENCES,
   MAX_CODEX_SCHEDULE_WORKERS,
   CodexScheduleWorkerPool,
   resolveCodexWorkerRoute,
@@ -134,11 +135,6 @@ const remoteCatalogStatePath = join(app.getPath('userData'), 'remote-catalog-upd
 let remoteCatalogUpdateState: RemoteCatalogUpdateState = readRemoteCatalogUpdateState(
   remoteCatalogStatePath
 )
-const BASELINE_WORKER_PREFERENCES = {
-  strategy: 'fixed' as const,
-  model: 'gpt-5.6-sol' as const,
-  reasoningEffort: 'medium' as const
-}
 
 // Electron requires this call before app readiness. Compatibility mode is the
 // safe default because some Windows GPU/game overlay combinations corrupt

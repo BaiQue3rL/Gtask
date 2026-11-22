@@ -34,6 +34,7 @@ export const CODEX_WORKER_STRATEGIES = ['fixed'] as const
 export type CodexWorkerStrategy = (typeof CODEX_WORKER_STRATEGIES)[number]
 export const CODEX_WORKER_MODELS = [
   'inherit',
+  'gpt-6.2-sol',
   'gpt-5.6-sol',
   'gpt-5.6-terra',
   'gpt-5.6-luna'
