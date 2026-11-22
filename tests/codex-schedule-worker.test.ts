@@ -108,6 +108,12 @@ describe('Codex schedule worker', () => {
       preferences,
       maxWebWorkers: 6
     })).toHaveLength(4)
+    expect(selectCodexWorkerRoutes({
+      jobs: expensiveJobs,
+      runningRoutes: [route('11', 'gpt-5.6-sol')],
+      preferences: { ...preferences, model: 'gpt-6.2-sol' },
+      maxSolWorkers: 2
+    }).map(selected => selected.jobId)).toEqual(['12'])
 
     const webJobs = [
       job('21', 'genshin'),
@@ -164,7 +170,7 @@ describe('Codex schedule worker', () => {
   it('applies Gtask-only model and reasoning overrides without changing global config', () => {
     expect(codexWorkerInferenceArguments()).toEqual([
       '--model',
-      'gpt-5.6-sol',
+      'gpt-6.2-sol',
       '-c',
       'model_reasoning_effort="medium"'
     ])

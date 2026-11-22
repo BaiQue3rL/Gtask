@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { planMaintenance, validateState, runKey, assertCloudPublicationPaths, planCloudRearm, verifyCloudRearm,
+import { planMaintenance, validateState, runKey, assertCloudPublicationPaths, planCloudRun, planCloudRearm, verifyCloudRearm, verifyCloudResearchDelivery,
   CLOUD_EXECUTION_PROFILE, verifyCloudExecutionProfile, verifyAnnouncementReview, assertCloudGamePublication } from './plan.mjs'
 
 const at = day => `2026-11-${String(day).padStart(2, '0')}T12:00:00+08:00`
@@ -86,6 +86,69 @@ test('a scoped current-half gap can wake later that day or next day without revi
   assert.deepEqual(verifyAnnouncementReview(state, { ...reviewReceipt(), checkedAt: at(13) }, 'genshin').coveredGames, ['genshin'])
   state.followUps = []
   assert.deepEqual(planMaintenance(state, at(13), 'genshin').due, [])
+})
+
+function eventGap() {
+  const state = fixture()
+  state.periods[0].firstHalfEndsAt = at(24)
+  state.followUps = [{ gameId: 'genshin', key: 'current-times', targets: ['events'], remoteKeys: ['event:known'],
+    checkedAt: at(14), reviewAt: at(15), reason: '等待当前半场活动公告', sources: [source] }]
+  return state
+}
+
+test('the real-run path waits out early delivery on the same occurrence and rereads the plan', async () => {
+  const state = eventGap()
+  for (const kind of ['follow_up', 'first_half_end']) {
+    if (kind === 'first_half_end') { state.followUps = []; state.periods[0].firstHalfEndsAt = at(15) }
+    let now = Date.parse('2026-11-15T11:58:21+08:00'), reads = 0
+    const waits = []
+    const result = await planCloudRun(() => { reads++; return state }, 'genshin', () => now, async delay => {
+      waits.push(delay); now += delay
+    })
+    assert.deepEqual(waits, [99_000]); assert.equal(reads, 2)
+    assert.equal(result.checkedAt, new Date(at(15)).toISOString())
+    assert.deepEqual(result.due.map(task => task.node), [kind])
+    assert.equal(result.due[0].eventNoticesSince, new Date(at(1)).toISOString())
+  }
+  const later = await planCloudRun(() => state, 'genshin', () => Date.parse(at(10)), () => assert.fail('distant timer'))
+  assert.deepEqual(later.due, [])
+})
+
+test('overdue named and unnamed event reviews remain ahead of future nodes until disposition', () => {
+  const state = eventGap()
+  for (const keys of [['event:known'], []]) {
+    state.followUps[0].remoteKeys = keys
+    const plan = planMaintenance(state, at(22), 'genshin')
+    assert.deepEqual(plan.due[0].remoteKeys, keys)
+    assert.equal(plan.due[0].eventNoticesSince, new Date(at(1)).toISOString())
+    assert.equal(plan.nextWake.reasons[0].key, plan.due[0].key)
+    assert.equal(planCloudRearm(plan).at, '2026-11-22T05:00:00.000Z')
+  }
+  state.followUps[0].targets = ['cycles']
+  assert.equal(planMaintenance(state, at(22), 'genshin').due[0].eventNoticesSince, undefined)
+  state.followUps = []
+  assert.equal(planCloudRearm(planMaintenance(state, at(22), 'genshin')).at, new Date(at(24)).toISOString())
+})
+
+test('a follow-up closes against its original scope and a source gap retains a same-game wake', () => {
+  const before = eventGap(), after = structuredClone(before)
+  after.followUps = []
+  const research = reviewReceipt()
+  research.checkedAt = at(22)
+  const entry = research.games[0], path = entry.evidencePath
+  const check = () => verifyCloudResearchDelivery('genshin', before, after, [{ path, document: { announcementReview: research } }])
+  assert.throws(check, /newly published notices/)
+  entry.eventNotices = { since: at(1), sources: [source], status: 'covered', reason: '本期新增公告已逐项核对', nextReviewKey: null }
+  assert.doesNotThrow(check)
+  entry.eventNotices.since = at(19)
+  assert.throws(check, /interval/)
+  entry.eventNotices.since = at(1)
+  entry.coverage = 'partial'; entry.pending = ['官方下一批公告仍待发布']
+  Object.assign(entry.eventNotices, { status: 'follow_up', reason: entry.pending[0], nextReviewKey: 'next-bulletin' })
+  assert.throws(check, /future events follow-up/)
+  after.followUps = [{ ...before.followUps[0], key: 'next-bulletin', remoteKeys: [], checkedAt: at(22), reviewAt: at(23) }]
+  assert.doesNotThrow(check)
+  assert.throws(() => verifyCloudResearchDelivery('genshin', before, after, []), /without covering/)
 })
 
 test('follow-ups require a reason and scope and preserve the other game', () => {
@@ -302,10 +365,10 @@ test('cloud publication cannot change software, permissions, workflows or produc
     { status: 'A', path: 'catalog-research/cloud/fixture.json' }])
   assert.throws(() => assertCloudPublicationPaths([{ status: 'D', path: 'updates/catalog.json' }]))
 })
-test('saved model settings belong to the same GPT-6.1 Sol Max cloud task', () => {
+test('saved model settings belong to the same GPT-6.2 Sol Max cloud task', () => {
   const actual = { id: 'fixture-automation', ...CLOUD_EXECUTION_PROFILE }
-  assert.deepEqual(verifyCloudExecutionProfile(actual.id, actual), { ok: true, model: 'gpt-6.1-sol', reasoningEffort: 'max' })
-  for (const change of [{ id: 'other' }, { model: 'gpt-6-sol' }, { model: null }, { reasoningEffort: 'high' }, { reasoningEffort: null }]) {
+  assert.deepEqual(verifyCloudExecutionProfile(actual.id, actual), { ok: true, model: 'gpt-6.2-sol', reasoningEffort: 'max' })
+  for (const change of [{ id: 'other' }, { model: 'gpt-6.1-sol' }, { model: null }, { reasoningEffort: 'high' }, { reasoningEffort: null }]) {
     assert.throws(() => verifyCloudExecutionProfile(actual.id, { ...actual, ...change }))
   }
 })

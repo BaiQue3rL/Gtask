@@ -11,6 +11,11 @@ import type {
 
 export const CODEX_SCHEDULE_WORKER_AGENT_ID = 'gtask-background-worker'
 export const MAX_CODEX_SCHEDULE_WORKERS = 6
+export const BASELINE_WORKER_PREFERENCES: Readonly<CodexWorkerPreferences> = {
+  strategy: 'fixed',
+  model: 'gpt-6.2-sol',
+  reasoningEffort: 'medium'
+}
 
 export interface CodexWorkerRoute {
   jobId: string
@@ -69,7 +74,7 @@ export function selectCodexWorkerRoutes({
     gameCounts.set(job.gameId, (gameCounts.get(job.gameId) ?? 0) + 1)
     const route = runningRouteByJobId.get(job.id) ?? resolveCodexWorkerRoute(job, preferences)
     if (route.requiresWeb) webCount += 1
-    if (route.model === 'gpt-5.6-sol') solCount += 1
+    if (route.model.endsWith('-sol')) solCount += 1
   }
 
   const selected: CodexWorkerRoute[] = []
@@ -80,11 +85,11 @@ export function selectCodexWorkerRoutes({
     if ((gameCounts.get(job.gameId) ?? 0) >= maxPerGame) continue
     const route = resolveCodexWorkerRoute(job, preferences)
     if (route.requiresWeb && webCount >= maxWebWorkers) continue
-    if (route.model === 'gpt-5.6-sol' && solCount >= maxSolWorkers) continue
+    if (route.model.endsWith('-sol') && solCount >= maxSolWorkers) continue
     selected.push(route)
     gameCounts.set(job.gameId, (gameCounts.get(job.gameId) ?? 0) + 1)
     if (route.requiresWeb) webCount += 1
-    if (route.model === 'gpt-5.6-sol') solCount += 1
+    if (route.model.endsWith('-sol')) solCount += 1
   }
   return selected
 }
@@ -158,11 +163,7 @@ export function codexWorkerTransportArguments(
 }
 
 export function codexWorkerInferenceArguments(
-  preferences: CodexWorkerPreferences = {
-    strategy: 'fixed',
-    model: 'gpt-5.6-sol',
-    reasoningEffort: 'medium'
-  }
+  preferences: CodexWorkerPreferences = BASELINE_WORKER_PREFERENCES
 ): string[] {
   const args: string[] = []
   if (preferences.model !== 'inherit') args.push('--model', preferences.model)
