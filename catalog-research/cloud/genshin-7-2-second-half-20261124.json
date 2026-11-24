@@ -1,0 +1,219 @@
+{
+  "schemaVersion": 1,
+  "gameId": "genshin",
+  "nodeKeys": [
+    "genshin/7.1/version_end",
+    "genshin/7.2/first_half_end"
+  ],
+  "checkedAt": "2026-11-24T10:00:11.144Z",
+  "baseMainSha": "c8f62af95f6081ebc443f33bcb55502015a58d7b",
+  "scope": "原神国服7.2下半活动公告与仍有效既有活动，另续接7.1版更遗留的7.2上半、地图、周期和排期核对。",
+  "sources": [
+    "https://www.taptap.cn/app/168332/topic?sort=created&type=official",
+    "https://www.taptap.cn/app/168332/topic?page=2&sort=created&type=official",
+    "https://www.miyoushe.com/ys/?crawler=googlebot",
+    "https://www.taptap.cn/moment/866276924782019655?group_id=201765",
+    "https://www.taptap.cn/moment/872242613523056958?group_id=201765",
+    "https://img2-tc.tapimg.com/moment/etag/tc_1795081166130_9298fb52cae5c241.jpg/_tap_ugc.jpg",
+    "https://img2-tc.tapimg.com/moment/etag/tc_1795011678798_7bb5d867d3878521.jpg/_tap_ugc.jpg",
+    "https://www.taptap.cn/moment/871886252599672947?group_id=201765",
+    "https://www.taptap.cn/moment/872238992341340157?group_id=201765",
+    "https://ys.mihoyo.com/main/m/news/detail/167205",
+    "https://www.hoyolab.com/article/47177975",
+    "https://timesaver.gg/blog/genshin-7-1-events-calendar",
+    "https://itemgame.com/zh-sg/blog/genshin-impact-7-2-hour-of-ruin-banner-mitya-zh"
+  ],
+  "priorEvidence": [
+    "catalog-research/cloud/genshin-7-1-version-end-20261104.json",
+    "catalog-research/cloud/genshin-7-2-first-half-notices-20261122.json",
+    "catalog-research/current-half-recovery-20261114.json",
+    "catalog-research/genshin-event-scope-20261105.json"
+  ],
+  "priorRun": {
+    "key": "genshin/7.1/version_end",
+    "gameId": "genshin",
+    "periodKey": "7.1",
+    "node": "version_end",
+    "boundaryAt": "2026-11-04T06:00:00+08:00",
+    "status": "pending",
+    "attempts": 1,
+    "updatedAt": "2026-11-04T14:22:02.668Z",
+    "retryAt": null,
+    "branch": "codex/cloud-baseline/genshin-7-1-version-end-20261104",
+    "pullRequestUrl": "https://github.com/BaiQue3rL/Gtask/pull/48",
+    "catalogRevision": "2026-11-04.genshin-7.2-baseline",
+    "catalogSha256": "5dbbdb1d7bcb8ee2e17f1f0829dc1fb4086a6d76711866a3a25c71fc91441d55",
+    "evidencePath": "catalog-research/cloud/genshin-7-1-version-end-20261104.json",
+    "completedAt": null,
+    "notes": "已核验部分提交发布；官方时分缺口与其余预告活动留待原神下半节点。 2026-11-04用户纠正：版本结束及两项随版本结束活动采用12月16日06:00北京时间的nominal停服基准；其他预告活动仍待核验。 2026-11-14用户纠正后完成当前活动枚举：压力方块粉碎计划、厉影定格录、地脉移涌已先入清单，三项时间缺口改由activityTimeReviews定向复查，不再因缺时间留到下半；旧活动延期判断已被取代。研究见catalog-research/activity-audit-20261114.json。本记录不据活动审计冒充全版块完成。 2026-11-14同日后续用户纠正：撤回缺时间先入库，三项候选暂缓；压力方块当前半场信息改由followUps次日12:00定向补查，其余候选按当前半场及完整时间判断，不恢复旧activityTimeReviews规则。"
+  },
+  "decisions": [
+    {
+      "key": "event:7.2:frames-of-resilience",
+      "status": "resolved",
+      "publishedOn": "2026-11-19",
+      "oldValue": "2026-11-14 起按原键暂缓，等待可靠时分及进入下半。",
+      "adoptedValue": {
+        "title": "厉影定格录",
+        "startsAt": "2026-11-27T10:00:00+08:00",
+        "endsAt": "2026-12-07T03:59:00+08:00"
+      },
+      "sources": [
+        "https://www.taptap.cn/moment/872242613523056958?group_id=201765",
+        "https://img2-tc.tapimg.com/moment/etag/tc_1795011678798_7bb5d867d3878521.jpg/_tap_ugc.jpg"
+      ],
+      "timeBasis": "exact",
+      "reason": "速递规则第6项明确为留影挑战。 起点在11月24日18:00下半开启之后，以同键恢复。"
+    },
+    {
+      "key": "event:7.2:ley-line-overflow",
+      "status": "resolved",
+      "publishedOn": "2026-11-19",
+      "oldValue": "2026-11-14 起按原键暂缓，等待可靠时分及进入下半。",
+      "adoptedValue": {
+        "title": "地脉移涌",
+        "startsAt": "2026-12-07T04:00:00+08:00",
+        "endsAt": "2026-12-14T03:59:00+08:00"
+      },
+      "sources": [
+        "https://www.taptap.cn/moment/872242613523056958?group_id=201765",
+        "https://img2-tc.tapimg.com/moment/etag/tc_1795011678798_7bb5d867d3878521.jpg/_tap_ugc.jpg"
+      ],
+      "timeBasis": "exact",
+      "reason": "速递规则第7项明确为地脉之花双倍掉落，每天三次。 起点在11月24日18:00下半开启之后，以同键恢复。"
+    },
+    {
+      "key": "7.2:active-carryovers",
+      "status": "resolved",
+      "sources": [
+        "https://www.taptap.cn/moment/872242613523056958?group_id=201765",
+        "https://www.taptap.cn/moment/871886252599672947?group_id=201765",
+        "https://www.taptap.cn/moment/872238992341340157?group_id=201765"
+      ],
+      "reason": "真实消费者目录中8项有效旧活动均继续保留，包括起于上半、跨半场仍有效的压力方块粉碎计划与奇策竞驰。"
+    },
+    {
+      "key": "7.2:prior-version-audit",
+      "status": "resolved",
+      "sources": [
+        "https://ys.mihoyo.com/main/m/news/detail/167205",
+        "https://www.taptap.cn/moment/866276924782019655?group_id=201765",
+        "https://www.taptap.cn/moment/872242613523056958?group_id=201765"
+      ],
+      "reason": "续接11月4日报告。核对消费者中至冬新基捷城、如翼之峰；幽境危战、幻想真境剧诗、深境螺旋均按既有周期，12月1日剧诗更新保持常规规则；无排期例外。上半活动缺口由11月22日复核关闭；下半线索独立随本次维护处理。"
+    },
+    {
+      "key": "7.2:community-and-miliastra",
+      "status": "excluded",
+      "sources": [
+        "https://www.taptap.cn/app/168332/topic?sort=created&type=official",
+        "https://www.miyoushe.com/ys/?crawler=googlebot",
+        "https://genshin.hoyoverse.com/zh-tw/news/detail/167340",
+        "https://www.miyoushe.com/ys/article/79310357",
+        "https://ys.mihoyo.com/main/news/detail/167214"
+      ],
+      "reason": "社区评论、投稿、商店兑换和祈愿没有独立本体参与流程。僭越者的试炼按社媒寄语参与，千星奇域公告按实际独立玩法维持排除。"
+    },
+    {
+      "key": "web-event:7.2:long-night",
+      "status": "pending",
+      "sources": [
+        "https://www.hoyolab.com/article/47177975",
+        "https://timesaver.gg/blog/genshin-7-1-events-calendar",
+        "https://itemgame.com/zh-sg/blog/genshin-impact-7-2-hour-of-ruin-banner-mitya-zh",
+        "https://www.taptap.cn/app/168332/topic?sort=created&type=official",
+        "https://www.taptap.cn/moment/872242613523056958?group_id=201765"
+      ],
+      "reason": "「长夜」网页活动据版本活动日历的交叉转录预计12月4日至15日，第二期速递未列，国服独立规则及参与起止时分待核。"
+    }
+  ],
+  "pending": [
+    "「长夜」网页活动据版本活动日历的交叉转录预计12月4日至15日，第二期速递未列，国服独立规则及参与起止时分待核。"
+  ],
+  "auditComplete": false,
+  "announcementReview": {
+    "checkedAt": "2026-11-24T10:00:11.144Z",
+    "games": [
+      {
+        "gameId": "genshin",
+        "coverage": "partial",
+        "checkedSources": [
+          "https://www.taptap.cn/app/168332/topic?sort=created&type=official",
+          "https://www.taptap.cn/app/168332/topic?page=2&sort=created&type=official",
+          "https://www.miyoushe.com/ys/?crawler=googlebot",
+          "https://www.taptap.cn/moment/866276924782019655?group_id=201765",
+          "https://www.taptap.cn/moment/872242613523056958?group_id=201765",
+          "https://img2-tc.tapimg.com/moment/etag/tc_1795081166130_9298fb52cae5c241.jpg/_tap_ugc.jpg",
+          "https://img2-tc.tapimg.com/moment/etag/tc_1795011678798_7bb5d867d3878521.jpg/_tap_ugc.jpg",
+          "https://www.taptap.cn/moment/871886252599672947?group_id=201765",
+          "https://www.taptap.cn/moment/872238992341340157?group_id=201765",
+          "https://ys.mihoyo.com/main/m/news/detail/167205",
+          "https://www.hoyolab.com/article/47177975",
+          "https://timesaver.gg/blog/genshin-7-1-events-calendar",
+          "https://itemgame.com/zh-sg/blog/genshin-impact-7-2-hour-of-ruin-banner-mitya-zh"
+        ],
+        "evidencePath": "catalog-research/cloud/genshin-7-2-second-half-20261124.json",
+        "pending": [
+          "「长夜」网页活动据版本活动日历的交叉转录预计12月4日至15日，第二期速递未列，国服独立规则及参与起止时分待核。"
+        ],
+        "eventNotices": {
+          "since": "2026-11-04T03:00:00.000Z",
+          "sources": [
+            "https://www.taptap.cn/app/168332/topic?sort=created&type=official",
+            "https://www.taptap.cn/app/168332/topic?page=2&sort=created&type=official",
+            "https://www.miyoushe.com/ys/?crawler=googlebot",
+            "https://www.taptap.cn/moment/866276924782019655?group_id=201765",
+            "https://www.taptap.cn/moment/872242613523056958?group_id=201765",
+            "https://img2-tc.tapimg.com/moment/etag/tc_1795081166130_9298fb52cae5c241.jpg/_tap_ugc.jpg",
+            "https://img2-tc.tapimg.com/moment/etag/tc_1795011678798_7bb5d867d3878521.jpg/_tap_ugc.jpg",
+            "https://timesaver.gg/blog/genshin-7-1-events-calendar"
+          ],
+          "status": "follow_up",
+          "reason": "复用11月22日对11月4日起的覆盖，核查TapTap与米游社最新国服公告衔接至11月19日第二期速递，读速递原图及相关单项规则。两项下半活动时分已核实；后续仍待「长夜」公告。",
+          "nextReviewKey": "7.2-second-half-web-event-notices"
+        }
+      }
+    ]
+  },
+  "verifiedCatalogDelta": {
+    "schemaVersion": 3,
+    "publishedAt": "2026-11-24T10:00:11.144Z",
+    "revision": "2026-11-24.genshin-7.2-second-half",
+    "games": [
+      {
+        "gameId": "genshin",
+        "upserts": [
+          {
+            "remoteKey": "event:7.2:frames-of-resilience",
+            "category": "limited_event",
+            "title": "厉影定格录",
+            "activityTags": [
+              "photography"
+            ],
+            "scheduleKind": "fixed_window",
+            "timeZone": "Asia/Shanghai",
+            "startsAt": "2026-11-27T10:00:00+08:00",
+            "endsAt": "2026-12-07T03:59:00+08:00",
+            "sourceUrl": "https://www.taptap.cn/moment/872242613523056958?group_id=201765"
+          },
+          {
+            "remoteKey": "event:7.2:ley-line-overflow",
+            "category": "limited_event",
+            "title": "地脉移涌",
+            "activityTags": [
+              "double-drop",
+              "ley-line"
+            ],
+            "scheduleKind": "fixed_window",
+            "timeZone": "Asia/Shanghai",
+            "startsAt": "2026-12-07T04:00:00+08:00",
+            "endsAt": "2026-12-14T03:59:00+08:00",
+            "sourceUrl": "https://www.taptap.cn/moment/872242613523056958?group_id=201765"
+          }
+        ],
+        "archives": []
+      }
+    ]
+  },
+  "catalogSha256": "d8b6621ad48b53545d9f32175f99d7fe4f8cc43910530d00907617a5d59ea65e"
+}
