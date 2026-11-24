@@ -1,7 +1,7 @@
 {
   "schemaVersion": 3,
-  "revision": "2026-11-22.genshin-first-half-events",
-  "publishedAt": "2026-11-22T03:17:33.246Z",
+  "revision": "2026-11-24.genshin-7.2-second-half",
+  "publishedAt": "2026-11-24T10:00:11.144Z",
   "games": [
     {
       "gameId": "genshin",
@@ -407,6 +407,33 @@
           ],
           "scheduleKind": "fixed_window",
           "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:7.2:frames-of-resilience",
+          "title": "厉影定格录",
+          "startsAt": "2026-11-27T10:00:00+08:00",
+          "endsAt": "2026-12-07T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/872242613523056958?group_id=201765",
+          "category": "limited_event",
+          "activityTags": [
+            "photography"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
+        },
+        {
+          "remoteKey": "event:7.2:ley-line-overflow",
+          "title": "地脉移涌",
+          "startsAt": "2026-12-07T04:00:00+08:00",
+          "endsAt": "2026-12-14T03:59:00+08:00",
+          "sourceUrl": "https://www.taptap.cn/moment/872242613523056958?group_id=201765",
+          "category": "limited_event",
+          "activityTags": [
+            "double-drop",
+            "ley-line"
+          ],
+          "scheduleKind": "fixed_window",
+          "timeZone": "Asia/Shanghai"
         }
       ],
       "archives": [
@@ -420,9 +447,7 @@
         "event:7.1:youshang-yaoxing-changhuai",
         "event:7.2:qiyi-treasure-hechi",
         "event:7.2:milliastra-creation-contest",
-        "event:7.2:milliastra-fuyin-season",
-        "event:7.2:frames-of-resilience",
-        "event:7.2:ley-line-overflow"
+        "event:7.2:milliastra-fuyin-season"
       ]
     },
     {
